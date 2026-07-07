@@ -1,0 +1,67 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "1. ADB Pair Device",
+            "type": "shell",
+            "command": "read -p 'Enter IP:Port (e.g. 192.168.1.50:37483): ' ip_port && read -p 'Enter Pairing Code: ' code && adb pair $ip_port $code",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "2. ADB Connect Device",
+            "type": "shell",
+            "command": "read -p 'Enter IP:Port (e.g. 192.168.1.50:41923): ' ip_port && adb connect $ip_port",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "3. Gradle: Build & Install Debug",
+            "type": "shell",
+            "command": "./gradlew installDebug",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "4. ADB: Launch DeskLink App",
+            "type": "shell",
+            "command": "adb shell am start -n org.desklink.mobile.debug/org.desklink.mobile.ui.MainActivity",
+            "problemMatcher": []
+        },
+        {
+            "label": "5. Run App (Build + Install + Launch)",
+            "dependsOn": [
+                "3. Gradle: Build & Install Debug",
+                "4. ADB: Launch DeskLink App"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "6. ADB: Show Logcat",
+            "type": "shell",
+            "command": "adb logcat *:S org.desklink.mobile.debug:V DeskLink:V KDEConnect:V",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+}
