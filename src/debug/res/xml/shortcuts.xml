@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <share-target android:targetClass="org.desklink.mobile.plugins.share.ShareActivity">
+        <data android:mimeType="*/*" />
+        <category android:name="org.desklink.mobile.category.SHARE_TARGET" />
+    </share-target>
+    <shortcut
+        android:shortcutId="quit"
+        android:enabled="true"
+        android:icon="@drawable/ic_quit_shortcut"
+        android:shortcutShortLabel="@string/quit_app_shortcut">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="org.desklink.mobile.debug"
+            android:targetClass="org.desklink.mobile.QuitActivity" />
+    </shortcut>
+</shortcuts>
