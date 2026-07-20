@@ -1,37 +1,34 @@
-# DeskLink Mobile - Android app
+# DeskLink for Android
 
-DeskLink Mobile is a multi-platform app that allows your devices to communicate (eg: your phone and your computer).
+DeskLink is a phone-to-Linux connectivity application. The Android app
+discovers DeskLink peers on the same local network and communicates directly
+over encrypted links.
 
-## (Some) Features
-- **Shared clipboard**: copy and paste between your phone and your computer (or any other device).
-- **Notification sync**: Read and reply to your Android notifications from the desktop.
-- **Share files and URLs** instantly from one device to another.
-- **Multimedia remote control**: Use your phone as a remote for Linux media players.
-- **Virtual touchpad**: Use your phone screen as your computer's touchpad and keyboard.
+## Current transport
 
-All this without wires, over the already existing Wi-Fi network, and using TLS encryption.
+KDE Connect-compatible local-network protocol v8.
 
-## About this app
+## Current support
 
-This is a native Android port of the DeskLink Mobile Qt app. You will find a more complete readme about DeskLink Mobile [here](https://invent.kde.org/network/kdeconnect-kde/).
+- Same-LAN discovery and direct encrypted communication.
+- Clipboard, files and links, notifications, media control, remote input, and
+  the other plugins included in this repository.
 
-## How to install this app
+## Not yet implemented
 
-You can install this app from the [Play Store](https://play.google.com/store/apps/details?id=org.desklink.mobile) as well as [F-Droid](https://f-droid.org/repository/browse/?fdid=org.desklink.mobile). Note you will also need to install the [desktop app](https://invent.kde.org/network/kdeconnect-kde) for it to work.
+Internet relay, WebRTC, Wi-Fi Direct, remote shell, phone-to-desktop screen
+capture, and a shared virtual library.
 
-## Contributing
+## Compatibility
 
-A lot of useful information, including how to get started working on DeskLink Mobile and how to connect with the current developers, is on our [KDE Community Wiki page](https://community.kde.org/KDEConnect)
+The published Android package identity remains `org.desklink.mobile` so
+existing installations can update in place. The legacy `kdeconnect` deep-link
+scheme and all `kdeconnect.*` packet identifiers are retained only for wire
+compatibility; they are not public product branding.
 
-For bug reporting, please use [KDE's Bugzilla](https://bugs.kde.org). Please do not use the issue tracker in GitLab since we want to keep everything in one place.
+## License and attribution
 
-To contribute patches, use [DeskLink Mobile's Gitlab](https://invent.kde.org/network/desklink-mobile/).
-On Gitlab (as well as on our [old Phabricator](https://phabricator.kde.org/tag/kde_connect/)) you can find a task list with stuff to do and links to other relevant resources.
-It is a good idea to also subscribe to the [DeskLink Mobile mailing list](https://mail.kde.org/mailman/listinfo/kdeconnect).
-
-Please know that all translations for all KDE apps are handled by the [localization team](https://l10n.kde.org/). If you would like to submit a translation, that should be done by working with the proper team for that language.
-
-## License
-[GNU GPL v2](https://www.gnu.org/licenses/gpl-2.0.html) and [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.html)
-
-If you are reading this from GitHub, you should know that this is just a mirror of the [KDE Project repo](https://invent.kde.org/network/desklink-mobile/).
+DeskLink includes code and protocol-compatible behavior derived from KDE
+Connect. Required copyright, license, and contributor attribution remain in
+the source. See the workspace documentation for the complete attribution and
+compatibility record.

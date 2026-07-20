@@ -10,13 +10,13 @@ KDE connect cihazlarınız arasında inteqrasiya üçün funksiyalar dəstini t�
 - WiFi bağlantısı: USB qoşulması və ya Bluetooth qoşulmasına ehtiyyac yoxdur.
 - Ucdan-uca TLC şifrələmə: məlumatlarınızın təhlükəsizliyi qorunur.
 
-Nəzərə alın ki, bu tətbiqin işləməsi üçün kompyuterinizə DeskLink Mobile-i quraşdırmalısınız və sonuncu funksiyaların işləməsi üçün masaüstü və Android versiyalarını sonuncu versiyaya eyni şəkildə yeniləməlisiniz.
+Nəzərə alın ki, bu tətbiqin işləməsi üçün kompyuterinizə DeskLink-i quraşdırmalısınız və sonuncu funksiyaların işləməsi üçün masaüstü və Android versiyalarını sonuncu versiyaya eyni şəkildə yeniləməlisiniz.
 
 Həssas icazələr haqqında məlumat:
 *Giriş imkanı icazələri: Əgər uzaqdan daxiletmə funksiyasından istifadə edirsinizsə Android cihazınızı idarə etmək üçün başqa cihazlardan daxil olanları qəbul etmək tələb olunur.
 *Məkanın arxa fonda istifadəsinə icazə: Əgər etibarlı şəbəkə funksiyasından
 istifadə edirsinizsə hansı WiFi şəbəkəsinə qoşulduğunuzu bilməniz tələb olunur
 
-DeskLink Mobile heç bir halda məlumatları KDE-yə və ya üçüncü tərəfə ötürmür. DeskLink Mobile məlumatları bir cihazdan başqasına internet istifadə etmədən və ucdan-uca şifrələmədən istifadə edərək yerli şəbəkə üzərindən göndərir.
+DeskLink heç bir halda məlumatları KDE-yə və ya üçüncü tərəfə ötürmür. DeskLink məlumatları bir cihazdan başqasına internet istifadə etmədən və ucdan-uca şifrələmədən istifadə edərək yerli şəbəkə üzərindən göndərir.
 
 Bu tətbiq açıq qaynaq layihəsinin bir hissəsidir və ona töhvə verənlərin sayəsində mövcuddur. Mənbə kodunu əldə etmək üçün veb-səhifəyə daxil olun.

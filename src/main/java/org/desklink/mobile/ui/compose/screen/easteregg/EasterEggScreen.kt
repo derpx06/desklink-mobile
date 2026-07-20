@@ -43,8 +43,7 @@ import org.desklink.mobile.R
 import kotlin.math.PI
 import kotlin.math.atan2
 
-private val KDE_ICON_BACKGROUND_COLOR = Color(29, 153, 243)
-private val KONQI_BACKGROUND_COLOR = Color(191, 255, 0)
+private val DESKLINK_ICON_BACKGROUND_COLOR = Color(20, 33, 61)
 
 @Composable
 fun EasterEggScreen() {
@@ -54,8 +53,8 @@ fun EasterEggScreen() {
     val accelerometer = remember { sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
 
     var currentAngle by remember { mutableFloatStateOf(0f) }
-    var currentIcon by remember { mutableIntStateOf(R.drawable.ic_kde_48dp) }
-    var backgroundColor by remember { mutableStateOf(KDE_ICON_BACKGROUND_COLOR) }
+    var currentIcon by remember { mutableIntStateOf(R.drawable.desklink_mark) }
+    var backgroundColor by remember { mutableStateOf(DESKLINK_ICON_BACKGROUND_COLOR) }
 
     val animatedRotation by animateFloatAsState(
         targetValue = currentAngle,
@@ -78,7 +77,7 @@ fun EasterEggScreen() {
             R.drawable.ic_delete, R.drawable.ic_warning,
             R.drawable.ic_volume, R.drawable.ic_wifi,
             R.drawable.ic_add, R.drawable.touchpad_plugin_action_24dp,
-            R.drawable.konqi, R.drawable.run_command_plugin_icon_24dp,
+            R.drawable.desklink_mark, R.drawable.run_command_plugin_icon_24dp,
             R.drawable.ic_phonelink_36dp, R.drawable.ic_phonelink_off_36dp,
             R.drawable.ic_error_outline_48dp, R.drawable.ic_home_black_24dp,
             R.drawable.ic_settings_white_32dp, R.drawable.ic_stop,
@@ -88,7 +87,7 @@ fun EasterEggScreen() {
             R.drawable.ic_next_black, R.drawable.ic_previous_black,
             R.drawable.ic_presenter_24dp, R.drawable.ic_key,
             R.drawable.ic_keyboard_return_black_24dp, R.drawable.ic_keyboard_hide_36dp,
-            R.drawable.ic_kde_24dp, R.drawable.ic_album_art_placeholder,
+            R.drawable.desklink_mark, R.drawable.ic_album_art_placeholder,
             R.drawable.ic_arrow_back_black_24dp, R.drawable.share_plugin_action_24dp
         )
     }
@@ -128,7 +127,7 @@ fun EasterEggScreen() {
 
     val activity = context as? ComponentActivity
     LaunchedEffect(backgroundColor) {
-        val isDarkBackground = backgroundColor == KDE_ICON_BACKGROUND_COLOR
+        val isDarkBackground = backgroundColor == DESKLINK_ICON_BACKGROUND_COLOR
         val transparentArgb = Color.Transparent.toArgb()
 
         val barStyle = if (isDarkBackground) {
@@ -152,11 +151,7 @@ fun EasterEggScreen() {
                     onLongPress = {
                         val icon = icons.random()
                         currentIcon = icon
-                        backgroundColor = if (icon == R.drawable.konqi) {
-                            KONQI_BACKGROUND_COLOR
-                        } else {
-                            KDE_ICON_BACKGROUND_COLOR
-                        }
+                        backgroundColor = DESKLINK_ICON_BACKGROUND_COLOR
                     }
                 )
             },
@@ -169,7 +164,7 @@ fun EasterEggScreen() {
                 modifier = Modifier
                     .size(396.dp)
                     .rotate(animatedRotation),
-                colorFilter = if (currentIcon == R.drawable.konqi) null else ColorFilter.tint(Color.White)
+                colorFilter = ColorFilter.tint(Color.White)
             )
 
             if (accelerometer != null) {

@@ -1,4 +1,4 @@
-El DeskLink Mobile proporciona un conjunt de característiques per a integrar el flux de treball entre dispositius:
+El DeskLink proporciona un conjunt de característiques per a integrar el flux de treball entre dispositius:
 
 - Transferiu fitxers entre els vostres dispositius.
 - Accediu als fitxers del telèfon mòbil des de l'ordinador, sense cables.
@@ -10,12 +10,12 @@ El DeskLink Mobile proporciona un conjunt de característiques per a integrar el
 - Connexió Wi-Fi: no cal connexió USB ni Bluetooth.
 - Encriptatge TLS d'extrem a extrem: la informació és segura.
 
-Tingueu en compte que haureu d'instal·lar el DeskLink Mobile a l'ordinador perquè aquesta aplicació funcioni, i mantingueu actualitzada la versió d'escriptori amb la versió de l'Android perquè funcionin les últimes característiques.
+Tingueu en compte que haureu d'instal·lar el DeskLink a l'ordinador perquè aquesta aplicació funcioni, i mantingueu actualitzada la versió d'escriptori amb la versió de l'Android perquè funcionin les últimes característiques.
 
 Informació dels permisos confidencials:
 * Permís d'accessibilitat: requerit per a rebre l'entrada des d'un altre dispositiu per a controlar el telèfon Android, si utilitzeu la característica d'entrada remota.
 * Permís d'ubicació en segon pla: requerit per a saber a quina xarxa Wi-Fi esteu connectat, si utilitzeu la característica xarxes de confiança.
 
-El DeskLink Mobile mai envia cap informació a KDE ni a cap tercer. El DeskLink Mobile envia dades des d'un dispositiu a l'altre directament utilitzant la xarxa local, mai a través d'Internet, i utilitzant l'encriptatge d'extrem a extrem.
+El DeskLink mai envia cap informació a KDE ni a cap tercer. El DeskLink envia dades des d'un dispositiu a l'altre directament utilitzant la xarxa local, mai a través d'Internet, i utilitzant l'encriptatge d'extrem a extrem.
 
 Aquesta aplicació forma part d'un projecte de codi obert i existeix gràcies a totes les persones que hi han contribuït. Visiteu el lloc web per a aconseguir el codi font.
