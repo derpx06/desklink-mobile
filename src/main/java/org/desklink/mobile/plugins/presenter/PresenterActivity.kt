@@ -53,10 +53,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.media.VolumeProviderCompat
 import androidx.preference.PreferenceManager
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.ui.compose.KdeButton
-import org.desklink.mobile.ui.compose.KdeTheme
-import org.desklink.mobile.ui.compose.KdeTopAppBar
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
 import org.desklink.mobile.R
 
 private const val VOLUME_UP = 1
@@ -95,7 +95,7 @@ class PresenterActivity : AppCompatActivity(), SensorEventListener, OnSharedPref
         prefs!!.registerOnSharedPreferenceChangeListener(this)
         applyPrefs()
 
-        plugin = DeskLink.getInstance().getDevicePlugin(intent.getStringExtra("deviceId"), PresenterPlugin::class.java)
+        plugin = DeskLinkApplication.getInstance().getDevicePlugin(intent.getStringExtra("deviceId"), PresenterPlugin::class.java)
             ?: run {
                 finish()
                 return
@@ -175,7 +175,7 @@ class PresenterActivity : AppCompatActivity(), SensorEventListener, OnSharedPref
 
         val sensorManager = LocalContext.current.getSystemService(SENSOR_SERVICE) as? SensorManager
 
-        KdeTheme(this) {
+        DeskLinkTheme(this) {
             Scaffold(
                 modifier = Modifier.safeDrawingPadding(),
                 topBar = { PresenterAppBar() }
@@ -255,7 +255,7 @@ class PresenterActivity : AppCompatActivity(), SensorEventListener, OnSharedPref
 
         var dropdownShownState by remember { mutableStateOf(false) }
 
-        KdeTopAppBar(
+        DeskLinkTopAppBar(
             title = stringResource(R.string.pref_plugin_presenter),
             navIconOnClick = { onBackPressedDispatcher.onBackPressed() },
             navIconDescription = getString(androidx.appcompat.R.string.abc_action_bar_up_description),

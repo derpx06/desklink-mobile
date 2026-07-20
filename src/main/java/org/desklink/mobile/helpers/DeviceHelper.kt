@@ -19,6 +19,7 @@ import org.desklink.mobile.DeviceInfo
 import org.desklink.mobile.DeviceType
 import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.plugins.PluginFactory
+import org.desklink.mobile.protocol.legacykdeconnectv8.LegacyKdeConnectV8
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
@@ -27,7 +28,7 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 object DeviceHelper {
-    const val PROTOCOL_VERSION = 8
+    const val PROTOCOL_VERSION = LegacyKdeConnectV8.PROTOCOL_VERSION
 
     const val KEY_DEVICE_NAME_PREFERENCE = "device_name_preference"
     private const val KEY_DEVICE_NAME_FETCHED_FROM_THE_INTERNET = "device_name_downloaded_preference"

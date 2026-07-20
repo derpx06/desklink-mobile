@@ -26,7 +26,7 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import org.desklink.mobile.Device
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.R
 import org.reactivestreams.FlowAdapters
@@ -84,7 +84,7 @@ class RunCommandControlsProviderService : ControlsProviderService() {
             val commandEntry = getCommandByControlId(controlId)
             if (commandEntry != null) {
                 val deviceId = controlId.split(":")[0]
-                val plugin = DeskLink.getInstance().getDevicePlugin(deviceId ,RunCommandPlugin::class.java)
+                val plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId ,RunCommandPlugin::class.java)
                 if (plugin != null) {
                     plugin.runCommand(commandEntry.key)
                     consumer.accept(ControlAction.RESPONSE_OK)
@@ -125,7 +125,7 @@ class RunCommandControlsProviderService : ControlsProviderService() {
     private fun getAllCommandsList(): List<CommandEntryWithDevice> {
         val commandList = mutableListOf<CommandEntryWithDevice>()
 
-        for (device in DeskLink.getInstance().devices.values) {
+        for (device in DeskLinkApplication.getInstance().devices.values) {
             if (!device.isReachable) {
                 commandList.addAll(getSavedCommandsList(device))
                 continue
@@ -151,7 +151,7 @@ class RunCommandControlsProviderService : ControlsProviderService() {
     private fun getCommandByControlId(controlId: String): CommandEntryWithDevice? {
         val controlIdParts = controlId.split(":")
 
-        val device = DeskLink.getInstance().getDevice(controlIdParts[0])
+        val device = DeskLinkApplication.getInstance().getDevice(controlIdParts[0])
 
         if (device == null || !device.isPaired) return null
 

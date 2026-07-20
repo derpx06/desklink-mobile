@@ -13,7 +13,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import org.desklink.mobile.helpers.calculateNewVolume
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.plugins.mpris.MprisPlugin
 import org.desklink.mobile.plugins.mpris.VolumeKeyListener
 import org.desklink.mobile.plugins.systemvolume.SystemVolumePlugin.SinkListener
@@ -73,7 +73,7 @@ class SystemVolumeFragment : BaseFragment<SystemVolumeFragmentBinding>(),
     }
 
     private fun connectToPlugin(deviceId: String?) {
-        val plugin = DeskLink.getInstance().getDevicePlugin(
+        val plugin = DeskLinkApplication.getInstance().getDevicePlugin(
             deviceId,
             SystemVolumePlugin::class.java
         )
@@ -86,7 +86,7 @@ class SystemVolumeFragment : BaseFragment<SystemVolumeFragmentBinding>(),
     }
 
     private fun disconnectFromPlugin(deviceId: String?) {
-        val plugin = DeskLink.getInstance().getDevicePlugin(
+        val plugin = DeskLinkApplication.getInstance().getDevicePlugin(
             deviceId,
             SystemVolumePlugin::class.java
         )

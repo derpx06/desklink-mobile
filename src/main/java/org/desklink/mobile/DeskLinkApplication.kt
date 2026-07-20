@@ -38,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap
  * It also takes care of initializing all classes that need so when the app boots.
  * It provides a ConnectionReceiver that the BackgroundService uses to ping this class every time a new DeviceLink is created.
  */
-class DeskLink : Application() {
+class DeskLinkApplication : Application() {
     fun interface DeviceListChangedCallback {
         fun onDeviceListChanged()
     }
@@ -89,7 +89,7 @@ class DeskLink : Application() {
     private fun setupSL4JLogging() {
         HandroidLoggerAdapter.DEBUG = BuildConfig.DEBUG
         HandroidLoggerAdapter.ANDROID_API_LEVEL = Build.VERSION.SDK_INT
-        HandroidLoggerAdapter.APP_NAME = "KDEConnect"
+        HandroidLoggerAdapter.APP_NAME = getString(R.string.product_name)
     }
 
     override fun onTerminate() {
@@ -178,7 +178,7 @@ class DeskLink : Application() {
             if (device != null) {
                 device.addLink(link)
             } else {
-                device = Device(this@DeskLink, link)
+                device = Device(this@DeskLinkApplication, link)
                 devices[link.deviceId] = device
                 device.addPairingCallback(devicePairingCallback)
             }
@@ -242,9 +242,9 @@ class DeskLink : Application() {
 
     companion object {
         @JvmStatic
-        private lateinit var _instance: DeskLink
+        private lateinit var _instance: DeskLinkApplication
 
         @JvmStatic
-        fun getInstance(): DeskLink = _instance
+        fun getInstance(): DeskLinkApplication = _instance
     }
 }

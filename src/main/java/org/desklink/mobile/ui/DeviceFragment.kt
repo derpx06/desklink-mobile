@@ -23,14 +23,14 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.Device
 import org.desklink.mobile.Device.PluginsChangedListener
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.PairingHandler
 import org.desklink.mobile.base.BaseFragment
 import org.desklink.mobile.extensions.setupBottomPadding
 import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.battery.BatteryPlugin
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.screen.device.PluginsScreen
 import org.desklink.mobile.R
 import org.desklink.mobile.databinding.ActivityDeviceBinding
@@ -61,7 +61,7 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             ?: throw RuntimeException("You must instantiate a new DeviceFragment using DeviceFragment.newInstance()")
     }
 
-    private val device by lazy { DeskLink.getInstance().getDevice(deviceId) }
+    private val device by lazy { DeskLinkApplication.getInstance().getDevice(deviceId) }
 
     /**
      * Not-yet-paired ViewBinding.
@@ -296,7 +296,7 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
                     binding.deviceViewCompose.apply {
                         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
                         setContent {
-                            KdeTheme(context) {
+                            DeskLinkTheme(context) {
                                 PluginsScreen(
                                     pluginsWithButtons = pluginsWithButtons,
                                     pluginsNeedPermissions = pluginsNeedPermissions,

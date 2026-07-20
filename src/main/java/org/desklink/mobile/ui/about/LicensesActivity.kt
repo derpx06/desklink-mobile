@@ -22,7 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.screen.licenses.LicensesEvent
 import org.desklink.mobile.ui.compose.screen.licenses.LicensesScreen
 import org.desklink.mobile.R
@@ -37,7 +37,7 @@ class LicensesActivity : AppCompatActivity() {
         enableEdgeToEdge()
 
         setContent {
-            KdeTheme(this) {
+            DeskLinkTheme(this) {
                 Scaffold(
                     topBar = {
                         LicensesTopBar(

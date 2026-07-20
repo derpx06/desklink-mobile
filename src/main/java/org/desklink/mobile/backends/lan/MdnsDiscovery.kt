@@ -14,6 +14,7 @@ import android.net.wifi.WifiManager
 import android.net.wifi.WifiManager.MulticastLock
 import android.util.Log
 import org.desklink.mobile.helpers.DeviceHelper
+import org.desklink.mobile.protocol.legacykdeconnectv8.LegacyKdeConnectV8
 import org.desklink.mobile.helpers.DeviceHelper.deviceType
 import org.desklink.mobile.helpers.DeviceHelper.getDeviceId
 import org.desklink.mobile.helpers.DeviceHelper.getDeviceName
@@ -198,6 +199,6 @@ class MdnsDiscovery {
     companion object {
         const val LOG_TAG: String = "MdnsDiscovery"
 
-        const val SERVICE_TYPE: String = "_kdeconnect._udp"
+        const val SERVICE_TYPE: String = LegacyKdeConnectV8.MDNS_SERVICE_TYPE
     }
 }

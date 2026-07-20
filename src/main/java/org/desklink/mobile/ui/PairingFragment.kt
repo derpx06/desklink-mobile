@@ -29,10 +29,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.desklink.mobile.BackgroundService.Companion.ForceRefreshConnections
 import org.desklink.mobile.BackgroundService.Companion.instance
 import org.desklink.mobile.Device
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.base.BaseFragment
 import org.desklink.mobile.helpers.TrustedNetworkHelper.Companion.isTrustedNetwork
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.screen.pairing.PairingScreen
 import org.desklink.mobile.ui.compose.screen.pairing.PairingViewModel
 import org.desklink.mobile.R
@@ -94,7 +94,7 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
     private fun createComposeView() {
         binding.composeView.apply {
             setContent {
-                KdeTheme(context) {
+                DeskLinkTheme(context) {
                     val state by viewModel.pairingUiState.collectAsStateWithLifecycle()
 
                     PairingScreen(
@@ -166,7 +166,7 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
         }
 
         try {
-            val allDevices = DeskLink.getInstance().devices.values.filter {
+            val allDevices = DeskLinkApplication.getInstance().devices.values.filter {
                 it.isReachable || it.isPaired
             }
 
@@ -198,7 +198,7 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
 
     override fun onStart() {
         super.onStart()
-        DeskLink.getInstance().addDeviceListChangedCallback("PairingFragment") {
+        DeskLinkApplication.getInstance().addDeviceListChangedCallback("PairingFragment") {
             mActivity?.runOnUiThread { this.updateDeviceList() }
         }
         ForceRefreshConnections(requireContext()) // force a network re-discover
@@ -206,7 +206,7 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
     }
 
     override fun onStop() {
-        DeskLink.getInstance().removeDeviceListChangedCallback("PairingFragment")
+        DeskLinkApplication.getInstance().removeDeviceListChangedCallback("PairingFragment")
         super.onStop()
     }
 

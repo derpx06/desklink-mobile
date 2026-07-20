@@ -1,8 +1,4 @@
-/*
- * SPDX-FileCopyrightText: 2014 Albert Vaca Cintora <albertvaka@gmail.com>
- *
- * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
-*/
+
 package org.desklink.mobile
 
 import android.Manifest
@@ -50,7 +46,7 @@ import org.desklink.mobile.R
  * It can be started by the DeskLinkBroadcastReceiver on some events or when the MainActivity is launched.
  */
 class BackgroundService : Service() {
-    private lateinit var applicationInstance: DeskLink
+    private lateinit var applicationInstance: DeskLinkApplication
 
     private val linkProviders = mutableListOf<BaseLinkProvider>()
 
@@ -101,10 +97,10 @@ class BackgroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.d("DeskLink/BgService", "onCreate")
-        this.applicationInstance = DeskLink.getInstance()
+        this.applicationInstance = DeskLinkApplication.getInstance()
         instance = this
 
-        DeskLink.getInstance().addDeviceListChangedCallback("BackgroundService", this::updateForegroundNotification)
+        DeskLinkApplication.getInstance().addDeviceListChangedCallback("BackgroundService", this::updateForegroundNotification)
 
         // Register screen on listener
         val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
@@ -183,7 +179,7 @@ class BackgroundService : Service() {
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             // Pre-oreo, the notification will have an empty title line without this
-            notification.setContentTitle(getString(R.string.kde_connect))
+            notification.setContentTitle(getString(R.string.app_name))
         }
 
         if (connectedDevices.isEmpty()) {
@@ -201,7 +197,7 @@ class BackgroundService : Service() {
 
             if (connectedDeviceIds.size == 1) {
                 val deviceId = connectedDeviceIds[0]
-                val device = DeskLink.getInstance().getDevice(deviceId)
+                val device = DeskLinkApplication.getInstance().getDevice(deviceId)
                 if (device != null) {
                     // Adding two action buttons only when there is a single device connected.
                     // Setting up Send File Intent.
@@ -230,7 +226,7 @@ class BackgroundService : Service() {
         for (linkProvider in linkProviders) {
             linkProvider.onStop()
         }
-        DeskLink.getInstance().removeDeviceListChangedCallback("BackgroundService")
+        DeskLinkApplication.getInstance().removeDeviceListChangedCallback("BackgroundService")
         super.onDestroy()
     }
 

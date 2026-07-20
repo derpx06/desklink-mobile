@@ -17,7 +17,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.desklink.mobile.helpers.ThreadHelper;
-import org.desklink.mobile.DeskLink;
+import org.desklink.mobile.DeskLinkApplication;
 import org.desklink.mobile.R;
 
 import java.util.ArrayList;
@@ -70,7 +70,7 @@ public class SendFileActivity extends AppCompatActivity {
                         Log.w("SendFileActivity", "No files to send?");
                     } else {
                         ThreadHelper.execute(() -> {
-                            SharePlugin plugin = DeskLink.getInstance().getDevicePlugin(mDeviceId, SharePlugin.class);
+                            SharePlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(mDeviceId, SharePlugin.class);
                             if (plugin == null) {
                                 finish();
                                 return;

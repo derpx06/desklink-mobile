@@ -50,8 +50,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.desklink.mobile.Device
-import org.desklink.mobile.ui.compose.KdeTheme
-import org.desklink.mobile.ui.compose.KdeTopAppBar
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
 import org.desklink.mobile.R
 
 @Composable
@@ -81,7 +81,7 @@ fun RunCommandScreen(
         }
     }
 
-    KdeTheme(context) {
+    DeskLinkTheme(context) {
         Scaffold(
             modifier = Modifier.safeDrawingPadding(),
             topBar = { RunCommandAppBar(device.name, onBackPressedDispatcher) },
@@ -219,7 +219,7 @@ fun RunCommandScreen(
 
 @Composable
 fun RunCommandAppBar(name: String, onBackPressedDispatcher: OnBackPressedDispatcher) {
-    KdeTopAppBar(
+    DeskLinkTopAppBar(
         title = stringResource(R.string.pref_plugin_runcommand),
         subTitle = name,
         navIconOnClick = { onBackPressedDispatcher.onBackPressed() },

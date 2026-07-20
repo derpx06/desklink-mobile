@@ -42,7 +42,7 @@ import org.apache.commons.lang3.ArrayUtils
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.Device
 import org.desklink.mobile.helpers.DeviceHelper
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.extensions.setOnApplyWindowInsetsListenerCompat
 import org.desklink.mobile.plugins.share.ShareSettingsFragment
 import org.desklink.mobile.ui.about.AboutFragment
@@ -240,7 +240,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private fun onPairResultFromNotification(deviceId: String?, pairStatus: String): String? {
         assert(deviceId != null)
         if (pairStatus != PAIRING_PENDING) {
-            val device = DeskLink.getInstance().getDevice(deviceId)
+            val device = DeskLinkApplication.getInstance().getDevice(deviceId)
             if (device == null) {
                 Log.w(this::class.simpleName, "Reject pairing - device no longer exists: $deviceId")
                 return null
@@ -277,7 +277,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         mMapMenuToDeviceId.clear()
         val devicesMenu = menu.addSubMenu(R.string.devices)
         var id = MENU_ENTRY_DEVICE_FIRST_ID
-        val devices: Collection<Device> = DeskLink.getInstance().devices.values
+        val devices: Collection<Device> = DeskLinkApplication.getInstance().devices.values
         for (device in devices) {
             if (device.isReachable && device.isPaired) {
                 val item = devicesMenu.add(Menu.FIRST, id++, 1, device.name)
@@ -306,7 +306,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     override fun onStart() {
         super.onStart()
         BackgroundService.Start(applicationContext)
-        DeskLink.getInstance().addDeviceListChangedCallback(this::class.simpleName!!) { runOnUiThread { updateDeviceList() } }
+        DeskLinkApplication.getInstance().addDeviceListChangedCallback(this::class.simpleName!!) { runOnUiThread { updateDeviceList() } }
         updateDeviceList()
         onBackPressedDispatcher.addCallback(mainFragmentCallback)
         onBackPressedDispatcher.addCallback(closeDrawerCallback)
@@ -314,7 +314,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     }
 
     override fun onStop() {
-        DeskLink.getInstance().removeDeviceListChangedCallback(this::class.simpleName!!)
+        DeskLinkApplication.getInstance().removeDeviceListChangedCallback(this::class.simpleName!!)
         mainFragmentCallback.remove()
         closeDrawerCallback.remove()
         super.onStop()
@@ -357,7 +357,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         when {
             requestCode == RESULT_NEEDS_RELOAD -> {
                 CoroutineScope(Dispatchers.IO).launch {
-                    DeskLink.getInstance().devices.values.forEach(Device::reloadPluginsFromSettings)
+                    DeskLinkApplication.getInstance().devices.values.forEach(Device::reloadPluginsFromSettings)
                 }
             }
             requestCode == STORAGE_LOCATION_CONFIGURED && resultCode == RESULT_OK && data != null -> {
@@ -401,7 +401,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
             //New permission granted, reload plugins
             CoroutineScope(Dispatchers.IO).launch {
-                DeskLink.getInstance().devices.values.forEach(Device::reloadPluginsFromSettings)
+                DeskLinkApplication.getInstance().devices.values.forEach(Device::reloadPluginsFromSettings)
             }
         }
     }

@@ -24,11 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.ui.compose.KdeTextButton
 import org.desklink.mobile.ui.compose.KdeTextField
-import org.desklink.mobile.ui.compose.KdeTheme
-import org.desklink.mobile.ui.compose.KdeTopAppBar
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
 import org.desklink.mobile.R
 import androidx.core.content.edit
 
@@ -59,7 +59,7 @@ class ComposeSendActivity : AppCompatActivity() {
     }
 
     private fun sendComposed() {
-        val plugin = DeskLink.getInstance().getDevicePlugin(deviceId, MousePadPlugin::class.java)
+        val plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MousePadPlugin::class.java)
         if (plugin == null) {
             finish()
             return
@@ -74,11 +74,11 @@ class ComposeSendActivity : AppCompatActivity() {
 
     @Composable
     private fun ComposeSendScreen() {
-        KdeTheme(this) {
+        DeskLinkTheme(this) {
             Scaffold(
                 modifier = Modifier.safeDrawingPadding(),
                 topBar = {
-                    KdeTopAppBar(
+                    DeskLinkTopAppBar(
                         title = stringResource(R.string.compose_send_title),
                         navIconOnClick = { onBackPressedDispatcher.onBackPressed() },
                         navIconDescription = getString(androidx.appcompat.R.string.abc_action_bar_up_description),

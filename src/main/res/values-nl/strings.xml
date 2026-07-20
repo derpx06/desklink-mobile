@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-  <string name="kde_connect">DeskLink Mobile</string>
+  <string name="app_name">DeskLink</string>
   <string name="manifest_label_share">Naar apparaat verzenden</string>
   <string name="foreground_notification_no_devices">Niet verbonden met enig apparaat</string>
   <string name="foreground_notification_devices">Verbonden met: %s</string>
@@ -48,11 +48,11 @@
   <string name="open_settings">Instellingen openen</string>
   <string name="no_permissions">U moet toestemming geven voor toegang tot meldingen</string>
   <string name="no_permission_mprisreceiver">Om in staat te zijn uw mediaspelers te besturen moet u toegan geven tot de meldingen</string>
-  <string name="no_permissions_remotekeyboard">Om indrukken van toetsen te ontvangen moet u het DeskLink Mobile Remote Keyboard activeren</string>
+  <string name="no_permissions_remotekeyboard">Om indrukken van toetsen te ontvangen moet u het DeskLink Remote Keyboard activeren</string>
   <string name="send_ping">Ping verzenden</string>
   <string name="open_mpris_controls">Bediening van multimedia</string>
   <string name="remotekeyboard_editing_only_title">Behandel toetsen op afstand alleen bij bewerken</string>
-  <string name="remotekeyboard_not_connected">Er is geen actieve verbinding met een toetsenbord op afstand, maak er een in kdeconnect</string>
+  <string name="remotekeyboard_not_connected">Er is geen actieve verbinding met een toetsenbord op afstand, maak er een  in DeskLink</string>
   <string name="remotekeyboard_connected">Verbinding met toetsenbord op afstand is actief</string>
   <string name="remotekeyboard_multiple_connections">Er is meer dan een verbinding met een toetsenbord op afstand, selecteer het te configureren apparaat</string>
   <string name="open_mousepad">Invoer op afstand</string>
@@ -202,7 +202,7 @@
   </string-array>
   <string name="mpris_notifications_explanation">Het recht op meldingen is nodig om media op afstand te tonen in de meldingenschuiflade</string>
   <string name="mpris_notification_settings_title">Mediabesturingsmelding tonen</string>
-  <string name="mpris_notification_settings_summary">Staat besturing van uw mediaspelers toe zonder DeskLink Mobile te openen</string>
+  <string name="mpris_notification_settings_summary">Staat besturing van uw mediaspelers toe zonder DeskLink te openen</string>
   <string name="share_to">Delen met…</string>
   <string name="unreachable_device_dynamic_shortcut">%s (✕)</string>
   <string name="unreachable_device_url_share_text">URL\'s gedeeld met een niet bereikbaar apparaat zullen er afgeleverd worden wanneer deze bereikbaar wordt.\n\n</string>
@@ -244,7 +244,7 @@
   <string name="sftp_action_mode_menu_delete">Verwijderen</string>
   <string name="sftp_no_storage_locations_configured">Geen opslaglocaties geconfigureerd</string>
   <string name="sftp_saf_permission_explanation">Om toegang te hebben tot bestanden op afstand moet u opslaglocaties configureren</string>
-  <string name="sftp_manage_storage_permission_explanation">Om toegang tot bestanden op dit apparaat toe te staan moet u toestaan dat DeskLink Mobile de opslag mag beheren.</string>
+  <string name="sftp_manage_storage_permission_explanation">Om toegang tot bestanden op dit apparaat toe te staan moet u toestaan dat DeskLink de opslag mag beheren.</string>
   <string name="sftp_missing_permission_error">Toegangsrechten ontbreken: toegang tot bestandssysteem</string>
   <string name="no_players_connected">Geen spelers gevonden</string>
   <string name="send_files">Bestanden verzenden</string>
@@ -263,8 +263,8 @@
   </string-array>
   <string name="block_notification_contents">Inhoud van meldingen blokkeren</string>
   <string name="block_notification_images">Afbeeldingen van meldingen blokkeren</string>
-  <string name="pairing_title">Apparaten van DeskLink Mobile</string>
-  <string name="pairing_description">Andere apparaten met DeskLink Mobile in uw zelfde netwerk zouden hier moeten verschijnen.</string>
+  <string name="pairing_title">Apparaten van DeskLink</string>
+  <string name="pairing_description">Andere apparaten met DeskLink in uw zelfde netwerk zouden hier moeten verschijnen.</string>
   <string name="device_rename_title">Apparaat hernoemen</string>
   <string name="device_rename_confirm">Hernoemen</string>
   <string name="refresh">Vernieuwen</string>
@@ -275,7 +275,7 @@
   <string name="pref_plugin_telepathy">SMS verzenden</string>
   <string name="pref_plugin_telepathy_desc">Stuur tekstberichten van uw bureaublad</string>
   <string name="pref_plugin_telepathy_mms">MMS verzenden</string>
-  <string name="pref_plugin_telepathy_mms_desc">Om MMS te kunnen verzenden vanuit DeskLink Mobile moet u het als de standaard SMS-app instellen.</string>
+  <string name="pref_plugin_telepathy_mms_desc">Om MMS te kunnen verzenden vanuit DeskLink moet u het als de standaard SMS-app instellen.</string>
   <string name="findmyphone_title">Zoek mijn telefoon</string>
   <string name="findmyphone_title_tablet">Zoek mijn tablet</string>
   <string name="findmyphone_title_tv">Zoek mijn tv</string>
@@ -294,7 +294,7 @@
   <string name="telephony_permission_explanation">Om telefoonoproepen te zien op het bureaublad moet u toestemming geven tot telefoonoproeplogs en telefoonstatus</string>
   <string name="telephony_optional_permission_explanation">Om een naam van een contactpersoon te zien in plaats van een telefoonnummer moet u toegang geven tot de contacten in uw telefoon</string>
   <string name="contacts_permission_explanation">Om uw contactpersoennboek te delen met het bureaublad moet u contacten rechten geven</string>
-  <string name="contacts_per_device_confirmation">Uw telefooncontacten zullen gekopieerd worden naar dit apparaat, ze kunnen dus gebruikt worden door de toepassing DeskLink Mobile SMS en andere toepassingen.</string>
+  <string name="contacts_per_device_confirmation">Uw telefooncontacten zullen gekopieerd worden naar dit apparaat, ze kunnen dus gebruikt worden door de toepassing DeskLink SMS en andere toepassingen.</string>
   <string name="select_ringtone">Selecteer een ringtone</string>
   <string name="telephony_pref_blocked_title">Geblokkeerde nummers</string>
   <string name="telephony_pref_blocked_dialog_desc">Geen oproepen en SMSen vanaf deze nummers tonen. Specificeer één nummer per regel</string>
@@ -338,7 +338,7 @@
   <string name="devices">Apparaten</string>
   <string name="settings_rename">Apparaatnaam</string>
   <string name="settings_dark_mode">Donker thema</string>
-  <string name="settings_export_logs">Logs van DeskLink Mobile exporteren</string>
+  <string name="settings_export_logs">Logs van DeskLink exporteren</string>
   <string name="settings_export_logs_text">Genereert een bestand met uitvoeringsinformatie die kan helpen problemen op te lossen.</string>
   <string name="settings_more_settings_title">Meer instellingen</string>
   <string name="settings_more_settings_text">Instellingen per apparaat kunnen gevonden worden onder \'Plug-in-instellingen\' vanuit een apparaat.</string>
@@ -353,7 +353,7 @@
   <string name="notification_channel_receivenotification">Meldingen van andere apparaten</string>
   <string name="findmyphone_preference_title_flashlight">Flitslamp laten flitsen</string>
   <string name="no_app_for_opening">Geen geschikte toepassing gevonden om dit bestand te openen</string>
-  <string name="remote_keyboard_service">DeskLink Mobile Toetsenbord op afstand</string>
+  <string name="remote_keyboard_service">DeskLink Toetsenbord op afstand</string>
   <string name="presenter_pointer">Aanwijzer</string>
   <string name="trusted_networks">Vertrouwde netwerken</string>
   <string name="trusted_networks_desc">Automatisch ontdekken beperken tot bekende netwerken</string>
@@ -361,8 +361,8 @@
   <string name="empty_trusted_networks_list_text">U hebt nog geen vertrouwd netwerk toegevoegd</string>
   <string name="allow_all_networks_text">Allen toestaan</string>
   <string name="location_permission_needed_title">Toestemming vereist</string>
-  <string name="bluetooth_permission_needed_desc">DeskLink Mobile heeft rechten nodig om te verbinden met apparaten dichtbij om apparaten te laten paren met Bluetooth beschikbaar in DeskLink Mobile.</string>
-  <string name="location_permission_needed_desc">DeskLink Mobile heeft de permissie achtergrondlocatie nodig om het WiFi-netwerk te weten waarmee u bent verbonden zelfs wanneer de toepassing in de achtergrond is. Dit vanwege dat de naam van de WiFi-netwerken om u heen gebruikt zouden kunnen worden om uw locatie te vinden, zelfs wanneer dit niet is wat DeskLink Mobile doet.</string>
+  <string name="bluetooth_permission_needed_desc">DeskLink heeft rechten nodig om te verbinden met apparaten dichtbij om apparaten te laten paren met Bluetooth beschikbaar in DeskLink.</string>
+  <string name="location_permission_needed_desc">DeskLink heeft de permissie achtergrondlocatie nodig om het WiFi-netwerk te weten waarmee u bent verbonden zelfs wanneer de toepassing in de achtergrond is. Dit vanwege dat de naam van de WiFi-netwerken om u heen gebruikt zouden kunnen worden om uw locatie te vinden, zelfs wanneer dit niet is wat DeskLink doet.</string>
   <string name="clipboard_android_x_incompat">Android 10 heeft toegang tot het klembord naar alle toepassingen verwijderd. Deze plug-in zal uitgeschakeld worden.</string>
   <string name="mpris_open_url">Hier doorgaan met afspelen</string>
   <string name="cant_open_url">Kan URL niet openen om door te gaan met afspelen</string>
@@ -443,7 +443,7 @@
   <string name="holger_kaelberer_task">"Plug-in voor toetsenbord op afstand  en reparaties"</string>
   <string name="saikrishna_arcot_task">Ondersteuning voor gebruik van toetsenbord in de plug-in voor invoer op afstand, bugreparaties en algemene verbeteringen</string>
   <string name="shellwen_chen_task">Verbeter de beveiliging van SFTP, verbeter de onderhoudbaarheid van dit project, reparaties van bugs en algemene verbeteringen</string>
-  <string name="everyone_else">Ieder ander die over de jaren heeft bijgedragen aan DeskLink Mobile</string>
+  <string name="everyone_else">Ieder ander die over de jaren heeft bijgedragen aan DeskLink</string>
   <string name="send_clipboard">Klembord verzenden</string>
   <string name="tap_to_execute">Tik om uit te voeren</string>
   <string name="plugin_stats">Plug-in-statistieken</string>

@@ -15,7 +15,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import androidx.preference.PreferenceManager
-import org.desklink.mobile.DeskLink.Companion.getInstance
+import org.desklink.mobile.DeskLinkApplication.Companion.getInstance
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.ui.PermissionsAlertDialogFragment
 import org.desklink.mobile.base.BaseActivity

@@ -9,7 +9,7 @@ import android.content.Context
 import android.os.Bundle
 import androidx.preference.PreferenceFragmentCompat
 import org.desklink.mobile.Device
-import org.desklink.mobile.DeskLink.Companion.getInstance
+import org.desklink.mobile.DeskLinkApplication.Companion.getInstance
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory
 import org.desklink.mobile.R

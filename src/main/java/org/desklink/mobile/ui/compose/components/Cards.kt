@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 
 @Composable
 fun KdeCard(
@@ -41,7 +41,7 @@ fun KdeCard(
 @PreviewLightDark
 @Composable
 private fun KdeCardPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         KdeCard(
             modifier = Modifier.fillMaxWidth(),
             content = {

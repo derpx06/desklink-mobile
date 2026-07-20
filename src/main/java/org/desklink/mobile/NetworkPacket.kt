@@ -5,6 +5,8 @@
 */
 package org.desklink.mobile
 
+import org.desklink.mobile.protocol.legacykdeconnectv8.LegacyKdeConnectV8
+
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -282,8 +284,8 @@ class NetworkPacket private constructor(
     }
 
     companion object {
-        const val PACKET_TYPE_IDENTITY: String = "kdeconnect.identity"
-        const val PACKET_TYPE_PAIR: String = "kdeconnect.pair"
+        const val PACKET_TYPE_IDENTITY: String = LegacyKdeConnectV8.PACKET_TYPE_IDENTITY
+        const val PACKET_TYPE_PAIR: String = LegacyKdeConnectV8.PACKET_TYPE_PAIR
 
         val PROTOCOL_PACKET_TYPES: List<String> = listOf(
             PACKET_TYPE_IDENTITY,

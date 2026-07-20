@@ -17,7 +17,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.desklink.mobile.Device;
-import org.desklink.mobile.DeskLink;
+import org.desklink.mobile.DeskLinkApplication;
 import org.desklink.mobile.R;
 
 public class RunCommandUrlActivity extends AppCompatActivity {
@@ -31,7 +31,7 @@ public class RunCommandUrlActivity extends AppCompatActivity {
                 Uri uri = getIntent().getData();
                 String deviceId = uri.getPathSegments().get(0);
 
-                final Device device = DeskLink.getInstance().getDevice(deviceId);
+                final Device device = DeskLinkApplication.getInstance().getDevice(deviceId);
 
                 if(device == null) {
                     error(R.string.runcommand_nosuchdevice);

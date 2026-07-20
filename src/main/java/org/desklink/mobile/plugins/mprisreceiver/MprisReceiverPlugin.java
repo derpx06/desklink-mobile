@@ -220,7 +220,7 @@ public class MprisReceiverPlugin extends Plugin {
     }
 
     private void createPlayer(MediaController controller) {
-        // Skip the media session we created ourselves as DeskLink Mobile
+        // Skip the media session we created ourselves as DeskLink
         if (controller.getPackageName().equals(context.getPackageName())) return;
 
         MprisReceiverPlayer player = new MprisReceiverPlayer(controller, AppsHelper.appNameLookup(context, controller.getPackageName()));

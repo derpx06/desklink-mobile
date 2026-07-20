@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-  <string name="kde_connect">DeskLink Mobile</string>
+  <string name="app_name">DeskLink</string>
   <string name="manifest_label_share">デバイスに送信</string>
   <string name="foreground_notification_no_devices">デバイスに接続されていません</string>
   <string name="foreground_notification_devices">接続済み: %s</string>
@@ -46,11 +46,11 @@
   <string name="open_settings">設定を開く</string>
   <string name="no_permissions">通知にアクセスするには権限を付与する必要があります</string>
   <string name="no_permission_mprisreceiver">メディアプレーヤーを操作するには、通知へのアクセスを許可する必要があります</string>
-  <string name="no_permissions_remotekeyboard">キー入力を受信するには DeskLink Mobile リモートキーボードを有効化する必要があります</string>
+  <string name="no_permissions_remotekeyboard">キー入力を受信するには DeskLink リモートキーボードを有効化する必要があります</string>
   <string name="send_ping">Ping を送信</string>
   <string name="open_mpris_controls">マルチメディアの操作</string>
   <string name="remotekeyboard_editing_only_title">編集中にのみリモートキーを取り扱う</string>
-  <string name="remotekeyboard_not_connected">有効なリモートキーボード接続がありません。DeskLink Mobile で確立してください</string>
+  <string name="remotekeyboard_not_connected">有効なリモートキーボード接続がありません。DeskLink で確立してください</string>
   <string name="remotekeyboard_connected">リモートキーボード接続はアクティブです</string>
   <string name="remotekeyboard_multiple_connections">複数のリモートキーボード接続があります。設定するデバイスを選択してください</string>
   <string name="open_mousepad">リモート入力</string>
@@ -187,7 +187,7 @@
   </string-array>
   <string name="mpris_notifications_explanation">通知ドロアにメディア情報を表示するためには、通知の許可が必要です。</string>
   <string name="mpris_notification_settings_title">メディア操作の通知を表示</string>
-  <string name="mpris_notification_settings_summary">DeskLink Mobile を開かずにメディアプレーヤーをコントロール可能にします</string>
+  <string name="mpris_notification_settings_summary">DeskLink を開かずにメディアプレーヤーをコントロール可能にします</string>
   <string name="share_to">共有先...</string>
   <string name="unreachable_device_url_share_text">到達できないデバイスと共有された URL はデバイスが到達可能になったときに送信されます。\n\n</string>
   <string name="unreachable_share_toast">URL は次回デバイスに接続された際に共有されます。</string>
@@ -228,7 +228,7 @@
   <string name="sftp_action_mode_menu_delete">削除</string>
   <string name="sftp_no_storage_locations_configured">ストレージの場所が設定されていません</string>
   <string name="sftp_saf_permission_explanation">リモートからファイルにアクセスするには、ストレージの場所を設定する必要があります</string>
-  <string name="sftp_manage_storage_permission_explanation">このデバイスのファイルにリモートからアクセスするには、DeskLink Mobile にストレージ管理を許可する必要があります。</string>
+  <string name="sftp_manage_storage_permission_explanation">このデバイスのファイルにリモートからアクセスするには、DeskLink にストレージ管理を許可する必要があります。</string>
   <string name="sftp_missing_permission_error">パーミッション不足: ファイルシステムへのアクセス</string>
   <string name="no_players_connected">プレーヤーが見つかりませんでした</string>
   <string name="send_files">ファイルを送信</string>
@@ -244,8 +244,8 @@
   </string-array>
   <string name="block_notification_contents">通知の内容をブロック</string>
   <string name="block_notification_images">通知の画像をブロック</string>
-  <string name="pairing_title">DeskLink Mobile デバイス</string>
-  <string name="pairing_description">同じネットワーク内で DeskLink Mobile を実行しているデバイスがここに表示されます</string>
+  <string name="pairing_title">DeskLink デバイス</string>
+  <string name="pairing_description">同じネットワーク内で DeskLink を実行しているデバイスがここに表示されます</string>
   <string name="device_rename_title">デバイス名を変更</string>
   <string name="device_rename_confirm">名前変更</string>
   <string name="refresh">更新</string>
@@ -256,7 +256,7 @@
   <string name="pref_plugin_telepathy">SMS を送信</string>
   <string name="pref_plugin_telepathy_desc">デスクトップからテキストメッセージを送信</string>
   <string name="pref_plugin_telepathy_mms">SMS を送信</string>
-  <string name="pref_plugin_telepathy_mms_desc">DeskLink Mobile から MMS を送信するには MMS をデフォルトの SMS アプリとして設定する必要があります。</string>
+  <string name="pref_plugin_telepathy_mms_desc">DeskLink から MMS を送信するには MMS をデフォルトの SMS アプリとして設定する必要があります。</string>
   <string name="findmyphone_title">スマートフォンを見つける</string>
   <string name="findmyphone_title_tablet">タブレットを見つける</string>
   <string name="findmyphone_title_tv">TV を探す</string>
@@ -275,7 +275,7 @@
   <string name="telephony_permission_explanation">デスクトップで通話を表示するために、電話の状態と通話履歴の権限を付与する必要があります</string>
   <string name="telephony_optional_permission_explanation">電話番号の代わりに連絡先名を見るには、端末の連絡先へのアクセスを許可する必要があります</string>
   <string name="contacts_permission_explanation">連絡先をデスクトップと共有するには、連絡先の権限を付与する必要があります</string>
-  <string name="contacts_per_device_confirmation">携帯電話に保存されている連絡先はこのデバイスにコピーされ、DeskLink Mobile SMS App などのアプリで使用できるようになります。</string>
+  <string name="contacts_per_device_confirmation">携帯電話に保存されている連絡先はこのデバイスにコピーされ、DeskLink SMS App などのアプリで使用できるようになります。</string>
   <string name="select_ringtone">着信音を選択</string>
   <string name="telephony_pref_blocked_title">ブロックされた番号</string>
   <string name="telephony_pref_blocked_dialog_desc">ここで設定された番号からの通話と SMS は非表示になります。一行にひとつずつ電話番号を入力してください</string>
@@ -286,7 +286,7 @@
   <string name="presenter_lock_tip">デバイスをロックして、音量キーでスライドを前/次に移動できます</string>
   <string name="add_command">コマンドを追加</string>
   <string name="addcommand_explanation">コマンドが登録されていません</string>
-  <string name="addcommand_explanation2">システム設定の DeskLink Mobile ページで新しいコマンドを追加できます</string>
+  <string name="addcommand_explanation2">システム設定の DeskLink ページで新しいコマンドを追加できます</string>
   <string name="add_command_description">デスクトップから新しいコマンドを追加できます</string>
   <string name="pref_plugin_mprisreceiver">メディアプレーヤーの操作</string>
   <string name="pref_plugin_mprisreceiver_desc">他のデバイスからスマートフォンのメディアプレーヤーを操作</string>
@@ -319,7 +319,7 @@
   <string name="devices">デバイス</string>
   <string name="settings_rename">デバイス名</string>
   <string name="settings_dark_mode">ダークテーマ</string>
-  <string name="settings_export_logs">DeskLink Mobile のログをエクスポート</string>
+  <string name="settings_export_logs">DeskLink のログをエクスポート</string>
   <string name="settings_export_logs_text">問題のトラブルシューティングに役立つアプリの実行情報ファイルを生成します。</string>
   <string name="settings_more_settings_title">その他の設定</string>
   <string name="settings_more_settings_text">デバイスごとの設定はデバイス内の「プラグイン設定」にあります</string>
@@ -333,7 +333,7 @@
   <string name="notification_channel_receivenotification">他のデバイスからの通知</string>
   <string name="findmyphone_preference_title_flashlight">フラッシュライトを点滅</string>
   <string name="no_app_for_opening">このファイルを開くための適切なアプリが見つかりません</string>
-  <string name="remote_keyboard_service">DeskLink Mobile リモートキーボード</string>
+  <string name="remote_keyboard_service">DeskLink リモートキーボード</string>
   <string name="presenter_pointer">ポインタ</string>
   <string name="trusted_networks">信頼済みネットワーク</string>
   <string name="trusted_networks_desc">自動検出を既知のネットワークでのみに制限する</string>
@@ -342,7 +342,7 @@
   <string name="allow_all_networks_text">すべて許可</string>
   <string name="location_permission_needed_title">許可が必要です</string>
   <string name="bluetooth_permission_needed_desc">Bluetooth でデバイスをペアリングするには、付近のデバイスの接続の権限が必要です。</string>
-  <string name="location_permission_needed_desc">DeskLink Mobile がバックグラウンドの間でも接続している WiFi ネットワークを識別できるよう、バックグラウンドでの位置情報へのアクセスの許可が必要です。WiFi ネットワーク名は位置情報としても使われることがあるため、この権限が必要です。(DeskLink Mobile が位置情報を収集することはありません)</string>
+  <string name="location_permission_needed_desc">DeskLink がバックグラウンドの間でも接続している WiFi ネットワークを識別できるよう、バックグラウンドでの位置情報へのアクセスの許可が必要です。WiFi ネットワーク名は位置情報としても使われることがあるため、この権限が必要です。(DeskLink が位置情報を収集することはありません)</string>
   <string name="clipboard_android_x_incompat">Android 10 はすべてのアプリからクリップボードへのアクセスを削除しました。このプラグインは無効化されます。</string>
   <string name="mpris_open_url">このデバイスで再生を続ける</string>
   <string name="cant_open_url">再生を続けるための URL を開けません</string>
@@ -421,7 +421,7 @@
   <string name="holger_kaelberer_task">リモートキーボードプラグインとバグ修正</string>
   <string name="saikrishna_arcot_task">リモート入力プラグインでのキーボードのサポート、バグ修正と全体的な改善</string>
   <string name="shellwen_chen_task">SFTP のセキュリティの改善、このプロジェクトのメンテナンス性の改善、バグ修正と全体的な改善</string>
-  <string name="everyone_else">DeskLink Mobile に貢献してきたその他すべての人々</string>
+  <string name="everyone_else">DeskLink に貢献してきたその他すべての人々</string>
   <string name="send_clipboard">クリップボードを送信</string>
   <string name="tap_to_execute">タップして実行</string>
   <string name="plugin_stats">プラグイン統計</string>

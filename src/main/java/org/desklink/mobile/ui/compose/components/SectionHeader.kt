@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.R
 
 @Composable
@@ -32,7 +32,7 @@ fun SectionHeader(title: String) {
 @KdePortraitThemePreviews
 @Composable
 private fun SectionHeaderPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         SectionHeader(title = stringResource(id = R.string.category_connected_devices))
     }
 }

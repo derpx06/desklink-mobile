@@ -14,7 +14,7 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 
-import org.desklink.mobile.DeskLink;
+import org.desklink.mobile.DeskLinkApplication;
 import org.desklink.mobile.NetworkPacket;
 
 public class KeyListenerView extends View {
@@ -83,7 +83,7 @@ public class KeyListenerView extends View {
     }
 
     public void sendChars(CharSequence chars) {
-        MousePadPlugin plugin = DeskLink.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
+        MousePadPlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
         if (plugin == null) {
             return;
         }
@@ -91,7 +91,7 @@ public class KeyListenerView extends View {
     }
 
     private void sendKeyPressPacket(final NetworkPacket np) {
-        MousePadPlugin plugin = DeskLink.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
+        MousePadPlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
         if (plugin == null) {
             return;
         }

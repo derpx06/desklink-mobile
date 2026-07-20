@@ -17,7 +17,7 @@ import androidx.appcompat.app.ActionBar
 import androidx.appcompat.widget.Toolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.desklink.mobile.DeviceStats
-import org.desklink.mobile.DeskLink.Companion.getInstance
+import org.desklink.mobile.DeskLinkApplication.Companion.getInstance
 import org.desklink.mobile.base.BaseActivity
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.ui.PluginPreference.PluginPreferenceCallback

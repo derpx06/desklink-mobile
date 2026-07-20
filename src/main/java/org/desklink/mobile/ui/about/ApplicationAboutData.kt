@@ -14,9 +14,13 @@ import org.desklink.mobile.R
 * Add authors and credits here
  */
 fun getApplicationAboutData(context: Context): AboutData {
-    val aboutData = AboutData(context.getString(R.string.kde_connect), R.drawable.icon, BuildConfig.VERSION_NAME,
-                              context.getString(R.string.report_bug_url), context.getString(R.string.website_url), context.getString(R.string.source_code_url), context.getString(R.string.donate_url),
-                              R.string.everyone_else)
+    val aboutData = AboutData(
+        context.getString(R.string.app_name),
+        R.drawable.icon,
+        BuildConfig.VERSION_NAME,
+        sourceCodeURL = context.getString(R.string.source_code_url),
+        authorsFooterText = R.string.everyone_else
+    )
 
     aboutData.authors += AboutPerson("Albert Vaca Cintora", R.string.maintainer_and_developer, "albertvaka+kde@gmail.com")
     aboutData.authors += AboutPerson("Aleix Pol", R.string.developer, "aleixpol@kde.org")

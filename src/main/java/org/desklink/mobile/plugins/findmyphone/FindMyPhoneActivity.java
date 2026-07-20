@@ -12,7 +12,7 @@ import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 
-import org.desklink.mobile.DeskLink;
+import org.desklink.mobile.DeskLinkApplication;
 import org.desklink.mobile.base.BaseActivity;
 import org.desklink.mobile.databinding.ActivityFindMyPhoneBinding;
 
@@ -62,7 +62,7 @@ public class FindMyPhoneActivity extends BaseActivity<ActivityFindMyPhoneBinding
     @Override
     protected void onStart() {
         super.onStart();
-        FindMyPhonePlugin plugin = DeskLink.getInstance().getDevicePlugin(deviceId, FindMyPhonePlugin.class);
+        FindMyPhonePlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, FindMyPhonePlugin.class);
         if (plugin == null) {
             return;
         }
@@ -74,7 +74,7 @@ public class FindMyPhoneActivity extends BaseActivity<ActivityFindMyPhoneBinding
     @Override
     protected void onStop() {
         super.onStop();
-        FindMyPhonePlugin plugin = DeskLink.getInstance().getDevicePlugin(deviceId, FindMyPhonePlugin.class);
+        FindMyPhonePlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, FindMyPhonePlugin.class);
         if (plugin == null) {
             return;
         }

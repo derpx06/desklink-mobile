@@ -21,9 +21,9 @@ import androidx.compose.runtime.setValue
 import androidx.preference.PreferenceManager
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.Device
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.base.BaseActivity
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.extensions.device.toUiModel
 import org.desklink.mobile.ui.compose.model.device.DeviceUiModel
 import org.desklink.mobile.ui.compose.screen.share.ShareScreen
@@ -74,7 +74,7 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
             finish()
             return
         }
-        val devices = DeskLink.getInstance().devices.values
+        val devices = DeskLinkApplication.getInstance().devices.values
         this.intentHasUrl = doesIntentContainUrl(intent)
         this.uiDevices = devices
             .filter { device -> device.isPaired && (intentHasUrl || device.isReachable) }
@@ -87,7 +87,7 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
         intent: Intent
     ) {
         val plugin: SharePlugin? =
-            DeskLink.getInstance().getDevicePlugin(
+            DeskLinkApplication.getInstance().getDevicePlugin(
                 deviceId = device.deviceId,
                 pluginClass = SharePlugin::class.java
             )
@@ -142,13 +142,13 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
         }
 
         binding.devicesListLayout.composeView.setContent {
-            KdeTheme(this) {
+            DeskLinkTheme(this) {
                 ShareScreen(
                     devices = uiDevices,
                     intentHasUrl = intentHasUrl,
                     isRefreshing = isRefreshing,
                     onDeviceClick = { deviceId ->
-                        val device = DeskLink.getInstance().getDevice(id = deviceId)
+                        val device = DeskLinkApplication.getInstance().getDevice(id = deviceId)
                             ?: return@ShareScreen
                         deviceClicked(
                             device = device,
@@ -173,13 +173,13 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
 
         if (deviceId != null) {
             val plugin: SharePlugin? =
-                DeskLink.getInstance().getDevicePlugin(deviceId, SharePlugin::class.java)
+                DeskLinkApplication.getInstance().getDevicePlugin(deviceId, SharePlugin::class.java)
             if (plugin != null) {
                 plugin.share(intent)
             } else {
                 val extras = intent.extras
                 if (extras != null && extras.containsKey(Intent.EXTRA_TEXT)) {
-                    val device = DeskLink.getInstance().getDevice(id = deviceId)
+                    val device = DeskLinkApplication.getInstance().getDevice(id = deviceId)
                     if (doesIntentContainUrl(intent) && device != null && !device.isReachable) {
                         val text = extras.getString(Intent.EXTRA_TEXT)
                         storeUrlForFutureDelivery(
@@ -191,7 +191,7 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
             }
             finish()
         } else {
-            DeskLink.getInstance().addDeviceListChangedCallback(key = "ShareActivity") {
+            DeskLinkApplication.getInstance().addDeviceListChangedCallback(key = "ShareActivity") {
                 runOnUiThread { updateDeviceList() }
             }
             BackgroundService.ForceRefreshConnections(context = this) // force a network re-discover
@@ -200,7 +200,7 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
     }
 
     override fun onStop() {
-        DeskLink.getInstance().removeDeviceListChangedCallback(key = "ShareActivity")
+        DeskLinkApplication.getInstance().removeDeviceListChangedCallback(key = "ShareActivity")
         super.onStop()
     }
 

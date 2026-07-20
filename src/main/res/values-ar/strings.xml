@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-  <string name="kde_connect">جسر كِيدِي</string>
+  <string name="app_name">جسر كِيدِي</string>
   <string name="manifest_label_share">أرسِل إلى جهاز</string>
   <string name="foreground_notification_no_devices">غير متصل بأي جهاز</string>
   <string name="foreground_notification_devices">متّصل بـ: %s</string>

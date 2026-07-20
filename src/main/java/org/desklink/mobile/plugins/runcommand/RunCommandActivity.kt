@@ -22,7 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.desklink.mobile.Device
-import org.desklink.mobile.DeskLink.Companion.getInstance
+import org.desklink.mobile.DeskLinkApplication.Companion.getInstance
 import org.desklink.mobile.R
 
 

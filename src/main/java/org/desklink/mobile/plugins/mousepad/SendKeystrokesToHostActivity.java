@@ -18,7 +18,7 @@ import org.desklink.mobile.BackgroundService;
 import org.desklink.mobile.Device;
 import org.desklink.mobile.helpers.SafeTextChecker;
 import org.desklink.mobile.helpers.WindowHelper;
-import org.desklink.mobile.DeskLink;
+import org.desklink.mobile.DeskLinkApplication;
 import org.desklink.mobile.ui.list.DeviceItem;
 import org.desklink.mobile.ui.list.ListAdapter;
 import org.desklink.mobile.ui.list.SectionItem;
@@ -102,7 +102,7 @@ public class SendKeystrokesToHostActivity extends BaseActivity<ActivitySendkeyst
 
                 // If we trust the sending app, check if there is only one device paired / reachable...
                 if (contentIsOkay) {
-                    List<Device> reachableDevices = DeskLink.getInstance().getDevices().values().stream()
+                    List<Device> reachableDevices = DeskLinkApplication.getInstance().getDevices().values().stream()
                             .filter(Device::isReachable)
                             .limit(2)  // we only need the first two; if its more than one, we need to show the user the device-selection
                             .collect(Collectors.toList());
@@ -116,7 +116,7 @@ public class SendKeystrokesToHostActivity extends BaseActivity<ActivitySendkeyst
                     }
                 }
 
-                DeskLink.getInstance().addDeviceListChangedCallback("SendKeystrokesToHostActivity", () -> runOnUiThread(this::updateDeviceList));
+                DeskLinkApplication.getInstance().addDeviceListChangedCallback("SendKeystrokesToHostActivity", () -> runOnUiThread(this::updateDeviceList));
                 BackgroundService.ForceRefreshConnections(this); // force a network re-discover
                 updateDeviceList();
             } else {
@@ -128,14 +128,14 @@ public class SendKeystrokesToHostActivity extends BaseActivity<ActivitySendkeyst
 
     @Override
     protected void onStop() {
-        DeskLink.getInstance().removeDeviceListChangedCallback("SendKeystrokesToHostActivity");
+        DeskLinkApplication.getInstance().removeDeviceListChangedCallback("SendKeystrokesToHostActivity");
         super.onStop();
     }
 
     private void sendKeys(Device deviceId) {
         String toSend;
         if (getBinding().textToSend.getText() != null && (toSend = getBinding().textToSend.getText().toString().trim()).length() > 0) {
-            MousePadPlugin plugin = DeskLink.getInstance().getDevicePlugin(deviceId.getDeviceId(), MousePadPlugin.class);
+            MousePadPlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId.getDeviceId(), MousePadPlugin.class);
             if (plugin == null) {
                 finish();
                 return;
@@ -152,7 +152,7 @@ public class SendKeystrokesToHostActivity extends BaseActivity<ActivitySendkeyst
 
 
     private void updateDeviceList() {
-        Collection<Device> devices = DeskLink.getInstance().getDevices().values();
+        Collection<Device> devices = DeskLinkApplication.getInstance().getDevices().values();
         final ArrayList<Device> devicesList = new ArrayList<>();
         final ArrayList<ListAdapter.Item> items = new ArrayList<>();
 

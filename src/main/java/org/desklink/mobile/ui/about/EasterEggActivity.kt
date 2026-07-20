@@ -11,7 +11,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.screen.easteregg.EasterEggScreen
 
 class EasterEggActivity : AppCompatActivity() {
@@ -23,7 +23,7 @@ class EasterEggActivity : AppCompatActivity() {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_NOSENSOR
 
         setContent {
-            KdeTheme(this) {
+            DeskLinkTheme(this) {
                 EasterEggScreen()
             }
         }

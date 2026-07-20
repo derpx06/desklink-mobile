@@ -16,7 +16,7 @@ import androidx.preference.PreferenceScreen;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.desklink.mobile.Device;
-import org.desklink.mobile.DeskLink;
+import org.desklink.mobile.DeskLinkApplication;
 import org.desklink.mobile.plugins.PluginFactory;
 import org.desklink.mobile.R;
 
@@ -77,7 +77,7 @@ public class PluginSettingsListFragment extends PreferenceFragmentCompat {
 
         final String deviceId = getArguments().getString(ARG_DEVICE_ID);
 
-        Device device = DeskLink.getInstance().getDevice(deviceId);
+        Device device = DeskLinkApplication.getInstance().getDevice(deviceId);
         if (device == null) {
             final FragmentActivity activity = requireActivity();
             activity.runOnUiThread(activity::finish);

@@ -32,7 +32,7 @@ import org.desklink.mobile.helpers.DEFAULT_MAX_VOLUME
 import org.desklink.mobile.helpers.DEFAULT_VOLUME_STEP
 import org.desklink.mobile.helpers.VideoUrlsHelper
 import org.desklink.mobile.helpers.calculateNewVolume
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.plugins.mpris.MprisPlugin.MprisPlayer
 import org.desklink.mobile.R
 import org.desklink.mobile.databinding.MprisControlBinding
@@ -155,7 +155,7 @@ class MprisNowPlayingFragment : Fragment(), VolumeKeyListener {
     }
 
     private fun disconnectFromPlugin() {
-        val plugin = DeskLink.getInstance().getDevicePlugin(deviceId, MprisPlugin::class.java) ?: return
+        val plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MprisPlugin::class.java) ?: return
         plugin.apply {
             removePlayerListUpdatedHandler("activity")
             removePlayerStatusUpdatedHandler("activity")
@@ -163,7 +163,7 @@ class MprisNowPlayingFragment : Fragment(), VolumeKeyListener {
     }
 
     private fun connectToPlugin() {
-        val plugin = DeskLink.getInstance().getDevicePlugin(deviceId, MprisPlugin::class.java)
+        val plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MprisPlugin::class.java)
         if (plugin == null) {
             if (isAdded) {
                 requireActivity().finish()

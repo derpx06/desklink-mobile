@@ -39,10 +39,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:orientation="vertical">
 
             <TextView
-                android:id="@+id/kdeconnect_label"
+                android:id="@+id/desklink_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/kde_connect"
+                android:text="@string/app_name"
                 android:textAppearance="?attr/textAppearanceHeadline6" />
 
             <TextView

@@ -70,7 +70,7 @@ val InetAddress.isUniqueLocal: Boolean
     }
 
 /**
- * Returns true if the address is not a public internet address, so it can be used to send and receive DeskLink Mobile packets
+ * Returns true if the address is not a public internet address, so it can be used to send and receive DeskLink packets
  */
 fun isPrivateAddress(address: InetAddress): Boolean {
     return address.isLoopbackAddress

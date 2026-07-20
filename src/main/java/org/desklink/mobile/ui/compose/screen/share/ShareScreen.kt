@@ -36,9 +36,9 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.desklink.mobile.extensions.safeDrawingBottomPadding
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.components.KdeCard
-import org.desklink.mobile.ui.compose.components.KdeThemePreviews
+import org.desklink.mobile.ui.compose.components.DeskLinkThemePreviews
 import org.desklink.mobile.ui.compose.components.SectionHeader
 import org.desklink.mobile.ui.compose.model.device.DeviceUiModel
 import org.desklink.mobile.R
@@ -155,10 +155,10 @@ private fun ShareScreenCardContent(device: DeviceUiModel) {
     }
 }
 
-@KdeThemePreviews
+@DeskLinkThemePreviews
 @Composable
 private fun ShareScreenPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         ShareScreenContent(
             state = rememberLazyListState(),
             isRefreshing = false,

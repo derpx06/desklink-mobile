@@ -26,8 +26,8 @@ import androidx.compose.ui.unit.dp
 import org.desklink.mobile.extensions.safeDrawingBottomPadding
 import org.desklink.mobile.ui.about.AboutData
 import org.desklink.mobile.ui.about.AboutPerson
-import org.desklink.mobile.ui.compose.KdeTheme
-import org.desklink.mobile.ui.compose.components.KdeThemePreviews
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.components.DeskLinkThemePreviews
 import org.desklink.mobile.R
 
 @Composable
@@ -38,7 +38,6 @@ fun AboutScreen(
     onDonateClicked: () -> Unit,
     onSourceCodeClicked: () -> Unit,
     onLicensesClicked: () -> Unit,
-    onAboutKdeClicked: () -> Unit,
     onWebsiteClicked: () -> Unit
 ) {
     val bottomPadding = safeDrawingBottomPadding()
@@ -67,7 +66,6 @@ fun AboutScreen(
                 onDonateClicked = onDonateClicked,
                 onSourceCodeClicked = onSourceCodeClicked,
                 onLicensesClicked = onLicensesClicked,
-                onAboutKdeClicked = onAboutKdeClicked,
                 onWebsiteClicked = onWebsiteClicked
             )
         }
@@ -145,7 +143,6 @@ private fun ActionButtons(
     onDonateClicked: () -> Unit,
     onSourceCodeClicked: () -> Unit,
     onLicensesClicked: () -> Unit,
-    onAboutKdeClicked: () -> Unit,
     onWebsiteClicked: () -> Unit
 ) {
     val buttons = remember(aboutData) {
@@ -185,14 +182,6 @@ private fun ActionButtons(
                 onClick = onLicensesClicked
             )
         }
-        list.add {
-            ActionIconTextButton(
-                textRes = R.string.about_kde,
-                iconRes = R.drawable.ic_kde_24dp,
-                onClick = onAboutKdeClicked
-            )
-        }
-
         if (aboutData.websiteURL != null) {
             list.add {
                 ActionIconTextButton(
@@ -310,24 +299,21 @@ private fun AuthorItemRow(author: AboutPerson) {
     }
 }
 
-@KdeThemePreviews
+@DeskLinkThemePreviews
 @Composable
 private fun AboutScreenPreview() {
     val sampleAboutData = AboutData(
-        name = "DeskLink Mobile",
+        name = "DeskLink",
         icon = R.drawable.icon,
         versionName = "1.27.0",
-        bugURL = "https://bugs.kde.org",
-        websiteURL = "https://kdeconnect.kde.org",
-        sourceCodeURL = "https://invent.kde.org/network/desklink-mobile",
-        donateURL = "https://www.kde.org/community/donations",
+        sourceCodeURL = "https://github.com/derpx06/desklink-mobile",
         authorsFooterText = R.string.everyone_else
     ).apply {
         authors += AboutPerson("Albert Vaca Cintora", R.string.maintainer_and_developer)
         authors += AboutPerson("Aleix Pol", R.string.developer)
     }
 
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         Surface {
             AboutScreen(
                 aboutData = sampleAboutData,
@@ -336,7 +322,6 @@ private fun AboutScreenPreview() {
                 onDonateClicked = {},
                 onSourceCodeClicked = {},
                 onLicensesClicked = {},
-                onAboutKdeClicked = {},
                 onWebsiteClicked = {}
             )
         }

@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 
 @Composable
 private fun KdeText(
@@ -137,7 +137,7 @@ fun KdeTitleMediumText(
 @KdePortraitThemePreviews
 @Composable
 private fun KdeTextsPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         Column(modifier = Modifier.fillMaxWidth()) {
             KdeBodySmallText(
                 text = "KdeBodySmallText",

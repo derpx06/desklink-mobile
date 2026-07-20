@@ -27,7 +27,7 @@ import androidx.core.app.TaskStackBuilder
 import androidx.core.content.ContextCompat
 import org.desklink.mobile.Device
 import org.desklink.mobile.helpers.NotificationHelper
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.plugins.mpris.MprisPlugin.MprisPlayer
 import org.desklink.mobile.plugins.notifications.NotificationReceiver
 import org.desklink.mobile.plugins.systemvolume.SystemVolumePlugin
@@ -159,7 +159,7 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
 
     private fun findPlayer(): Pair<Device, MprisPlayer>? {
         val currentDevice = if (notificationDeviceId != null && mprisDevices.contains(notificationDeviceId)) {
-            DeskLink.getInstance().getDevice(notificationDeviceId)
+            DeskLinkApplication.getInstance().getDevice(notificationDeviceId)
         } else {
             null
         }
@@ -174,7 +174,7 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
         }
 
         // Try a different player from another device
-        for (otherDevice in DeskLink.getInstance().devices.values) {
+        for (otherDevice in DeskLinkApplication.getInstance().devices.values) {
             val player = getPlayerFromDevice(otherDevice, null)
             if (player != null) {
                 return Pair(otherDevice, player)
@@ -210,7 +210,7 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
     }
 
     private fun updateRemoteDeviceVolumeControl() {
-        val plugin = DeskLink.getInstance().getDevicePlugin(notificationDeviceId, SystemVolumePlugin::class.java)
+        val plugin = DeskLinkApplication.getInstance().getDevicePlugin(notificationDeviceId, SystemVolumePlugin::class.java)
             ?: return
         val systemVolumeProvider = SystemVolumeProvider.getInstance()
         systemVolumeProvider.setPlugin(plugin)
@@ -240,7 +240,7 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
         // Make sure our information is up-to-date
         val currentPlayer = updateCurrentPlayer()
 
-        val device = DeskLink.getInstance().getDevice(notificationDeviceId)
+        val device = DeskLinkApplication.getInstance().getDevice(notificationDeviceId)
         if (device == null) {
             closeMediaNotification()
             return

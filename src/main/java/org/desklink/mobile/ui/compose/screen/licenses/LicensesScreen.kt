@@ -23,8 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.withContext
-import org.desklink.mobile.ui.compose.KdeTheme
-import org.desklink.mobile.ui.compose.components.KdeThemePreviews
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.components.DeskLinkThemePreviews
 import org.desklink.mobile.R
 import androidx.compose.ui.platform.LocalResources
 
@@ -102,10 +102,10 @@ fun LicensesScreen(
     }
 }
 
-@KdeThemePreviews
+@DeskLinkThemePreviews
 @Composable
 private fun LicensesScreenPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         LicensesScreen(eventFlow = remember { MutableSharedFlow() })
     }
 }

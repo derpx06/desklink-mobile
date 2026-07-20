@@ -17,7 +17,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 @Composable
-fun KdeTheme(context : Context, content: @Composable () -> Unit) {
+fun DeskLinkTheme(context : Context, content: @Composable () -> Unit) {
     val colorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         when (isSystemInDarkTheme()) {
             true -> dynamicDarkColorScheme(context)

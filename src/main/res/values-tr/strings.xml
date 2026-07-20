@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-  <string name="kde_connect">KDE Bağlan</string>
+  <string name="app_name">KDE Bağlan</string>
   <string name="manifest_label_share">Aygıta Gönder</string>
   <string name="foreground_notification_no_devices">Hiçbir aygıta bağlı değil</string>
   <string name="foreground_notification_devices">Bağlı: %s</string>
@@ -52,7 +52,7 @@
   <string name="send_ping">Ping gönder</string>
   <string name="open_mpris_controls">Çoklu ortam denetimi</string>
   <string name="remotekeyboard_editing_only_title">Yalnızca düzenlerken uzaktan düğmeleri işle</string>
-  <string name="remotekeyboard_not_connected">Etkin bir uzak klavye bağlantısı yok, kdeconnect ile bir bağlantı kurun</string>
+  <string name="remotekeyboard_not_connected">Etkin bir uzak klavye bağlantısı yok, DeskLink ile bir bağlantı kurun</string>
   <string name="remotekeyboard_connected">Uzak klavye bağlantısı etkin</string>
   <string name="remotekeyboard_multiple_connections">Birden çok uzak klavye bağlantısı mevcut, yapılandırmak istediğiniz aygıtı seçin</string>
   <string name="open_mousepad">Uzaktan giriş</string>

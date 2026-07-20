@@ -9,7 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.extensions.getParcelableCompat
 
 /**
@@ -27,7 +27,7 @@ class MprisMediaNotificationReceiver : BroadcastReceiver() {
             // Get the correct device, the mpris plugin and the mpris player
 
             val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID)
-            val plugin = DeskLink.getInstance().getDevicePlugin(deviceId, MprisPlugin::class.java) ?: return
+            val plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MprisPlugin::class.java) ?: return
             val player = plugin.getPlayerStatus(intent.getStringExtra(EXTRA_MPRIS_PLAYER))
                 ?: return
 

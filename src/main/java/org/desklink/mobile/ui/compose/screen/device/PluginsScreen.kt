@@ -36,8 +36,8 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.mpris.MprisPlugin
 import org.desklink.mobile.plugins.presenter.PresenterPlugin
 import org.desklink.mobile.plugins.runcommand.RunCommandPlugin
-import org.desklink.mobile.ui.compose.KdeTheme
-import org.desklink.mobile.ui.compose.components.KdeThemePreviews
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.components.DeskLinkThemePreviews
 import org.desklink.mobile.R
 
 @Composable
@@ -187,10 +187,10 @@ private fun PluginsWithoutPermissions(
     }
 }
 
-@KdeThemePreviews
+@DeskLinkThemePreviews
 @Composable
 private fun PluginsScreenPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         val pluginsWithButtons = listOf(
             MprisPlugin(),
             RunCommandPlugin(),

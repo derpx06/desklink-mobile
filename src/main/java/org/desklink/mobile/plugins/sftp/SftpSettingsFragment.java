@@ -31,7 +31,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.desklink.mobile.Device;
-import org.desklink.mobile.DeskLink;
+import org.desklink.mobile.DeskLinkApplication;
 import org.desklink.mobile.plugins.Plugin;
 import org.desklink.mobile.ui.PluginSettingsActivity;
 import org.desklink.mobile.ui.PluginSettingsFragment;
@@ -326,7 +326,7 @@ public class SftpSettingsFragment
 
         addStoragePreferences(preferenceCategory);
 
-        Device device = DeskLink.getInstance().getDevice(getDeviceId());
+        Device device = DeskLinkApplication.getInstance().getDevice(getDeviceId());
 
         device.launchBackgroundReloadPluginsFromSettings();
     }

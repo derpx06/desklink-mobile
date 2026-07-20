@@ -63,15 +63,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.preference.PreferenceManager
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.screen.ScreenCoordinateMapper
 import org.desklink.mobile.plugins.screen.ScreenPoint
 import org.desklink.mobile.ui.PluginSettingsActivity
-import org.desklink.mobile.ui.compose.KdeTheme
-import org.desklink.mobile.ui.compose.KdeTopAppBar
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
 
 class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
     private var deviceId: String? = null
@@ -100,7 +100,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         requestDesktopScreen()
 
         setContent {
-            KdeTheme(this) {
+            DeskLinkTheme(this) {
                 RemoteControlScreen()
             }
         }
@@ -127,7 +127,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         Scaffold(
             modifier = Modifier.safeDrawingPadding(),
             topBar = {
-                KdeTopAppBar(
+                DeskLinkTopAppBar(
                     title = stringResource(R.string.pref_plugin_mousepad),
                     subTitle = screenStatus,
                     navIconOnClick = { onBackPressedDispatcher.onBackPressed() },
@@ -475,10 +475,10 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     }
 
     private fun mousePadPlugin(): MousePadPlugin? =
-        DeskLink.getInstance().getDevicePlugin(deviceId, MousePadPlugin::class.java)
+        DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MousePadPlugin::class.java)
 
     private fun screenControlPlugin(): ScreenControlPlugin? =
-        DeskLink.getInstance().getDevicePlugin(deviceId, ScreenControlPlugin::class.java)
+        DeskLinkApplication.getInstance().getDevicePlugin(deviceId, ScreenControlPlugin::class.java)
 
     private fun applyPrefs() {
         if (prefsApplied) {

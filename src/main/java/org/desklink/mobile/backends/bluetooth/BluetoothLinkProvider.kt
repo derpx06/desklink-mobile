@@ -135,7 +135,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
 
         override fun run() {
             serverSocket = try {
-                bluetoothAdapter!!.listenUsingRfcommWithServiceRecord("DeskLink Mobile", SERVICE_UUID)
+                bluetoothAdapter!!.listenUsingRfcommWithServiceRecord("DeskLink", SERVICE_UUID)
             } catch (e: IOException) {
                 Log.e("KDEConnect", "Exception", e)
                 return
@@ -352,7 +352,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                 socket.connect()
                 synchronized(sockets) { sockets.put(device, socket) }
             } catch (e: IOException) {
-                Log.e("BTLinkProvider/Client", "Could not connect to DeskLink Mobile service on " + device!!.address, e)
+                Log.e("BTLinkProvider/Client", "Could not connect to DeskLink service on " + device!!.address, e)
                 return
             } catch (e: SecurityException) {
                 Log.e("BTLinkProvider/Client", "Security Exception connecting to " + device!!.address, e)

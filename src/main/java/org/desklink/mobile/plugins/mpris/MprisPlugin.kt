@@ -376,7 +376,7 @@ class MprisPlugin : Plugin() {
                     Handler(Looper.getMainLooper()).post {
                         val notificationManager = context.getSystemService<NotificationManager>()!!
                         val builder = NotificationCompat.Builder(context, NotificationHelper.Channels.CONTINUEWATCHING)
-                            .setContentTitle(context.resources.getString(R.string.kde_connect))
+                            .setContentTitle(context.resources.getString(R.string.app_name))
                             .setSmallIcon(R.drawable.ic_play_white)
                             .setTimeoutAfter(3000)
                             .setContentIntent(pendingIntent)

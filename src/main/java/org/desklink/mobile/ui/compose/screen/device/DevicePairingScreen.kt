@@ -25,9 +25,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.desklink.mobile.PairingHandler
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.components.KdeBodyMediumText
-import org.desklink.mobile.ui.compose.components.KdeThemePreviews
+import org.desklink.mobile.ui.compose.components.DeskLinkThemePreviews
 import org.desklink.mobile.ui.compose.components.KdeTitleMediumText
 import org.desklink.mobile.R
 
@@ -135,10 +135,10 @@ private fun DevicePairingScreenContent(
     }
 }
 
-@KdeThemePreviews
+@DeskLinkThemePreviews
 @Composable
 private fun DevicePairingScreenNotPairedPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         DevicePairingScreenContent(
             pairStatus = PairingHandler.PairState.NotPaired,
             verificationKey = "",
@@ -149,10 +149,10 @@ private fun DevicePairingScreenNotPairedPreview() {
     }
 }
 
-@KdeThemePreviews
+@DeskLinkThemePreviews
 @Composable
 private fun DevicePairingScreenRequestedPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         DevicePairingScreenContent(
             pairStatus = PairingHandler.PairState.Requested,
             verificationKey = "123456",
@@ -163,10 +163,10 @@ private fun DevicePairingScreenRequestedPreview() {
     }
 }
 
-@KdeThemePreviews
+@DeskLinkThemePreviews
 @Composable
 private fun DevicePairingScreenRequestedByPeerPreview() {
-    KdeTheme(context = LocalContext.current) {
+    DeskLinkTheme(context = LocalContext.current) {
         DevicePairingScreenContent(
             pairStatus = PairingHandler.PairState.RequestedByPeer,
             verificationKey = "123456",

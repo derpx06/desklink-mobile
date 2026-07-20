@@ -23,8 +23,8 @@ import org.desklink.mobile.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KdeTopAppBar(
-    title: String = stringResource(R.string.kde_connect),
+fun DeskLinkTopAppBar(
+    title: String = stringResource(R.string.app_name),
     subTitle: String? = null,
     navIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowBack,
     navIconDescription: String = "",

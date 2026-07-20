@@ -23,7 +23,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.preference.PreferenceManager
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.ui.PluginSettingsActivity
 import org.desklink.mobile.base.BaseActivity
 import org.desklink.mobile.extensions.viewBinding
@@ -42,7 +42,7 @@ class DigitizerActivity : BaseActivity<ActivityDigitizerBinding>(), DrawingPadVi
 
     private val plugin: DigitizerPlugin?
         get() {
-            val plugin = DeskLink.getInstance().getDevicePlugin(deviceId, DigitizerPlugin::class.java)
+            val plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, DigitizerPlugin::class.java)
 
             if (plugin == null)
                 finish()

@@ -13,7 +13,7 @@ import android.service.quicksettings.TileService
 import androidx.annotation.RequiresApi
 import androidx.core.service.quicksettings.PendingIntentActivityWrapper
 import androidx.core.service.quicksettings.TileServiceCompat
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 
 @RequiresApi(Build.VERSION_CODES.N)
 class ClipboardTileService : TileService() {
@@ -23,7 +23,7 @@ class ClipboardTileService : TileService() {
         TileServiceCompat.startActivityAndCollapse(this, PendingIntentActivityWrapper(
             this, 0, Intent(this, ClipboardFloatingActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
-                val ids = DeskLink.getInstance().devices.values
+                val ids = DeskLinkApplication.getInstance().devices.values
                     .asSequence()
                     .filter { it.isReachable && it.isPaired }
                     .map { it.deviceId }

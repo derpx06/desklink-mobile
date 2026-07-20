@@ -11,7 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
-import org.desklink.mobile.DeskLink;
+import org.desklink.mobile.DeskLinkApplication;
 
 public class ShareBroadcastReceiver extends BroadcastReceiver {
     @Override
@@ -35,7 +35,7 @@ public class ShareBroadcastReceiver extends BroadcastReceiver {
         long jobId = intent.getLongExtra(SharePlugin.CANCEL_SHARE_BACKGROUND_JOB_ID_EXTRA, -1);
         String deviceId = intent.getStringExtra(SharePlugin.CANCEL_SHARE_DEVICE_ID_EXTRA);
 
-        SharePlugin plugin = DeskLink.getInstance().getDevicePlugin(deviceId, SharePlugin.class);
+        SharePlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, SharePlugin.class);
         if (plugin == null) {
             return;
         }

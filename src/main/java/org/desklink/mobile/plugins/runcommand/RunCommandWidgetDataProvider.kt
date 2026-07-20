@@ -15,7 +15,7 @@ import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import android.widget.RemoteViewsService.RemoteViewsFactory
-import org.desklink.mobile.DeskLink
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 
 internal class RunCommandWidgetDataProvider(private val context: Context, val intent: Intent?) : RemoteViewsFactory {
@@ -39,7 +39,7 @@ internal class RunCommandWidgetDataProvider(private val context: Context, val in
     override fun onDestroy() {}
 
     private fun getPlugin(): RunCommandPlugin? {
-        return DeskLink.getInstance().getDevicePlugin(deviceId, RunCommandPlugin::class.java)
+        return DeskLinkApplication.getInstance().getDevicePlugin(deviceId, RunCommandPlugin::class.java)
     }
 
     override fun getCount(): Int {

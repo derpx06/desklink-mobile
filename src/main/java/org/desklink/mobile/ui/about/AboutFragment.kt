@@ -17,7 +17,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.net.toUri
 import androidx.fragment.app.Fragment
 import org.desklink.mobile.extensions.getParcelableCompat
-import org.desklink.mobile.ui.compose.KdeTheme
+import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.screen.about.AboutScreen
 import org.desklink.mobile.R
 
@@ -53,7 +53,7 @@ class AboutFragment : Fragment() {
         return ComposeView(requireContext()).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
-                KdeTheme(context) {
+                DeskLinkTheme(context) {
                     AboutScreen(
                         aboutData = aboutData,
                         onEasterEggTriggered = {
@@ -64,9 +64,6 @@ class AboutFragment : Fragment() {
                         onSourceCodeClicked = { openUrl(aboutData.sourceCodeURL) },
                         onLicensesClicked = {
                             startActivity(Intent(context, LicensesActivity::class.java))
-                        },
-                        onAboutKdeClicked = {
-                            startActivity(Intent(context, AboutKDEActivity::class.java))
                         },
                         onWebsiteClicked = { openUrl(aboutData.websiteURL) },
                     )
