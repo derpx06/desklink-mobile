@@ -129,7 +129,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
             try {
                 IOUtils.close(serverSocket)
             } catch (e: IOException) {
-                Log.e("KDEConnect", "Exception", e)
+                Log.e("DeskLink", "Exception", e)
             }
         }
 
@@ -137,10 +137,10 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
             serverSocket = try {
                 bluetoothAdapter!!.listenUsingRfcommWithServiceRecord("DeskLink", SERVICE_UUID)
             } catch (e: IOException) {
-                Log.e("KDEConnect", "Exception", e)
+                Log.e("DeskLink", "Exception", e)
                 return
             } catch (e: SecurityException) {
-                Log.e("KDEConnect", "Security Exception for CONNECT", e)
+                Log.e("DeskLink", "Security Exception for CONNECT", e)
 
                 PreferenceManager.getDefaultSharedPreferences(context).edit {
                     putBoolean(SettingsFragment.KEY_BLUETOOTH_ENABLED, false)

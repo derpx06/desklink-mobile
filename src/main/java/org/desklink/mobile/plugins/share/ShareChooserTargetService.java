@@ -30,7 +30,7 @@ public class ShareChooserTargetService extends ChooserTargetService {
             if (d.isReachable() && d.isPaired()) {
                 Log.d("DirectShare", d.getName());
                 final String targetName = d.getName();
-                final Icon targetIcon = Icon.createWithResource(this, R.drawable.icon);
+                final Icon targetIcon = Icon.createWithResource(this, R.drawable.desklink_mark);
                 final float targetRanking = 1;
                 final ComponentName targetComponentName = new ComponentName(getPackageName(),
                         ShareActivity.class.getCanonicalName());

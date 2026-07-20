@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:DeskLink="http://schemas.android.com/apk/res-auto">
+    xmlns:desklink="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/menu_use_mouse_and_keyboard"
         android:icon="@drawable/touchpad_plugin_action_24dp"
         android:title="@string/show_mouse_and_keyboard"
-        DeskLink:iconTint="?colorOnBackground"
-        DeskLink:showAsAction="ifRoom" />
+        desklink:iconTint="?colorOnBackground"
+        desklink:showAsAction="ifRoom" />
 </menu>

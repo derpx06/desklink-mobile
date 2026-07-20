@@ -104,6 +104,8 @@ object SslHelper {
 
             val nameBuilder = X500NameBuilder(BCStyle.INSTANCE)
             nameBuilder.addRDN(BCStyle.CN, deviceId)
+            // Retain the established certificate subject for existing pairing
+            // compatibility. It is not user-visible product branding.
             nameBuilder.addRDN(BCStyle.OU, "DeskLink Mobile")
             nameBuilder.addRDN(BCStyle.O, "KDE")
             val localDate = LocalDate.now()

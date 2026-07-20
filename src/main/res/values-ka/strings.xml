@@ -275,10 +275,6 @@
   <string name="easter_egg">სააღდგომო კვერცხი</string>
   <string name="email_contributor">ელფოსტით შემომწირავი \n%s</string>
   <string name="version">ვერისა %s</string>
-  <string name="about_kde">KDE-ს შესახებ</string>
-  <string name="kde_be_free">KDE - იყავი თავისუფალი!</string>
-  <string name="kde">KDE</string>
-  <string name="konqi">Konqi</string>
   <string name="rise_up">აწევა</string>
   <string name="rise_down">დაწევა</string>
   <string name="click_here_to_type">ასაკრეფად აქ დაატყაპუნეთ</string>

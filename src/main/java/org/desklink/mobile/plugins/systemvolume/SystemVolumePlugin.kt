@@ -41,7 +41,7 @@ class SystemVolumePlugin : Plugin() {
                     sinkMap[sink.name] = sink
                 }
             } catch (e: JSONException) {
-                Log.e("KDEConnect", "Exception", e)
+                Log.e("DeskLink", "Exception", e)
             }
 
             synchronized(listeners) {

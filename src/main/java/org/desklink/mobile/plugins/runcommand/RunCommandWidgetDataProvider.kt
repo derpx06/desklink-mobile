@@ -26,7 +26,7 @@ internal class RunCommandWidgetDataProvider(private val context: Context, val in
     override fun onCreate() {
         widgetId = intent?.getIntExtra(EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID) ?: AppWidgetManager.INVALID_APPWIDGET_ID
         if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
-            Log.e("KDEConnect/Widget", "RunCommandWidgetDataProvider: No widget id extra was set")
+            Log.e("DeskLink", "RunCommandWidgetDataProvider: No widget id extra was set")
             return
         }
         deviceId = loadWidgetDeviceIdPref(context, widgetId)

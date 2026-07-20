@@ -431,10 +431,6 @@
   <string name="email_contributor">Odoslať email prispievateľovi\n%s</string>
   <string name="visit_contributors_homepage">Navštíviť domovskú stránku prispievateľa\n%s</string>
   <string name="version">Verzia %s</string>
-  <string name="about_kde">O prostredí KDE</string>
-  <string name="kde_be_free">KDE - Buďte voľní!</string>
-  <string name="kde">KDE</string>
-  <string name="konqi">Konqi</string>
   <string name="rise_up">Povstať</string>
   <string name="rise_down">Dole</string>
   <string name="click_here_to_type">Ťuknutím otvoríte</string>
@@ -444,10 +440,6 @@
   <string name="open_compose_send">Vybrať tému</string>
   <string name="double_tap_to_drag">Dvojité ťuknutie na ťahanie</string>
   <string name="hold_to_drag">Podržať na ťahanie</string>
-  <string name="about_kde_about">&lt;h1&gt;O KDE&lt;/h1&gt; &lt;p&gt;KDE je celosvetová komunita softvérových inžinierov, umelcov, spisovateľov, prekladateľov a tvorcov, ktorí sa venujú vývoju &lt;a href=https://www.gnu.org/philosophy/free-sw.html&gt;slobodného softvéru&lt;/a&gt;. KDE vytvára pracovné prostredie Plasma, stovky aplikácií a mnohé softvérové knižnice, ktoré ich podporujú.&lt;/p&gt; &lt;p&gt;KDE je kooperatívny podnik: žiadna jediná entita neovláda jeho smerovanie ani produkty. Namiesto toho spolupracujeme na dosiahnutí spoločného cieľa vytvoriť najlepší slobodný softvér na svete. Každý je vítaný &lt;a href=https://community.kde.org/Get_Involved&gt;pripojiť sa a prispieť&lt;/a&gt; do KDE, vrátane vás.&lt;/p&gt; Navštívte &lt;a href=https://www.kde.org/&gt;https://www.kde.org/&lt;/a&gt; pre viac informácií o komunite KDE a softvéri, ktorý vytvárame.</string>
-  <string name="about_kde_report_bugs_or_wishes">&lt;h1&gt;Nahlásenie chýb alebo prianí&lt;/h1&gt; &lt;p&gt;Softvér sa dá vždy vylepšiť a tím KDE je pripravený tak urobiť. Avšak vy - používateľ - nám musíte povedať, keď niečo nefunguje podľa očakávaní alebo by sa to dalo urobiť lepšie.&lt;/p&gt; &lt;p&gt;KDE má systém sledovania chýb. Navštívte &lt;a href=https://bugs.kde.org/&gt;https://bugs.kde.org/&lt;/a&gt; alebo použite tlačidlo \"Nahlásiť chybu\" z obrazovky O aplikácii na nahlásenie chýb.&lt;/p&gt; Ak máte návrh na vylepšenie, ste vítaní použiť systém sledovania chýb na zaregistrovanie vášho priania. Uistite sa, že použijete závažnosť s názvom \"Wishlist\".</string>
-  <string name="about_kde_join_kde">&lt;h1&gt;Pridajte sa ku KDE&lt;/h1&gt; &lt;p&gt;Nemusíte byť softvérový vývojár, aby ste boli členom tímu KDE. Môžete sa pripojiť k jazykovým tímom, ktoré prekladajú rozhrania programov. Môžete poskytnúť grafiku, témy, zvuky a vylepšenú dokumentáciu. Rozhodnite sa!&lt;/p&gt; &lt;p&gt;Navštívte &lt;a href=https://community.kde.org/Get_Involved&gt;https://community.kde.org/Get_Involved&lt;/a&gt; pre informácie o niektorých projektoch, na ktorých sa môžete zúčastniť.&lt;/p&gt; Ak potrebujete viac informácií alebo dokumentáciu, navštívte &lt;a href=https://techbase.kde.org/&gt;https://techbase.kde.org/&lt;/a&gt;, kde nájdete, čo potrebujete.</string>
-  <string name="about_kde_support_kde">&lt;h1&gt;Podporte KDE&lt;/h1&gt; &lt;p&gt;Softvér KDE je a vždy bude dostupný bezplatne, avšak jeho tvorba nie je zadarmo.&lt;/p&gt; &lt;p&gt;Na podporu vývoja komunita KDE vytvorila KDE e.V., neziskovú organizáciu právne založenú v Nemecku. KDE e.V. zastupuje komunitu KDE v právnych a finančných záležitostiach. Pozrite &lt;a href=https://ev.kde.org/&gt;https://ev.kde.org/&lt;/a&gt; pre informácie o KDE e.V.&lt;/p&gt; &lt;p&gt;KDE profituje z mnohých druhov príspevkov, vrátane finančných. Finančné prostriedky používame na preplatenie výdavkov členom a iným prispievateľom. Ďalšie prostriedky sa používajú na právnu podporu a organizovanie konferencií a stretnutí.&lt;/p&gt; &lt;p&gt;Radi by sme vás povzbudili, aby ste podporili naše úsilie finančným darom, jedným zo spôsobov popísaných na &lt;a href=https://www.kde.org/community/donations/&gt;https://www.kde.org/community/donations/&lt;/a&gt;.&lt;/p&gt; Vopred vám veľmi ďakujeme za vašu podporu.</string>
   <string name="maintainer_and_developer">Správca a vývojár</string>
   <string name="developer">Vývojár</string>
   <string name="apple_support">Podpora macOS. Práca na podpore iOS</string>

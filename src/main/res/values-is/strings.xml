@@ -376,10 +376,6 @@
   <string name="email_contributor">Senda þátttakanda tölvupóst\n%s</string>
   <string name="visit_contributors_homepage">Fara á heimasíðu þátttakandans\n%s</string>
   <string name="version">Útgáfa %s</string>
-  <string name="about_kde">Um KDE</string>
-  <string name="kde_be_free">KDE - Vertu frjáls!</string>
-  <string name="kde">KDE</string>
-  <string name="konqi">Konqi</string>
   <string name="rise_up">Ris upp</string>
   <string name="rise_down">Ris niður</string>
   <string name="click_here_to_type">Ýttu hér til að skrifa</string>

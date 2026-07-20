@@ -1,4 +1,4 @@
-KDE connect cihazlarınız arasında inteqrasiya üçün funksiyalar dəstini təqdim edir:
+DeskLink cihazlarınız arasında inteqrasiya üçün funksiyalar dəstini təqdim edir:
 
 - Faylların cihazlar arasında köçürülməsi.
 - Heç bir kabel qoşulmadan telefonunuzdakı fayllara compyuterinizdə baxmaq.

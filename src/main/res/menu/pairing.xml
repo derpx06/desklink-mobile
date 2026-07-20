@@ -7,25 +7,25 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 -->
 
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:DeskLink="http://schemas.android.com/apk/res-auto">
+    xmlns:desklink="http://schemas.android.com/apk/res-auto">
 
     <item
         android:id="@+id/menu_refresh"
         android:icon="@drawable/ic_action_refresh_24dp"
         android:orderInCategory="200"
         android:title="@string/refresh"
-        DeskLink:showAsAction="never" />
+        desklink:showAsAction="never" />
 
     <item
         android:id="@+id/menu_custom_device_list"
         android:orderInCategory="900"
         android:title="@string/custom_device_list"
-        DeskLink:showAsAction="never" />
+        desklink:showAsAction="never" />
 
     <item
         android:id="@+id/menu_trusted_networks"
         android:orderInCategory="900"
         android:title="@string/trusted_networks"
-        DeskLink:showAsAction="never" />
+        desklink:showAsAction="never" />
 
 </menu>
