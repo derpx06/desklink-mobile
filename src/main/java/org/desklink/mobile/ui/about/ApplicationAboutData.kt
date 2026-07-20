@@ -16,7 +16,7 @@ import org.desklink.mobile.R
 fun getApplicationAboutData(context: Context): AboutData {
     val aboutData = AboutData(
         context.getString(R.string.app_name),
-        R.drawable.icon,
+        R.drawable.desklink_mark,
         BuildConfig.VERSION_NAME,
         sourceCodeURL = context.getString(R.string.source_code_url),
         authorsFooterText = R.string.everyone_else

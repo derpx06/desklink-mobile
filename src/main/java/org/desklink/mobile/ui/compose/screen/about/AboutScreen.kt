@@ -37,8 +37,7 @@ fun AboutScreen(
     onReportBugClicked: () -> Unit,
     onDonateClicked: () -> Unit,
     onSourceCodeClicked: () -> Unit,
-    onLicensesClicked: () -> Unit,
-    onWebsiteClicked: () -> Unit
+    onLicensesClicked: () -> Unit
 ) {
     val bottomPadding = safeDrawingBottomPadding()
 
@@ -65,8 +64,7 @@ fun AboutScreen(
                 onReportBugClicked = onReportBugClicked,
                 onDonateClicked = onDonateClicked,
                 onSourceCodeClicked = onSourceCodeClicked,
-                onLicensesClicked = onLicensesClicked,
-                onWebsiteClicked = onWebsiteClicked
+                onLicensesClicked = onLicensesClicked
             )
         }
 
@@ -142,8 +140,7 @@ private fun ActionButtons(
     onReportBugClicked: () -> Unit,
     onDonateClicked: () -> Unit,
     onSourceCodeClicked: () -> Unit,
-    onLicensesClicked: () -> Unit,
-    onWebsiteClicked: () -> Unit
+    onLicensesClicked: () -> Unit
 ) {
     val buttons = remember(aboutData) {
         val list = mutableListOf<@Composable () -> Unit>()
@@ -181,15 +178,6 @@ private fun ActionButtons(
                 iconRes = R.drawable.ic_baseline_gavel_24,
                 onClick = onLicensesClicked
             )
-        }
-        if (aboutData.websiteURL != null) {
-            list.add {
-                ActionIconTextButton(
-                    textRes = R.string.website,
-                    iconRes = R.drawable.ic_baseline_web_24,
-                    onClick = onWebsiteClicked
-                )
-            }
         }
         list
     }
@@ -304,7 +292,7 @@ private fun AuthorItemRow(author: AboutPerson) {
 private fun AboutScreenPreview() {
     val sampleAboutData = AboutData(
         name = "DeskLink",
-        icon = R.drawable.icon,
+        icon = R.drawable.desklink_mark,
         versionName = "1.27.0",
         sourceCodeURL = "https://github.com/derpx06/desklink-mobile",
         authorsFooterText = R.string.everyone_else
@@ -321,8 +309,7 @@ private fun AboutScreenPreview() {
                 onReportBugClicked = {},
                 onDonateClicked = {},
                 onSourceCodeClicked = {},
-                onLicensesClicked = {},
-                onWebsiteClicked = {}
+                onLicensesClicked = {}
             )
         }
     }

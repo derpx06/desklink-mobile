@@ -65,7 +65,6 @@ class AboutFragment : Fragment() {
                         onLicensesClicked = {
                             startActivity(Intent(context, LicensesActivity::class.java))
                         },
-                        onWebsiteClicked = { openUrl(aboutData.websiteURL) },
                     )
                 }
             }
