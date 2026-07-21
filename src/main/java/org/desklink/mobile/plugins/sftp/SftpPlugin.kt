@@ -251,8 +251,8 @@ class SftpPlugin : Plugin(), OnSharedPreferenceChangeListener {
     }
 
     companion object {
-        private const val PACKET_TYPE_SFTP = "kdeconnect.sftp"
-        private const val PACKET_TYPE_SFTP_REQUEST = "kdeconnect.sftp.request"
+        private const val PACKET_TYPE_SFTP = "desklink.sftp"
+        private const val PACKET_TYPE_SFTP_REQUEST = "desklink.sftp.request"
 
         @JvmField
         val PREFERENCE_KEY_STORAGE_INFO_LIST: Int = R.string.sftp_preference_key_storage_info_list

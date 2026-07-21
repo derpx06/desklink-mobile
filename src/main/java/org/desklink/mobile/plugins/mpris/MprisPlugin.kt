@@ -505,7 +505,7 @@ class MprisPlugin : Plugin() {
 
     companion object {
         const val DEVICE_ID_KEY: String = "deviceId"
-        private const val PACKET_TYPE_MPRIS = "kdeconnect.mpris"
-        private const val PACKET_TYPE_MPRIS_REQUEST = "kdeconnect.mpris.request"
+        private const val PACKET_TYPE_MPRIS = "desklink.mpris"
+        private const val PACKET_TYPE_MPRIS_REQUEST = "desklink.mpris.request"
     }
 }

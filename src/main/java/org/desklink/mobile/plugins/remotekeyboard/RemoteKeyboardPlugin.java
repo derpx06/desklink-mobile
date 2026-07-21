@@ -41,9 +41,9 @@ import java.util.concurrent.locks.ReentrantLock;
 @PluginFactory.LoadablePlugin
 public class RemoteKeyboardPlugin extends Plugin implements SharedPreferences.OnSharedPreferenceChangeListener {
 
-    private final static String PACKET_TYPE_MOUSEPAD_REQUEST = "kdeconnect.mousepad.request";
-    private final static String PACKET_TYPE_MOUSEPAD_ECHO = "kdeconnect.mousepad.echo";
-    private final static String PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = "kdeconnect.mousepad.keyboardstate";
+    private final static String PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request";
+    private final static String PACKET_TYPE_MOUSEPAD_ECHO = "desklink.mousepad.echo";
+    private final static String PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = "desklink.mousepad.keyboardstate";
 
     /**
      * Track and expose plugin instances to allow for a 'connected'-indicator in the IME:

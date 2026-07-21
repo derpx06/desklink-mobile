@@ -1,8 +1,4 @@
-/*
- * SPDX-FileCopyrightText: 2023 Albert Vaca Cintora <albertvaka@gmail.com>
- *
- * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
- */
+
 package org.desklink.mobile.backends.lan
 
 import android.content.Context
@@ -14,7 +10,7 @@ import android.net.wifi.WifiManager
 import android.net.wifi.WifiManager.MulticastLock
 import android.util.Log
 import org.desklink.mobile.helpers.DeviceHelper
-import org.desklink.mobile.protocol.legacykdeconnectv8.LegacyKdeConnectV8
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.desklink.mobile.helpers.DeviceHelper.deviceType
 import org.desklink.mobile.helpers.DeviceHelper.getDeviceId
 import org.desklink.mobile.helpers.DeviceHelper.getDeviceName
@@ -199,6 +195,6 @@ class MdnsDiscovery {
     companion object {
         const val LOG_TAG: String = "MdnsDiscovery"
 
-        const val SERVICE_TYPE: String = LegacyKdeConnectV8.MDNS_SERVICE_TYPE
+        const val SERVICE_TYPE: String = DeskLinkProtocol.MDNS_SERVICE_TYPE
     }
 }

@@ -88,8 +88,8 @@ class DigitizerPlugin : Plugin() {
         )
 
     companion object {
-        private const val PACKET_TYPE_DIGITIZER_SESSION = "kdeconnect.digitizer.session"
-        private const val PACKET_TYPE_DIGITIZER = "kdeconnect.digitizer"
+        private const val PACKET_TYPE_DIGITIZER_SESSION = "desklink.digitizer.session"
+        private const val PACKET_TYPE_DIGITIZER = "desklink.digitizer"
 
         private const val TAG = "DigitizerPlugin"
     }

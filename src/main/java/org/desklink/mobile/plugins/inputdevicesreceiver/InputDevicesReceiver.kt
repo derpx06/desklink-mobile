@@ -128,8 +128,8 @@ class InputDevicesReceiverPlugin : Plugin() {
         private const val BOTTOM_EDGE = 0x00001
         private const val NONE_EDGE = 0
 
-        private const val PACKET_TYPE_MOUSEPAD_REQUEST = "kdeconnect.mousepad.request"
-        private const val PACKET_TYPE_SHAREINPUTDEVICES = "kdeconnect.shareinputdevices"
-        private const val PACKET_TYPE_SHAREINPUTDEVICES_REQUEST = "kdeconnect.shareinputdevices.request"
+        private const val PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request"
+        private const val PACKET_TYPE_SHAREINPUTDEVICES = "desklink.shareinputdevices"
+        private const val PACKET_TYPE_SHAREINPUTDEVICES_REQUEST = "desklink.shareinputdevices.request"
     }
 }

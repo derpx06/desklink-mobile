@@ -108,7 +108,7 @@ class ReceiveNotificationsPlugin : Plugin() {
     override val permissionExplanation: Int = R.string.receive_notifications_permission_explanation
 
     companion object {
-        private const val PACKET_TYPE_NOTIFICATION = "kdeconnect.notification"
-        private const val PACKET_TYPE_NOTIFICATION_REQUEST = "kdeconnect.notification.request"
+        private const val PACKET_TYPE_NOTIFICATION = "desklink.notification"
+        private const val PACKET_TYPE_NOTIFICATION_REQUEST = "desklink.notification.request"
     }
 }

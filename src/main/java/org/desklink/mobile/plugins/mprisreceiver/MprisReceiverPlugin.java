@@ -40,8 +40,8 @@ import java.util.stream.Stream;
 
 @PluginFactory.LoadablePlugin
 public class MprisReceiverPlugin extends Plugin {
-    private final static String PACKET_TYPE_MPRIS = "kdeconnect.mpris";
-    private final static String PACKET_TYPE_MPRIS_REQUEST = "kdeconnect.mpris.request";
+    private final static String PACKET_TYPE_MPRIS = "desklink.mpris";
+    private final static String PACKET_TYPE_MPRIS_REQUEST = "desklink.mpris.request";
 
     private static final String TAG = "MprisReceiver";
 

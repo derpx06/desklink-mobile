@@ -88,6 +88,6 @@ class ConnectivityReportPlugin : Plugin() {
     override val requiredPermissions: Array<String> = arrayOf(Manifest.permission.READ_PHONE_STATE)
 
     companion object {
-        private const val PACKET_TYPE_CONNECTIVITY_REPORT = "kdeconnect.connectivity_report"
+        private const val PACKET_TYPE_CONNECTIVITY_REPORT = "desklink.connectivity_report"
     }
 }

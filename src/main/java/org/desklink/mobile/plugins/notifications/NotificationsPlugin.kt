@@ -559,10 +559,10 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
 
     companion object {
-        private const val PACKET_TYPE_NOTIFICATION = "kdeconnect.notification"
-        private const val PACKET_TYPE_NOTIFICATION_REQUEST = "kdeconnect.notification.request"
-        private const val PACKET_TYPE_NOTIFICATION_REPLY = "kdeconnect.notification.reply"
-        private const val PACKET_TYPE_NOTIFICATION_ACTION = "kdeconnect.notification.action"
+        private const val PACKET_TYPE_NOTIFICATION = "desklink.notification"
+        private const val PACKET_TYPE_NOTIFICATION_REQUEST = "desklink.notification.request"
+        private const val PACKET_TYPE_NOTIFICATION_REPLY = "desklink.notification.reply"
+        private const val PACKET_TYPE_NOTIFICATION_ACTION = "desklink.notification.action"
         const val PREFERENCE_KEY = "prefKey"
         const val PREF_NOTIFICATION_SCREEN_OFF = "pref_notification_screen_off"
         private const val NOTIFICATION_SYNC_DELAY_MS = 50L

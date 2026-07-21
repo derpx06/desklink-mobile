@@ -93,7 +93,7 @@ class PingPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = arrayOf(PACKET_TYPE_PING)
 
     companion object {
-        private const val PACKET_TYPE_PING = "kdeconnect.ping"
+        private const val PACKET_TYPE_PING = "desklink.ping"
         private const val LOG_TAG = "PingPlugin"
     }
 }

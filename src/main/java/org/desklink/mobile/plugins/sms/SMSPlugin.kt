@@ -433,7 +433,7 @@ class SMSPlugin : Plugin() {
          *     "address": <String> // Address (phone number, email address, etc.) of this object
          * }
          */
-        private const val PACKET_TYPE_SMS_MESSAGE: String = "kdeconnect.sms.messages"
+        private const val PACKET_TYPE_SMS_MESSAGE: String = "desklink.sms.messages"
         private const val SMS_MESSAGE_PACKET_VERSION: Int = 2 // We *send* packets of this version
 
         /**
@@ -457,14 +457,14 @@ class SMSPlugin : Plugin() {
          *     "mimeType": <String>             // File type (eg: image/jpg, video/mp4 etc.)
          * }
          */
-        private const val PACKET_TYPE_SMS_REQUEST: String = "kdeconnect.sms.request"
+        private const val PACKET_TYPE_SMS_REQUEST: String = "desklink.sms.request"
 
         /**
          * Packet sent to request the most-recent message in each conversations on the device
          *
          * The request packet shall contain no body
          */
-        private const val PACKET_TYPE_SMS_REQUEST_CONVERSATIONS: String = "kdeconnect.sms.request_conversations"
+        private const val PACKET_TYPE_SMS_REQUEST_CONVERSATIONS: String = "desklink.sms.request_conversations"
 
         /**
          * Packet sent to request all the messages in a particular conversation
@@ -476,7 +476,7 @@ class SMSPlugin : Plugin() {
          *                               // May return fewer than expected if there are not enough or more than expected if many
          *                               // messages have the same timestamp.
          */
-        private const val PACKET_TYPE_SMS_REQUEST_CONVERSATION: String = "kdeconnect.sms.request_conversation"
+        private const val PACKET_TYPE_SMS_REQUEST_CONVERSATION: String = "desklink.sms.request_conversation"
 
         /**
          * Packet sent to request an attachment file in a particular message of a conversation
@@ -486,7 +486,7 @@ class SMSPlugin : Plugin() {
          * "part_id": <long>                // Part id of the attachment
          * "unique_identifier": <String>    // This unique_identifier should come from a previous message packet's attachment field
          */
-        private const val PACKET_TYPE_SMS_REQUEST_ATTACHMENT: String = "kdeconnect.sms.request_attachment"
+        private const val PACKET_TYPE_SMS_REQUEST_ATTACHMENT: String = "desklink.sms.request_attachment"
 
         /**
          * Packet used to send original attachment file from mms database to desktop
@@ -496,7 +496,7 @@ class SMSPlugin : Plugin() {
          * "filename": <String>     // Name of the attachment file in the database
          * "payload":               // Actual attachment file to be transferred
          */
-        private const val PACKET_TYPE_SMS_ATTACHMENT_FILE: String = "kdeconnect.sms.attachment_file"
+        private const val PACKET_TYPE_SMS_ATTACHMENT_FILE: String = "desklink.sms.attachment_file"
 
         private const val KEY_PREF_BLOCKED_NUMBERS: String = "telephony_blocked_numbers"
 

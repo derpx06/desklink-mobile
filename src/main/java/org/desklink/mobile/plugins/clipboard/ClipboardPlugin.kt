@@ -132,7 +132,7 @@ class ClipboardPlugin : Plugin() {
          * "content": "password"
          * }
          */
-        private const val PACKET_TYPE_CLIPBOARD = "kdeconnect.clipboard"
+        private const val PACKET_TYPE_CLIPBOARD = "desklink.clipboard"
 
         /**
          * Packet containing clipboard contents and a timestamp that the contents were last updated, sent
@@ -149,7 +149,7 @@ class ClipboardPlugin : Plugin() {
          * "content": "password"
          * }
          */
-        private const val PACKET_TYPE_CLIPBOARD_CONNECT = "kdeconnect.clipboard.connect"
+        private const val PACKET_TYPE_CLIPBOARD_CONNECT = "desklink.clipboard.connect"
 
         fun canSyncAutomatically(context: Context): Boolean {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {

@@ -107,7 +107,7 @@ class SystemVolumePlugin : Plugin() {
     }
 
     companion object {
-        private const val PACKET_TYPE_SYSTEMVOLUME = "kdeconnect.systemvolume"
-        private const val PACKET_TYPE_SYSTEMVOLUME_REQUEST = "kdeconnect.systemvolume.request"
+        private const val PACKET_TYPE_SYSTEMVOLUME = "desklink.systemvolume"
+        private const val PACKET_TYPE_SYSTEMVOLUME_REQUEST = "desklink.systemvolume.request"
     }
 }

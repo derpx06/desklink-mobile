@@ -108,7 +108,7 @@ class LockDevicePlugin : Plugin() {
 
     companion object {
         private const val LOG_TAG = "LockDevicePlugin"
-        private const val PACKET_TYPE_LOCK = "kdeconnect.lock"
-        private const val PACKET_TYPE_LOCK_REQUEST = "kdeconnect.lock.request"
+        private const val PACKET_TYPE_LOCK = "desklink.lock"
+        private const val PACKET_TYPE_LOCK_REQUEST = "desklink.lock.request"
     }
 }

@@ -145,6 +145,6 @@ class MouseReceiverPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = emptyArray()
 
     companion object {
-        private const val PACKET_TYPE_MOUSEPAD_REQUEST = "kdeconnect.mousepad.request"
+        private const val PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request"
     }
 }

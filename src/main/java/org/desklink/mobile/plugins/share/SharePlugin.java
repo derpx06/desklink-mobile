@@ -69,8 +69,8 @@ public class SharePlugin extends Plugin {
     final static String CANCEL_SHARE_DEVICE_ID_EXTRA = "deviceId";
     final static String CANCEL_SHARE_BACKGROUND_JOB_ID_EXTRA = "backgroundJobId";
 
-    private final static String PACKET_TYPE_SHARE_REQUEST = "kdeconnect.share.request";
-    final static String PACKET_TYPE_SHARE_REQUEST_UPDATE = "kdeconnect.share.request.update";
+    private final static String PACKET_TYPE_SHARE_REQUEST = "desklink.share.request";
+    final static String PACKET_TYPE_SHARE_REQUEST_UPDATE = "desklink.share.request.update";
 
     final static String KEY_NUMBER_OF_FILES = "numberOfFiles";
     final static String KEY_TOTAL_PAYLOAD_SIZE = "totalPayloadSize";

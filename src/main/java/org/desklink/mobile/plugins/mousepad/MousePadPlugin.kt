@@ -193,7 +193,7 @@ class MousePadPlugin : Plugin() {
     override val outgoingPacketTypes = arrayOf(PACKET_TYPE_MOUSEPAD_REQUEST)
 
     companion object {
-        const val PACKET_TYPE_MOUSEPAD_REQUEST: String = "kdeconnect.mousepad.request"
-        private const val PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = "kdeconnect.mousepad.keyboardstate"
+        const val PACKET_TYPE_MOUSEPAD_REQUEST: String = "desklink.mousepad.request"
+        private const val PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = "desklink.mousepad.keyboardstate"
     }
 }
