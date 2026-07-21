@@ -16,6 +16,7 @@ import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.ui.PluginSettingsFragment.Companion.newInstance
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 
 @LoadablePlugin
@@ -88,7 +89,7 @@ class PresenterPlugin : Plugin() {
     }
 
     companion object {
-        private const val PACKET_TYPE_PRESENTER = "desklink.presenter"
-        private const val PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request"
+        private const val PACKET_TYPE_PRESENTER = DeskLinkProtocol.PACKET_TYPE_PRESENTER
+        private const val PACKET_TYPE_MOUSEPAD_REQUEST = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST
     }
 }

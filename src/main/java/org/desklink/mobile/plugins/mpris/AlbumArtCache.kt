@@ -96,7 +96,7 @@ internal object AlbumArtCache {
             //Initialize the disk cache with a limit of 5 MB storage (fits ~830 images, taking Spotify as reference)
             diskCache = DiskLruCache.open(cacheDir, BuildConfig.VERSION_CODE, 1, 1000 * 1000 * 5.toLong())
         } catch (e: IOException) {
-            Log.e("KDE/Mpris/AlbumArtCache", "Could not open the album art disk cache!", e)
+            Log.e("DeskLink/Mpris/AlbumArtCache", "Could not open the album art disk cache!", e)
         }
         connectivityManager = context.applicationContext.getSystemService()!!
     }
@@ -154,7 +154,7 @@ internal object AlbumArtCache {
 
         //If not found, check the disk cache
         if (!this::diskCache.isInitialized) {
-            Log.e("KDE/Mpris/AlbumArtCache", "The disk cache is not initialized!")
+            Log.e("DeskLink/Mpris/AlbumArtCache", "The disk cache is not initialized!")
             return null
         }
         try {
@@ -171,7 +171,7 @@ internal object AlbumArtCache {
                     memItem.failedFetch = true
                     memItem.albumArt = null
                     diskCache.remove(urlToDiskCacheKey(albumUrl))
-                    Log.d("KDE/Mpris/AlbumArtCache", "Invalid image: $albumUrl")
+                    Log.d("DeskLink/Mpris/AlbumArtCache", "Invalid image: $albumUrl")
                 }
                 memoryCache.put(albumUrl, memItem)
                 return result
@@ -203,7 +203,7 @@ internal object AlbumArtCache {
     private fun fetchUrl(url: Uri) {
         //We need the disk cache for this
         if (!this::diskCache.isInitialized) {
-            Log.e("KDE/Mpris/AlbumArtCache", "The disk cache is not initialized!")
+            Log.e("DeskLink/Mpris/AlbumArtCache", "The disk cache is not initialized!")
             return
         }
         if (ConnectivityManagerCompat.isActiveNetworkMetered(connectivityManager)) {
@@ -244,7 +244,7 @@ internal object AlbumArtCache {
         try {
             val cacheItem = diskCache.edit(urlToDiskCacheKey(url.toString()))
             if (cacheItem == null) {
-                Log.e("KDE/Mpris/AlbumArtCache",
+                Log.e("DeskLink/Mpris/AlbumArtCache",
                         "Two disk cache edits happened at the same time, should be impossible!")
                 --numFetching
                 return
@@ -253,7 +253,7 @@ internal object AlbumArtCache {
             //Do the actual fetch in the background
             cacheScope.launch { fetchURL(url, null, cacheItem) }
         } catch (e: IOException) {
-            Log.e("KDE/Mpris/AlbumArtCache", "Problems with the disk cache", e)
+            Log.e("DeskLink/Mpris/AlbumArtCache", "Problems with the disk cache", e)
             --numFetching
         }
     }
@@ -283,14 +283,14 @@ internal object AlbumArtCache {
             return
         }
         if (!this::diskCache.isInitialized) {
-            Log.e("KDE/Mpris/AlbumArtCache", "The disk cache is not initialized!")
+            Log.e("DeskLink/Mpris/AlbumArtCache", "The disk cache is not initialized!")
             payload.close()
             return
         }
         val url = albumUrl.toUri()
         if (url.scheme !in REMOTE_FETCH_SCHEMES) {
             //Shouldn't happen (checked on receival of the url), but just to be sure
-            Log.e("KDE/Mpris/AlbumArtCache", "Got invalid art url with payload: $albumUrl")
+            Log.e("DeskLink/Mpris/AlbumArtCache", "Got invalid art url with payload: $albumUrl")
             payload.close()
             return
         }
@@ -308,7 +308,7 @@ internal object AlbumArtCache {
                 return
             }
         } catch (e: IOException) {
-            Log.e("KDE/Mpris/AlbumArtCache", "Disk cache problem!", e)
+            Log.e("DeskLink/Mpris/AlbumArtCache", "Disk cache problem!", e)
             payload.close()
             return
         }
@@ -319,7 +319,7 @@ internal object AlbumArtCache {
         try {
             val cacheItem = diskCache.edit(urlToDiskCacheKey(url.toString()))
             if (cacheItem == null) {
-                Log.e("KDE/Mpris/AlbumArtCache",
+                Log.e("DeskLink/Mpris/AlbumArtCache",
                         "Two disk cache edits happened at the same time, should be impossible!")
                 --numFetching
                 payload.close()
@@ -329,7 +329,7 @@ internal object AlbumArtCache {
             //Do the actual fetch in the background
             cacheScope.launch { fetchURL(url, payload, cacheItem) }
         } catch (e: IOException) {
-            Log.e("KDE/Mpris/AlbumArtCache", "Problems with the disk cache", e)
+            Log.e("DeskLink/Mpris/AlbumArtCache", "Problems with the disk cache", e)
             --numFetching
         }
     }
@@ -372,7 +372,7 @@ internal object AlbumArtCache {
             try {
                 cacheItem.abort()
             } catch (e: IOException) {
-                Log.e("KDE/Mpris/AlbumArtCache", "Problem with the disk cache", e)
+                Log.e("DeskLink/Mpris/AlbumArtCache", "Problem with the disk cache", e)
             }
             //Mark the fetch as failed in the memory cache
             memoryCache.put(url.toString(), MemoryCacheItem(true))

@@ -7,7 +7,7 @@ import org.desklink.mobile.DeviceStats.removeOldEvents
 class DeviceStatsTest {
     @Test
     fun removeOldEvents_cutoutExists() {
-        val key = "kdeconnect.ping"
+        val key = "desklink.ping"
         val eventsByType = HashMap<String, ArrayList<Long>>().apply {
             val events = arrayListOf(10L, 20L, 30L)
             put(key, events)
@@ -23,7 +23,7 @@ class DeviceStatsTest {
 
     @Test
     fun removeOldEvents_cutoutDoesntExist() {
-        val key = "kdeconnect.ping"
+        val key = "desklink.ping"
         val eventsByType = HashMap<String, ArrayList<Long>>().apply {
             val events = arrayListOf(10L, 20L, 30L)
             put(key, events)
@@ -38,7 +38,7 @@ class DeviceStatsTest {
 
     @Test
     fun removeOldEvents_OnlyOldEvents() {
-        val key = "kdeconnect.ping"
+        val key = "desklink.ping"
         val eventsByType = HashMap<String, ArrayList<Long>>().apply {
             val events = arrayListOf(10L, 20L)
             put(key, events)
@@ -51,7 +51,7 @@ class DeviceStatsTest {
 
     @Test
     fun removeOldEvents_OnlyNewEvents() {
-        val key = "kdeconnect.ping"
+        val key = "desklink.ping"
         val eventsByType = HashMap<String, ArrayList<Long>>().apply {
             val events = arrayListOf(10L)
             put(key, events)

@@ -23,6 +23,7 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class ReceiveNotificationsPlugin : Plugin() {
@@ -108,7 +109,7 @@ class ReceiveNotificationsPlugin : Plugin() {
     override val permissionExplanation: Int = R.string.receive_notifications_permission_explanation
 
     companion object {
-        private const val PACKET_TYPE_NOTIFICATION = "desklink.notification"
-        private const val PACKET_TYPE_NOTIFICATION_REQUEST = "desklink.notification.request"
+        private const val PACKET_TYPE_NOTIFICATION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION
+        private const val PACKET_TYPE_NOTIFICATION_REQUEST = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REQUEST
     }
 }

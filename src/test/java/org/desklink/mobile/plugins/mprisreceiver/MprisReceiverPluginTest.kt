@@ -8,7 +8,7 @@ import org.junit.Test
 class MprisReceiverPluginTest {
     @Test
     fun missingPlayerFallsBackToFirstActivePlayer() {
-        val packet = NetworkPacket("kdeconnect.mpris.request").apply {
+        val packet = NetworkPacket("desklink.mpris.request").apply {
             this["action"] = "PlayPause"
         }
 
@@ -22,7 +22,7 @@ class MprisReceiverPluginTest {
 
     @Test
     fun unknownPlayerDoesNotFallBackToAnotherPlayer() {
-        val packet = NetworkPacket("kdeconnect.mpris.request").apply {
+        val packet = NetworkPacket("desklink.mpris.request").apply {
             this["player"] = "Missing"
             this["action"] = "PlayPause"
         }

@@ -43,7 +43,7 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
     companion object {
         private const val ARG_DEVICE_ID = "deviceId"
         private const val ARG_FROM_DEVICE_LIST = "fromDeviceList"
-        private const val TAG = "KDE/DeviceFragment"
+        private const val TAG = "DeskLink/DeviceFragment"
         fun newInstance(deviceId: String?, fromDeviceList: Boolean): DeviceFragment {
             val frag = DeviceFragment()
             val args = Bundle()

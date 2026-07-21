@@ -217,5 +217,5 @@ object SslHelper {
         return IETFUtils.valueToString(rdn.getFirst().value)
     }
 
-    private const val LOG_TAG = "KDE/SslHelper"
+    private const val LOG_TAG = "DeskLink/SslHelper"
 }

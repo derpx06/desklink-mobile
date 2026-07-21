@@ -6,7 +6,10 @@ over encrypted links.
 
 ## Current transport
 
-KDE Connect-compatible local-network protocol v8.
+DeskLink Protocol v9 over the local network.
+
+The inactive compatibility module documents the legacy KDE Connect-compatible
+protocol v8; it is not advertised or transmitted by the active path.
 
 ## Current support
 
@@ -23,8 +26,9 @@ capture, and a shared virtual library.
 
 The published Android package identity remains `org.desklink.mobile` so
 existing installations can update in place. The legacy `kdeconnect` deep-link
-scheme and all `kdeconnect.*` packet identifiers are retained only for wire
-compatibility; they are not public product branding.
+scheme remains a stable external identifier. Active packet identifiers use
+`desklink.*`; legacy `kdeconnect.*` values are kept only in the inactive
+compatibility module and are not public product branding.
 
 ## License and attribution
 

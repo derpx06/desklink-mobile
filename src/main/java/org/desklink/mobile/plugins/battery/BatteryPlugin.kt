@@ -15,6 +15,7 @@ import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class BatteryPlugin : Plugin() {
@@ -114,7 +115,7 @@ class BatteryPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = arrayOf(PACKET_TYPE_BATTERY)
 
     companion object {
-        const val PACKET_TYPE_BATTERY = "desklink.battery"
+        const val PACKET_TYPE_BATTERY = DeskLinkProtocol.PACKET_TYPE_BATTERY
 
         // keep these fields in sync with kdeconnect-kded:BatteryPlugin.h:ThresholdBatteryEvent
         private const val THRESHOLD_EVENT_NONE = 0

@@ -49,7 +49,7 @@ class PingPluginTest {
         executeWithMocks { device, plugin, notificationManager ->
             val entries = plugin.getUiMenuEntries()
             entries.single().onClick(mockk())
-            verify(exactly = 1) { device.sendPacket(match { np -> np.type == "kdeconnect.ping" && np.payload == null }) }
+            verify(exactly = 1) { device.sendPacket(match { np -> np.type == "desklink.ping" && np.payload == null }) }
         }
     }
 
@@ -58,7 +58,7 @@ class PingPluginTest {
     @Test
     fun wrongPacketType() {
         executeWithMocks { device, plugin, notificationManager ->
-            val np = NetworkPacket("kdeconnect.wrench")
+            val np = NetworkPacket("desklink.wrench")
             np["message"] = "Test Ping"
             assert(!plugin.onPacketReceived(np))
         }
@@ -67,7 +67,7 @@ class PingPluginTest {
     @Test
     fun sendsNotificationNoMessage() {
         executeWithMocks { device, plugin, notificationManager ->
-            val np = NetworkPacket("kdeconnect.ping")
+            val np = NetworkPacket("desklink.ping")
             // np["message"] not set here
             assert(plugin.onPacketReceived(np))
 
@@ -78,7 +78,7 @@ class PingPluginTest {
     @Test
     fun sendsNotification() {
         executeWithMocks { device, plugin, notificationManager ->
-            val np = NetworkPacket("kdeconnect.ping")
+            val np = NetworkPacket("desklink.ping")
             np["message"] = "Test Ping"
             assert(plugin.onPacketReceived(np))
 

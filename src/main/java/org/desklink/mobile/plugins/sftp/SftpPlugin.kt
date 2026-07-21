@@ -26,6 +26,7 @@ import org.desklink.mobile.ui.DeviceSettingsAlertDialogFragment
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.ui.StartActivityAlertDialogFragment
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.desklink.mobile.BuildConfig
 import org.desklink.mobile.R
 
@@ -251,8 +252,8 @@ class SftpPlugin : Plugin(), OnSharedPreferenceChangeListener {
     }
 
     companion object {
-        private const val PACKET_TYPE_SFTP = "desklink.sftp"
-        private const val PACKET_TYPE_SFTP_REQUEST = "desklink.sftp.request"
+        private const val PACKET_TYPE_SFTP = DeskLinkProtocol.PACKET_TYPE_SFTP
+        private const val PACKET_TYPE_SFTP_REQUEST = DeskLinkProtocol.PACKET_TYPE_SFTP_REQUEST
 
         @JvmField
         val PREFERENCE_KEY_STORAGE_INFO_LIST: Int = R.string.sftp_preference_key_storage_info_list

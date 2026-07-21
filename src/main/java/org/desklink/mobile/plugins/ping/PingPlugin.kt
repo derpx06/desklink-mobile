@@ -25,6 +25,7 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class PingPlugin : Plugin() {
@@ -93,7 +94,7 @@ class PingPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = arrayOf(PACKET_TYPE_PING)
 
     companion object {
-        private const val PACKET_TYPE_PING = "desklink.ping"
+        private const val PACKET_TYPE_PING = DeskLinkProtocol.PACKET_TYPE_PING
         private const val LOG_TAG = "PingPlugin"
     }
 }

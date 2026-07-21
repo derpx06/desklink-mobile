@@ -12,6 +12,7 @@ import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class InputDevicesReceiverPlugin : Plugin() {
@@ -128,8 +129,8 @@ class InputDevicesReceiverPlugin : Plugin() {
         private const val BOTTOM_EDGE = 0x00001
         private const val NONE_EDGE = 0
 
-        private const val PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request"
-        private const val PACKET_TYPE_SHAREINPUTDEVICES = "desklink.shareinputdevices"
-        private const val PACKET_TYPE_SHAREINPUTDEVICES_REQUEST = "desklink.shareinputdevices.request"
+        private const val PACKET_TYPE_MOUSEPAD_REQUEST = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST
+        private const val PACKET_TYPE_SHAREINPUTDEVICES = DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES
+        private const val PACKET_TYPE_SHAREINPUTDEVICES_REQUEST = DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST
     }
 }

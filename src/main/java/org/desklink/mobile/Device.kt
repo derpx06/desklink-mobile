@@ -353,7 +353,7 @@ class Device : PacketReceiver {
         link.removePacketReceiver(this)
         links.remove(link)
         Log.i(
-            "KDE/Device",
+            "DeskLink/Device",
             "removeLink: ${link.linkProvider.name} -> $name active links: ${links.size}"
         )
         if (links.isEmpty()) {
@@ -408,7 +408,7 @@ class Device : PacketReceiver {
         countReceived(deviceId, np.type)
 
         if (NetworkPacket.PACKET_TYPE_PAIR == np.type) {
-            Log.i("KDE/Device", "Pair packet")
+            Log.i("DeskLink/Device", "Pair packet")
             pairingHandler.packetReceived(np)
             return
         }
@@ -513,7 +513,7 @@ class Device : PacketReceiver {
         sendPayloadFromSameThread: Boolean
     ): Boolean {
         if (!supportsPacketType(np.type)) {
-            Log.e("KDE/sendPacket", "Tried to send an unsupported packet type ${np.type} to: ${deviceInfo.name}")
+            Log.e("DeskLink/sendPacket", "Tried to send an unsupported packet type ${np.type} to: ${deviceInfo.name}")
             return false
         }
 
@@ -521,7 +521,7 @@ class Device : PacketReceiver {
             try {
                 link.sendPacket(np, callback, sendPayloadFromSameThread)
             } catch (e: IOException) {
-                Log.w("KDE/sendPacket", "Failed to send packet", e)
+                Log.w("DeskLink/sendPacket", "Failed to send packet", e)
                 false
             }.also { sent ->
                 countSent(deviceId, np.type, sent)
@@ -530,7 +530,7 @@ class Device : PacketReceiver {
 
         if (!success) {
             Log.e(
-                "KDE/sendPacket",
+                "DeskLink/sendPacket",
                 "No device link (of ${links.size} available) could send the packet. Packet ${np.type} to ${deviceInfo.name} lost!"
             )
         }
@@ -561,12 +561,12 @@ class Device : PacketReceiver {
                 ?: return false
 
         if (!plugin.isCompatible) {
-            Log.d("KDE/addPlugin", "Minimum requirements (e.g. API level) not fulfilled $pluginKey")
+            Log.d("DeskLink/addPlugin", "Minimum requirements (e.g. API level) not fulfilled $pluginKey")
             return false
         }
 
         if (!plugin.checkRequiredPermissions()) {
-            Log.d("KDE/addPlugin", "No permission $pluginKey")
+            Log.d("DeskLink/addPlugin", "No permission $pluginKey")
             pluginsWithoutPermissions[pluginKey] = plugin
             if (plugin.loadPluginWhenRequiredPermissionsMissing()) {
                 loadedPlugins[pluginKey] = plugin
@@ -575,14 +575,14 @@ class Device : PacketReceiver {
                 return false
             }
         } else {
-            Log.d("KDE/addPlugin", "Permissions OK $pluginKey")
+            Log.d("DeskLink/addPlugin", "Permissions OK $pluginKey")
             loadedPlugins[pluginKey] = plugin
             pluginsWithoutPermissions.remove(pluginKey)
             if (plugin.checkOptionalPermissions()) {
-                Log.d("KDE/addPlugin", "Optional Permissions OK $pluginKey")
+                Log.d("DeskLink/addPlugin", "Optional Permissions OK $pluginKey")
                 pluginsWithoutOptionalPermissions.remove(pluginKey)
             } else {
-                Log.d("KDE/addPlugin", "No optional permission $pluginKey")
+                Log.d("DeskLink/addPlugin", "No optional permission $pluginKey")
                 pluginsWithoutOptionalPermissions[pluginKey] = plugin
             }
         }
@@ -594,7 +594,7 @@ class Device : PacketReceiver {
         return runCatching {
             plugin.onCreate()
         }.onFailure {
-            Log.e("KDE/addPlugin", "plugin failed to load $pluginKey", it)
+            Log.e("DeskLink/addPlugin", "plugin failed to load $pluginKey", it)
         }.getOrDefault(false)
     }
 
@@ -606,7 +606,7 @@ class Device : PacketReceiver {
             plugin.onDestroy()
             // Log.e("removePlugin","removed " + pluginKey);
         } catch (e: Exception) {
-            Log.e("KDE/removePlugin", "Exception calling onDestroy for plugin $pluginKey", e)
+            Log.e("DeskLink/removePlugin", "Exception calling onDestroy for plugin $pluginKey", e)
         }
 
         return true

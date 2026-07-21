@@ -15,6 +15,7 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory
 import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @PluginFactory.LoadablePlugin
 class DigitizerPlugin : Plugin() {
@@ -88,8 +89,8 @@ class DigitizerPlugin : Plugin() {
         )
 
     companion object {
-        private const val PACKET_TYPE_DIGITIZER_SESSION = "desklink.digitizer.session"
-        private const val PACKET_TYPE_DIGITIZER = "desklink.digitizer"
+        private const val PACKET_TYPE_DIGITIZER_SESSION = DeskLinkProtocol.PACKET_TYPE_DIGITIZER_SESSION
+        private const val PACKET_TYPE_DIGITIZER = DeskLinkProtocol.PACKET_TYPE_DIGITIZER
 
         private const val TAG = "DigitizerPlugin"
     }

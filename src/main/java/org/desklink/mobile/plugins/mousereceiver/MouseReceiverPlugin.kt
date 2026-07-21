@@ -17,6 +17,7 @@ import org.desklink.mobile.plugins.remotekeyboard.RemoteKeyboardPlugin
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.ui.StartActivityAlertDialogFragment
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -145,6 +146,6 @@ class MouseReceiverPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = emptyArray()
 
     companion object {
-        private const val PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request"
+        private const val PACKET_TYPE_MOUSEPAD_REQUEST = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST
     }
 }

@@ -45,6 +45,7 @@ import org.desklink.mobile.ui.PluginSettingsFragment;
 import org.desklink.mobile.async.BackgroundJob;
 import org.desklink.mobile.async.BackgroundJobHandler;
 import org.desklink.mobile.R;
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol;
 
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -69,8 +70,8 @@ public class SharePlugin extends Plugin {
     final static String CANCEL_SHARE_DEVICE_ID_EXTRA = "deviceId";
     final static String CANCEL_SHARE_BACKGROUND_JOB_ID_EXTRA = "backgroundJobId";
 
-    private final static String PACKET_TYPE_SHARE_REQUEST = "desklink.share.request";
-    final static String PACKET_TYPE_SHARE_REQUEST_UPDATE = "desklink.share.request.update";
+    private final static String PACKET_TYPE_SHARE_REQUEST = DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST;
+    final static String PACKET_TYPE_SHARE_REQUEST_UPDATE = DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST_UPDATE;
 
     final static String KEY_NUMBER_OF_FILES = "numberOfFiles";
     final static String KEY_TOTAL_PAYLOAD_SIZE = "totalPayloadSize";
@@ -422,7 +423,7 @@ public class SharePlugin extends Plugin {
 
     @Override
     public void onDeviceUnpaired(Context context, String deviceId) {
-        Log.i("KDE/SharePlugin", "onDeviceUnpaired deviceId = " + deviceId);
+        Log.i("DeskLink/SharePlugin", "onDeviceUnpaired deviceId = " + deviceId);
         if (mSharedPrefs == null) {
             mSharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
         }

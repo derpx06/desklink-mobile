@@ -52,7 +52,7 @@
   <string name="send_ping">Envia un ping</string>
   <string name="open_mpris_controls">Control multimèdia</string>
   <string name="remotekeyboard_editing_only_title">Fes servir les tecles remotes només en editar</string>
-  <string name="remotekeyboard_not_connected">No hi ha cap connexió activa amb el teclat remot, establiu-ne una al kde-connect</string>
+  <string name="remotekeyboard_not_connected">No hi ha cap connexió activa amb el teclat remot, establiu-ne una al DeskLink</string>
   <string name="remotekeyboard_connected">La connexió amb el teclat remot està activa</string>
   <string name="remotekeyboard_multiple_connections">Hi ha més d\'una connexió amb un teclat remot, seleccioneu el dispositiu per a configurar-lo</string>
   <string name="open_mousepad">Entrada remota</string>

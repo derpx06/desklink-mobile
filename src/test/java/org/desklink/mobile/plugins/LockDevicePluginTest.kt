@@ -28,7 +28,7 @@ class LockDevicePluginTest {
 
         verify(exactly = 1) {
             device.sendPacket(match { packet ->
-                packet.type == "kdeconnect.lock.request" && packet.getBoolean("setLocked")
+                packet.type == "desklink.lock.request" && packet.getBoolean("setLocked")
             })
         }
     }
@@ -37,10 +37,10 @@ class LockDevicePluginTest {
     fun advertisesLockCapabilities() {
         val plugin = LockDevicePlugin()
 
-        assert("kdeconnect.lock" in plugin.supportedPacketTypes)
-        assert("kdeconnect.lock.request" in plugin.supportedPacketTypes)
-        assert("kdeconnect.lock" in plugin.outgoingPacketTypes)
-        assert("kdeconnect.lock.request" in plugin.outgoingPacketTypes)
+        assert("desklink.lock" in plugin.supportedPacketTypes)
+        assert("desklink.lock.request" in plugin.supportedPacketTypes)
+        assert("desklink.lock" in plugin.outgoingPacketTypes)
+        assert("desklink.lock.request" in plugin.outgoingPacketTypes)
         assert(plugin.loadPluginWhenRequiredPermissionsMissing())
     }
 }

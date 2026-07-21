@@ -35,12 +35,13 @@ import org.desklink.mobile.plugins.Plugin;
 import org.desklink.mobile.plugins.PluginFactory;
 import org.desklink.mobile.ui.PluginSettingsFragment;
 import org.desklink.mobile.R;
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol;
 
 import java.io.IOException;
 
 @PluginFactory.LoadablePlugin
 public class FindMyPhonePlugin extends Plugin {
-    public final static String PACKET_TYPE_FINDMYPHONE_REQUEST = "desklink.findmyphone.request";
+    public final static String PACKET_TYPE_FINDMYPHONE_REQUEST = DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST;
 
     private NotificationManager notificationManager;
     private int notificationId;

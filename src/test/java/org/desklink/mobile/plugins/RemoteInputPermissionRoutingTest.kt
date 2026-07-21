@@ -19,7 +19,7 @@ class RemoteInputPermissionRoutingTest {
         val plugin = MouseReceiverPlugin()
         MouseReceiverService.instance = null
 
-        val packet = NetworkPacket("kdeconnect.mousepad.request").apply {
+        val packet = NetworkPacket("desklink.mousepad.request").apply {
             this["dx"] = 4.0
             this["dy"] = 2.0
         }

@@ -33,6 +33,7 @@ import org.desklink.mobile.ui.MainActivity;
 import org.desklink.mobile.ui.PluginSettingsFragment;
 import org.desklink.mobile.ui.StartActivityAlertDialogFragment;
 import org.desklink.mobile.R;
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,9 +42,9 @@ import java.util.concurrent.locks.ReentrantLock;
 @PluginFactory.LoadablePlugin
 public class RemoteKeyboardPlugin extends Plugin implements SharedPreferences.OnSharedPreferenceChangeListener {
 
-    private final static String PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request";
-    private final static String PACKET_TYPE_MOUSEPAD_ECHO = "desklink.mousepad.echo";
-    private final static String PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = "desklink.mousepad.keyboardstate";
+    private final static String PACKET_TYPE_MOUSEPAD_REQUEST = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST;
+    private final static String PACKET_TYPE_MOUSEPAD_ECHO = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_ECHO;
+    private final static String PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE;
 
     /**
      * Track and expose plugin instances to allow for a 'connected'-indicator in the IME:

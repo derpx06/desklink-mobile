@@ -17,6 +17,7 @@ import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.ui.PluginSettingsFragment.Companion.newInstance
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class MousePadPlugin : Plugin() {
@@ -193,7 +194,7 @@ class MousePadPlugin : Plugin() {
     override val outgoingPacketTypes = arrayOf(PACKET_TYPE_MOUSEPAD_REQUEST)
 
     companion object {
-        const val PACKET_TYPE_MOUSEPAD_REQUEST: String = "desklink.mousepad.request"
-        private const val PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = "desklink.mousepad.keyboardstate"
+        const val PACKET_TYPE_MOUSEPAD_REQUEST: String = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST
+        private const val PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE
     }
 }

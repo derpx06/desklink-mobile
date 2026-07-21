@@ -29,6 +29,7 @@ import org.desklink.mobile.plugins.PluginFactory;
 import org.desklink.mobile.ui.MainActivity;
 import org.desklink.mobile.ui.StartActivityAlertDialogFragment;
 import org.desklink.mobile.R;
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,8 +41,8 @@ import java.util.stream.Stream;
 
 @PluginFactory.LoadablePlugin
 public class MprisReceiverPlugin extends Plugin {
-    private final static String PACKET_TYPE_MPRIS = "desklink.mpris";
-    private final static String PACKET_TYPE_MPRIS_REQUEST = "desklink.mpris.request";
+    private final static String PACKET_TYPE_MPRIS = DeskLinkProtocol.PACKET_TYPE_MPRIS;
+    private final static String PACKET_TYPE_MPRIS_REQUEST = DeskLinkProtocol.PACKET_TYPE_MPRIS_REQUEST;
 
     private static final String TAG = "MprisReceiver";
 

@@ -25,6 +25,7 @@ import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.ui.PluginSettingsFragment.Companion.newInstance
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import java.util.Timer
 import java.util.TimerTask
 
@@ -213,14 +214,14 @@ class TelephonyPlugin : Plugin() {
          *
          * Depending on the event, other fields may be defined
          */
-        const val PACKET_TYPE_TELEPHONY: String = "desklink.telephony"
+        const val PACKET_TYPE_TELEPHONY: String = DeskLinkProtocol.PACKET_TYPE_TELEPHONY
 
         /**
          * Packet sent to indicate the user has requested the device mute its ringer
          *
          * The body should be empty
          */
-        private const val PACKET_TYPE_TELEPHONY_REQUEST_MUTE = "desklink.telephony.request_mute"
+        private const val PACKET_TYPE_TELEPHONY_REQUEST_MUTE = DeskLinkProtocol.PACKET_TYPE_TELEPHONY_REQUEST_MUTE
 
         private const val KEY_PREF_BLOCKED_NUMBERS = "telephony_blocked_numbers"
     }

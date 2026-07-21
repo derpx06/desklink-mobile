@@ -39,7 +39,7 @@ object RsaHelper {
                 keyPair = generator.generateKeyPair()
             }
             catch (e: Exception) {
-                Log.e("KDE/initializeRsaKeys", "Exception", e)
+                Log.e("DeskLink/initializeRsaKeys", "Exception", e)
                 return
             }
 

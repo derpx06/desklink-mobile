@@ -14,6 +14,7 @@ import org.desklink.mobile.plugins.connectivityreport.ConnectivityListener.Subsc
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class ConnectivityReportPlugin : Plugin() {
@@ -88,6 +89,6 @@ class ConnectivityReportPlugin : Plugin() {
     override val requiredPermissions: Array<String> = arrayOf(Manifest.permission.READ_PHONE_STATE)
 
     companion object {
-        private const val PACKET_TYPE_CONNECTIVITY_REPORT = "desklink.connectivity_report"
+        private const val PACKET_TYPE_CONNECTIVITY_REPORT = DeskLinkProtocol.PACKET_TYPE_CONNECTIVITY_REPORT
     }
 }

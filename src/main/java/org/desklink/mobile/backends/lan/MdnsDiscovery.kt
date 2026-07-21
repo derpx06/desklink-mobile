@@ -31,7 +31,7 @@ class MdnsDiscovery {
         this.mNsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
         this.mNsdResolveQueue = NsdResolveQueue(this.mNsdManager)
         val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        multicastLock = wifiManager.createMulticastLock("kdeConnectMdnsMulticastLock")
+        multicastLock = wifiManager.createMulticastLock("deskLinkMdnsMulticastLock")
     }
 
     fun startDiscovering() {

@@ -18,6 +18,7 @@ import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.plugins.mousereceiver.MouseReceiverService
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.ui.StartActivityAlertDialogFragment
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 @RequiresApi(Build.VERSION_CODES.P)
@@ -108,7 +109,7 @@ class LockDevicePlugin : Plugin() {
 
     companion object {
         private const val LOG_TAG = "LockDevicePlugin"
-        private const val PACKET_TYPE_LOCK = "desklink.lock"
-        private const val PACKET_TYPE_LOCK_REQUEST = "desklink.lock.request"
+        private const val PACKET_TYPE_LOCK = DeskLinkProtocol.PACKET_TYPE_LOCK
+        private const val PACKET_TYPE_LOCK_REQUEST = DeskLinkProtocol.PACKET_TYPE_LOCK_REQUEST
     }
 }

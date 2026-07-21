@@ -21,6 +21,7 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.ui.AlertDialogFragment
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class ContactsPlugin : Plugin() {
@@ -174,7 +175,7 @@ class ContactsPlugin : Plugin() {
         /**
          * Used to request the device send the unique ID of every contact
          */
-        private const val PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS: String = "desklink.contacts.request_all_uids_timestamps"
+        private const val PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS: String = DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS
 
         /**
          * Used to request the names for the contacts corresponding to a list of UIDs
@@ -182,7 +183,7 @@ class ContactsPlugin : Plugin() {
          *
          * It shall contain the key "uids", which will have a list of uIDs (long int, as string)
          */
-        private const val PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS: String = "desklink.contacts.request_vcards_by_uid"
+        private const val PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS: String = DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS
 
         /**
          * Response indicating the packet contains a list of contact uIDs
@@ -191,7 +192,7 @@ class ContactsPlugin : Plugin() {
          * It shall contain the key "uids", which will mark a list of uIDs (long int, as string)
          * The returned IDs can be used in future requests for more information about the contact
          */
-        private const val PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS: String = "desklink.contacts.response_uids_timestamps"
+        private const val PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS: String = DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS
 
         /**
          * Response indicating the packet contains a list of contact names
@@ -208,6 +209,6 @@ class ContactsPlugin : Plugin() {
          * '15' : 'Mom'
          * }
          */
-        private const val PACKET_TYPE_CONTACTS_RESPONSE_VCARDS: String = "desklink.contacts.response_vcards"
+        private const val PACKET_TYPE_CONTACTS_RESPONSE_VCARDS: String = DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_VCARDS
     }
 }

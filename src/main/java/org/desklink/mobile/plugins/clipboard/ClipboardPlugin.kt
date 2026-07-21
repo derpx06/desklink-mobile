@@ -20,9 +20,11 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.plugins.clipboard.ClipboardListener.ClipboardObserver
 import org.desklink.mobile.R
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class ClipboardPlugin : Plugin() {
+    private val maxClipboardBytes = 1024 * 1024
     override val displayName: String
         get() = context.resources.getString(R.string.pref_plugin_clipboard)
 
@@ -31,6 +33,9 @@ class ClipboardPlugin : Plugin() {
 
     override fun onPacketReceived(np: NetworkPacket): Boolean {
         val content = np.getString("content")
+        if (content.toByteArray(Charsets.UTF_8).size > maxClipboardBytes) {
+            return false
+        }
         when (np.type) {
             (PACKET_TYPE_CLIPBOARD) -> {
                 ClipboardListener.instance(context).setText(content)
@@ -59,6 +64,7 @@ class ClipboardPlugin : Plugin() {
 
     @VisibleForTesting
     fun propagateClipboard(content: String) {
+        if (content.toByteArray(Charsets.UTF_8).size > maxClipboardBytes) return
         val np = NetworkPacket(PACKET_TYPE_CLIPBOARD)
         np["content"] = content
         device.sendPacket(np)
@@ -132,7 +138,7 @@ class ClipboardPlugin : Plugin() {
          * "content": "password"
          * }
          */
-        private const val PACKET_TYPE_CLIPBOARD = "desklink.clipboard"
+        private const val PACKET_TYPE_CLIPBOARD = DeskLinkProtocol.PACKET_TYPE_CLIPBOARD
 
         /**
          * Packet containing clipboard contents and a timestamp that the contents were last updated, sent
@@ -149,7 +155,7 @@ class ClipboardPlugin : Plugin() {
          * "content": "password"
          * }
          */
-        private const val PACKET_TYPE_CLIPBOARD_CONNECT = "desklink.clipboard.connect"
+        private const val PACKET_TYPE_CLIPBOARD_CONNECT = DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT
 
         fun canSyncAutomatically(context: Context): Boolean {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {

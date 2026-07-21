@@ -34,6 +34,8 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.channels.NotYetConnectedException;
 import java.security.cert.CertificateException;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLSocket;
@@ -44,6 +46,7 @@ import main.java.org.desklink.mobile.helpers.LineTooLongException;
 public class LanLink extends BaseLink {
 
     final static int MAX_PACKET_SIZE = 32 * 1024 * 1024;
+    final static long MAX_PAYLOAD_SIZE = 4L * 1024L * 1024L * 1024L;
 
     public enum ConnectionStarted {
         Locally, Remotely
@@ -126,12 +129,16 @@ public class LanLink extends BaseLink {
     @Override
     public boolean sendPacket(@NonNull NetworkPacket np, @NonNull final Device.SendPacketStatusCallback callback, boolean sendPayloadFromSameThread) {
         if (socket == null) {
-            Log.e("KDE/sendPacket", "Not yet connected");
+            Log.e("DeskLink/sendPacket", "Not yet connected");
             callback.onFailure(new NotYetConnectedException());
             return false;
         }
 
         try {
+
+            if (np.hasPayload() && np.getPayloadSize() > MAX_PAYLOAD_SIZE) {
+                throw new IOException("Payload exceeds the maximum supported size");
+            }
 
             //Prepare socket for the payload
             final ServerSocket server;
@@ -140,6 +147,9 @@ public class LanLink extends BaseLink {
                 JSONObject payloadTransferInfo = new JSONObject();
                 payloadTransferInfo.put("port", server.getLocalPort());
                 np.setPayloadTransferInfo(payloadTransferInfo);
+                if (np.getStringOrNull("transferToken") == null) {
+                    np.set("transferToken", UUID.randomUUID().toString());
+                }
             } else {
                 server = null;
             }
@@ -168,25 +178,23 @@ public class LanLink extends BaseLink {
                         try {
                             sendPayload(np, callback, server);
                         } catch (IOException e) {
-                            e.printStackTrace();
-                            Log.e("LanLink/sendPacket", "Async sendPayload failed for packet of type " + np.getType() + ". The Plugin was NOT notified.");
+                            Log.e("LanLink/sendPacket", "Async sendPayload failed for packet of type " + np.getType(), e);
+                            callback.onFailure(e);
                         }
                     });
                 }
             }
 
-            if (!np.isCanceled()) {
+            if (server == null && !np.isCanceled()) {
                 callback.onSuccess();
             }
             return true;
         } catch (Exception e) {
-            callback.onFailure(e);
-            return false;
-        } finally  {
-            //Make sure we close the payload stream, if any
             if (np.hasPayload()) {
                 np.getPayload().close();
             }
+            callback.onFailure(e);
+            return false;
         }
     }
 
@@ -207,7 +215,13 @@ public class LanLink extends BaseLink {
                 outputStream = payloadSocket.getOutputStream();
                 inputStream = np.getPayload().getInputStream();
 
-                Log.i("KDE/LanLink", "Beginning to send payload for " + np.getType());
+                String transferToken = np.getStringOrNull("transferToken");
+                if (transferToken == null || transferToken.isEmpty() || transferToken.length() > 128) {
+                    throw new IOException("Missing or invalid payload transfer token");
+                }
+                outputStream.write((transferToken + "\n").getBytes(StandardCharsets.UTF_8));
+
+                Log.i("DeskLink/LanLink", "Beginning to send payload for " + np.getType());
                 byte[] buffer = new byte[4096];
                 int bytesRead;
                 long size = np.getPayloadSize();
@@ -226,15 +240,23 @@ public class LanLink extends BaseLink {
                     }
                 }
                 outputStream.flush();
-                Log.i("KDE/LanLink", "Finished sending payload (" + progress + " bytes written)");
+                Log.i("DeskLink/LanLink", "Finished sending payload (" + progress + " bytes written)");
+                if (np.isCanceled()) {
+                    callback.onFailure(new IOException("Payload transfer cancelled"));
+                } else {
+                    callback.onPayloadProgressChanged(100);
+                    callback.onSuccess();
+                }
             }
         } catch(SocketTimeoutException e) {
             Log.e("LanLink", "Socket for payload in packet " + np.getType() + " timed out. The other end didn't fetch the payload.");
+            callback.onFailure(e);
         } catch(CertificateException | SSLHandshakeException e) {
             // The exception can be due to several causes. "Connection closed by peer" seems to be a common one.
             // If we could distinguish different cases we could react differently for some of them, but I haven't found how.
             Log.e("sendPacket","Payload SSLSocket failed");
-            e.printStackTrace();
+            Log.e("sendPacket", "Payload transfer failed", e);
+            callback.onFailure(e);
         } finally {
             try { server.close(); } catch (Exception ignored) { }
             try { IOUtils.close(payloadSocket); } catch (Exception ignored) { }
@@ -248,14 +270,33 @@ public class LanLink extends BaseLink {
         if (np.hasPayloadTransferInfo()) {
             Socket payloadSocket = new Socket();
             try {
+                if (np.getPayloadSize() < 0 || np.getPayloadSize() > MAX_PAYLOAD_SIZE) {
+                    throw new IOException("Payload size is invalid");
+                }
                 int tcpPort = np.getPayloadTransferInfo().getInt("port");
                 InetSocketAddress deviceAddress = (InetSocketAddress) socket.getRemoteSocketAddress();
                 payloadSocket.connect(new InetSocketAddress(deviceAddress.getAddress(), tcpPort));
                 payloadSocket = SslHelper.convertToSslSocket(context, payloadSocket, getDeviceId(), true, true);
+                String expectedToken = np.getStringOrNull("transferToken");
+                if (expectedToken == null || expectedToken.isEmpty() || expectedToken.length() > 128) {
+                    throw new IOException("Missing or invalid payload transfer token");
+                }
+                InputStream tokenStream = payloadSocket.getInputStream();
+                StringBuilder token = new StringBuilder();
+                int tokenByte;
+                while ((tokenByte = tokenStream.read()) != -1 && tokenByte != '\n') {
+                    if (token.length() >= 128) {
+                        throw new IOException("Payload transfer token is too long");
+                    }
+                    token.append((char) tokenByte);
+                }
+                if (!expectedToken.contentEquals(token)) {
+                    throw new IOException("Payload transfer token does not match control packet");
+                }
                 np.setPayload(new NetworkPacket.Payload(payloadSocket, np.getPayloadSize()));
             } catch (Exception e) {
                 try { payloadSocket.close(); } catch(Exception ignored) { }
-                Log.e("KDE/LanLink", "Exception connecting to payload remote socket", e);
+                Log.e("DeskLink/LanLink", "Exception connecting to payload remote socket", e);
             }
 
         }

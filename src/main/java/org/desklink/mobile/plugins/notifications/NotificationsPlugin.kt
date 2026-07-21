@@ -45,6 +45,7 @@ import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import java.util.Locale
 import androidx.core.graphics.createBitmap
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener {
@@ -525,8 +526,12 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
                     this.sendCurrentNotifications(service)
                 }
             }
-        } else if (np.has("cancel")) {
-            val dismissedId = np.getString("cancel")
+        } else if (np.has("cancel") || np.type == PACKET_TYPE_NOTIFICATION_CANCEL) {
+            val dismissedId = if (np.type == PACKET_TYPE_NOTIFICATION_CANCEL) {
+                np.getString("id")
+            } else {
+                np.getString("cancel")
+            }
             currentNotifications.remove(dismissedId)
             NotificationReceiver.RunCommand(context) { service ->
                 service.cancelNotification(dismissedId)
@@ -551,6 +556,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     override val supportedPacketTypes = arrayOf(
             PACKET_TYPE_NOTIFICATION_REQUEST,
+            PACKET_TYPE_NOTIFICATION_CANCEL,
             PACKET_TYPE_NOTIFICATION_REPLY,
             PACKET_TYPE_NOTIFICATION_ACTION
         )
@@ -559,15 +565,16 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
 
     companion object {
-        private const val PACKET_TYPE_NOTIFICATION = "desklink.notification"
-        private const val PACKET_TYPE_NOTIFICATION_REQUEST = "desklink.notification.request"
-        private const val PACKET_TYPE_NOTIFICATION_REPLY = "desklink.notification.reply"
-        private const val PACKET_TYPE_NOTIFICATION_ACTION = "desklink.notification.action"
+        private const val PACKET_TYPE_NOTIFICATION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION
+        private const val PACKET_TYPE_NOTIFICATION_REQUEST = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REQUEST
+        private const val PACKET_TYPE_NOTIFICATION_CANCEL = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_CANCEL
+        private const val PACKET_TYPE_NOTIFICATION_REPLY = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REPLY
+        private const val PACKET_TYPE_NOTIFICATION_ACTION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_ACTION
         const val PREFERENCE_KEY = "prefKey"
         const val PREF_NOTIFICATION_SCREEN_OFF = "pref_notification_screen_off"
         private const val NOTIFICATION_SYNC_DELAY_MS = 50L
 
-        private const val TAG = "KDE/NotificationsPlugin"
+        private const val TAG = "DeskLink/NotificationsPlugin"
 
         private fun extractStringFromExtra(extras: Bundle, key: String): String? {
             val extra = extras.get(key)

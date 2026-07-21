@@ -53,7 +53,7 @@ class RunCommandPluginTest {
         runCommandPlugin.runCommand(commandKey)
 
         val sentPacket = checkNotNull(packet)
-        assertEquals("kdeconnect.runcommand.request", sentPacket.type)
+        assertEquals("desklink.runcommand.request", sentPacket.type)
         assertEquals(commandKey, sentPacket.getString("key"))
     }
 
@@ -62,7 +62,7 @@ class RunCommandPluginTest {
         runCommandPlugin.onCreate() // Simulate plugin creation that requests command list
 
         val sentPacket = checkNotNull(packet)
-        assertEquals("kdeconnect.runcommand.request", sentPacket.type)
+        assertEquals("desklink.runcommand.request", sentPacket.type)
         assertTrue(sentPacket.has("requestCommandList"))
         assertTrue(sentPacket.getBoolean("requestCommandList"))
     }
@@ -71,7 +71,7 @@ class RunCommandPluginTest {
 
     @Test
     fun testReceiveCommandList() {
-        val commandListPacket = NetworkPacket("kdeconnect.runcommand").apply {
+        val commandListPacket = NetworkPacket("desklink.runcommand").apply {
             set("commandList", JSONObject().apply {
                 put("command1", JSONObject().apply {
                     put("name", "Command 1")
@@ -103,7 +103,7 @@ class RunCommandPluginTest {
     @Test
     fun testReceiveCommandsUpdate() {
         // First, simulate receiving a basic command list
-        val initialCommandPacket = NetworkPacket("kdeconnect.runcommand").apply {
+        val initialCommandPacket = NetworkPacket("desklink.runcommand").apply {
             set("commandList", JSONObject().apply {
                 put("command1", JSONObject().apply {
                     put("name", "Command 1")
@@ -114,7 +114,7 @@ class RunCommandPluginTest {
         assertTrue(runCommandPlugin.onPacketReceived(initialCommandPacket))
 
         // Then, send a new packet with an updated command1 and a new command2
-        val updatedCommandPacket = NetworkPacket("kdeconnect.runcommand").apply {
+        val updatedCommandPacket = NetworkPacket("desklink.runcommand").apply {
             set("commandList", JSONObject().apply {
                 put("command1", JSONObject().apply {
                     put("name", "Updated Command 1")
@@ -148,7 +148,7 @@ class RunCommandPluginTest {
         val listener = mockk<RunCommandPlugin.CommandsChangedCallback>(relaxed = true)
         runCommandPlugin.addCommandsUpdatedCallback(listener)
 
-        val commandListPacket = NetworkPacket("kdeconnect.runcommand").apply {
+        val commandListPacket = NetworkPacket("desklink.runcommand").apply {
             set("commandList", JSONObject().apply {
                 put("command1", JSONObject().apply {
                     put("name", "Command 1")
@@ -176,7 +176,7 @@ class RunCommandPluginTest {
             }
         }
 
-        val canAddCommandPacket = NetworkPacket("kdeconnect.runcommand").apply {
+        val canAddCommandPacket = NetworkPacket("desklink.runcommand").apply {
             set("canAddCommand", true)
             addBasicCommandList(this)
         }
@@ -184,7 +184,7 @@ class RunCommandPluginTest {
         assertTrue(runCommandPlugin.onPacketReceived(canAddCommandPacket))
         assertTrue(runCommandPlugin.canAddCommand())
 
-        val cannotAddCommandPacket = NetworkPacket("kdeconnect.runcommand").apply {
+        val cannotAddCommandPacket = NetworkPacket("desklink.runcommand").apply {
             set("canAddCommand", false)
             addBasicCommandList(this)
         }

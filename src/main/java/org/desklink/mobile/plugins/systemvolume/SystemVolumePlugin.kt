@@ -13,6 +13,7 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.R
 import java.util.concurrent.ConcurrentHashMap
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class SystemVolumePlugin : Plugin() {
@@ -107,7 +108,7 @@ class SystemVolumePlugin : Plugin() {
     }
 
     companion object {
-        private const val PACKET_TYPE_SYSTEMVOLUME = "desklink.systemvolume"
-        private const val PACKET_TYPE_SYSTEMVOLUME_REQUEST = "desklink.systemvolume.request"
+        private const val PACKET_TYPE_SYSTEMVOLUME = DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME
+        private const val PACKET_TYPE_SYSTEMVOLUME_REQUEST = DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME_REQUEST
     }
 }

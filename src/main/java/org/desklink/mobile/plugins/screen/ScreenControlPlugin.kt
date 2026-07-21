@@ -13,6 +13,7 @@ import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 @LoadablePlugin
 class ScreenControlPlugin : Plugin() {
@@ -84,11 +85,11 @@ class ScreenControlPlugin : Plugin() {
 
     companion object {
         private const val TAG = "DeskLink/ScreenControl"
-        const val PACKET_TYPE_SCREEN_REQUEST = "desklink.screen.request"
-        const val PACKET_TYPE_SCREEN_READY = "desklink.screen.ready"
-        const val PACKET_TYPE_SCREEN_FRAME = "desklink.screen.frame"
-        const val PACKET_TYPE_SCREEN_STOP = "desklink.screen.stop"
-        const val PACKET_TYPE_SCREEN_ERROR = "desklink.screen.error"
+        const val PACKET_TYPE_SCREEN_REQUEST = DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST
+        const val PACKET_TYPE_SCREEN_READY = DeskLinkProtocol.PACKET_TYPE_SCREEN_READY
+        const val PACKET_TYPE_SCREEN_FRAME = DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME
+        const val PACKET_TYPE_SCREEN_STOP = DeskLinkProtocol.PACKET_TYPE_SCREEN_STOP
+        const val PACKET_TYPE_SCREEN_ERROR = DeskLinkProtocol.PACKET_TYPE_SCREEN_ERROR
 
         const val ROLE_PHONE_SCREEN = "phone-screen"
         const val ROLE_DESKTOP_SCREEN = "desktop-screen"

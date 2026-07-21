@@ -26,6 +26,7 @@ import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.mpris.AlbumArtCache.deregisterPlugin
 import org.desklink.mobile.plugins.mpris.AlbumArtCache.getAlbumArt
 import org.desklink.mobile.plugins.mpris.AlbumArtCache.initializeDiskCache
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.desklink.mobile.plugins.mpris.AlbumArtCache.payloadToDiskCache
 import org.desklink.mobile.plugins.mpris.AlbumArtCache.registerPlugin
 import org.desklink.mobile.plugins.Plugin
@@ -505,7 +506,7 @@ class MprisPlugin : Plugin() {
 
     companion object {
         const val DEVICE_ID_KEY: String = "deviceId"
-        private const val PACKET_TYPE_MPRIS = "desklink.mpris"
-        private const val PACKET_TYPE_MPRIS_REQUEST = "desklink.mpris.request"
+        private const val PACKET_TYPE_MPRIS = DeskLinkProtocol.PACKET_TYPE_MPRIS
+        private const val PACKET_TYPE_MPRIS_REQUEST = DeskLinkProtocol.PACKET_TYPE_MPRIS_REQUEST
     }
 }

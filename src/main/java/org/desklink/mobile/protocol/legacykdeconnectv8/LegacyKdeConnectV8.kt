@@ -3,9 +3,9 @@ package org.desklink.mobile.protocol.legacykdeconnectv8
 /**
  * KDE Connect-compatible protocol v8 wire identifiers.
  *
- * Retained as a legacy KDE Connect-compatible wire identifier. This is not a
- * user-visible DeskLink product name. Do not change these values during
- * branding work: paired DeskLink peers serialize and discover with them.
+ * Retained as an inactive legacy KDE Connect-compatible wire reference. This
+ * is not a user-visible DeskLink product name and is not used by the active
+ * DeskLink Protocol v9 transport.
  */
 object LegacyKdeConnectV8 {
     const val PROTOCOL_VERSION = 8

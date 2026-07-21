@@ -16,6 +16,6 @@ Sensitive permissions information:
 * Accessibility permission: Required to receive input from another device to control your Android phone, if you use the Remote Input feature.
 * Background location permission: Required to know to which WiFi network you are connected to, if you use the Trusted Networks feature.
 
-DeskLink never sends any information to KDE nor to any third party. DeskLink sends data from one device to the other directly using the local network, never through the internet, and using end to end encryption.
+DeskLink sends data directly from one device to the other using the local network, never through the internet, and using end to end encryption.
 
 This app is part of an open source project and it exists thanks to all the people who contributed to it. Visit the website to grab the source code.

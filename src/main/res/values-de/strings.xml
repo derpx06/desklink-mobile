@@ -48,7 +48,7 @@
   <string name="open_settings">Einstellungen öffnen</string>
   <string name="no_permissions">Sie müssen die Berechtigung zum Zugriff auf Benachrichtigungen erteilen</string>
   <string name="no_permission_mprisreceiver">Um die Medienwiedergabe steuern zu können, müssen Sie Zugriff auf die Benachrichtigungen gewähren</string>
-  <string name="no_permissions_remotekeyboard">Um Tasteneingaben empfangen zu können, muss die KDE-Connect-Tastatur aktiviert werden</string>
+  <string name="no_permissions_remotekeyboard">Um Tasteneingaben empfangen zu können, muss die DeskLink-Tastatur aktiviert werden</string>
   <string name="send_ping">Ping senden</string>
   <string name="open_mpris_controls">Medienkontrolle</string>
   <string name="remotekeyboard_editing_only_title">Entfernte Tasteneingaben nur empfangen, wenn ein Textfeld ausgewählt ist</string>

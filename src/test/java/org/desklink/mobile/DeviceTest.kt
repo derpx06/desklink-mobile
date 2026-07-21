@@ -109,8 +109,8 @@ class DeviceTest {
         val deviceId = "testDevice"
         val deviceInfo = loadFromSettings(context, deviceId)
         deviceInfo.protocolVersion = DeviceHelper.PROTOCOL_VERSION
-        deviceInfo.incomingCapabilities = hashSetOf("kdeconnect.plugin1State", "kdeconnect.plugin2State")
-        deviceInfo.outgoingCapabilities = hashSetOf("kdeconnect.plugin1State.request", "kdeconnect.plugin2State.request")
+        deviceInfo.incomingCapabilities = hashSetOf("desklink.plugin1State", "desklink.plugin2State")
+        deviceInfo.outgoingCapabilities = hashSetOf("desklink.plugin1State.request", "desklink.plugin2State.request")
 
         val networkPacket = deviceInfo.toIdentityPacket()
         Assert.assertEquals(deviceInfo.id, networkPacket.getString("deviceId"))
