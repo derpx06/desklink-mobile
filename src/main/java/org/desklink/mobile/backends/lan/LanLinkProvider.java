@@ -93,6 +93,19 @@ public class LanLinkProvider extends BaseLinkProvider {
         String deviceId = link.getDeviceId();
         visibleDevices.remove(deviceId);
         super.onConnectionLost(link);
+        if (listening) {
+            ThreadHelper.execute(() -> {
+                try {
+                    Thread.sleep(500L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (listening) {
+                    broadcastUdpIdentityPacket(null);
+                }
+            });
+        }
     }
 
     Pair<NetworkPacket, Boolean> unserializeReceivedIdentityPacket(String message) {

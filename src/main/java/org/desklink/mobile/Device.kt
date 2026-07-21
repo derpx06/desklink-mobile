@@ -100,7 +100,7 @@ class Device : PacketReceiver {
     private val pairingCallbacks = CopyOnWriteArrayList<PairingCallback>()
     private val pluginsChangedListeners = CopyOnWriteArrayList<PluginsChangedListener>()
 
-    private val sendChannel = Channel<NetworkPacketWithCallback>(Channel.UNLIMITED)
+    private val sendChannel = Channel<NetworkPacketWithCallback>(64)
     private var sendCoroutine : Job? = null
 
     /**
@@ -482,7 +482,10 @@ class Device : PacketReceiver {
      */
     @AnyThread
     fun sendPacket(np: NetworkPacket, callback: SendPacketStatusCallback) {
-        sendChannel.trySend(NetworkPacketWithCallback(np, callback))
+        val result = sendChannel.trySend(NetworkPacketWithCallback(np, callback))
+        if (result.isFailure) {
+            callback.onFailure(IllegalStateException("DeskLink outbound queue is full or closed"))
+        }
     }
 
     @AnyThread

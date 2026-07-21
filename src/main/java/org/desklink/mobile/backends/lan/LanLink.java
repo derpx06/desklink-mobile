@@ -150,6 +150,11 @@ public class LanLink extends BaseLink {
                 if (np.getStringOrNull("transferToken") == null) {
                     np.set("transferToken", UUID.randomUUID().toString());
                 }
+                if (np.getStringOrNull("transferId") == null) {
+                    // Optional v9 field used by both sides to persist a
+                    // resumable transfer without changing the packet envelope.
+                    np.set("transferId", UUID.randomUUID().toString());
+                }
             } else {
                 server = null;
             }

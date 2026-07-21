@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-  <string name="app_name">கே.டீ.யீ. கனெக்ட்</string>
+  <string name="app_name">DeskLink</string>
   <string name="manifest_label_share">சாதனத்திற்கு அனுப்பு</string>
   <string name="foreground_notification_no_devices">எச்சாதனத்துடனும் இணைக்கப்படவில்லை</string>
   <string name="foreground_notification_devices">%s உடன் இணைந்துள்ளது</string>

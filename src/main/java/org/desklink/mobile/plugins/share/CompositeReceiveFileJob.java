@@ -23,6 +23,8 @@ import org.apache.commons.io.IOUtils;
 import org.desklink.mobile.Device;
 import org.desklink.mobile.helpers.FilesHelper;
 import org.desklink.mobile.helpers.MediaStoreHelper;
+import org.desklink.mobile.helpers.TransferCheckpoint;
+import org.desklink.mobile.helpers.TransferCheckpointStore;
 import org.desklink.mobile.NetworkPacket;
 import org.desklink.mobile.async.BackgroundJob;
 import org.desklink.mobile.R;
@@ -72,6 +74,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
     @GuardedBy("lock")
     private long totalPayloadSize;
     private boolean isRunning;
+    private final TransferCheckpointStore checkpointStore;
 
     CompositeReceiveFileJob(Device device, BackgroundJob.Callback<Void> callBack) {
         super(device, callBack);
@@ -85,6 +88,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
         totalReceived = 0;
         lastProgressTimeMillis = 0;
         prevProgressPercentage = 0;
+        checkpointStore = new TransferCheckpointStore(getDevice().getContext());
     }
 
     private Device getDevice() {
@@ -140,13 +144,18 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
 
                 setProgress((int)prevProgressPercentage);
 
-                fileDocument = getDocumentFileFor(currentFileName, currentNetworkPacket.getBoolean("open", false));
+                String transferId = currentNetworkPacket.getStringOrNull("transferId");
+                TransferCheckpoint checkpoint = transferId == null ? null : checkpointStore.load(transferId);
+                fileDocument = getDocumentFileFor(currentFileName, currentNetworkPacket.getBoolean("open", false), checkpoint);
 
                 if (currentNetworkPacket.hasPayload()) {
-                    outputStream = new BufferedOutputStream(getDevice().getContext().getContentResolver().openOutputStream(fileDocument.getUri()));
+                    long resumeOffset = checkpoint != null && checkpoint.getTotalSize() == currentNetworkPacket.getPayloadSize()
+                            ? checkpoint.getOffset() : 0L;
+                    String outputMode = resumeOffset > 0 ? "wa" : "w";
+                    outputStream = new BufferedOutputStream(getDevice().getContext().getContentResolver().openOutputStream(fileDocument.getUri(), outputMode));
                     InputStream inputStream = currentNetworkPacket.getPayload().getInputStream();
 
-                    long received = receiveFile(inputStream, outputStream);
+                    long received = receiveFile(inputStream, outputStream, transferId, fileDocument.getUri().toString(), resumeOffset, currentNetworkPacket.getPayloadSize());
 
                     currentNetworkPacket.getPayload().close();
 
@@ -163,6 +172,9 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                         }
                     } else {
                         publishFile(fileDocument, received);
+                        if (transferId != null) {
+                            checkpointStore.remove(transferId);
+                        }
                     }
                 } else {
                     //TODO: Only set progress to 100 if this is the only file/packet to send
@@ -259,7 +271,13 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
         }
     }
 
-    private DocumentFile getDocumentFileFor(final String filename, final boolean open) throws RuntimeException {
+    private DocumentFile getDocumentFileFor(final String filename, final boolean open, final TransferCheckpoint checkpoint) throws RuntimeException {
+        if (checkpoint != null && checkpoint.getUri() != null) {
+            DocumentFile existing = DocumentFile.fromSingleUri(getDevice().getContext(), Uri.parse(checkpoint.getUri()));
+            if (existing != null && existing.exists()) {
+                return existing;
+            }
+        }
         final DocumentFile destinationFolderDocument;
 
         // If the file should be opened immediately store it in the standard location to avoid the FileProvider trouble (See ReceiveNotification::setURI)
@@ -281,16 +299,31 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
         return fileDocument;
     }
 
-    private long receiveFile(InputStream input, OutputStream output) throws IOException {
+    private long receiveFile(InputStream input, OutputStream output, String transferId, String uri,
+                             long resumeOffset, long totalSize) throws IOException {
         byte[] data = new byte[4096];
         int count;
-        long received = 0;
+        long received = resumeOffset;
+
+        // The sender may retransmit the stream from byte zero.  Discard the
+        // already checkpointed prefix before appending new bytes.
+        long remaining = resumeOffset;
+        while (remaining > 0) {
+            int skipped = input.read(data, 0, (int) Math.min(remaining, data.length));
+            if (skipped < 0) throw new IOException("Transfer ended before the resume offset");
+            remaining -= skipped;
+        }
 
         while ((count = input.read(data)) >= 0 && !isCancelled()) {
             received += count;
             totalReceived += count;
 
             output.write(data, 0, count);
+
+            if (transferId != null) {
+                checkpointStore.save(new TransferCheckpoint(
+                        transferId, uri, received, totalSize, "transferring"));
+            }
 
             long progressPercentage;
             synchronized (lock) {
