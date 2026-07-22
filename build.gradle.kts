@@ -311,6 +311,8 @@ dependencies {
     implementation(libs.commons.lang3)
 
     implementation(libs.univocity.parsers)
+    implementation(libs.okhttp)
+    implementation(libs.webrtc)
 
     // Kotlin
     implementation(libs.kotlin.stdlib.jdk8)

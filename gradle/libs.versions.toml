@@ -41,6 +41,8 @@ sshdCore = "2.18.0"
 swiperefreshlayout = "1.2.0"
 uiToolingPreview = "1.11.2"
 univocityParsers = "2.9.1"
+okhttp = "5.3.0"
+webrtc = "144.7559.05"
 
 [libraries]
 android-desugarJdkLibsNio = { module = "com.android.tools:desugar_jdk_libs_nio", version.ref = "androidDesugarJdkLibs" }
@@ -89,6 +91,8 @@ reactive-streams = { module = "org.reactivestreams:reactive-streams", version.re
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 rxjava = { module = "io.reactivex.rxjava2:rxjava", version.ref = "rxjava" }
 univocity-parsers = { module = "com.univocity:univocity-parsers", version.ref = "univocityParsers" }
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+webrtc = { module = "io.github.webrtc-sdk:android", version.ref = "webrtc" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 slf4j-handroid = { module = "com.gitlab.mvysny.slf4j:slf4j-handroid", version.ref = "slf4j-handroid" }
