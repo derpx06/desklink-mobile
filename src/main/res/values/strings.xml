@@ -577,6 +577,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
   <string name="remote_screen_requesting">Requesting live screen</string>
   <string name="remote_screen_connected">Live screen connected</string>
   <string name="remote_screen_error">Could not show live screen</string>
+  <string name="notification_channel_screen_sharing">Screen sharing</string>
   <string name="remote_screen_plugin_missing">Screen sharing unavailable on this device</string>
   <string name="remote_screen_retry">Retry screen request</string>
   <string name="remote_mode_screen">Screen</string>

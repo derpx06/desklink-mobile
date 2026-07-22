@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.security.MessageDigest;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
@@ -61,6 +62,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
     private final ReceiveNotification receiveNotification;
     private NetworkPacket currentNetworkPacket;
     private String currentFileName;
+    private String currentFinalFileName;
     private int currentFileNum;
     private long totalReceived;
     private long lastProgressTimeMillis;
@@ -130,8 +132,8 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
             done = networkPacketList.isEmpty();
         }
 
+        DocumentFile fileDocument = null;
         try {
-            DocumentFile fileDocument = null;
 
             isRunning = true;
 
@@ -146,7 +148,15 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
 
                 String transferId = currentNetworkPacket.getStringOrNull("transferId");
                 TransferCheckpoint checkpoint = transferId == null ? null : checkpointStore.load(transferId);
-                fileDocument = getDocumentFileFor(currentFileName, currentNetworkPacket.getBoolean("open", false), checkpoint);
+                String expectedSha256 = currentNetworkPacket.getStringOrNull("sha256");
+                if (checkpoint != null
+                        && ((checkpoint.getDeviceId() != null && !getDevice().getDeviceId().equals(checkpoint.getDeviceId()))
+                        || (checkpoint.getFilename() != null && !currentFileName.equals(checkpoint.getFilename()))
+                        || (checkpoint.getSha256() != null && expectedSha256 != null
+                        && !checkpoint.getSha256().equalsIgnoreCase(expectedSha256)))) {
+                    throw new RuntimeException("Transfer checkpoint does not match the incoming file");
+                }
+                fileDocument = getDocumentFileFor(currentFileName, currentNetworkPacket.getBoolean("open", false), checkpoint, transferId);
 
                 if (currentNetworkPacket.hasPayload()) {
                     long resumeOffset = checkpoint != null && checkpoint.getTotalSize() == currentNetworkPacket.getPayloadSize()
@@ -155,7 +165,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                     outputStream = new BufferedOutputStream(getDevice().getContext().getContentResolver().openOutputStream(fileDocument.getUri(), outputMode));
                     InputStream inputStream = currentNetworkPacket.getPayload().getInputStream();
 
-                    long received = receiveFile(inputStream, outputStream, transferId, fileDocument.getUri().toString(), resumeOffset, currentNetworkPacket.getPayloadSize());
+                    long received = receiveFile(inputStream, outputStream, transferId, fileDocument.getUri().toString(), resumeOffset, currentNetworkPacket.getPayloadSize(), expectedSha256);
 
                     currentNetworkPacket.getPayload().close();
 
@@ -165,12 +175,22 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                     outputStream = null;
 
                     if ( received != currentNetworkPacket.getPayloadSize()) {
-                        fileDocument.delete();
-
                         if (!isCancelled()) {
+                            fileDocument.delete();
                             throw new RuntimeException("Failed to receive: " + currentFileName + " received:" + received + " bytes, expected: " + currentNetworkPacket.getPayloadSize() + " bytes");
                         }
                     } else {
+                        if (expectedSha256 != null && !expectedSha256.isBlank()) {
+                            String actualSha256 = sha256(fileDocument);
+                            if (!expectedSha256.equalsIgnoreCase(actualSha256)) {
+                                fileDocument.delete();
+                                throw new RuntimeException("Received file checksum does not match the sender");
+                            }
+                        }
+                        if (!fileDocument.renameTo(currentFinalFileName)) {
+                            fileDocument.delete();
+                            throw new RuntimeException("Failed to finalize received file: " + currentFinalFileName);
+                        }
                         publishFile(fileDocument, received);
                         if (transferId != null) {
                             checkpointStore.remove(transferId);
@@ -179,6 +199,10 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                 } else {
                     //TODO: Only set progress to 100 if this is the only file/packet to send
                     setProgress(100);
+                    if (!fileDocument.renameTo(currentFinalFileName)) {
+                        fileDocument.delete();
+                        throw new RuntimeException("Failed to finalize received file: " + currentFinalFileName);
+                    }
                     publishFile(fileDocument, 0);
                 }
 
@@ -251,6 +275,11 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
         } catch (Exception e) {
             isRunning = false;
 
+            if (fileDocument != null && fileDocument.getName() != null
+                    && fileDocument.getName().startsWith(".desklink-")) {
+                fileDocument.delete();
+            }
+
             Log.e("Shareplugin", "Error receiving file", e);
 
             int failedFiles;
@@ -271,13 +300,9 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
         }
     }
 
-    private DocumentFile getDocumentFileFor(final String filename, final boolean open, final TransferCheckpoint checkpoint) throws RuntimeException {
-        if (checkpoint != null && checkpoint.getUri() != null) {
-            DocumentFile existing = DocumentFile.fromSingleUri(getDevice().getContext(), Uri.parse(checkpoint.getUri()));
-            if (existing != null && existing.exists()) {
-                return existing;
-            }
-        }
+    private DocumentFile getDocumentFileFor(final String filename, final boolean open,
+                                            final TransferCheckpoint checkpoint,
+                                            final String transferId) throws RuntimeException {
         final DocumentFile destinationFolderDocument;
 
         // If the file should be opened immediately store it in the standard location to avoid the FileProvider trouble (See ReceiveNotification::setURI)
@@ -288,19 +313,31 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
             destinationFolderDocument = ShareSettingsFragment.getDestinationDirectory(getDevice().getContext());
         }
 
-        String filenameToUse = FilesHelper.findValidNonExistingFileName(destinationFolderDocument, filename);
+        currentFinalFileName = FilesHelper.findValidNonExistingFileName(destinationFolderDocument, filename);
 
-        DocumentFile fileDocument = destinationFolderDocument.createFile("*/*", filenameToUse);
+        if (checkpoint != null && checkpoint.getUri() != null) {
+            DocumentFile existing = DocumentFile.fromSingleUri(getDevice().getContext(), Uri.parse(checkpoint.getUri()));
+            if (existing != null && existing.exists()) {
+                return existing;
+            }
+        }
+
+        String safeTransferId = transferId == null
+                ? Long.toString(System.currentTimeMillis())
+                : transferId.replaceAll("[^A-Za-z0-9_-]", "_");
+        String temporaryName = ".desklink-" + safeTransferId + ".part";
+
+        DocumentFile fileDocument = destinationFolderDocument.createFile("application/octet-stream", temporaryName);
 
         if (fileDocument == null) {
-            throw new RuntimeException(getDevice().getContext().getString(R.string.cannot_create_file, filenameToUse));
+            throw new RuntimeException(getDevice().getContext().getString(R.string.cannot_create_file, temporaryName));
         }
 
         return fileDocument;
     }
 
     private long receiveFile(InputStream input, OutputStream output, String transferId, String uri,
-                             long resumeOffset, long totalSize) throws IOException {
+                             long resumeOffset, long totalSize, String expectedSha256) throws IOException {
         byte[] data = new byte[4096];
         int count;
         long received = resumeOffset;
@@ -322,7 +359,8 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
 
             if (transferId != null) {
                 checkpointStore.save(new TransferCheckpoint(
-                        transferId, uri, received, totalSize, "transferring"));
+                        transferId, uri, received, totalSize, "transferring",
+                        currentFileName, getDevice().getDeviceId(), expectedSha256));
             }
 
             long progressPercentage;
@@ -348,6 +386,35 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
         for (NetworkPacket np : networkPacketList) {
             np.getPayload().close();
         }
+    }
+
+    private String sha256(DocumentFile fileDocument) throws IOException {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (Exception exception) {
+            throw new IOException("SHA-256 is unavailable", exception);
+        }
+
+        try (InputStream input = getDevice().getContext().getContentResolver()
+                .openInputStream(fileDocument.getUri())) {
+            if (input == null) {
+                throw new IOException("Could not reopen received file for verification");
+            }
+            byte[] buffer = new byte[64 * 1024];
+            int count;
+            while ((count = input.read(buffer)) >= 0) {
+                if (count > 0) {
+                    digest.update(buffer, 0, count);
+                }
+            }
+        }
+
+        StringBuilder result = new StringBuilder(64);
+        for (byte value : digest.digest()) {
+            result.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
+        }
+        return result.toString();
     }
 
     private void setProgress(int progress) {

@@ -24,6 +24,11 @@ import org.desklink.mobile.helpers.TrustedDevices
 import org.desklink.mobile.PairingHandler.PairingCallback
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory
+import org.desklink.mobile.session.DeviceManager
+import org.desklink.mobile.session.PairingState
+import org.desklink.mobile.session.SessionBinding
+import org.desklink.mobile.transport.DisconnectReason
+import org.desklink.mobile.transport.LegacyLanTransport
 import org.desklink.mobile.ui.ThemeUtil
 import org.desklink.mobile.BuildConfig
 import org.slf4j.impl.HandroidLoggerAdapter
@@ -44,6 +49,11 @@ class DeskLinkApplication : Application() {
     }
 
     val devices: ConcurrentHashMap<String, Device> = ConcurrentHashMap()
+
+    /** The single owner of live LAN session identity and transport generations. */
+    val sessionManager = DeviceManager()
+
+    private val legacyLanBindings = ConcurrentHashMap<BaseLink, SessionBinding>()
 
     private val deviceListChangedCallbacks = ConcurrentHashMap<String, DeviceListChangedCallback>()
 
@@ -94,6 +104,7 @@ class DeskLinkApplication : Application() {
 
     override fun onTerminate() {
         Log.d("DeskLink/Application", "onTerminate")
+        sessionManager.terminateAll()
         super.onTerminate()
     }
 
@@ -182,6 +193,28 @@ class DeskLinkApplication : Application() {
                 devices[link.deviceId] = device
                 device.addPairingCallback(devicePairingCallback)
             }
+
+            // Keep the existing authenticated Java LAN link and wire behavior.
+            // Only small control packets use the new session boundary for now;
+            // payload jobs and Bluetooth remain on their existing paths.
+            if (link is org.desklink.mobile.backends.lan.LanLink) {
+                val pairingState = if (device.isPaired || TrustedDevices.isTrustedDevice(this@DeskLinkApplication, link.deviceId)) {
+                    PairingState.PAIRED
+                } else {
+                    PairingState.NOT_PAIRED
+                }
+                runCatching {
+                    val registration = sessionManager.register(
+                        link.deviceId,
+                        LegacyLanTransport(link),
+                        pairingState,
+                    )
+                    legacyLanBindings[link] = registration.binding
+                    device.setSessionTransport(registration.binding.transport)
+                }.onFailure { error ->
+                    Log.e("DeskLink/Session", "Could not register LAN session", error)
+                }
+            }
             onDeviceListChanged()
         }
 
@@ -189,6 +222,13 @@ class DeskLinkApplication : Application() {
         override fun onConnectionLost(link: BaseLink) {
             val device = devices[link.deviceId]
             Log.i("DeskLink/onConnectionLost", "removeLink, deviceId: ${link.deviceId}")
+            val binding = legacyLanBindings.remove(link)
+            val disconnectedCurrentSession = binding?.let {
+                sessionManager.disconnectIfCurrent(it, DisconnectReason.NETWORK_LOST)
+            } == true
+            if (disconnectedCurrentSession) {
+                device?.setSessionTransport(null)
+            }
             if (device != null) {
                 device.removeLink(link)
                 if (!device.isReachable && !device.isPaired) {

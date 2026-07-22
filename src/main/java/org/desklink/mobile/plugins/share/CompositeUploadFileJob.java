@@ -198,14 +198,24 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
     @Override
     public void cancel() {
         super.cancel();
-
-        currentNetworkPacket.cancel();
+        NetworkPacket packet;
+        synchronized (lock) {
+            packet = currentNetworkPacket;
+        }
+        if (packet != null) {
+            packet.cancel();
+        }
     }
 
     private class SendPacketStatusCallback extends Device.SendPacketStatusCallback {
         @Override
         public void onPayloadProgressChanged(int percent) {
-            float send = totalSend + (currentNetworkPacket.getPayloadSize() * ((float)percent / 100));
+            NetworkPacket packet;
+            synchronized (lock) {
+                packet = currentNetworkPacket;
+            }
+            if (packet == null || totalPayloadSize <= 0) return;
+            float send = totalSend + (packet.getPayloadSize() * ((float)percent / 100));
             int progress = (int)((send * 100) / totalPayloadSize);
 
             if (progress != prevProgressPercentage) {
@@ -216,7 +226,12 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
 
         @Override
         public void onSuccess() {
-            if (currentNetworkPacket.getPayloadSize() == 0) {
+            NetworkPacket packet;
+            synchronized (lock) {
+                packet = currentNetworkPacket;
+            }
+            if (packet == null) return;
+            if (packet.getPayloadSize() == 0) {
                 synchronized (lock) {
                     if (networkPacketList.isEmpty()) {
                         setProgress(100);
@@ -224,7 +239,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                 }
             }
 
-            totalSend += currentNetworkPacket.getPayloadSize();
+            totalSend += packet.getPayloadSize();
         }
 
         @Override
