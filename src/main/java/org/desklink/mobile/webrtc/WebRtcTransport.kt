@@ -96,6 +96,14 @@ class WebRtcTransport(
             LogicalChannel.PAYLOAD -> WebRtcChannel.FILE_DATA
             LogicalChannel.STREAM -> WebRtcChannel.EVENTS
         }
+        sendOn(webRtcChannel, payload, callback)
+    }
+
+    override fun sendRealtime(channel: LogicalChannel, payload: ByteArray, callback: TransportCallback) {
+        sendOn(WebRtcChannel.INPUT_REALTIME, payload, callback)
+    }
+
+    private fun sendOn(webRtcChannel: WebRtcChannel, payload: ByteArray, callback: TransportCallback) {
         val dataChannel = channels[webRtcChannel.label]
         if (dataChannel == null || dataChannel.state() != DataChannel.State.OPEN) {
             callback.onFailure(TransportError(TransportErrorCode.CLOSED, "WebRTC data channel is not open"))
@@ -119,24 +127,16 @@ class WebRtcTransport(
         timestamp: Long,
         callback: TransportCallback,
     ) {
-        val logicalChannel = when (channel) {
-            WebRtcChannel.CONTROL -> LogicalChannel.CONTROL
-            WebRtcChannel.FILE_DATA -> LogicalChannel.PAYLOAD
-            else -> LogicalChannel.STREAM
-        }
-        send(
-            logicalChannel,
-            WebRtcEnvelope.create(
-                deviceId,
-                sessionId,
-                generation,
-                channel,
-                messageType,
-                payload,
-                timestamp,
-            ).toJson().toString().toByteArray(Charsets.UTF_8),
-            callback,
-        )
+        val encoded = WebRtcEnvelope.create(
+            deviceId,
+            sessionId,
+            generation,
+            channel,
+            messageType,
+            payload,
+            timestamp,
+        ).toJson().toString().toByteArray(Charsets.UTF_8)
+        sendOn(channel, encoded, callback)
     }
 
     fun createOffer() {
@@ -148,6 +148,18 @@ class WebRtcTransport(
         }, MediaConstraints())
     }
 
+    fun createAnswer() {
+        peer.createAnswer(object : SdpObserverAdapter() {
+            override fun onCreateSuccess(description: SessionDescription) {
+                peer.setLocalDescription(SdpObserverAdapter(), description)
+                observer.onSignalingNeeded(
+                    SignalingMessageType.ANSWER,
+                    JSONObject().put("sdp", description.description),
+                )
+            }
+        }, MediaConstraints())
+    }
+
     fun setRemoteDescription(type: SessionDescription.Type, sdp: String) {
         peer.setRemoteDescription(SdpObserverAdapter(), SessionDescription(type, sdp))
     }
@@ -155,7 +167,8 @@ class WebRtcTransport(
     fun addIceCandidate(candidate: IceCandidate) { peer.addIceCandidate(candidate) }
 
     override fun close(reason: DisconnectReason) {
-        if (stateRef.getAndSet(TransportState.CLOSING) == TransportState.CLOSED) return
+        val previous = stateRef.getAndSet(TransportState.CLOSING)
+        if (previous == TransportState.CLOSED || previous == TransportState.CLOSING) return
         channels.values.forEach(DataChannel::dispose)
         channels.clear()
         peer.close()
@@ -173,7 +186,11 @@ class WebRtcTransport(
             }
         }
         override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
-        override fun onIceGatheringChange(newState: PeerConnection.IceGatheringState) = Unit
+        override fun onIceGatheringChange(newState: PeerConnection.IceGatheringState) {
+            if (newState == PeerConnection.IceGatheringState.COMPLETE) {
+                observer.onSignalingNeeded(SignalingMessageType.END_OF_CANDIDATES, JSONObject())
+            }
+        }
         override fun onIceCandidate(candidate: IceCandidate) {
             observer.onSignalingNeeded(SignalingMessageType.ICE_CANDIDATE, JSONObject()
                 .put("sdpMid", candidate.sdpMid)
