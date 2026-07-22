@@ -5,9 +5,29 @@ package org.desklink.mobile.webrtc
 
 import org.json.JSONObject
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class WebRtcSignalingTest {
+    @Test
+    fun canonicalRecordMatchesRustFixture() {
+        val message = WebRtcSignalingMessage(
+            signalingVersion = 1,
+            requestId = "request-1",
+            sessionAttemptId = "attempt-1",
+            fromDeviceId = "desktop",
+            toDeviceId = "phone",
+            timestamp = 1000,
+            messageType = SignalingMessageType.OFFER,
+            payload = JSONObject().put("sdp", "offer"),
+            signature = "",
+        )
+        assertEquals(
+            "1:19:request-19:attempt-17:desktop5:phone4:10005:offer9:sdp=offer",
+            String(message.canonicalBytes()),
+        )
+    }
+
     @Test
     fun wrongDestinationIsRejected() {
         val message = WebRtcSignalingMessage(

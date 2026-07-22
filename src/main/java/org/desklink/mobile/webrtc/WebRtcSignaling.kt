@@ -3,6 +3,7 @@
  */
 package org.desklink.mobile.webrtc
 
+import android.util.Base64
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -10,6 +11,12 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.LinkedHashSet
+import java.nio.charset.StandardCharsets
+import java.security.PrivateKey
+import java.security.PublicKey
+import java.security.Signature
+import org.desklink.mobile.NetworkPacket
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 enum class SignalingMessageType { OFFER, ANSWER, ICE_CANDIDATE, END_OF_CANDIDATES, ICE_RESTART, CLOSE }
 
@@ -36,6 +43,44 @@ data class WebRtcSignalingMessage(
         require(kotlin.math.abs(now - timestamp) <= 5 * 60 * 1000) { "Expired WebRTC signaling message" }
     }
 
+    /**
+     * Cross-platform signature record. Do not replace this with JSONObject
+     * serialization: Android and Rust are free to store object keys in
+     * different orders, while the paired identity signature must be stable.
+     */
+    fun canonicalBytes(): ByteArray {
+        val values = listOf(
+            signalingVersion.toString(),
+            requestId,
+            sessionAttemptId,
+            fromDeviceId,
+            toDeviceId,
+            timestamp.toString(),
+            messageType.name.lowercase(),
+            canonicalPayload(),
+        )
+        return buildString {
+            values.forEach { value -> append(value.toByteArray(StandardCharsets.UTF_8).size).append(':').append(value) }
+        }.toByteArray(StandardCharsets.UTF_8)
+    }
+
+    fun sign(privateKey: PrivateKey): WebRtcSignalingMessage {
+        val signature = signatureFor(privateKey.algorithm).run {
+            initSign(privateKey)
+            update(canonicalBytes())
+            Base64.encodeToString(sign(), Base64.NO_WRAP)
+        }
+        return copy(signature = signature)
+    }
+
+    fun verify(publicKey: PublicKey): Boolean = runCatching {
+        signatureFor(publicKey.algorithm).run {
+            initVerify(publicKey)
+            update(canonicalBytes())
+            verify(Base64.decode(signature, Base64.NO_WRAP))
+        }
+    }.getOrDefault(false)
+
     fun toJson(): JSONObject = JSONObject()
         .put("signalingVersion", signalingVersion)
         .put("requestId", requestId)
@@ -46,6 +91,32 @@ data class WebRtcSignalingMessage(
         .put("messageType", messageType.name.lowercase())
         .put("payload", payload)
         .put("signature", signature)
+
+    fun toNetworkPacket(): NetworkPacket = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1).also {
+        it["signalingVersion"] = signalingVersion
+        it["requestId"] = requestId
+        it["sessionAttemptId"] = sessionAttemptId
+        it["fromDeviceId"] = fromDeviceId
+        it["toDeviceId"] = toDeviceId
+        it["timestamp"] = timestamp
+        it["messageType"] = messageType.name.lowercase()
+        it["payload"] = payload
+        it["signature"] = signature
+    }
+
+    private fun canonicalPayload(): String = when (messageType) {
+        SignalingMessageType.OFFER, SignalingMessageType.ANSWER ->
+            "sdp=${payload.getString("sdp")}"
+        SignalingMessageType.ICE_CANDIDATE ->
+            "sdpMLineIndex=${payload.getInt("sdpMLineIndex")}\ncandidate=${payload.getString("candidate")}"
+        SignalingMessageType.END_OF_CANDIDATES,
+        SignalingMessageType.ICE_RESTART,
+        SignalingMessageType.CLOSE -> ""
+    }
+
+    private fun signatureFor(keyAlgorithm: String): Signature = Signature.getInstance(
+        if (keyAlgorithm.equals("RSA", ignoreCase = true)) "SHA256withRSA" else "SHA256withECDSA",
+    )
 
     companion object {
         fun fromJson(json: String): WebRtcSignalingMessage {
@@ -60,6 +131,23 @@ data class WebRtcSignalingMessage(
                 SignalingMessageType.valueOf(value.getString("messageType").uppercase()),
                 value.getJSONObject("payload"),
                 value.getString("signature"),
+            )
+        }
+
+        fun fromNetworkPacket(packet: NetworkPacket): WebRtcSignalingMessage {
+            require(packet.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1) {
+                "Wrong DeskLink WebRTC signaling packet type"
+            }
+            return WebRtcSignalingMessage(
+                packet.getInt("signalingVersion"),
+                packet.getString("requestId"),
+                packet.getString("sessionAttemptId"),
+                packet.getString("fromDeviceId"),
+                packet.getString("toDeviceId"),
+                packet.getLong("timestamp"),
+                SignalingMessageType.valueOf(packet.getString("messageType").uppercase()),
+                requireNotNull(packet.getJSONObject("payload")) { "Missing WebRTC signaling payload" },
+                packet.getString("signature"),
             )
         }
     }

@@ -67,6 +67,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             trustedNetworkPref(context),
             devicesByIpPref(context),
             bluetoothSupportPref(context),
+            webRtcTransportPref(context),
             exportLogsPref(context),
             moreSettingsPref(context),
         ).forEach(screen::addPreference)
@@ -220,6 +221,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
             true
         }
+    }
+
+    private fun webRtcTransportPref(context: Context) = SwitchPreference(context).apply {
+        key = DeviceHelper.KEY_WEBRTC_ENABLED_PREFERENCE
+        setDefaultValue(false)
+        setTitle(R.string.setting_webrtc_transport)
+        setSummary(R.string.setting_webrtc_transport_description)
     }
 
     private fun exportLogsPref(context: Context) = Preference(context).apply {

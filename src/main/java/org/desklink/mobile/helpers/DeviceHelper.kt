@@ -18,8 +18,8 @@ import com.univocity.parsers.csv.CsvParserSettings
 import org.desklink.mobile.DeviceInfo
 import org.desklink.mobile.DeviceType
 import org.desklink.mobile.helpers.security.SslHelper
-import org.desklink.mobile.plugins.PluginFactory
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.plugins.PluginFactory
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
@@ -31,6 +31,7 @@ object DeviceHelper {
     const val PROTOCOL_VERSION = DeskLinkProtocol.PROTOCOL_VERSION
 
     const val KEY_DEVICE_NAME_PREFERENCE = "device_name_preference"
+    const val KEY_WEBRTC_ENABLED_PREFERENCE = "webrtc_enabled"
     private const val KEY_DEVICE_NAME_FETCHED_FROM_THE_INTERNET = "device_name_downloaded_preference"
     private const val KEY_DEVICE_ID_PREFERENCE = "device_id_preference"
 
@@ -145,14 +146,23 @@ object DeviceHelper {
 
     @JvmStatic
     fun getDeviceInfo(context: Context): DeviceInfo {
+        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+        val incoming = PluginFactory.incomingCapabilities.toMutableSet()
+        val outgoing = PluginFactory.outgoingCapabilities.toMutableSet()
+        // Signaling is not a plugin. It is advertised only when its paired
+        // control-packet handler is enabled in this process.
+        if (preferences.getBoolean(KEY_WEBRTC_ENABLED_PREFERENCE, false)) {
+            incoming += DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+            outgoing += DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        }
         return DeviceInfo(
             getDeviceId(context),
             SslHelper.certificate,
             getDeviceName(context),
             deviceType,
             PROTOCOL_VERSION,
-            PluginFactory.incomingCapabilities,
-            PluginFactory.outgoingCapabilities
+            incoming,
+            outgoing
         )
     }
 

@@ -613,6 +613,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <string name="enable_udp_broadcast">Enable UDP device discovery</string>
     <string name="enable_bluetooth">Enable bluetooth (beta)</string>
+    <string name="setting_webrtc_transport">Experimental WebRTC transport</string>
+    <string name="setting_webrtc_transport_description">Use an encrypted peer connection when the paired desktop also enables it. Restart DeskLink after changing this setting.</string>
 
     <string name="receive_notifications_permission_explanation">Notifications need to be allowed to receive them from other devices</string>
     <string name="findmyphone_notifications_explanation">The notifications permission is needed so the phone can ring when the app is in the background</string>

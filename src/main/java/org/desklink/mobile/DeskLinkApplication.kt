@@ -30,6 +30,7 @@ import org.desklink.mobile.session.SessionBinding
 import org.desklink.mobile.transport.DisconnectReason
 import org.desklink.mobile.transport.LegacyLanTransport
 import org.desklink.mobile.ui.ThemeUtil
+import org.desklink.mobile.webrtc.WebRtcSessionCoordinator
 import org.desklink.mobile.BuildConfig
 import org.slf4j.impl.HandroidLoggerAdapter
 import java.security.cert.CertificateException
@@ -54,6 +55,7 @@ class DeskLinkApplication : Application() {
     val sessionManager = DeviceManager()
 
     private val legacyLanBindings = ConcurrentHashMap<BaseLink, SessionBinding>()
+    private val webRtcCoordinators = ConcurrentHashMap<String, WebRtcSessionCoordinator>()
 
     private val deviceListChangedCallbacks = ConcurrentHashMap<String, DeviceListChangedCallback>()
 
@@ -104,6 +106,7 @@ class DeskLinkApplication : Application() {
 
     override fun onTerminate() {
         Log.d("DeskLink/Application", "onTerminate")
+        webRtcCoordinators.values.forEach(WebRtcSessionCoordinator::close)
         sessionManager.terminateAll()
         super.onTerminate()
     }
@@ -167,6 +170,7 @@ class DeskLinkApplication : Application() {
         }
 
         override fun pairingSuccessful() {
+            devices.values.forEach { device -> webRtcCoordinatorFor(device).beginIfSupported() }
             onDeviceListChanged()
         }
 
@@ -175,6 +179,7 @@ class DeskLinkApplication : Application() {
         }
 
         override fun unpaired(device: Device) {
+            webRtcCoordinators.remove(device.deviceId)?.close()
             onDeviceListChanged()
             if (!device.isReachable) {
                 scheduleForDeletion(device)
@@ -211,6 +216,8 @@ class DeskLinkApplication : Application() {
                     )
                     legacyLanBindings[link] = registration.binding
                     device.setSessionTransport(registration.binding.transport)
+                    device.setControlPacketHandler(webRtcCoordinatorFor(device))
+                    webRtcCoordinatorFor(device).beginIfSupported()
                 }.onFailure { error ->
                     Log.e("DeskLink/Session", "Could not register LAN session", error)
                 }
@@ -228,6 +235,7 @@ class DeskLinkApplication : Application() {
             } == true
             if (disconnectedCurrentSession) {
                 device?.setSessionTransport(null)
+                device?.let { webRtcCoordinators.remove(it.deviceId)?.close() }
             }
             if (device != null) {
                 device.removeLink(link)
@@ -249,6 +257,7 @@ class DeskLinkApplication : Application() {
             }
             val hasChanges = device.updateDeviceInfo(deviceInfo)
             if (hasChanges) {
+                webRtcCoordinatorFor(device).beginIfSupported()
                 onDeviceListChanged()
             }
         }
@@ -276,9 +285,18 @@ class DeskLinkApplication : Application() {
             }
             Log.i("DeskLink", "Deleting unpaired and unreachable device: $device")
             device.removePairingCallback(devicePairingCallback)
+            webRtcCoordinators.remove(device.deviceId)?.close()
             devices.remove(device.deviceId)
         }
     }
+
+    private fun webRtcCoordinatorFor(device: Device): WebRtcSessionCoordinator =
+        webRtcCoordinators.computeIfAbsent(device.deviceId) {
+            WebRtcSessionCoordinator(this, device, sessionManager) { state, detail ->
+                Log.i("DeskLink/WebRTC", "${device.deviceId}: $state${detail?.let { " ($it)" } ?: ""}")
+                onDeviceListChanged()
+            }
+        }
 
     companion object {
         @JvmStatic

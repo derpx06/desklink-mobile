@@ -80,6 +80,14 @@ class Device : PacketReceiver {
     @Volatile
     private var sessionTransport: SessionTransport? = null
 
+    /** Paired-session control packets that are not plugin capabilities. */
+    fun interface ControlPacketHandler {
+        fun onControlPacket(packet: NetworkPacket): Boolean
+    }
+
+    @Volatile
+    private var controlPacketHandler: ControlPacketHandler? = null
+
     /**
      * Plugins that have matching capabilities.
      */
@@ -334,6 +342,10 @@ class Device : PacketReceiver {
         sessionTransport = transport
     }
 
+    fun setControlPacketHandler(handler: ControlPacketHandler?) {
+        controlPacketHandler = handler
+    }
+
     fun addLink(link: BaseLink) {
         synchronized(sendChannel) {
             if (sendCoroutine == null) {
@@ -435,6 +447,19 @@ class Device : PacketReceiver {
         if (NetworkPacket.PACKET_TYPE_PAIR == np.type) {
             Log.i("DeskLink/Device", "Pair packet")
             pairingHandler.packetReceived(np)
+            return
+        }
+
+        if (np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1) {
+            if (!isPaired) {
+                Log.w("DeskLink/WebRTC", "Rejected signaling from an unpaired device")
+                np.payload?.close()
+                return
+            }
+            if (controlPacketHandler?.onControlPacket(np) != true) {
+                Log.w("DeskLink/WebRTC", "Rejected or unavailable WebRTC signaling packet")
+                np.payload?.close()
+            }
             return
         }
 

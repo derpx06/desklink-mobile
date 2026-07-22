@@ -37,6 +37,7 @@ class WebRtcTransport(
     interface Observer {
         fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject)
         fun onEnvelope(envelope: WebRtcEnvelope)
+        fun onControlChannelOpen()
         fun onFailure(error: Throwable)
     }
 
@@ -73,7 +74,10 @@ class WebRtcTransport(
         channel.registerObserver(object : DataChannel.Observer {
             override fun onBufferedAmountChange(previousAmount: Long) = Unit
             override fun onStateChange() {
-                if (channel.state() == DataChannel.State.OPEN) stateRef.compareAndSet(TransportState.CONNECTING, TransportState.CONNECTED)
+                if (channel.state() == DataChannel.State.OPEN) {
+                    stateRef.compareAndSet(TransportState.CONNECTING, TransportState.CONNECTED)
+                    if (channel.label() == WebRtcChannel.CONTROL.label) observer.onControlChannelOpen()
+                }
             }
             override fun onMessage(buffer: DataChannel.Buffer) {
                 runCatching {
@@ -142,26 +146,58 @@ class WebRtcTransport(
     fun createOffer() {
         peer.createOffer(object : SdpObserverAdapter() {
             override fun onCreateSuccess(description: SessionDescription) {
-                peer.setLocalDescription(SdpObserverAdapter(), description)
-                observer.onSignalingNeeded(SignalingMessageType.OFFER, JSONObject().put("sdp", description.description))
+                peer.setLocalDescription(object : SdpObserverAdapter() {
+                    override fun onSetSuccess() {
+                        observer.onSignalingNeeded(
+                            SignalingMessageType.OFFER,
+                            JSONObject().put("sdp", description.description),
+                        )
+                    }
+
+                    override fun onSetFailure(error: String) = observer.onFailure(
+                        IllegalStateException("Could not set local WebRTC offer: $error"),
+                    )
+                }, description)
             }
+            override fun onCreateFailure(error: String) = observer.onFailure(
+                IllegalStateException("Could not create WebRTC offer: $error"),
+            )
         }, MediaConstraints())
     }
 
     fun createAnswer() {
         peer.createAnswer(object : SdpObserverAdapter() {
             override fun onCreateSuccess(description: SessionDescription) {
-                peer.setLocalDescription(SdpObserverAdapter(), description)
-                observer.onSignalingNeeded(
-                    SignalingMessageType.ANSWER,
-                    JSONObject().put("sdp", description.description),
-                )
+                peer.setLocalDescription(object : SdpObserverAdapter() {
+                    override fun onSetSuccess() {
+                        observer.onSignalingNeeded(
+                            SignalingMessageType.ANSWER,
+                            JSONObject().put("sdp", description.description),
+                        )
+                    }
+
+                    override fun onSetFailure(error: String) = observer.onFailure(
+                        IllegalStateException("Could not set local WebRTC answer: $error"),
+                    )
+                }, description)
             }
+            override fun onCreateFailure(error: String) = observer.onFailure(
+                IllegalStateException("Could not create WebRTC answer: $error"),
+            )
         }, MediaConstraints())
     }
 
-    fun setRemoteDescription(type: SessionDescription.Type, sdp: String) {
-        peer.setRemoteDescription(SdpObserverAdapter(), SessionDescription(type, sdp))
+    fun setRemoteDescription(
+        type: SessionDescription.Type,
+        sdp: String,
+        onSuccess: () -> Unit = {},
+    ) {
+        peer.setRemoteDescription(object : SdpObserverAdapter() {
+            override fun onSetSuccess() = onSuccess()
+            override fun onSetFailure(error: String) = observer.onFailure(
+                IllegalStateException("Could not set remote WebRTC description: $error"),
+            )
+        }, SessionDescription(type, sdp))
     }
 
     fun addIceCandidate(candidate: IceCandidate) { peer.addIceCandidate(candidate) }
