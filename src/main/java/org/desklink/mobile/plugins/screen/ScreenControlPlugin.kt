@@ -3,8 +3,6 @@
  */
 package org.desklink.mobile.plugins.screen
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.content.Intent
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -15,6 +13,10 @@ import org.desklink.mobile.R
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.webrtc.VideoFrame
+import org.webrtc.VideoSink
+import org.webrtc.VideoTrack
+import java.util.concurrent.ConcurrentHashMap
 
 @LoadablePlugin
 class ScreenControlPlugin : Plugin() {
@@ -29,9 +31,48 @@ class ScreenControlPlugin : Plugin() {
     override fun onDestroy() {
         context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
         phoneCaptureRequested = false
-        latestFrame = null
+        clearRemoteVideoTrack()
         latestStatus = ""
         super.onDestroy()
+    }
+
+    /** Installs the current authenticated desktop video track for the screen UI. */
+    fun onRemoteVideoTrack(track: VideoTrack) {
+        synchronized(remoteVideoLock) {
+            remoteVideoTrack?.let { oldTrack ->
+                remoteVideoSinks.values.forEach(oldTrack::removeSink)
+            }
+            remoteVideoTrack = track
+            remoteVideoSinks.values.forEach(track::addSink)
+        }
+        latestStatus = context.getString(R.string.remote_screen_connected)
+    }
+
+    /** Attaches a native WebRTC renderer to the current remote video track. */
+    fun attachRemoteVideoSink(sink: VideoSink) {
+        synchronized(remoteVideoLock) {
+            val forwardingSink = SizeTrackingVideoSink(sink)
+            remoteVideoSinks[sink] = forwardingSink
+            remoteVideoTrack?.addSink(forwardingSink)
+        }
+    }
+
+    /** Detaches a renderer and stops forwarding frames to it. */
+    fun detachRemoteVideoSink(sink: VideoSink) {
+        synchronized(remoteVideoLock) {
+            remoteVideoSinks.remove(sink)?.let { forwardingSink ->
+                remoteVideoTrack?.removeSink(forwardingSink)
+            }
+        }
+    }
+
+    fun clearRemoteVideoTrack() {
+        synchronized(remoteVideoLock) {
+            remoteVideoTrack?.let { track ->
+                remoteVideoSinks.values.forEach(track::removeSink)
+            }
+            remoteVideoTrack = null
+        }
     }
 
     override fun onPacketReceived(np: NetworkPacket): Boolean {
@@ -57,37 +98,10 @@ class ScreenControlPlugin : Plugin() {
             PACKET_TYPE_SCREEN_ERROR -> {
                 latestStatus = np.getString("message", context.getString(R.string.remote_screen_error))
             }
-            PACKET_TYPE_SCREEN_FRAME -> {
-                val payload = np.payload
-                if (payload?.inputStream == null || np.payloadSize <= 0L || np.payloadSize > MAX_FRAME_BYTES) {
-                    latestStatus = context.getString(R.string.remote_screen_error)
-                    payload?.close()
-                    return true
-                }
-
-                try {
-                    val encoded = payload.inputStream.readBytes()
-                    val frame = ScreenFrameCodec.decode(encoded)
-                    val bitmap = BitmapFactory.decodeByteArray(frame.payload, 0, frame.payload.size)
-                    if (bitmap != null) {
-                        latestFrameWidth = frame.header.width
-                        latestFrameHeight = frame.header.height
-                        latestFrame = bitmap
-                        latestStatus = context.getString(R.string.remote_screen_connected)
-                    } else {
-                        latestStatus = context.getString(R.string.remote_screen_error)
-                    }
-                } catch (exception: Exception) {
-                    Log.e(TAG, "Failed to decode screen frame", exception)
-                    latestStatus = context.getString(R.string.remote_screen_error)
-                } finally {
-                    payload.close()
-                }
-            }
             PACKET_TYPE_SCREEN_STOP -> {
                 context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
                 phoneCaptureRequested = false
-                latestFrame = null
+                clearRemoteVideoTrack()
                 latestStatus = ""
             }
         }
@@ -99,7 +113,7 @@ class ScreenControlPlugin : Plugin() {
         fps: Int = DEFAULT_FPS,
         quality: Int = DEFAULT_QUALITY
     ) {
-        latestFrame = null
+        clearRemoteVideoTrack()
         latestStatus = context.getString(R.string.remote_screen_requesting)
         device.sendPacket(
             createScreenRequestPacket(
@@ -115,29 +129,7 @@ class ScreenControlPlugin : Plugin() {
         device.sendPacket(NetworkPacket(PACKET_TYPE_SCREEN_STOP))
         context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
         phoneCaptureRequested = false
-        latestFrame = null
-    }
-
-    fun sendPhoneScreenFrame(encodedFrame: ByteArray, width: Int, height: Int, sequence: Long) {
-        val encodedScreenFrame = ScreenFrameCodec.encode(
-            ScreenFrameHeader(
-                streamId = "phone-screen",
-                sequence = sequence,
-                width = width,
-                height = height,
-                format = ScreenFrameFormat.JPEG,
-                timestampMillis = System.currentTimeMillis()
-            ),
-            encodedFrame
-        )
-        val packet = NetworkPacket(PACKET_TYPE_SCREEN_FRAME).apply {
-            this["streamId"] = "phone-screen"
-            this["sequence"] = sequence
-            this["width"] = width
-            this["height"] = height
-            payload = NetworkPacket.Payload(encodedScreenFrame)
-        }
-        device.sendPacket(packet)
+        clearRemoteVideoTrack()
     }
 
     fun onPhoneCapturePermissionFinished(granted: Boolean) {
@@ -154,7 +146,6 @@ class ScreenControlPlugin : Plugin() {
         private const val TAG = "DeskLink/ScreenControl"
         const val PACKET_TYPE_SCREEN_REQUEST = DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST
         const val PACKET_TYPE_SCREEN_READY = DeskLinkProtocol.PACKET_TYPE_SCREEN_READY
-        const val PACKET_TYPE_SCREEN_FRAME = DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME
         const val PACKET_TYPE_SCREEN_STOP = DeskLinkProtocol.PACKET_TYPE_SCREEN_STOP
         const val PACKET_TYPE_SCREEN_ERROR = DeskLinkProtocol.PACKET_TYPE_SCREEN_ERROR
 
@@ -163,11 +154,6 @@ class ScreenControlPlugin : Plugin() {
         const val DEFAULT_MAX_DIMENSION = 1280
         const val DEFAULT_FPS = 6
         const val DEFAULT_QUALITY = 60
-        const val MAX_FRAME_BYTES = 64L * 1024L * 1024L
-
-        var latestFrame: Bitmap? by mutableStateOf(null)
-            private set
-
         var latestFrameWidth: Int by mutableStateOf(1280)
             private set
 
@@ -177,10 +163,21 @@ class ScreenControlPlugin : Plugin() {
         var latestStatus: String by mutableStateOf("")
             private set
 
+        private val remoteVideoLock = Any()
+        private var remoteVideoTrack: VideoTrack? = null
+        private val remoteVideoSinks = ConcurrentHashMap<VideoSink, VideoSink>()
+
+        private class SizeTrackingVideoSink(private val downstream: VideoSink) : VideoSink {
+            override fun onFrame(frame: VideoFrame) {
+                latestFrameWidth = frame.rotatedWidth
+                latestFrameHeight = frame.rotatedHeight
+                downstream.onFrame(frame)
+            }
+        }
+
         val SCREEN_PACKET_TYPES = arrayOf(
             PACKET_TYPE_SCREEN_REQUEST,
             PACKET_TYPE_SCREEN_READY,
-            PACKET_TYPE_SCREEN_FRAME,
             PACKET_TYPE_SCREEN_STOP,
             PACKET_TYPE_SCREEN_ERROR
         )

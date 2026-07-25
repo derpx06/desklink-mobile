@@ -248,6 +248,7 @@ class NetworkPacket private constructor(
          */
         val inputStream: InputStream?
         private val inputSocket: Socket?
+        private val closeAction: (() -> Unit)?
         val payloadSize: Long
 
         constructor(payloadSize: Long) : this(null, payloadSize)
@@ -261,12 +262,21 @@ class NetworkPacket private constructor(
             this.inputSocket = null
             this.inputStream = inputStream
             this.payloadSize = payloadSize
+            this.closeAction = null
+        }
+
+        constructor(inputStream: InputStream?, payloadSize: Long, closeAction: () -> Unit) {
+            this.inputSocket = null
+            this.inputStream = inputStream
+            this.payloadSize = payloadSize
+            this.closeAction = closeAction
         }
 
         constructor(inputSocket: Socket, payloadSize: Long) {
             this.inputSocket = inputSocket
             this.inputStream = inputSocket.getInputStream()
             this.payloadSize = payloadSize
+            this.closeAction = null
         }
 
         fun close() {
@@ -280,6 +290,8 @@ class NetworkPacket private constructor(
                 inputSocket?.close()
             } catch (ignored: IOException) {
             }
+
+            runCatching { closeAction?.invoke() }
         }
     }
 

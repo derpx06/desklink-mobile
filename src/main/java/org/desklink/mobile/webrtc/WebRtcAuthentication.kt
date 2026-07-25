@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.Signature
-import org.json.JSONObject
+import org.json.JSONStringer
 
 data class WebRtcAuthenticationTranscript(
     val sessionAttemptId: String,
@@ -24,20 +24,22 @@ data class WebRtcAuthenticationTranscript(
     val protocolVersion: Int,
     val timestamp: Long,
 ) {
-    fun canonicalBytes(): ByteArray = JSONObject()
-        .put("sessionAttemptId", sessionAttemptId)
-        .put("initiatorDeviceId", initiatorDeviceId)
-        .put("responderDeviceId", responderDeviceId)
-        .put("sessionId", sessionId)
-        .put("connectionGeneration", connectionGeneration)
-        .put("initiatorNonce", initiatorNonce)
-        .put("responderNonce", responderNonce)
-        .put("offerSha256", offerSha256)
-        .put("answerSha256", answerSha256)
-        .put("initiatorDtlsFingerprint", initiatorDtlsFingerprint)
-        .put("responderDtlsFingerprint", responderDtlsFingerprint)
-        .put("protocolVersion", protocolVersion)
-        .put("timestamp", timestamp)
+    fun canonicalBytes(): ByteArray = JSONStringer()
+        .`object`()
+        .key("sessionAttemptId").value(sessionAttemptId)
+        .key("initiatorDeviceId").value(initiatorDeviceId)
+        .key("responderDeviceId").value(responderDeviceId)
+        .key("sessionId").value(sessionId)
+        .key("connectionGeneration").value(connectionGeneration)
+        .key("initiatorNonce").value(initiatorNonce)
+        .key("responderNonce").value(responderNonce)
+        .key("offerSha256").value(offerSha256)
+        .key("answerSha256").value(answerSha256)
+        .key("initiatorDtlsFingerprint").value(initiatorDtlsFingerprint)
+        .key("responderDtlsFingerprint").value(responderDtlsFingerprint)
+        .key("protocolVersion").value(protocolVersion)
+        .key("timestamp").value(timestamp)
+        .endObject()
         .toString()
         .toByteArray(StandardCharsets.UTF_8)
 

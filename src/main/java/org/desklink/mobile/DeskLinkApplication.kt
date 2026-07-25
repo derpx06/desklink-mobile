@@ -136,6 +136,17 @@ class DeskLinkApplication : Application() {
         return device?.getPlugin(pluginClass)
     }
 
+    fun startWebRtcScreenCapture(deviceId: String?, permissionData: android.content.Intent): Boolean {
+        val device = getDevice(deviceId) ?: return false
+        return runCatching {
+            webRtcCoordinatorFor(device).startPhoneScreenCapture(permissionData)
+        }.isSuccess
+    }
+
+    fun stopWebRtcScreenCapture(deviceId: String?) {
+        getDevice(deviceId)?.let { webRtcCoordinatorFor(it).stopPhoneScreenCapture() }
+    }
+
     private fun loadRememberedDevicesFromSettings() {
         // Log.e("BackgroundService", "Loading remembered trusted devices")
         val trustedDevices = TrustedDevices.getAllTrustedDevices(this)

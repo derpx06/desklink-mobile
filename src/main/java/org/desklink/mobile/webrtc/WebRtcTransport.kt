@@ -3,6 +3,9 @@
  */
 package org.desklink.mobile.webrtc
 
+import android.content.Context
+import android.content.Intent
+import android.media.projection.MediaProjection
 import org.desklink.mobile.transport.DisconnectReason
 import org.desklink.mobile.transport.LogicalChannel
 import org.desklink.mobile.transport.SessionTransport
@@ -11,25 +14,31 @@ import org.desklink.mobile.transport.TransportError
 import org.desklink.mobile.transport.TransportErrorCode
 import org.desklink.mobile.transport.TransportState
 import org.desklink.mobile.transport.TransportType
+import org.desklink.mobile.NetworkPacket
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
+import org.webrtc.ScreenCapturerAndroid
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
+import org.webrtc.SurfaceTextureHelper
+import org.webrtc.VideoSource
+import org.webrtc.VideoTrack
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
+enum class WebRtcPeerHealth { CONNECTED, DISCONNECTED, FAILED, CLOSED }
+
 /** One authenticated WebRTC peer connection for one DeskLink device session. */
 class WebRtcTransport(
+    private val context: Context,
     private val factory: PeerConnectionFactory,
     override val transportId: String,
-    private val deviceId: String,
-    private val sessionId: Long,
-    private val generation: Long,
+    private val wireBinding: WebRtcWireBinding,
     iceServers: List<PeerConnection.IceServer> = emptyList(),
     private val createLocalChannels: Boolean = false,
     private val observer: Observer,
@@ -38,12 +47,21 @@ class WebRtcTransport(
         fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject)
         fun onEnvelope(envelope: WebRtcEnvelope)
         fun onControlChannelOpen()
+        fun onRemoteVideoTrack(track: VideoTrack)
+        fun onConnectionStateChanged(state: WebRtcPeerHealth)
         fun onFailure(error: Throwable)
     }
 
     private val stateRef = AtomicReference(TransportState.CONNECTING)
+    private val handoverRef = AtomicReference(WebRtcHandoverState.NEGOTIATING)
     private val channels = ConcurrentHashMap<String, DataChannel>()
     private val peer: PeerConnection
+    private val videoSource: VideoSource = factory.createVideoSource(true).also {
+        it.setIsScreencast(true)
+    }
+    private val videoTrack: VideoTrack = factory.createVideoTrack("desklink-screen", videoSource)
+    private var screenCapturer: ScreenCapturerAndroid? = null
+    private var screenTextureHelper: SurfaceTextureHelper? = null
 
     init {
         val configuration = PeerConnection.RTCConfiguration(iceServers).apply {
@@ -61,6 +79,7 @@ class WebRtcTransport(
                 peer.createDataChannel(channel.label, init)?.also { installChannel(it) }
             }
         }
+        peer.addTrack(videoTrack, listOf("desklink-screen"))
     }
 
     override val transportType: TransportType = TransportType.WEBRTC
@@ -87,7 +106,11 @@ class WebRtcTransport(
                     require(envelope.channel == channel.label()) {
                         "WebRTC envelope channel does not match its data channel"
                     }
-                    envelope.validate(deviceId, sessionId, generation)
+                    envelope.validate(
+                        wireBinding.peerDeviceId,
+                        wireBinding.sessionId,
+                        wireBinding.generation,
+                    )
                     observer.onEnvelope(envelope)
                 }.onFailure(observer::onFailure)
             }
@@ -100,7 +123,7 @@ class WebRtcTransport(
             LogicalChannel.PAYLOAD -> WebRtcChannel.FILE_DATA
             LogicalChannel.STREAM -> WebRtcChannel.EVENTS
         }
-        sendOn(webRtcChannel, payload, callback)
+        sendEnvelope(webRtcChannel, "desklink.raw.v1", payload, System.currentTimeMillis(), callback)
     }
 
     override fun sendRealtime(channel: LogicalChannel, payload: ByteArray, callback: TransportCallback) {
@@ -132,15 +155,56 @@ class WebRtcTransport(
         callback: TransportCallback,
     ) {
         val encoded = WebRtcEnvelope.create(
-            deviceId,
-            sessionId,
-            generation,
+            wireBinding.senderDeviceId,
+            wireBinding.sessionId,
+            wireBinding.generation,
             channel,
             messageType,
             payload,
             timestamp,
         ).toJson().toString().toByteArray(Charsets.UTF_8)
         sendOn(channel, encoded, callback)
+    }
+
+    fun isReadyForPackets(): Boolean =
+        state == TransportState.CONNECTED &&
+            handoverRef.get().featuresAllowed &&
+            channels[WebRtcChannel.CONTROL.label]?.state() == DataChannel.State.OPEN
+
+    fun advanceHandover(message: WebRtcHandoverMessage): WebRtcHandoverState {
+        while (true) {
+            val current = handoverRef.get()
+            val next = current.receive(message)
+            require(next != WebRtcHandoverState.FAILED || message == WebRtcHandoverMessage.CLOSE) {
+                "Invalid DeskLink WebRTC handover transition: $current -> $message"
+            }
+            if (handoverRef.compareAndSet(current, next)) return next
+        }
+    }
+
+    fun handoverState(): WebRtcHandoverState = handoverRef.get()
+
+    fun sendPacket(packet: NetworkPacket, callback: TransportCallback) {
+        if (!handoverRef.get().featuresAllowed) {
+            callback.onFailure(
+                TransportError(
+                    TransportErrorCode.CLOSED,
+                    "DeskLink WebRTC feature handover is incomplete",
+                ),
+            )
+            return
+        }
+        val envelope = try {
+            WebRtcPacketBridge.encode(wireBinding, packet, System.currentTimeMillis())
+        } catch (error: Throwable) {
+            callback.onFailure(TransportError(TransportErrorCode.INVALID_PACKET, error.message ?: "Invalid WebRTC packet", error))
+            return
+        }
+        sendOn(
+            WebRtcChannel.fromLabel(envelope.channel) ?: error("Unknown DeskLink WebRTC channel"),
+            envelope.toJson().toString().toByteArray(Charsets.UTF_8),
+            callback,
+        )
     }
 
     fun createOffer() {
@@ -202,9 +266,53 @@ class WebRtcTransport(
 
     fun addIceCandidate(candidate: IceCandidate) { peer.addIceCandidate(candidate) }
 
+    fun restartIce() = peer.restartIce()
+
+    fun startScreenCapture(
+        permissionData: Intent,
+        width: Int = 1280,
+        height: Int = 720,
+        fps: Int = 12,
+    ) {
+        stopScreenCapture()
+        val capturer = ScreenCapturerAndroid(
+            permissionData,
+            object : MediaProjection.Callback() {
+                override fun onStop() {
+                    observer.onFailure(IllegalStateException("Android screen capture permission was revoked"))
+                }
+            },
+        )
+        val helper = SurfaceTextureHelper.create(
+            "DeskLink-screen-capture",
+            WebRtcRuntime.eglContext(context),
+        )
+        capturer.initialize(helper, context, videoSource.capturerObserver)
+        capturer.startCapture(
+            width.coerceIn(320, 1920),
+            height.coerceIn(240, 1920),
+            fps.coerceIn(1, 30),
+        )
+        screenCapturer = capturer
+        screenTextureHelper = helper
+    }
+
+    fun stopScreenCapture() {
+        screenCapturer?.let { capturer ->
+            runCatching { capturer.stopCapture() }
+            capturer.dispose()
+        }
+        screenCapturer = null
+        screenTextureHelper?.dispose()
+        screenTextureHelper = null
+    }
+
     override fun close(reason: DisconnectReason) {
         val previous = stateRef.getAndSet(TransportState.CLOSING)
         if (previous == TransportState.CLOSED || previous == TransportState.CLOSING) return
+        stopScreenCapture()
+        videoTrack.dispose()
+        videoSource.dispose()
         channels.values.forEach(DataChannel::dispose)
         channels.clear()
         peer.close()
@@ -216,8 +324,21 @@ class WebRtcTransport(
         override fun onSignalingChange(newState: PeerConnection.SignalingState) = Unit
         override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState) {
             when (newState) {
-                PeerConnection.IceConnectionState.CONNECTED, PeerConnection.IceConnectionState.COMPLETED -> stateRef.set(TransportState.CONNECTED)
-                PeerConnection.IceConnectionState.DISCONNECTED -> stateRef.set(TransportState.FAILED)
+                PeerConnection.IceConnectionState.CONNECTED,
+                PeerConnection.IceConnectionState.COMPLETED -> {
+                    stateRef.set(TransportState.CONNECTED)
+                    observer.onConnectionStateChanged(WebRtcPeerHealth.CONNECTED)
+                }
+                PeerConnection.IceConnectionState.DISCONNECTED -> {
+                    stateRef.set(TransportState.FAILED)
+                    observer.onConnectionStateChanged(WebRtcPeerHealth.DISCONNECTED)
+                }
+                PeerConnection.IceConnectionState.FAILED -> {
+                    stateRef.set(TransportState.FAILED)
+                    observer.onConnectionStateChanged(WebRtcPeerHealth.FAILED)
+                }
+                PeerConnection.IceConnectionState.CLOSED ->
+                    observer.onConnectionStateChanged(WebRtcPeerHealth.CLOSED)
                 else -> Unit
             }
         }
@@ -238,9 +359,14 @@ class WebRtcTransport(
         override fun onRemoveStream(stream: org.webrtc.MediaStream) = Unit
         override fun onDataChannel(dataChannel: DataChannel) = installChannel(dataChannel)
         override fun onRenegotiationNeeded() = Unit
-        override fun onAddTrack(receiver: org.webrtc.RtpReceiver, mediaStreams: Array<out org.webrtc.MediaStream>) = Unit
+        override fun onAddTrack(receiver: org.webrtc.RtpReceiver, mediaStreams: Array<out org.webrtc.MediaStream>) {
+            (receiver.track() as? VideoTrack)?.let(observer::onRemoteVideoTrack)
+        }
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState) {
-            if (newState == PeerConnection.PeerConnectionState.FAILED) observer.onFailure(IllegalStateException("WebRTC peer connection failed"))
+            if (newState == PeerConnection.PeerConnectionState.FAILED) {
+                stateRef.set(TransportState.FAILED)
+                observer.onConnectionStateChanged(WebRtcPeerHealth.FAILED)
+            }
         }
     }
 

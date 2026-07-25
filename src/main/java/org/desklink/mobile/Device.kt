@@ -41,6 +41,7 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.Plugin.Companion.getPluginKey
 import org.desklink.mobile.plugins.PluginFactory
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.webrtc.WebRtcTransport
 import org.desklink.mobile.session.PairingState
 import org.desklink.mobile.transport.LogicalChannel
 import org.desklink.mobile.transport.SessionTransport
@@ -79,6 +80,17 @@ class Device : PacketReceiver {
     /** Current LAN control transport owned by DeskLinkApplication's session manager. */
     @Volatile
     private var sessionTransport: SessionTransport? = null
+
+    /** Authenticated data-channel transport. LAN remains bootstrap/signaling-only. */
+    @Volatile
+    private var webRtcTransport: WebRtcTransport? = null
+
+    fun interface PayloadPacketHandler {
+        fun sendPayload(packet: NetworkPacket, callback: SendPacketStatusCallback): Boolean
+    }
+
+    @Volatile
+    private var payloadPacketHandler: PayloadPacketHandler? = null
 
     /** Paired-session control packets that are not plugin capabilities. */
     fun interface ControlPacketHandler {
@@ -342,6 +354,14 @@ class Device : PacketReceiver {
         sessionTransport = transport
     }
 
+    fun setWebRtcTransport(transport: WebRtcTransport?) {
+        webRtcTransport = transport
+    }
+
+    fun setWebRtcPayloadHandler(handler: PayloadPacketHandler?) {
+        payloadPacketHandler = handler
+    }
+
     fun setControlPacketHandler(handler: ControlPacketHandler?) {
         controlPacketHandler = handler
     }
@@ -442,7 +462,29 @@ class Device : PacketReceiver {
     }
 
     override fun onPacketReceived(np: NetworkPacket) {
+        dispatchPacket(np, fromWebRtc = false)
+    }
+
+    fun onWebRtcPacketReceived(np: NetworkPacket) {
+        dispatchPacket(np, fromWebRtc = true)
+    }
+
+    private fun dispatchPacket(np: NetworkPacket, fromWebRtc: Boolean) {
         countReceived(deviceId, np.type)
+
+        val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
+            np.type == NetworkPacket.PACKET_TYPE_PAIR ||
+            np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        if (fromWebRtc && bootstrapPacket) {
+            Log.w("DeskLink/WebRTC", "Rejected bootstrap packet on the WebRTC feature path")
+            np.payload?.close()
+            return
+        }
+        if (!fromWebRtc && isPaired && !bootstrapPacket) {
+            Log.w("DeskLink/Device", "Rejected paired feature packet on the LAN bootstrap path: ${np.type}")
+            np.payload?.close()
+            return
+        }
 
         if (NetworkPacket.PACKET_TYPE_PAIR == np.type) {
             Log.i("DeskLink/Device", "Pair packet")
@@ -570,15 +612,64 @@ class Device : PacketReceiver {
             return false
         }
 
-        // Route the first small control feature through the session boundary.
-        // Payload-bearing packets remain on the established link path so their
-        // existing framing and transfer callbacks are unchanged in this step.
-        val transport = sessionTransport
-        if (np.type == DeskLinkProtocol.PACKET_TYPE_PING && !np.hasPayload() && transport != null) {
+        // Pairing, identity, and signed SDP/ICE signaling retain their LAN
+        // path. Once paired, every ordinary non-payload feature packet requires
+        // the authenticated WebRTC handover; it must never silently fall back
+        // to LAN/TLS.
+        val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
+            np.type == NetworkPacket.PACKET_TYPE_PAIR ||
+            np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        val transport = webRtcTransport
+        val filePayload = np.type == DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST &&
+            np.getString("filename").isNotEmpty() && np.payload != null
+        if (isPaired && !bootstrapPacket && filePayload) {
+            val handler = payloadPacketHandler
+            if (transport == null || !transport.isReadyForPackets() || handler == null) {
+                val error = IllegalStateException(
+                    "DeskLink WebRTC file transport is not ready",
+                )
+                callback.onFailure(error)
+                np.payload?.close()
+                countSent(deviceId, np.type, false)
+                return false
+            }
+            return runCatching { handler.sendPayload(np, callback) }
+                .onFailure(callback::onFailure)
+                .getOrDefault(false)
+                .also { countSent(deviceId, np.type, it) }
+        }
+        if (
+            isPaired &&
+            np.type == DeskLinkProtocol.PACKET_TYPE_NOTIFICATION &&
+            np.payload != null
+        ) {
+            // Notification artwork is optional. The notification itself must
+            // still synchronize when its icon does not fit the event channel.
+            np.payload?.close()
+            np.payload = null
+            np.payloadTransferInfo = org.json.JSONObject()
+        }
+        if (isPaired && !bootstrapPacket && np.payload != null) {
+            val error = IllegalStateException(
+                "Payload-bearing ${np.type} has no WebRTC media/attachment transport",
+            )
+            callback.onFailure(error)
+            np.payload?.close()
+            countSent(deviceId, np.type, false)
+            return false
+        }
+        if (isPaired && !bootstrapPacket && !np.hasPayload()) {
+            if (transport == null || !transport.isReadyForPackets()) {
+                val error = IllegalStateException(
+                    "DeskLink WebRTC feature transport is not ready",
+                )
+                callback.onFailure(error)
+                countSent(deviceId, np.type, false)
+                return false
+            }
             return try {
-                transport.send(
-                    LogicalChannel.CONTROL,
-                    np.serialize().toByteArray(Charsets.UTF_8),
+                transport.sendPacket(
+                    np,
                     object : TransportCallback {
                         override fun onSuccess() = callback.onSuccess()
 

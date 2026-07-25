@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.desklink.mobile.Device
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -20,6 +21,8 @@ class ScreenControlPluginTest {
             assertTrue("missing supported packet $packetType", packetType in supported)
             assertTrue("missing outgoing packet $packetType", packetType in outgoing)
         }
+        assertTrue(DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME !in supported)
+        assertTrue(DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME !in outgoing)
     }
 
     @Test

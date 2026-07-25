@@ -68,6 +68,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
             devicesByIpPref(context),
             bluetoothSupportPref(context),
             webRtcTransportPref(context),
+            webRtcStunServersPref(context),
+            webRtcTurnServersPref(context),
             exportLogsPref(context),
             moreSettingsPref(context),
         ).forEach(screen::addPreference)
@@ -202,7 +204,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun bluetoothSupportPref(context: Context) = SwitchPreference(context).apply {
-        setDefaultValue(false)
+        setDefaultValue(true)
         key = KEY_BLUETOOTH_ENABLED
         setTitle(R.string.enable_bluetooth)
         onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _: Preference?, newValue: Any ->
@@ -225,9 +227,23 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     private fun webRtcTransportPref(context: Context) = SwitchPreference(context).apply {
         key = DeviceHelper.KEY_WEBRTC_ENABLED_PREFERENCE
-        setDefaultValue(false)
+        setDefaultValue(true)
         setTitle(R.string.setting_webrtc_transport)
         setSummary(R.string.setting_webrtc_transport_description)
+    }
+
+    private fun webRtcStunServersPref(context: Context) = EditTextPreference(context).apply {
+        key = DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE
+        setTitle(R.string.setting_webrtc_stun_servers)
+        setSummary(R.string.setting_webrtc_stun_servers_description)
+        setOnBindEditTextListener(EditText::setSingleLine)
+    }
+
+    private fun webRtcTurnServersPref(context: Context) = EditTextPreference(context).apply {
+        key = DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE
+        setTitle(R.string.setting_webrtc_turn_servers)
+        setSummary(R.string.setting_webrtc_turn_servers_description)
+        setOnBindEditTextListener(EditText::setSingleLine)
     }
 
     private fun exportLogsPref(context: Context) = Preference(context).apply {
