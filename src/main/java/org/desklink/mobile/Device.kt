@@ -480,7 +480,18 @@ class Device : PacketReceiver {
             np.payload?.close()
             return
         }
-        if (!fromWebRtc && isPaired && !bootstrapPacket) {
+        // Desktop WebRTC handover is not complete until both peers have
+        // installed a ready feature transport.  The encrypted LAN link remains
+        // the transition transport until that point; rejecting it earlier
+        // drops legitimate packets such as desklink.ping before their plugin
+        // can handle them.  Once WebRTC is ready, LAN is bootstrap-only.
+        if (shouldRejectPairedLanFeaturePacket(
+                fromWebRtc = fromWebRtc,
+                paired = isPaired,
+                bootstrapPacket = bootstrapPacket,
+                webRtcFeatureTransportReady = webRtcTransport?.isReadyForPackets() == true,
+            )
+        ) {
             Log.w("DeskLink/Device", "Rejected paired feature packet on the LAN bootstrap path: ${np.type}")
             np.payload?.close()
             return
@@ -613,13 +624,15 @@ class Device : PacketReceiver {
         }
 
         // Pairing, identity, and signed SDP/ICE signaling retain their LAN
-        // path. Once paired, every ordinary non-payload feature packet requires
-        // the authenticated WebRTC handover; it must never silently fall back
-        // to LAN/TLS.
+        // path. Ordinary features use WebRTC after mutual feature-ready. Until
+        // then, both peers use the already-authenticated LAN session as the
+        // explicit transition transport so that a partial desktop handover
+        // cannot drop pings, clipboard updates, or other feature state.
         val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
             np.type == NetworkPacket.PACKET_TYPE_PAIR ||
             np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
         val transport = webRtcTransport
+        val readyTransport = transport?.takeIf { it.isReadyForPackets() }
         val filePayload = np.type == DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST &&
             np.getString("filename").isNotEmpty() && np.payload != null
         if (isPaired && !bootstrapPacket && filePayload) {
@@ -658,17 +671,13 @@ class Device : PacketReceiver {
             countSent(deviceId, np.type, false)
             return false
         }
-        if (isPaired && !bootstrapPacket && !np.hasPayload()) {
-            if (transport == null || !transport.isReadyForPackets()) {
-                val error = IllegalStateException(
-                    "DeskLink WebRTC feature transport is not ready",
-                )
-                callback.onFailure(error)
-                countSent(deviceId, np.type, false)
-                return false
-            }
+        if (
+            isPaired && !bootstrapPacket && !np.hasPayload() &&
+                webRtcFeatureTransportShouldHandlePacket(readyTransport != null)
+        ) {
+            val activeTransport = requireNotNull(readyTransport)
             return try {
-                transport.sendPacket(
+                activeTransport.sendPacket(
                     np,
                     object : TransportCallback {
                         override fun onSuccess() = callback.onSuccess()
@@ -863,3 +872,17 @@ class Device : PacketReceiver {
         return deviceId.hashCode()
     }
 }
+
+/**
+ * LAN is allowed for paired feature packets only during the authenticated
+ * transition to WebRTC.  It becomes bootstrap-only after WebRTC handover.
+ */
+internal fun shouldRejectPairedLanFeaturePacket(
+    fromWebRtc: Boolean,
+    paired: Boolean,
+    bootstrapPacket: Boolean,
+    webRtcFeatureTransportReady: Boolean,
+): Boolean = !fromWebRtc && paired && !bootstrapPacket && webRtcFeatureTransportReady
+
+/** Feature sends switch atomically from the transitional LAN link to WebRTC. */
+internal fun webRtcFeatureTransportShouldHandlePacket(ready: Boolean): Boolean = ready
