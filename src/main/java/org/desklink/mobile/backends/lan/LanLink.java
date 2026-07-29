@@ -58,9 +58,9 @@ public class LanLink extends BaseLink {
 
     @Override
     public void disconnect() {
-        Log.i("LanLink/Disconnect","socket:"+ socket.hashCode());
+        Log.i("LanLink/Disconnect","socket:"+ (socket == null ? "none" : socket.hashCode()));
         try {
-            socket.close();
+            if (socket != null) socket.close();
         } catch (IOException e) {
             Log.e("LanLink", "Error", e);
         }
@@ -280,8 +280,10 @@ public class LanLink extends BaseLink {
                 }
                 int tcpPort = np.getPayloadTransferInfo().getInt("port");
                 InetSocketAddress deviceAddress = (InetSocketAddress) socket.getRemoteSocketAddress();
-                payloadSocket.connect(new InetSocketAddress(deviceAddress.getAddress(), tcpPort));
+                payloadSocket.connect(new InetSocketAddress(deviceAddress.getAddress(), tcpPort), 10_000);
+                payloadSocket.setSoTimeout(30_000);
                 payloadSocket = SslHelper.convertToSslSocket(context, payloadSocket, getDeviceId(), true, true);
+                payloadSocket.setSoTimeout(30_000);
                 String expectedToken = np.getStringOrNull("transferToken");
                 if (expectedToken == null || expectedToken.isEmpty() || expectedToken.length() > 128) {
                     throw new IOException("Missing or invalid payload transfer token");
@@ -302,6 +304,10 @@ public class LanLink extends BaseLink {
             } catch (Exception e) {
                 try { payloadSocket.close(); } catch(Exception ignored) { }
                 Log.e("DeskLink/LanLink", "Exception connecting to payload remote socket", e);
+                // A control packet that promised a payload is not a valid
+                // feature packet without that authenticated payload. Do not
+                // dispatch it as a successful empty transfer.
+                return;
             }
 
         }

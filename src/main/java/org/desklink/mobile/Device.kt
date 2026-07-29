@@ -40,6 +40,12 @@ import org.desklink.mobile.PairingHandler.PairingCallback
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.Plugin.Companion.getPluginKey
 import org.desklink.mobile.plugins.PluginFactory
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.session.PairingState
+import org.desklink.mobile.transport.LogicalChannel
+import org.desklink.mobile.transport.SessionTransport
+import org.desklink.mobile.transport.TransportCallback
+import org.desklink.mobile.transport.TransportError
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.R
 import java.io.IOException
@@ -69,6 +75,10 @@ class Device : PacketReceiver {
     var pairingHandler: PairingHandler
 
     private val links = CopyOnWriteArrayList<BaseLink>()
+
+    /** Current LAN control transport owned by DeskLinkApplication's session manager. */
+    @Volatile
+    private var sessionTransport: SessionTransport? = null
 
     /**
      * Plugins that have matching capabilities.
@@ -211,6 +221,7 @@ class Device : PacketReceiver {
 
                 // Store as trusted device
                 TrustedDevices.addTrustedDevice(context, deviceInfo.id)
+                updateSessionPairingState(PairingState.PAIRED)
 
                 try {
                     reloadPluginsFromSettings()
@@ -230,6 +241,7 @@ class Device : PacketReceiver {
                 assert(device == this@Device)
                 Log.i("Device", "unpaired, removing from trusted devices list")
                 TrustedDevices.removeTrustedDevice(context, deviceInfo.id)
+                updateSessionPairingState(PairingState.NOT_PAIRED)
 
                 notifyPluginsOfDeviceUnpaired(context, deviceInfo.id)
 
@@ -237,6 +249,15 @@ class Device : PacketReceiver {
 
                 pairingCallbacks.forEach { it.unpaired(this@Device) }
             }
+        }
+    }
+
+    private fun updateSessionPairingState(state: PairingState) {
+        // Device unit tests and a few library-style callers can construct a
+        // Device before Application.onCreate(). Pairing must still complete;
+        // session state is an optional runtime integration in that case.
+        runCatching {
+            DeskLinkApplication.getInstance().sessionManager.updatePairingState(deviceInfo.id, state)
         }
     }
 
@@ -308,6 +329,10 @@ class Device : PacketReceiver {
 
     val isReachable: Boolean
         get() = links.isNotEmpty()
+
+    fun setSessionTransport(transport: SessionTransport?) {
+        sessionTransport = transport
+    }
 
     fun addLink(link: BaseLink) {
         synchronized(sendChannel) {
@@ -518,6 +543,34 @@ class Device : PacketReceiver {
         if (!supportsPacketType(np.type)) {
             Log.e("DeskLink/sendPacket", "Tried to send an unsupported packet type ${np.type} to: ${deviceInfo.name}")
             return false
+        }
+
+        // Route the first small control feature through the session boundary.
+        // Payload-bearing packets remain on the established link path so their
+        // existing framing and transfer callbacks are unchanged in this step.
+        val transport = sessionTransport
+        if (np.type == DeskLinkProtocol.PACKET_TYPE_PING && !np.hasPayload() && transport != null) {
+            return try {
+                transport.send(
+                    LogicalChannel.CONTROL,
+                    np.serialize().toByteArray(Charsets.UTF_8),
+                    object : TransportCallback {
+                        override fun onSuccess() = callback.onSuccess()
+
+                        override fun onFailure(error: TransportError) = callback.onFailure(error)
+
+                        override fun onProgress(percent: Int) {
+                            callback.onPayloadProgressChanged(percent)
+                        }
+                    },
+                )
+                countSent(deviceId, np.type, true)
+                true
+            } catch (e: Exception) {
+                callback.onFailure(e)
+                countSent(deviceId, np.type, false)
+                false
+            }
         }
 
         val success = links.any { link ->

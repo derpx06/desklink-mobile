@@ -16,6 +16,7 @@ import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -47,6 +48,8 @@ import org.desklink.mobile.R
  */
 class BackgroundService : Service() {
     private lateinit var applicationInstance: DeskLinkApplication
+    private var networkCallback: NetworkCallback? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     private val linkProviders = mutableListOf<BaseLinkProvider>()
 
@@ -99,6 +102,7 @@ class BackgroundService : Service() {
         Log.d("DeskLink/BgService", "onCreate")
         this.applicationInstance = DeskLinkApplication.getInstance()
         instance = this
+        acquireWifiLock()
 
         DeskLinkApplication.getInstance().addDeviceListChangedCallback("BackgroundService", this::updateForegroundNotification)
 
@@ -113,21 +117,27 @@ class BackgroundService : Service() {
         // Watch for changes on all network connections except cellular networks
         val networkRequestBuilder = createNonCellularNetworkRequestBuilder()
         val connectivityManager = this.getSystemService<ConnectivityManager>()
-        connectivityManager?.registerNetworkCallback(networkRequestBuilder.build(), object : NetworkCallback() {
+        val callback = object : NetworkCallback() {
 
             // All callbacks runs on a dedicated thread that isn't the main thread
 
             override fun onAvailable(network: Network) {
                 Log.i("BackgroundService", "Valid network available")
                 connectedToNonCellularNetwork.postValue(true)
+                if (wifiLock == null) acquireWifiLock()
                 onNetworkChange(network)
             }
 
             override fun onLost(network: Network) {
                 Log.i("BackgroundService", "Valid network lost")
                 connectedToNonCellularNetwork.postValue(false)
+                // Close stale LAN sockets and trigger discovery on the next
+                // available network instead of waiting for TCP timeouts.
+                onNetworkChange(null)
             }
-        })
+        }
+        networkCallback = callback
+        connectivityManager?.registerNetworkCallback(networkRequestBuilder.build(), callback)
 
         registerLinkProviders()
         addConnectionListener(applicationInstance.connectionListener) // Link Providers need to be already registered
@@ -142,8 +152,26 @@ class BackgroundService : Service() {
             updateForegroundNotification()
         }
         else {
-            stopForeground(true)
-            Start(this)
+            // Android requires a foreground service to keep its user-visible
+            // notification while it owns a persistent LAN connection. The
+            // notification channel may be hidden by the user, but dropping
+            // foreground mode makes screen-off/OEM process killing likely.
+            updateForegroundNotification()
+        }
+    }
+
+    private fun acquireWifiLock() {
+        val wifiManager = getSystemService<WifiManager>() ?: return
+        if (!wifiManager.isWifiEnabled) return
+        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+        } else {
+            @Suppress("DEPRECATION")
+            WifiManager.WIFI_MODE_FULL_HIGH_PERF
+        }
+        wifiLock = wifiManager.createWifiLock(mode, "DeskLink:lan").apply {
+            setReferenceCounted(false)
+            acquire()
         }
     }
 
@@ -223,10 +251,19 @@ class BackgroundService : Service() {
     override fun onDestroy() {
         Log.d("DeskLink/BgService", "onDestroy")
         initialized = false
+        networkCallback?.let { callback ->
+            getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(callback)
+        }
+        networkCallback = null
+        wifiLock?.let { lock ->
+            if (lock.isHeld) lock.release()
+        }
+        wifiLock = null
         for (linkProvider in linkProviders) {
             linkProvider.onStop()
         }
         DeskLinkApplication.getInstance().removeDeviceListChangedCallback("BackgroundService")
+        instance = null
         super.onDestroy()
     }
 
@@ -234,18 +271,16 @@ class BackgroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(LOG_TAG, "onStartCommand")
-        if (NotificationHelper.isPersistentNotificationEnabled(this)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                try {
-                    startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-                } catch (e: IllegalStateException) { // To catch ForegroundServiceStartNotAllowedException
-                    Log.w("BackgroundService", "Couldn't startForeground", e)
-                    return START_STICKY
-                }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            } catch (e: IllegalStateException) { // To catch ForegroundServiceStartNotAllowedException
+                Log.w("BackgroundService", "Couldn't startForeground", e)
+                return START_STICKY
             }
-            else {
-                startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
-            }
+        }
+        else {
+            startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
         }
         if (intent != null && intent.getBooleanExtra("refresh", false)) {
             onNetworkChange(null)

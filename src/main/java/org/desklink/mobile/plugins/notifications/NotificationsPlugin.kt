@@ -111,6 +111,12 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     override fun onListenerConnected(service: NotificationReceiver?) {
         serviceReady = true
+        if (service != null && isDeviceInitialized) {
+            // Listener reconnection is a synchronization boundary. Re-send
+            // the active set so desktop state does not depend on missed post
+            // callbacks while Android was reconnecting the listener.
+            sendCurrentNotifications(service)
+        }
     }
 
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification?) {
@@ -221,13 +227,14 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         val key = getNotificationKeyCompat(statusBarNotification)
         val isUpdate = currentNotifications.contains(key)
 
-        if (!isUpdate) {
-            currentNotifications.add(key)
-        }
-
         val np = NetworkPacket(PACKET_TYPE_NOTIFICATION)
+        var iconHashToCommit: String? = null
 
-        val appIcon = extractIcon(statusBarNotification, notification)
+        val appIcon = runCatching { extractIcon(statusBarNotification, notification) }
+            .onFailure { error ->
+                Log.w(TAG, "Unable to extract notification icon for $packageName; continuing without it", error)
+            }
+            .getOrNull()
 
         if (appIcon != null && !appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_IMAGES)) {
             val iconBytes = getIconBytes(appIcon)
@@ -236,7 +243,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             // If it's the same icon, the other end should have it already, so there's no need to send it again.
             if (iconHash != notificationsIcons[key]) {
                 np.payload = NetworkPacket.Payload(iconBytes)
-                notificationsIcons[key] = iconHash
+                iconHashToCommit = iconHash
             }
             // We should always send the icon's hash so the other end can know which icon to use.
             np["payloadHash"] = iconHash
@@ -295,7 +302,17 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
                 }
             }
         }
-        device.sendPacket(np)
+        try {
+            device.sendPacket(np)
+            currentNotifications.add(key)
+            if (iconHashToCommit != null) {
+                notificationsIcons[key] = iconHashToCommit
+            }
+        } catch (error: Exception) {
+            // Do not mark a notification as synchronized until the packet has
+            // been accepted by the link. This allows a later resync to retry it.
+            Log.w(TAG, "Unable to synchronize notification $key", error)
+        }
     }
 
     private fun extractText(notification: Notification): String? {
@@ -408,7 +425,18 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     private fun iconToBitmap(foreignContext: Context?, icon: Icon?): Bitmap? {
         icon ?: return null
-        return drawableToBitmap(icon.loadDrawable(foreignContext))
+        return try {
+            drawableToBitmap(icon.loadDrawable(foreignContext))
+        } catch (error: RuntimeException) {
+            // Notification icons may reference resources from packages that
+            // have been removed, updated, or no longer grant access to them.
+            // An invalid icon must not abort notification synchronization.
+            Log.w(TAG, "Unable to load notification icon", error)
+            null
+        } catch (error: SecurityException) {
+            Log.w(TAG, "Permission denied while loading notification icon", error)
+            null
+        }
     }
 
     private fun replyToNotification(id: String, message: String) {
@@ -496,7 +524,13 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             return // Can happen only on API 23 and lower
         }
         for (notification in notifications) {
-            sendNotification(notification, true)
+            // A single malformed third-party notification must not prevent
+            // the rest of the active notification set from being mirrored.
+            try {
+                sendNotification(notification, true)
+            } catch (error: Exception) {
+                Log.w(TAG, "Skipping notification during resync", error)
+            }
         }
     }
 

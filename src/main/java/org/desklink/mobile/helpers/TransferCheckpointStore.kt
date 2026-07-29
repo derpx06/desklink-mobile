@@ -19,6 +19,9 @@ data class TransferCheckpoint(
     val offset: Long,
     val totalSize: Long,
     val state: String,
+    val filename: String? = null,
+    val deviceId: String? = null,
+    val sha256: String? = null,
 )
 
 class TransferCheckpointStore(context: Context) {
@@ -33,6 +36,9 @@ class TransferCheckpointStore(context: Context) {
             offset = preferences.getLong(key(transferId, "offset"), 0L),
             totalSize = preferences.getLong(key(transferId, "total"), -1L),
             state = preferences.getString(key(transferId, "state"), "failed") ?: "failed",
+            filename = preferences.getString(key(transferId, "filename"), null),
+            deviceId = preferences.getString(key(transferId, "deviceId"), null),
+            sha256 = preferences.getString(key(transferId, "sha256"), null),
         )
     }
 
@@ -49,6 +55,9 @@ class TransferCheckpointStore(context: Context) {
             .putLong(key(checkpoint.transferId, "offset"), checkpoint.offset)
             .putLong(key(checkpoint.transferId, "total"), checkpoint.totalSize)
             .putString(key(checkpoint.transferId, "state"), checkpoint.state)
+            .putString(key(checkpoint.transferId, "filename"), checkpoint.filename)
+            .putString(key(checkpoint.transferId, "deviceId"), checkpoint.deviceId)
+            .putString(key(checkpoint.transferId, "sha256"), checkpoint.sha256)
             .commit()
     }
 
@@ -59,6 +68,9 @@ class TransferCheckpointStore(context: Context) {
             .remove(key(transferId, "offset"))
             .remove(key(transferId, "total"))
             .remove(key(transferId, "state"))
+            .remove(key(transferId, "filename"))
+            .remove(key(transferId, "deviceId"))
+            .remove(key(transferId, "sha256"))
             .commit()
     }
 

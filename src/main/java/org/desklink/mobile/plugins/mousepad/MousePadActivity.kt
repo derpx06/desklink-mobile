@@ -78,7 +78,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     private val prefs by lazy { PreferenceManager.getDefaultSharedPreferences(this) }
     private var prefsApplied = false
 
-    private var controlMode by mutableStateOf(ControlMode.Trackpad)
+    // The remote-control surface is a screen viewer first. Trackpad remains
+    // available as an explicit mode instead of hiding the phone display.
+    private var controlMode by mutableStateOf(ControlMode.Screen)
     private var statusText by mutableStateOf("")
     private var textInput by mutableStateOf("")
 

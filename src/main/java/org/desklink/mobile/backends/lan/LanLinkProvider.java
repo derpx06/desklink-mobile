@@ -43,7 +43,6 @@ import java.net.UnknownHostException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -73,7 +72,7 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     private final Context context;
 
-    final HashMap<String, LanLink> visibleDevices = new HashMap<>(); // Links by device id
+    final ConcurrentHashMap<String, LanLink> visibleDevices = new ConcurrentHashMap<>(); // Links by device id
 
     final static int MAX_RATE_LIMIT_ENTRIES = 255;
     final ConcurrentHashMap<String, Long> lastConnectionTimeByDeviceId = new ConcurrentHashMap<>();
@@ -602,6 +601,14 @@ public class LanLinkProvider extends BaseLinkProvider {
         if (udpServer == null) {
             setupUdpListener();
         }
+
+        // A socket bound to the previous interface will not recover merely
+        // because discovery broadcasts are sent again. Close it now so the
+        // device layer can establish one fresh authenticated link.
+        for (LanLink link : visibleDevices.values()) {
+            link.disconnect();
+        }
+        visibleDevices.clear();
 
         broadcastUdpIdentityPacket(network);
         synchronized (mdnsDiscovery) {
