@@ -19,6 +19,7 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.MainThread
 import androidx.core.app.NotificationCompat
@@ -38,6 +39,8 @@ import org.desklink.mobile.plugins.runcommand.RunCommandPlugin
 import org.desklink.mobile.plugins.share.SendFileActivity
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.R
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * This class (still) does 3 things:
@@ -50,6 +53,8 @@ class BackgroundService : Service() {
     private lateinit var applicationInstance: DeskLinkApplication
     private var networkCallback: NetworkCallback? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var connectionWakeLock: PowerManager.WakeLock? = null
+    private val availableNetworks = Collections.newSetFromMap(ConcurrentHashMap<Network, Boolean>())
 
     private val linkProviders = mutableListOf<BaseLinkProvider>()
 
@@ -104,7 +109,10 @@ class BackgroundService : Service() {
         instance = this
         acquireWifiLock()
 
-        DeskLinkApplication.getInstance().addDeviceListChangedCallback("BackgroundService", this::updateForegroundNotification)
+        DeskLinkApplication.getInstance().addDeviceListChangedCallback(
+            "BackgroundService",
+            this::onDeviceConnectionStateChanged,
+        )
 
         // Register screen on listener
         val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
@@ -123,17 +131,29 @@ class BackgroundService : Service() {
 
             override fun onAvailable(network: Network) {
                 Log.i("BackgroundService", "Valid network available")
-                connectedToNonCellularNetwork.postValue(true)
+                val firstAvailableNetwork = availableNetworks.add(network) && availableNetworks.size == 1
+                connectedToNonCellularNetwork.postValue(availableNetworks.isNotEmpty())
                 if (wifiLock == null) acquireWifiLock()
-                onNetworkChange(network)
+                // Android reports each matching network independently. Do not
+                // tear down all LAN bootstrap links merely because a VPN or a
+                // second interface appeared while the active WebRTC session is
+                // healthy. A real recovery explicitly requests discovery.
+                if (firstAvailableNetwork) {
+                    onNetworkChange(network)
+                }
             }
 
             override fun onLost(network: Network) {
                 Log.i("BackgroundService", "Valid network lost")
-                connectedToNonCellularNetwork.postValue(false)
-                // Close stale LAN sockets and trigger discovery on the next
-                // available network instead of waiting for TCP timeouts.
-                onNetworkChange(null)
+                availableNetworks.remove(network)
+                val hasReplacement = availableNetworks.isNotEmpty()
+                connectedToNonCellularNetwork.postValue(hasReplacement)
+                // Only reset LAN discovery after the last eligible network is
+                // gone. `onLost` is per-network, not a guarantee that Android
+                // has no usable path left.
+                if (!hasReplacement) {
+                    onNetworkChange(null)
+                }
             }
         }
         networkCallback = callback
@@ -145,6 +165,56 @@ class BackgroundService : Service() {
             linkProvider.onStart()
         }
         initialized = true
+        updateConnectionPowerLease()
+    }
+
+    private fun onDeviceConnectionStateChanged() {
+        updateForegroundNotification()
+        updateConnectionPowerLease()
+    }
+
+    /**
+     * A foreground service keeps the process eligible to run, but it does not
+     * by itself keep the CPU awake while Android turns the display off. Hold a
+     * scoped partial wake lock only while there is a paired bootstrap session,
+     * authenticated WebRTC peer, or bounded WebRTC recovery attempt; release
+     * it immediately once the final session goes away.
+     *
+     * This intentionally does not try to defeat force-stop, battery-saver, or
+     * OEM task-killer decisions. Those are explicit system/user choices and
+     * must remain visible recovery states rather than being bypassed.
+     */
+    private fun updateConnectionPowerLease() {
+        if (!::applicationInstance.isInitialized) return
+        val needsLease = applicationInstance.devices.values.any { device ->
+            device.isPaired && device.requiresConnectionPowerLease
+        }
+        if (needsLease) {
+            acquireConnectionWakeLock()
+        } else {
+            releaseConnectionWakeLock()
+        }
+    }
+
+    private fun acquireConnectionWakeLock() {
+        val powerManager = getSystemService<PowerManager>() ?: return
+        val lock = connectionWakeLock ?: powerManager
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DeskLink:active-connection")
+            .apply { setReferenceCounted(false) }
+            .also { connectionWakeLock = it }
+        if (!lock.isHeld) {
+            runCatching { lock.acquire() }
+                .onFailure { error -> Log.w(LOG_TAG, "Could not acquire DeskLink connection wake lock", error) }
+        }
+    }
+
+    private fun releaseConnectionWakeLock() {
+        connectionWakeLock?.let { lock ->
+            if (lock.isHeld) {
+                runCatching { lock.release() }
+                    .onFailure { error -> Log.w(LOG_TAG, "Could not release DeskLink connection wake lock", error) }
+            }
+        }
     }
 
     fun changePersistentNotificationVisibility(visible: Boolean) {
@@ -255,10 +325,13 @@ class BackgroundService : Service() {
             getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(callback)
         }
         networkCallback = null
+        availableNetworks.clear()
         wifiLock?.let { lock ->
             if (lock.isHeld) lock.release()
         }
         wifiLock = null
+        releaseConnectionWakeLock()
+        connectionWakeLock = null
         for (linkProvider in linkProviders) {
             linkProvider.onStop()
         }
@@ -285,6 +358,7 @@ class BackgroundService : Service() {
         if (intent != null && intent.getBooleanExtra("refresh", false)) {
             onNetworkChange(null)
         }
+        updateConnectionPowerLease()
         return START_STICKY
     }
 

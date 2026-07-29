@@ -31,6 +31,7 @@ import org.desklink.mobile.transport.DisconnectReason
 import org.desklink.mobile.transport.LegacyLanTransport
 import org.desklink.mobile.ui.ThemeUtil
 import org.desklink.mobile.webrtc.WebRtcSessionCoordinator
+import org.desklink.mobile.webrtc.WebRtcScreenDirection
 import org.desklink.mobile.BuildConfig
 import org.slf4j.impl.HandroidLoggerAdapter
 import java.security.cert.CertificateException
@@ -147,6 +148,55 @@ class DeskLinkApplication : Application() {
         getDevice(deviceId)?.let { webRtcCoordinatorFor(it).stopPhoneScreenCapture() }
     }
 
+    /** MediaProjection failure is recoverable for the paired WebRTC session;
+     * it stops only the requested screen view. */
+    fun reportWebRtcScreenCaptureFailure(deviceId: String?, reason: String) {
+        getDevice(deviceId)?.let { webRtcCoordinatorFor(it).onPhoneScreenCaptureFailure(reason) }
+    }
+
+    /** Remote view/control entry points used only by explicit UI actions. */
+    fun requestRemoteView(deviceId: String?, direction: WebRtcScreenDirection): Boolean {
+        val device = getDevice(deviceId) ?: return false
+        return runCatching {
+            webRtcCoordinatorFor(device).requestRemoteView(direction)
+            true
+        }.onFailure { error ->
+            Log.w("DeskLink/RemoteSession", "Could not request remote view", error)
+        }.getOrDefault(false)
+    }
+
+    fun requestRemoteControl(deviceId: String?): Boolean {
+        val device = getDevice(deviceId) ?: return false
+        return runCatching {
+            webRtcCoordinatorFor(device).requestRemoteControl()
+            true
+        }.onFailure { error ->
+            Log.w("DeskLink/RemoteSession", "Could not request remote control", error)
+        }.getOrDefault(false)
+    }
+
+    fun stopRemoteSession(deviceId: String?) {
+        getDevice(deviceId)?.let { webRtcCoordinatorFor(it).stopRemoteSession() }
+    }
+
+    /**
+     * Requests a fresh discovery/signaling bootstrap only when WebRTC recovery
+     * needs it. This is intentionally not invoked for a healthy WebRTC peer;
+     * recreating LAN links during ordinary screen-off events used to replace a
+     * working transport generation.
+     */
+    fun requestBootstrapReconnect() {
+        val service = BackgroundService.instance
+        if (service != null) {
+            service.onNetworkChange(null)
+        } else {
+            runCatching { BackgroundService.ForceRefreshConnections(this) }
+                .onFailure { error ->
+                    Log.w("DeskLink/Session", "Could not request DeskLink bootstrap recovery", error)
+                }
+        }
+    }
+
     private fun loadRememberedDevicesFromSettings() {
         // Log.e("BackgroundService", "Loading remembered trusted devices")
         val trustedDevices = TrustedDevices.getAllTrustedDevices(this)
@@ -201,34 +251,47 @@ class DeskLinkApplication : Application() {
     val connectionListener: ConnectionReceiver = object : ConnectionReceiver {
         @WorkerThread
         override fun onConnectionReceived(link: BaseLink) {
-            var device = devices[link.deviceId]
-            if (device != null) {
-                device.addLink(link)
-            } else {
-                device = Device(this@DeskLinkApplication, link)
-                devices[link.deviceId] = device
-                device.addPairingCallback(devicePairingCallback)
+            val device = devices[link.deviceId]?.also { existing ->
+                existing.addLink(link)
+            } ?: run {
+                Device(this@DeskLinkApplication, link).also { created ->
+                    devices[link.deviceId] = created
+                    created.addPairingCallback(devicePairingCallback)
+                }
             }
 
-            // Keep the existing authenticated Java LAN link and wire behavior.
-            // Only small control packets use the new session boundary for now;
-            // payload jobs and Bluetooth remain on their existing paths.
             if (link is org.desklink.mobile.backends.lan.LanLink) {
                 val pairingState = if (device.isPaired || TrustedDevices.isTrustedDevice(this@DeskLinkApplication, link.deviceId)) {
                     PairingState.PAIRED
                 } else {
                     PairingState.NOT_PAIRED
                 }
+                val coordinator = webRtcCoordinatorFor(device)
                 runCatching {
-                    val registration = sessionManager.register(
-                        link.deviceId,
-                        LegacyLanTransport(link),
-                        pairingState,
-                    )
-                    legacyLanBindings[link] = registration.binding
-                    device.setSessionTransport(registration.binding.transport)
-                    device.setControlPacketHandler(webRtcCoordinatorFor(device))
-                    webRtcCoordinatorFor(device).beginIfSupported()
+                    val retainedBinding = sessionManager.currentBinding(link.deviceId)
+                        ?.takeIf { coordinator.hasActiveFeatureTransport() }
+                    if (retainedBinding != null) {
+                        // A replacement LAN connection is bootstrap/signaling
+                        // capacity only. Re-registering it would invalidate a
+                        // healthy WebRTC generation and make a screen lock
+                        // look like a full device disconnect.
+                        legacyLanBindings[link] = retainedBinding
+                        device.setSessionTransport(retainedBinding.transport)
+                        Log.i(
+                            "DeskLink/Session",
+                            "Retaining active WebRTC session while replacing LAN bootstrap link for ${link.deviceId}",
+                        )
+                    } else {
+                        val registration = sessionManager.register(
+                            link.deviceId,
+                            LegacyLanTransport(link),
+                            pairingState,
+                        )
+                        legacyLanBindings[link] = registration.binding
+                        device.setSessionTransport(registration.binding.transport)
+                    }
+                    device.setControlPacketHandler(coordinator)
+                    coordinator.beginIfSupported()
                 }.onFailure { error ->
                     Log.e("DeskLink/Session", "Could not register LAN session", error)
                 }
@@ -241,9 +304,22 @@ class DeskLinkApplication : Application() {
             val device = devices[link.deviceId]
             Log.i("DeskLink/onConnectionLost", "removeLink, deviceId: ${link.deviceId}")
             val binding = legacyLanBindings.remove(link)
-            val disconnectedCurrentSession = binding?.let {
-                sessionManager.disconnectIfCurrent(it, DisconnectReason.NETWORK_LOST)
-            } == true
+            val retainWebRtcSession = (
+                device
+                    ?.let { webRtcCoordinators[it.deviceId]?.shouldRetainSessionAfterBootstrapLoss() }
+                    == true
+            )
+            val disconnectedCurrentSession = if (retainWebRtcSession) {
+                Log.i(
+                    "DeskLink/Session",
+                    "LAN bootstrap link closed; preserving active WebRTC session for ${link.deviceId}",
+                )
+                false
+            } else {
+                binding?.let {
+                    sessionManager.disconnectIfCurrent(it, DisconnectReason.NETWORK_LOST)
+                } == true
+            }
             if (disconnectedCurrentSession) {
                 device?.setSessionTransport(null)
                 device?.let { webRtcCoordinators.remove(it.deviceId)?.close() }
@@ -271,6 +347,13 @@ class DeskLinkApplication : Application() {
                 webRtcCoordinatorFor(device).beginIfSupported()
                 onDeviceListChanged()
             }
+        }
+
+        @WorkerThread
+        override fun onConnectionReplaced(link: BaseLink) {
+            if (link !is org.desklink.mobile.backends.lan.LanLink) return
+            val device = devices[link.deviceId] ?: return
+            webRtcCoordinatorFor(device).onBootstrapLinkReplaced()
         }
     }
 

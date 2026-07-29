@@ -582,6 +582,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
   <string name="remote_screen_retry">Retry screen request</string>
   <string name="remote_mode_screen">Screen</string>
   <string name="remote_mode_trackpad">Trackpad</string>
+  <string name="remote_enable_control">Enable control</string>
+  <string name="remote_control_requesting">Requesting remote-control permission</string>
+  <string name="remote_control_unavailable">Remote control is unavailable until WebRTC view is connected</string>
   <string name="remote_live_screen_pending">Live screen will appear here</string>
   <string name="remote_live_screen_hint">Tap or drag on the screen area to control the desktop by absolute position.</string>
   <string name="remote_trackpad_ready">Trackpad mode</string>

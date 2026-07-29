@@ -89,6 +89,28 @@ class MousePadPlugin : Plugin() {
         sendPacket(np)
     }
 
+    /**
+     * Screen-mode taps must carry their absolute position with the click. The
+     * packet bridge then selects the reliable input channel, so a click cannot
+     * overtake a replaceable pointer-motion packet on the realtime channel.
+     */
+    fun sendScreenTap(x: Int, y: Int) {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["x"] = x
+        np["y"] = y
+        np["singleclick"] = true
+        sendPacket(np)
+    }
+
+    /** Starts a phone-style drag at the exact position displayed to the user. */
+    fun sendScreenHold(x: Int, y: Int) {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["x"] = x
+        np["y"] = y
+        np["singlehold"] = true
+        sendPacket(np)
+    }
+
     fun hasMicPermission(): Boolean {
         return isPermissionGranted(Manifest.permission.RECORD_AUDIO)
     }

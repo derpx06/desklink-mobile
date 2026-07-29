@@ -48,6 +48,10 @@ class WebRtcTransport(
         fun onEnvelope(envelope: WebRtcEnvelope)
         fun onControlChannelOpen()
         fun onRemoteVideoTrack(track: VideoTrack)
+        /** MediaProjection revocation is a screen-session event, not a peer
+         * failure. The authenticated WebRTC connection stays alive so the
+         * user can explicitly resume sharing after unlock or renewed consent. */
+        fun onScreenCaptureStopped(reason: String)
         fun onConnectionStateChanged(state: WebRtcPeerHealth)
         fun onFailure(error: Throwable)
     }
@@ -62,6 +66,9 @@ class WebRtcTransport(
     private val videoTrack: VideoTrack = factory.createVideoTrack("desklink-screen", videoSource)
     private var screenCapturer: ScreenCapturerAndroid? = null
     private var screenTextureHelper: SurfaceTextureHelper? = null
+    private var nextScreenCaptureEpoch = 0L
+    private var activeScreenCaptureEpoch: Long? = null
+    private var suppressedStopEpoch: Long? = null
 
     init {
         val configuration = PeerConnection.RTCConfiguration(iceServers).apply {
@@ -268,18 +275,23 @@ class WebRtcTransport(
 
     fun restartIce() = peer.restartIce()
 
+    @Synchronized
     fun startScreenCapture(
         permissionData: Intent,
         width: Int = 1280,
         height: Int = 720,
         fps: Int = 12,
     ) {
+        // A replacement capture is intentional. Do not turn its old
+        // MediaProjection callback into a false "screen locked" event for the
+        // new remote session.
         stopScreenCapture()
+        val captureEpoch = ++nextScreenCaptureEpoch
         val capturer = ScreenCapturerAndroid(
             permissionData,
             object : MediaProjection.Callback() {
                 override fun onStop() {
-                    observer.onFailure(IllegalStateException("Android screen capture permission was revoked"))
+                    onScreenCaptureStopped(captureEpoch)
                 }
             },
         )
@@ -287,24 +299,65 @@ class WebRtcTransport(
             "DeskLink-screen-capture",
             WebRtcRuntime.eglContext(context),
         )
-        capturer.initialize(helper, context, videoSource.capturerObserver)
-        capturer.startCapture(
-            width.coerceIn(320, 1920),
-            height.coerceIn(240, 1920),
-            fps.coerceIn(1, 30),
-        )
         screenCapturer = capturer
         screenTextureHelper = helper
+        activeScreenCaptureEpoch = captureEpoch
+        try {
+            capturer.initialize(helper, context, videoSource.capturerObserver)
+            capturer.startCapture(
+                width.coerceIn(320, 1920),
+                height.coerceIn(240, 1920),
+                fps.coerceIn(1, 30),
+            )
+        } catch (error: Throwable) {
+            releaseScreenCaptureLocked(stopCapture = true)
+            throw error
+        }
     }
 
+    /**
+     * Ends a locally requested capture without reporting it as a privacy
+     * revocation. The MediaProjection callback may arrive later, so it is
+     * bound to the exact capture epoch and cannot pause a newer capture.
+     */
+    @Synchronized
     fun stopScreenCapture() {
-        screenCapturer?.let { capturer ->
-            runCatching { capturer.stopCapture() }
-            capturer.dispose()
+        val epoch = activeScreenCaptureEpoch ?: return
+        suppressedStopEpoch = epoch
+        releaseScreenCaptureLocked(stopCapture = true)
+    }
+
+    private fun onScreenCaptureStopped(captureEpoch: Long) {
+        val shouldNotify = synchronized(this) {
+            when {
+                suppressedStopEpoch == captureEpoch -> {
+                    suppressedStopEpoch = null
+                    false
+                }
+                activeScreenCaptureEpoch != captureEpoch -> false
+                else -> {
+                    releaseScreenCaptureLocked(stopCapture = false)
+                    true
+                }
+            }
         }
+        if (shouldNotify) {
+            observer.onScreenCaptureStopped(
+                "Android screen capture permission was revoked or stopped",
+            )
+        }
+    }
+
+    /** Caller holds this instance monitor. */
+    private fun releaseScreenCaptureLocked(stopCapture: Boolean) {
+        val capturer = screenCapturer
+        val helper = screenTextureHelper
         screenCapturer = null
-        screenTextureHelper?.dispose()
         screenTextureHelper = null
+        activeScreenCaptureEpoch = null
+        if (stopCapture) runCatching { capturer?.stopCapture() }
+        capturer?.dispose()
+        helper?.dispose()
     }
 
     override fun close(reason: DisconnectReason) {

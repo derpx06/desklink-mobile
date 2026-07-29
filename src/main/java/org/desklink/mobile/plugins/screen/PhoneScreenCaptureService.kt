@@ -43,6 +43,10 @@ class PhoneScreenCaptureService : Service() {
         }
         if (!DeskLinkApplication.getInstance().startWebRtcScreenCapture(deviceId, data)) {
             Log.w(TAG, "Could not start the authenticated DeskLink WebRTC screen track")
+            DeskLinkApplication.getInstance().reportWebRtcScreenCaptureFailure(
+                deviceId,
+                "Could not start the DeskLink WebRTC screen track",
+            )
             stopSelf()
         }
     }

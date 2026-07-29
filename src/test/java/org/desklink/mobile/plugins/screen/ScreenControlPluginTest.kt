@@ -66,4 +66,29 @@ class ScreenControlPluginTest {
             })
         }
     }
+
+    @Test
+    fun stoppingOneScreenSessionSendsOnlyOneStopPacket() {
+        val plugin = ScreenControlPlugin()
+        val context = mockk<Context> {
+            every { getSharedPreferences(any(), any()) } returns mockk<SharedPreferences>()
+            every { getString(any()) } returns "Screen control"
+            every { stopService(any()) } returns true
+        }
+        val device = mockk<Device> {
+            every { deviceId } returns "device-id"
+            every { sendPacket(any()) } returns Unit
+        }
+
+        plugin.setContext(context, device)
+        plugin.requestDesktopScreen()
+        plugin.stopScreen()
+        plugin.stopScreen()
+
+        verify(exactly = 1) {
+            device.sendPacket(match { packet ->
+                packet.type == ScreenControlPlugin.PACKET_TYPE_SCREEN_STOP
+            })
+        }
+    }
 }

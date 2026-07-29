@@ -22,6 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
 class ScreenControlPlugin : Plugin() {
     @Volatile
     private var phoneCaptureRequested = false
+    @Volatile
+    private var screenSessionActive = false
     override val displayName: String
         get() = context.getString(R.string.pref_plugin_screen_control)
 
@@ -31,6 +33,7 @@ class ScreenControlPlugin : Plugin() {
     override fun onDestroy() {
         context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
         phoneCaptureRequested = false
+        screenSessionActive = false
         clearRemoteVideoTrack()
         latestStatus = ""
         super.onDestroy()
@@ -80,6 +83,7 @@ class ScreenControlPlugin : Plugin() {
             PACKET_TYPE_SCREEN_REQUEST -> {
                 if (np.getString("role", "") == ROLE_PHONE_SCREEN && !phoneCaptureRequested) {
                     phoneCaptureRequested = true
+                    screenSessionActive = true
                     val intent = Intent(context, ScreenProjectionActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         .putExtra(ScreenProjectionActivity.EXTRA_DEVICE_ID, device.deviceId)
@@ -93,6 +97,7 @@ class ScreenControlPlugin : Plugin() {
                 }
             }
             PACKET_TYPE_SCREEN_READY -> {
+                screenSessionActive = true
                 latestStatus = context.getString(R.string.remote_screen_connected)
             }
             PACKET_TYPE_SCREEN_ERROR -> {
@@ -101,6 +106,7 @@ class ScreenControlPlugin : Plugin() {
             PACKET_TYPE_SCREEN_STOP -> {
                 context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
                 phoneCaptureRequested = false
+                screenSessionActive = false
                 clearRemoteVideoTrack()
                 latestStatus = ""
             }
@@ -114,6 +120,7 @@ class ScreenControlPlugin : Plugin() {
         quality: Int = DEFAULT_QUALITY
     ) {
         clearRemoteVideoTrack()
+        screenSessionActive = true
         latestStatus = context.getString(R.string.remote_screen_requesting)
         device.sendPacket(
             createScreenRequestPacket(
@@ -126,17 +133,33 @@ class ScreenControlPlugin : Plugin() {
     }
 
     fun stopScreen() {
-        device.sendPacket(NetworkPacket(PACKET_TYPE_SCREEN_STOP))
+        if (screenSessionActive) {
+            device.sendPacket(NetworkPacket(PACKET_TYPE_SCREEN_STOP))
+        }
         context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
         phoneCaptureRequested = false
+        screenSessionActive = false
         clearRemoteVideoTrack()
     }
 
     fun onPhoneCapturePermissionFinished(granted: Boolean) {
         phoneCaptureRequested = granted
+        screenSessionActive = granted
         if (!granted) {
             latestStatus = context.getString(R.string.remote_screen_error)
         }
+    }
+
+    /**
+     * MediaProjection can be revoked by lock screen, system privacy controls,
+     * or process lifecycle without unpairing the DeskLink device. Reset only
+     * the capture state so the user can explicitly request fresh Android
+     * consent after unlock; do not leave the plugin stuck as "requested".
+     */
+    fun onPhoneCaptureStopped(reason: String) {
+        phoneCaptureRequested = false
+        screenSessionActive = false
+        latestStatus = reason.ifBlank { context.getString(R.string.remote_screen_error) }
     }
 
     override val supportedPacketTypes: Array<String> = SCREEN_PACKET_TYPES

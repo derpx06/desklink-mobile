@@ -102,7 +102,13 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
         prefs.registerOnSharedPreferenceChangeListener(this)
         applyPrefs()
-        requestDesktopScreen()
+        // A rotation recreates this activity but must not stop/re-request the
+        // same authenticated desktop view. The process-level WebRTC peer and
+        // renderer keep their session; an explicit refresh remains available
+        // for a real retry after permission denial or stream loss.
+        if (savedInstanceState == null) {
+            requestDesktopScreen()
+        }
 
         setContent {
             DeskLinkTheme(this) {
@@ -118,7 +124,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
     override fun onDestroy() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
-        sendStopScreen()
+        if (isFinishing && !isChangingConfigurations) {
+            sendStopScreen()
+        }
         super.onDestroy()
     }
 
@@ -163,6 +171,19 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             ) {
                 TextComposer()
                 ModeSelector()
+                FilledTonalButton(
+                    onClick = {
+                        val granted = DeskLinkApplication.getInstance().requestRemoteControl(deviceId)
+                        statusText = if (granted) {
+                            getString(R.string.remote_control_requesting)
+                        } else {
+                            getString(R.string.remote_control_unavailable)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.remote_enable_control))
+                }
                 RemoteInputSurface(
                     modifier = Modifier
                         .weight(1f)
@@ -229,9 +250,15 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                     detectTapGestures(
                         onTap = { offset -> handleSurfaceTap(offset, size) },
                         onDoubleTap = { sendDoubleClick() },
-                        onLongPress = {
+                        onLongPress = { offset ->
                             window.decorView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                            mousePadPlugin()?.sendSingleHold() ?: finish()
+                            if (controlMode == ControlMode.Screen) {
+                                mapScreenPoint(offset, size)?.let { point ->
+                                    mousePadPlugin()?.sendScreenHold(point.x, point.y) ?: finish()
+                                }
+                            } else {
+                                mousePadPlugin()?.sendSingleHold() ?: finish()
+                            }
                         }
                     )
                 }
@@ -319,15 +346,16 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     @Composable
     private fun RemoteVideoPreview(modifier: Modifier = Modifier) {
         var renderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
+        val plugin = screenControlPlugin()
 
-        DisposableEffect(renderer) {
+        DisposableEffect(renderer, plugin) {
             val current = renderer
-            if (current == null) {
+            if (current == null || plugin == null) {
                 return@DisposableEffect onDispose { }
             }
-            ScreenControlPlugin.attachRemoteVideoSink(current)
+            plugin.attachRemoteVideoSink(current)
             onDispose {
-                ScreenControlPlugin.detachRemoteVideoSink(current)
+                plugin.detachRemoteVideoSink(current)
                 current.release()
             }
         }
@@ -405,8 +433,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
         if (controlMode == ControlMode.Screen) {
             mapScreenPoint(offset, size)?.let { point ->
-                plugin.sendMousePosition(point.x, point.y)
+                plugin.sendScreenTap(point.x, point.y)
             }
+            return
         }
         plugin.sendLeftClick()
     }
@@ -483,18 +512,23 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     }
 
     private fun requestDesktopScreen() {
-        val plugin = screenControlPlugin()
-        if (plugin == null) {
+        if (screenControlPlugin() == null) {
             statusText = getString(R.string.remote_screen_plugin_missing)
             return
         }
-        plugin.requestDesktopScreen()
-        statusText = getString(R.string.remote_screen_requesting)
+        val requested = DeskLinkApplication.getInstance().requestRemoteView(
+            deviceId,
+            org.desklink.mobile.webrtc.WebRtcScreenDirection.DESKTOP_TO_PHONE,
+        )
+        statusText = if (requested) {
+            getString(R.string.remote_screen_requesting)
+        } else {
+            getString(R.string.remote_screen_error)
+        }
     }
 
     private fun sendStopScreen() {
-        val plugin = screenControlPlugin() ?: return
-        plugin.stopScreen()
+        DeskLinkApplication.getInstance().stopRemoteSession(deviceId)
     }
 
     private fun openSettings() {

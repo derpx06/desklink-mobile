@@ -41,6 +41,7 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.Plugin.Companion.getPluginKey
 import org.desklink.mobile.plugins.PluginFactory
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.webrtc.WebRtcFeatureProfile
 import org.desklink.mobile.webrtc.WebRtcTransport
 import org.desklink.mobile.session.PairingState
 import org.desklink.mobile.transport.LogicalChannel
@@ -85,6 +86,14 @@ class Device : PacketReceiver {
     @Volatile
     private var webRtcTransport: WebRtcTransport? = null
 
+    /**
+     * A short WebRTC recovery attempt still needs CPU time while the display is
+     * off.  It is deliberately separate from reachability: the UI must not
+     * present a recovering peer as ready for feature traffic.
+     */
+    @Volatile
+    private var webRtcRecoveryPending: Boolean = false
+
     fun interface PayloadPacketHandler {
         fun sendPayload(packet: NetworkPacket, callback: SendPacketStatusCallback): Boolean
     }
@@ -99,6 +108,18 @@ class Device : PacketReceiver {
 
     @Volatile
     private var controlPacketHandler: ControlPacketHandler? = null
+
+    /**
+     * The WebRTC coordinator injects generation-bound lease metadata here just
+     * before an input packet is serialized. UI plugins never own a lease and
+     * therefore cannot accidentally reuse one after peer replacement.
+     */
+    fun interface RemoteInputPacketPreparer {
+        fun prepare(packet: NetworkPacket): NetworkPacket
+    }
+
+    @Volatile
+    private var remoteInputPacketPreparer: RemoteInputPacketPreparer? = null
 
     /**
      * Plugins that have matching capabilities.
@@ -347,15 +368,48 @@ class Device : PacketReceiver {
         notificationManager.cancel(notificationId)
     }
 
+    /**
+     * A paired device remains reachable while its authenticated WebRTC peer is
+     * alive, even if the short-lived LAN bootstrap socket has gone away.  The
+     * latter is used only for discovery, pairing, and SDP/ICE signaling; using
+     * it as the reachability source caused plugins and their send queue to be
+     * torn down when Android locked the screen.
+     */
     val isReachable: Boolean
+        get() = links.isNotEmpty() || hasActiveWebRtcFeatureTransport
+
+    val hasActiveWebRtcFeatureTransport: Boolean
+        get() = webRtcTransport?.isReadyForPackets() == true
+
+    /** True when a LAN socket is available for the bootstrap/signaling path. */
+    val hasBootstrapLink: Boolean
         get() = links.isNotEmpty()
+
+    /**
+     * Used only by the foreground-service power lease. A recovery attempt is
+     * not reachable from a feature/UI perspective, but Android must not suspend
+     * the process before its bounded reconnect work has had a chance to run.
+     */
+    val requiresConnectionPowerLease: Boolean
+        get() = hasBootstrapLink || hasActiveWebRtcFeatureTransport || webRtcRecoveryPending
 
     fun setSessionTransport(transport: SessionTransport?) {
         sessionTransport = transport
     }
 
     fun setWebRtcTransport(transport: WebRtcTransport?) {
+        if (webRtcTransport === transport) return
         webRtcTransport = transport
+        // Plugin availability is calculated from reachability. Re-evaluate it
+        // when WebRTC becomes ready or is closed so a transient loss of the
+        // bootstrap socket cannot disable a live paired feature session.
+        CoroutineScope(Dispatchers.IO).launch {
+            reloadPluginsFromSettings()
+        }
+    }
+
+    fun setWebRtcRecoveryPending(pending: Boolean) {
+        webRtcRecoveryPending = pending
     }
 
     fun setWebRtcPayloadHandler(handler: PayloadPacketHandler?) {
@@ -364,6 +418,10 @@ class Device : PacketReceiver {
 
     fun setControlPacketHandler(handler: ControlPacketHandler?) {
         controlPacketHandler = handler
+    }
+
+    fun setWebRtcRemoteInputPreparer(preparer: RemoteInputPacketPreparer?) {
+        remoteInputPacketPreparer = preparer
     }
 
     fun addLink(link: BaseLink) {
@@ -413,12 +471,17 @@ class Device : PacketReceiver {
             "DeskLink/Device",
             "removeLink: ${link.linkProvider.name} -> $name active links: ${links.size}"
         )
-        if (links.isEmpty()) {
+        if (links.isEmpty() && !hasActiveWebRtcFeatureTransport) {
             reloadPluginsFromSettings()
             synchronized(sendChannel) {
                 sendCoroutine?.cancel(CancellationException("Device disconnected"))
                 sendCoroutine = null
             }
+        } else if (links.isEmpty()) {
+            Log.i(
+                "DeskLink/Device",
+                "LAN bootstrap link closed while authenticated WebRTC remains active for $name",
+            )
         }
     }
 
@@ -480,11 +543,14 @@ class Device : PacketReceiver {
             np.payload?.close()
             return
         }
-        // Desktop WebRTC handover is not complete until both peers have
-        // installed a ready feature transport.  The encrypted LAN link remains
-        // the transition transport until that point; rejecting it earlier
-        // drops legitimate packets such as desklink.ping before their plugin
-        // can handle them.  Once WebRTC is ready, LAN is bootstrap-only.
+        if (fromWebRtc && !bootstrapPacket && !WebRtcFeatureProfile.allows(np.type)) {
+            Log.w("DeskLink/WebRTC", "Rejected feature outside the active WebRTC profile: ${np.type}")
+            np.payload?.close()
+            return
+        }
+        // LAN is bootstrap-only at every handover stage.  A paired feature
+        // must wait for WebRTC readiness rather than leaking onto the TLS
+        // socket while negotiation or recovery is in progress.
         if (shouldRejectPairedLanFeaturePacket(
                 fromWebRtc = fromWebRtc,
                 paired = isPaired,
@@ -594,6 +660,23 @@ class Device : PacketReceiver {
     @AnyThread
     fun sendPacket(np: NetworkPacket) = sendPacket(np, defaultCallback)
 
+    /**
+     * Sends only bootstrap signaling immediately on the current LAN link.
+     * Feature messages never use this method and therefore can never fall
+     * back to LAN while WebRTC is negotiating or recovering.
+     */
+    @AnyThread
+    fun sendBootstrapPacket(np: NetworkPacket, callback: SendPacketStatusCallback): Boolean {
+        val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
+            np.type == NetworkPacket.PACKET_TYPE_PAIR ||
+            np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        if (!bootstrapPacket) {
+            callback.onFailure(IllegalArgumentException("Only DeskLink bootstrap packets may use LAN"))
+            return false
+        }
+        return sendPacketBlocking(np, callback, false)
+    }
+
     @WorkerThread
     fun sendPacketBlocking(np: NetworkPacket, callback: SendPacketStatusCallback): Boolean =
         sendPacketBlocking(np, callback, false)
@@ -601,17 +684,7 @@ class Device : PacketReceiver {
     @WorkerThread
     fun sendPacketBlocking(np: NetworkPacket): Boolean = sendPacketBlocking(np, defaultCallback, false)
 
-    /**
-     * Send `np` over one of this device's connected [.links].
-     *
-     * @param np                        the packet to send
-     * @param callback                  a callback that can receive realtime updates
-     * @param sendPayloadFromSameThread when set to true and np contains a Payload, this function
-     * won't return until the Payload has been received by the
-     * other end, or times out after 10 seconds
-     * @return true if the packet was sent ok, false otherwise
-     * @see BaseLink.sendPacket
-     */
+
     @WorkerThread
     fun sendPacketBlocking(
         np: NetworkPacket,
@@ -623,11 +696,7 @@ class Device : PacketReceiver {
             return false
         }
 
-        // Pairing, identity, and signed SDP/ICE signaling retain their LAN
-        // path. Ordinary features use WebRTC after mutual feature-ready. Until
-        // then, both peers use the already-authenticated LAN session as the
-        // explicit transition transport so that a partial desktop handover
-        // cannot drop pings, clipboard updates, or other feature state.
+
         val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
             np.type == NetworkPacket.PACKET_TYPE_PAIR ||
             np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
@@ -635,21 +704,30 @@ class Device : PacketReceiver {
         val readyTransport = transport?.takeIf { it.isReadyForPackets() }
         val filePayload = np.type == DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST &&
             np.getString("filename").isNotEmpty() && np.payload != null
+        if (isPaired && !bootstrapPacket && !WebRtcFeatureProfile.allows(np.type)) {
+            val error = IllegalStateException(
+                "${np.type} is not enabled in the initial DeskLink WebRTC feature profile",
+            )
+            callback.onFailure(error)
+            np.payload?.close()
+            countSent(deviceId, np.type, false)
+            return false
+        }
         if (isPaired && !bootstrapPacket && filePayload) {
             val handler = payloadPacketHandler
-            if (transport == null || !transport.isReadyForPackets() || handler == null) {
-                val error = IllegalStateException(
-                    "DeskLink WebRTC file transport is not ready",
-                )
-                callback.onFailure(error)
-                np.payload?.close()
-                countSent(deviceId, np.type, false)
-                return false
+            if (readyTransport != null && handler != null) {
+                return runCatching { handler.sendPayload(np, callback) }
+                    .onFailure(callback::onFailure)
+                    .getOrDefault(false)
+                    .also { countSent(deviceId, np.type, it) }
             }
-            return runCatching { handler.sendPayload(np, callback) }
-                .onFailure(callback::onFailure)
-                .getOrDefault(false)
-                .also { countSent(deviceId, np.type, it) }
+            val error = IllegalStateException(
+                "DeskLink WebRTC file transport is not ready",
+            )
+            callback.onFailure(error)
+            np.payload?.close()
+            countSent(deviceId, np.type, false)
+            return false
         }
         if (
             isPaired &&
@@ -671,14 +749,45 @@ class Device : PacketReceiver {
             countSent(deviceId, np.type, false)
             return false
         }
-        if (
-            isPaired && !bootstrapPacket && !np.hasPayload() &&
-                webRtcFeatureTransportShouldHandlePacket(readyTransport != null)
-        ) {
-            val activeTransport = requireNotNull(readyTransport)
+        if (isPaired && !bootstrapPacket) {
+            val activeTransport = readyTransport
+            if (activeTransport == null) {
+                val error = IllegalStateException(
+                    "DeskLink WebRTC feature transport is not ready; paired features are not sent over LAN",
+                )
+                callback.onFailure(error)
+                np.payload?.close()
+                countSent(deviceId, np.type, false)
+                return false
+            }
+            if (np.payload != null) {
+                val error = IllegalStateException(
+                    "Payload-bearing ${np.type} has no WebRTC attachment transport",
+                )
+                callback.onFailure(error)
+                np.payload?.close()
+                countSent(deviceId, np.type, false)
+                return false
+            }
+            val packetForTransport = try {
+                if (
+                    np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
+                    np.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
+                ) {
+                    requireNotNull(remoteInputPacketPreparer) {
+                        "DeskLink remote-control lease is not active"
+                    }.prepare(np)
+                } else {
+                    np
+                }
+            } catch (error: Throwable) {
+                callback.onFailure(error)
+                countSent(deviceId, np.type, false)
+                return false
+            }
             return try {
                 activeTransport.sendPacket(
-                    np,
+                    packetForTransport,
                     object : TransportCallback {
                         override fun onSuccess() = callback.onSuccess()
 
@@ -882,7 +991,7 @@ internal fun shouldRejectPairedLanFeaturePacket(
     paired: Boolean,
     bootstrapPacket: Boolean,
     webRtcFeatureTransportReady: Boolean,
-): Boolean = !fromWebRtc && paired && !bootstrapPacket && webRtcFeatureTransportReady
+): Boolean = !fromWebRtc && paired && !bootstrapPacket
 
-/** Feature sends switch atomically from the transitional LAN link to WebRTC. */
+/** Paired feature sends are allowed only on the authenticated WebRTC transport. */
 internal fun webRtcFeatureTransportShouldHandlePacket(ready: Boolean): Boolean = ready

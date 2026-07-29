@@ -58,6 +58,7 @@ class MouseReceiverPlugin : Plugin() {
 
         val dx = np.getDouble("dx", 0.toDouble()).let { if (it < 0) floor(it) else ceil(it) }.toInt()
         val dy = np.getDouble("dy", 0.toDouble()).let { if (it < 0) floor(it) else ceil(it) }.toInt()
+        val hasAbsolutePosition = np.has("x") && np.has("y")
         val x = np.getInt("x", 0)
         val y = np.getInt("y", 0)
 
@@ -76,8 +77,8 @@ class MouseReceiverPlugin : Plugin() {
             // Perform click
             when {
                 isSingleClick -> {
-                    // Log.i("MouseReceiverPlugin", "singleClick")
-                    return MouseReceiverService.click()
+                    return if (hasAbsolutePosition) MouseReceiverService.click(x, y)
+                    else MouseReceiverService.click()
                 }
                 isDoubleClick -> { // left & right
                     // Log.i("MouseReceiverPlugin", "doubleClick")
@@ -98,9 +99,14 @@ class MouseReceiverPlugin : Plugin() {
                     return MouseReceiverService.backButton()
                 }
                 isSingleHold -> {
-                    // For drag'n drop
-                    // Log.i("MouseReceiverPlugin", "singleHold")
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // A WebRTC screen-view hold includes its absolute point.
+                    // It begins a deterministic drag rather than toggling an
+                    // old cursor/gesture from a previous control lease.
+                    if (hasAbsolutePosition && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        return MouseReceiverService.longClickSwipe(x, y)
+                    } else if (hasAbsolutePosition) {
+                        return MouseReceiverService.longClick(x, y)
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         return MouseReceiverService.longClickSwipe()
                     } else {
                         return MouseReceiverService.longClick()
@@ -121,7 +127,7 @@ class MouseReceiverPlugin : Plugin() {
             if (dx != 0 || dy != 0) {
                 // Log.i("MouseReceiverPlugin", "move Mouse dx: $dx dy: $dy")
                 return MouseReceiverService.move(dx, dy)
-            } else if (x != 0 || y != 0) {
+            } else if (hasAbsolutePosition) {
                 return MouseReceiverService.setPos(x, y)
             } else {
                 // To hide the cursor once it crosses the barrier.

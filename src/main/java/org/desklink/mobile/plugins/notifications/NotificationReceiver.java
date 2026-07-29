@@ -70,10 +70,14 @@ public class NotificationReceiver extends NotificationListenerService {
     @Override
     public void onListenerConnected() {
         super.onListenerConnected();
+        // Android guarantees that querying active notifications is safe only
+        // after this lifecycle callback. Publish the state before notifying
+        // DeskLink plugins so their initial WebRTC resync cannot race a
+        // still-disconnected listener.
+        connected = true;
         for (NotificationListener listener : listeners) {
             listener.onListenerConnected(this);
         }
-        connected = true;
     }
 
     @Override

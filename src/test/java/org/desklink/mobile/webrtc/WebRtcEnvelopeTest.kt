@@ -97,6 +97,17 @@ class WebRtcEnvelopeTest {
     }
 
     @Test
+    fun positionedScreenTapStaysReliableSoItsClickCannotOvertakeItsPosition() {
+        val tap = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST).apply {
+            set("x", 640)
+            set("y", 360)
+            set("singleclick", true)
+        }
+
+        assertEquals(WebRtcChannel.INPUT_RELIABLE, WebRtcPacketBridge.channelFor(tap))
+    }
+
+    @Test
     fun wireBindingUsesTheSamePositiveSessionIdAsDesktop() {
         val binding = WebRtcWireBinding.fromAttempt(
             "phone-device",

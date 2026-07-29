@@ -392,6 +392,7 @@ public class LanLinkProvider extends BaseLinkProvider {
             // Update existing link
             Log.d("DeskLink/LanLinkProvider", "Reusing same link for device " + deviceInfo.id);
             link.reset(socket, deviceInfo);
+            onConnectionReplaced(link);
             onDeviceInfoUpdated(deviceInfo);
         } else {
             // Create a new link

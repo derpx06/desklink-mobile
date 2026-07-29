@@ -9,8 +9,8 @@ import org.junit.Test
 
 class DeviceTransportRoutingTest {
     @Test
-    fun `paired LAN feature is accepted while WebRTC handover is incomplete`() {
-        assertFalse(
+    fun `paired LAN feature is rejected before WebRTC handover`() {
+        assertTrue(
             shouldRejectPairedLanFeaturePacket(
                 fromWebRtc = false,
                 paired = true,
@@ -33,7 +33,7 @@ class DeviceTransportRoutingTest {
     }
 
     @Test
-    fun `ordinary feature uses LAN until WebRTC handover is ready`() {
+    fun `ordinary feature has no transport before WebRTC handover`() {
         assertFalse(webRtcFeatureTransportShouldHandlePacket(false))
         assertTrue(webRtcFeatureTransportShouldHandlePacket(true))
     }
