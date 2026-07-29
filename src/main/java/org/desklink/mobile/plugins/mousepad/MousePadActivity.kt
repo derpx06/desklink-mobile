@@ -13,7 +13,6 @@ import android.os.SystemClock
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -46,22 +45,23 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.preference.PreferenceManager
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.NetworkPacket
@@ -72,6 +72,9 @@ import org.desklink.mobile.plugins.screen.ScreenPoint
 import org.desklink.mobile.ui.PluginSettingsActivity
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
+import org.desklink.mobile.webrtc.WebRtcRuntime
+import org.webrtc.RendererCommon
+import org.webrtc.SurfaceViewRenderer
 
 class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
     private var deviceId: String? = null
@@ -99,7 +102,13 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
         prefs.registerOnSharedPreferenceChangeListener(this)
         applyPrefs()
-        requestDesktopScreen()
+        // A rotation recreates this activity but must not stop/re-request the
+        // same authenticated desktop view. The process-level WebRTC peer and
+        // renderer keep their session; an explicit refresh remains available
+        // for a real retry after permission denial or stream loss.
+        if (savedInstanceState == null) {
+            requestDesktopScreen()
+        }
 
         setContent {
             DeskLinkTheme(this) {
@@ -115,7 +124,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
     override fun onDestroy() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
-        sendStopScreen()
+        if (isFinishing && !isChangingConfigurations) {
+            sendStopScreen()
+        }
         super.onDestroy()
     }
 
@@ -160,6 +171,19 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             ) {
                 TextComposer()
                 ModeSelector()
+                FilledTonalButton(
+                    onClick = {
+                        val granted = DeskLinkApplication.getInstance().requestRemoteControl(deviceId)
+                        statusText = if (granted) {
+                            getString(R.string.remote_control_requesting)
+                        } else {
+                            getString(R.string.remote_control_unavailable)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.remote_enable_control))
+                }
                 RemoteInputSurface(
                     modifier = Modifier
                         .weight(1f)
@@ -216,8 +240,6 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         var size by mutableStateOf(IntSize.Zero)
         val shape = RoundedCornerShape(18.dp)
         val colors = MaterialTheme.colorScheme
-        val liveFrame = ScreenControlPlugin.latestFrame
-
         Surface(
             modifier = modifier
                 .clip(shape)
@@ -228,9 +250,15 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                     detectTapGestures(
                         onTap = { offset -> handleSurfaceTap(offset, size) },
                         onDoubleTap = { sendDoubleClick() },
-                        onLongPress = {
+                        onLongPress = { offset ->
                             window.decorView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                            mousePadPlugin()?.sendSingleHold() ?: finish()
+                            if (controlMode == ControlMode.Screen) {
+                                mapScreenPoint(offset, size)?.let { point ->
+                                    mousePadPlugin()?.sendScreenHold(point.x, point.y) ?: finish()
+                                }
+                            } else {
+                                mousePadPlugin()?.sendSingleHold() ?: finish()
+                            }
                         }
                     )
                 }
@@ -271,14 +299,11 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                     .padding(if (controlMode == ControlMode.Screen) 4.dp else 20.dp),
                 contentAlignment = Alignment.Center
             ) {
-                if (controlMode == ControlMode.Screen && liveFrame != null) {
-                    Image(
-                        bitmap = liveFrame.asImageBitmap(),
-                        contentDescription = stringResource(R.string.remote_mode_screen),
+                if (controlMode == ControlMode.Screen) {
+                    RemoteVideoPreview(
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Fit
+                            .clip(RoundedCornerShape(12.dp))
                     )
                 } else {
                     Column(
@@ -316,6 +341,37 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 }
             }
         }
+    }
+
+    @Composable
+    private fun RemoteVideoPreview(modifier: Modifier = Modifier) {
+        var renderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
+        val plugin = screenControlPlugin()
+
+        DisposableEffect(renderer, plugin) {
+            val current = renderer
+            if (current == null || plugin == null) {
+                return@DisposableEffect onDispose { }
+            }
+            plugin.attachRemoteVideoSink(current)
+            onDispose {
+                plugin.detachRemoteVideoSink(current)
+                current.release()
+            }
+        }
+
+        AndroidView(
+            modifier = modifier,
+            factory = { viewContext ->
+                SurfaceViewRenderer(viewContext).apply {
+                    init(WebRtcRuntime.eglContext(viewContext), null)
+                    setEnableHardwareScaler(true)
+                    setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+                    renderer = this
+                }
+            },
+            update = { it.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT) },
+        )
     }
 
     @Composable
@@ -377,8 +433,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
         if (controlMode == ControlMode.Screen) {
             mapScreenPoint(offset, size)?.let { point ->
-                plugin.sendMousePosition(point.x, point.y)
+                plugin.sendScreenTap(point.x, point.y)
             }
+            return
         }
         plugin.sendLeftClick()
     }
@@ -455,18 +512,23 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     }
 
     private fun requestDesktopScreen() {
-        val plugin = screenControlPlugin()
-        if (plugin == null) {
+        if (screenControlPlugin() == null) {
             statusText = getString(R.string.remote_screen_plugin_missing)
             return
         }
-        plugin.requestDesktopScreen()
-        statusText = getString(R.string.remote_screen_requesting)
+        val requested = DeskLinkApplication.getInstance().requestRemoteView(
+            deviceId,
+            org.desklink.mobile.webrtc.WebRtcScreenDirection.DESKTOP_TO_PHONE,
+        )
+        statusText = if (requested) {
+            getString(R.string.remote_screen_requesting)
+        } else {
+            getString(R.string.remote_screen_error)
+        }
     }
 
     private fun sendStopScreen() {
-        val plugin = screenControlPlugin() ?: return
-        plugin.stopScreen()
+        DeskLinkApplication.getInstance().stopRemoteSession(deviceId)
     }
 
     private fun openSettings() {

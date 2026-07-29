@@ -32,6 +32,25 @@ import org.desklink.mobile.R
 
 @LoadablePlugin
 class SftpPlugin : Plugin(), OnSharedPreferenceChangeListener {
+    /**
+     * Storage roots explicitly granted by the user. WebRTC file browsing uses
+     * these roots without starting the legacy SSH/SFTP server.
+     */
+    fun authorizedStorageRoots(): List<StorageInfo> = if (SimpleSftpServer.SUPPORTS_NATIVEFS) {
+        if (!Environment.isExternalStorageManager()) {
+            emptyList()
+        } else {
+            context.getSystemService(StorageManager::class.java).storageVolumes.mapNotNull { volume ->
+                volume.directory?.let { directory ->
+                    StorageInfo(volume.getDescription(context), directory.toUri())
+                }
+            }
+        }
+    } else {
+        SftpSettingsFragment.getStorageInfoList(context, this)
+            .sortedBy { it.uri.toString() }
+    }
+
     override val displayName: String
         get() = context.resources.getString(R.string.pref_plugin_sftp)
 

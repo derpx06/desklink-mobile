@@ -47,7 +47,6 @@ public class LanLink extends BaseLink {
 
     final static int MAX_PACKET_SIZE = 32 * 1024 * 1024;
     final static long MAX_PAYLOAD_SIZE = 4L * 1024L * 1024L * 1024L;
-
     public enum ConnectionStarted {
         Locally, Remotely
     }
@@ -134,64 +133,30 @@ public class LanLink extends BaseLink {
             return false;
         }
 
+        // Paired file bytes are WebRTC file-data messages only.  Keep the LAN
+        // link available for discovery, pairing, and signed signaling, but do
+        // not allow a caller to reintroduce the legacy payload socket by
+        // bypassing Device.sendPacketBlocking().
+        if (np.hasPayload()) {
+            IOException error = new IOException("DeskLink file transfer requires WebRTC");
+            Log.w("DeskLink/LanLink", error.getMessage());
+            callback.onFailure(error);
+            np.getPayload().close();
+            return false;
+        }
+
         try {
-
-            if (np.hasPayload() && np.getPayloadSize() > MAX_PAYLOAD_SIZE) {
-                throw new IOException("Payload exceeds the maximum supported size");
-            }
-
-            //Prepare socket for the payload
-            final ServerSocket server;
-            if (np.hasPayload()) {
-                server = LanLinkProvider.openServerSocketOnFreePort(LanLinkProvider.PAYLOAD_TRANSFER_MIN_PORT);
-                JSONObject payloadTransferInfo = new JSONObject();
-                payloadTransferInfo.put("port", server.getLocalPort());
-                np.setPayloadTransferInfo(payloadTransferInfo);
-                if (np.getStringOrNull("transferToken") == null) {
-                    np.set("transferToken", UUID.randomUUID().toString());
-                }
-                if (np.getStringOrNull("transferId") == null) {
-                    // Optional v9 field used by both sides to persist a
-                    // resumable transfer without changing the packet envelope.
-                    np.set("transferId", UUID.randomUUID().toString());
-                }
-            } else {
-                server = null;
-            }
 
             //Log.e("LanLink/sendPacket", np.getType());
 
-            //Send body of the network packet
-            try {
-                OutputStream writer = socket.getOutputStream();
-                writer.write(np.serialize().getBytes(Charsets.UTF_8));
-                writer.flush();
-            } catch (Exception e) {
-                disconnect(); //main socket is broken, disconnect
-                if (server != null) {
-                    try { server.close(); } catch (Exception ignored) { }
-                }
-                throw e;
-            }
-
-            //Send payload
-            if (server != null) {
-                if (sendPayloadFromSameThread) {
-                    sendPayload(np, callback, server);
-                } else {
-                    ThreadHelper.execute(() -> {
-                        try {
-                            sendPayload(np, callback, server);
-                        } catch (IOException e) {
-                            Log.e("LanLink/sendPacket", "Async sendPayload failed for packet of type " + np.getType(), e);
-                            callback.onFailure(e);
-                        }
-                    });
-                }
-            }
-
-            if (server == null && !np.isCanceled()) {
+            OutputStream writer = socket.getOutputStream();
+            writer.write(np.serialize().getBytes(Charsets.UTF_8));
+            writer.flush();
+            if (!np.isCanceled()) {
                 callback.onSuccess();
+            } else {
+                callback.onFailure(new IOException("DeskLink packet send cancelled"));
+                return false;
             }
             return true;
         } catch (Exception e) {
@@ -273,43 +238,10 @@ public class LanLink extends BaseLink {
     private void receivedNetworkPacket(NetworkPacket np) {
 
         if (np.hasPayloadTransferInfo()) {
-            Socket payloadSocket = new Socket();
-            try {
-                if (np.getPayloadSize() < 0 || np.getPayloadSize() > MAX_PAYLOAD_SIZE) {
-                    throw new IOException("Payload size is invalid");
-                }
-                int tcpPort = np.getPayloadTransferInfo().getInt("port");
-                InetSocketAddress deviceAddress = (InetSocketAddress) socket.getRemoteSocketAddress();
-                payloadSocket.connect(new InetSocketAddress(deviceAddress.getAddress(), tcpPort), 10_000);
-                payloadSocket.setSoTimeout(30_000);
-                payloadSocket = SslHelper.convertToSslSocket(context, payloadSocket, getDeviceId(), true, true);
-                payloadSocket.setSoTimeout(30_000);
-                String expectedToken = np.getStringOrNull("transferToken");
-                if (expectedToken == null || expectedToken.isEmpty() || expectedToken.length() > 128) {
-                    throw new IOException("Missing or invalid payload transfer token");
-                }
-                InputStream tokenStream = payloadSocket.getInputStream();
-                StringBuilder token = new StringBuilder();
-                int tokenByte;
-                while ((tokenByte = tokenStream.read()) != -1 && tokenByte != '\n') {
-                    if (token.length() >= 128) {
-                        throw new IOException("Payload transfer token is too long");
-                    }
-                    token.append((char) tokenByte);
-                }
-                if (!expectedToken.contentEquals(token)) {
-                    throw new IOException("Payload transfer token does not match control packet");
-                }
-                np.setPayload(new NetworkPacket.Payload(payloadSocket, np.getPayloadSize()));
-            } catch (Exception e) {
-                try { payloadSocket.close(); } catch(Exception ignored) { }
-                Log.e("DeskLink/LanLink", "Exception connecting to payload remote socket", e);
-                // A control packet that promised a payload is not a valid
-                // feature packet without that authenticated payload. Do not
-                // dispatch it as a successful empty transfer.
-                return;
-            }
-
+            // Never open a legacy TCP/TLS payload connection. File control
+            // and bytes arrive through the authenticated WebRTC channels.
+            Log.w("DeskLink/LanLink", "Rejected legacy LAN file payload; WebRTC is required");
+            return;
         }
 
         packetReceived(np);

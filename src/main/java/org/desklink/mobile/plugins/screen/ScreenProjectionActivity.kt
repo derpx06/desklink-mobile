@@ -42,6 +42,10 @@ class ScreenProjectionActivity : Activity() {
             DeskLinkApplication.getInstance()
                 .getDevicePlugin(deviceId, ScreenControlPlugin::class.java)
                 ?.onPhoneCapturePermissionFinished(false)
+            DeskLinkApplication.getInstance().reportWebRtcScreenCaptureFailure(
+                deviceId,
+                "Phone screen-sharing permission was not granted",
+            )
         }
         finish()
     }

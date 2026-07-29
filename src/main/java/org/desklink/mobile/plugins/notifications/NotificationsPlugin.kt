@@ -53,6 +53,15 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private val currentNotifications = mutableSetOf<String>()
     // Here we will map every notification to it's icon(hash)
     private val notificationsIcons = mutableMapOf<String, String>()
+    /** A later active-notification snapshot cannot describe an already
+     * dismissed notification, so dismissal delivery is retried explicitly. */
+    private val pendingCancellations = mutableSetOf<String>()
+    /**
+     * Delivery callbacks run on DeskLink's outbound worker, while Android
+     * notification callbacks run on the main thread. Keep synchronization
+     * bookkeeping coherent across those two boundaries.
+     */
+    private val notificationDeliveryLock = Any()
     private val postedNotifications = mutableSetOf<String>()
     private val pendingIntents = mutableMapOf<String, RepliableNotification>()
     private val pendingActions = ArrayListValuedHashMap<String, Notification.Action>()
@@ -94,8 +103,11 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     }
 
     override fun onDestroy() {
-        currentNotifications.clear()
-        notificationsIcons.clear()
+        synchronized(notificationDeliveryLock) {
+            currentNotifications.clear()
+            notificationsIcons.clear()
+            pendingCancellations.clear()
+        }
         pendingIntents.clear()
         pendingActions.clear()
 
@@ -119,6 +131,28 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
     }
 
+    /**
+     * Reconcile Android's active notifications immediately after the
+     * authenticated WebRTC feature transport becomes usable. Notifications
+     * posted while handover was in progress must not be treated as delivered
+     * merely because they entered the local outbound queue.
+     */
+    fun resyncAfterWebRtcReady() {
+        if (!isDeviceInitialized || !NotificationReceiver.hasReadNotificationsPermission(context)) {
+            return
+        }
+        NotificationReceiver.RunCommand(context) { service ->
+            serviceReady = service.isConnected
+            if (serviceReady) {
+                val cancellations = synchronized(notificationDeliveryLock) {
+                    pendingCancellations.toList()
+                }
+                cancellations.forEach(::sendNotificationCancellation)
+                sendCurrentNotifications(service)
+            }
+        }
+    }
+
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification?) {
         if (statusBarNotification == null) {
             Log.w(TAG, "onNotificationRemoved: notification is null")
@@ -135,16 +169,17 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         pendingActions.remove(id)
 
         if (!appDatabase.isEnabled(statusBarNotification.packageName)) {
-            currentNotifications.remove(id)
+            synchronized(notificationDeliveryLock) {
+                currentNotifications.remove(id)
+            }
             return
         }
 
-        val np = NetworkPacket(PACKET_TYPE_NOTIFICATION)
-        np["id"] = id
-        np["isCancel"] = true
-        device.sendPacket(np)
-        currentNotifications.remove(id)
-        notificationsIcons.remove(id)
+        sendNotificationCancellation(id)
+        synchronized(notificationDeliveryLock) {
+            currentNotifications.remove(id)
+            notificationsIcons.remove(id)
+        }
     }
 
     override fun onNotificationPosted(statusBarNotification: StatusBarNotification) {
@@ -225,8 +260,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
 
         val key = getNotificationKeyCompat(statusBarNotification)
-        val isUpdate = currentNotifications.contains(key)
-
         val np = NetworkPacket(PACKET_TYPE_NOTIFICATION)
         var iconHashToCommit: String? = null
 
@@ -241,7 +274,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             val iconHash = getIconHash(iconBytes)
 
             // If it's the same icon, the other end should have it already, so there's no need to send it again.
-            if (iconHash != notificationsIcons[key]) {
+            if (iconHash != synchronized(notificationDeliveryLock) { notificationsIcons[key] }) {
                 np.payload = NetworkPacket.Payload(iconBytes)
                 iconHashToCommit = iconHash
             }
@@ -302,17 +335,51 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
                 }
             }
         }
-        try {
-            device.sendPacket(np)
-            currentNotifications.add(key)
-            if (iconHashToCommit != null) {
-                notificationsIcons[key] = iconHashToCommit
+        // `sendPacket` only queues work. Its return cannot prove that the
+        // authenticated WebRTC event channel accepted the notification. Mark
+        // it synchronized only from the completion callback so a failed
+        // handover/channel write remains eligible for the next resync.
+        device.sendPacket(np, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
+            override fun onSuccess() {
+                synchronized(notificationDeliveryLock) {
+                    currentNotifications.add(key)
+                    if (iconHashToCommit != null) {
+                        notificationsIcons[key] = iconHashToCommit
+                    }
+                }
             }
-        } catch (error: Exception) {
-            // Do not mark a notification as synchronized until the packet has
-            // been accepted by the link. This allows a later resync to retry it.
-            Log.w(TAG, "Unable to synchronize notification $key", error)
-        }
+
+            override fun onFailure(e: Throwable) {
+                synchronized(notificationDeliveryLock) {
+                    currentNotifications.remove(key)
+                    if (iconHashToCommit != null) {
+                        notificationsIcons.remove(key)
+                    }
+                }
+                Log.w(TAG, "Unable to synchronize notification $key; it will be retried on resync", e)
+            }
+        })
+    }
+
+    private fun sendNotificationCancellation(id: String) {
+        if (id.isBlank()) return
+        val packet = NetworkPacket(PACKET_TYPE_NOTIFICATION)
+        packet["id"] = id
+        packet["isCancel"] = true
+        device.sendPacket(packet, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
+            override fun onSuccess() {
+                synchronized(notificationDeliveryLock) {
+                    pendingCancellations.remove(id)
+                }
+            }
+
+            override fun onFailure(e: Throwable) {
+                synchronized(notificationDeliveryLock) {
+                    pendingCancellations.add(id)
+                }
+                Log.w(TAG, "Unable to synchronize notification dismissal $id; it will be retried", e)
+            }
+        })
     }
 
     private fun extractText(notification: Notification): String? {
@@ -566,7 +633,10 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             } else {
                 np.getString("cancel")
             }
-            currentNotifications.remove(dismissedId)
+            synchronized(notificationDeliveryLock) {
+                currentNotifications.remove(dismissedId)
+                notificationsIcons.remove(dismissedId)
+            }
             NotificationReceiver.RunCommand(context) { service ->
                 service.cancelNotification(dismissedId)
             }

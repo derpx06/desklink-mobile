@@ -23,6 +23,13 @@ public abstract class BaseLinkProvider {
         void onConnectionReceived(@NonNull final BaseLink link);
         @WorkerThread
         void onDeviceInfoUpdated(@NonNull final DeviceInfo deviceInfo);
+        /**
+         * The same logical link received a replacement bootstrap socket.  This
+         * is not a device disconnect: a feature-ready WebRTC peer stays alive,
+         * while an incomplete SDP/ICE attempt must restart on the new socket.
+         */
+        @WorkerThread
+        default void onConnectionReplaced(@NonNull final BaseLink link) { }
         @WorkerThread
         void onConnectionLost(BaseLink link);
     }
@@ -66,6 +73,14 @@ public abstract class BaseLinkProvider {
     protected void onDeviceInfoUpdated(@NonNull final DeviceInfo deviceInfo) {
         for(ConnectionReceiver cr : connectionReceivers) {
             cr.onDeviceInfoUpdated(deviceInfo);
+        }
+    }
+
+    /** Notifies listeners after an existing logical link changes socket. */
+    @WorkerThread
+    protected void onConnectionReplaced(@NonNull final BaseLink link) {
+        for(ConnectionReceiver cr : connectionReceivers) {
+            cr.onConnectionReplaced(link);
         }
     }
 

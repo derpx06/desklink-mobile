@@ -196,6 +196,18 @@ public class MouseReceiverService extends AccessibilityService {
                 ViewConfiguration.getLongPressTimeout()), null, null);
     }
 
+    /**
+     * Executes a long press at the exact coordinate supplied by the remote
+     * screen viewer.  A screen-mode action must not depend on the position of
+     * a stale accessibility cursor from an earlier pointer packet.
+     */
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public static boolean longClick(int x, int y) {
+        if (instance == null) return false;
+        return instance.dispatchGesture(createClick(x, y,
+                ViewConfiguration.getLongPressTimeout()), null, null);
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.O)
     public static boolean longClickSwipe() {
         if (instance == null) return false;
@@ -205,6 +217,16 @@ public class MouseReceiverService extends AccessibilityService {
         } else {
             return instance.startSwipe();
         }
+    }
+
+    /** Starts a drag at an absolute remote-screen coordinate.  Unlike the
+     * legacy toggle helper above, this never interprets a repeated start as a
+     * request to release the current drag. */
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public static boolean longClickSwipe(int x, int y) {
+        if (instance == null || instance.isSwiping()) return false;
+        if (!setPos(x, y)) return false;
+        return instance.startSwipe();
     }
 
     private boolean isSwiping() {

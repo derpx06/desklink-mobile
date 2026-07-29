@@ -48,6 +48,7 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_SMS_REQUEST = "desklink.sms.request"
     const val PACKET_TYPE_TELEPHONY_REQUEST = "desklink.telephony.request"
     const val PACKET_TYPE_CONNECTIVITY_REPORT = "desklink.connectivity_report"
+    const val PACKET_TYPE_WEBRTC_SIGNAL_V1 = "desklink.webrtc.signal.v1"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES = "desklink.shareinputdevices"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST = "desklink.shareinputdevices.request"
     const val PACKET_TYPE_DIGITIZER_SESSION = "desklink.digitizer.session"

@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.desklink.mobile.Device
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -20,6 +21,8 @@ class ScreenControlPluginTest {
             assertTrue("missing supported packet $packetType", packetType in supported)
             assertTrue("missing outgoing packet $packetType", packetType in outgoing)
         }
+        assertTrue(DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME !in supported)
+        assertTrue(DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME !in outgoing)
     }
 
     @Test
@@ -60,6 +63,31 @@ class ScreenControlPluginTest {
                     packet.getInt("maxDimension") == 1280 &&
                     packet.getInt("fps") == 6 &&
                     packet.getInt("quality") == 60
+            })
+        }
+    }
+
+    @Test
+    fun stoppingOneScreenSessionSendsOnlyOneStopPacket() {
+        val plugin = ScreenControlPlugin()
+        val context = mockk<Context> {
+            every { getSharedPreferences(any(), any()) } returns mockk<SharedPreferences>()
+            every { getString(any()) } returns "Screen control"
+            every { stopService(any()) } returns true
+        }
+        val device = mockk<Device> {
+            every { deviceId } returns "device-id"
+            every { sendPacket(any()) } returns Unit
+        }
+
+        plugin.setContext(context, device)
+        plugin.requestDesktopScreen()
+        plugin.stopScreen()
+        plugin.stopScreen()
+
+        verify(exactly = 1) {
+            device.sendPacket(match { packet ->
+                packet.type == ScreenControlPlugin.PACKET_TYPE_SCREEN_STOP
             })
         }
     }

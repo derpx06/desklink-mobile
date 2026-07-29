@@ -17,5 +17,33 @@ interface SessionTransport {
 
     fun send(channel: LogicalChannel, payload: ByteArray, callback: TransportCallback)
 
+    /** Reliable feature traffic. Legacy LAN maps this to its control packet path. */
+    fun sendReliable(channel: LogicalChannel, payload: ByteArray, callback: TransportCallback) =
+        send(channel, payload, callback)
+
+    /** Realtime traffic may be dropped by WebRTC; legacy transports reject it. */
+    fun sendRealtime(channel: LogicalChannel, payload: ByteArray, callback: TransportCallback) =
+        send(channel, payload, callback)
+
+    fun openLogicalStream(channel: LogicalChannel, callback: TransportCallback) {
+        callback.onFailure(
+            TransportError(
+                TransportErrorCode.UNSUPPORTED_CHANNEL,
+                "Logical streams are not available on this transport",
+            ),
+        )
+    }
+
+    fun requestMedia(kind: String, callback: TransportCallback) {
+        callback.onFailure(
+            TransportError(
+                TransportErrorCode.UNSUPPORTED_CHANNEL,
+                "Media is not available on this transport",
+            ),
+        )
+    }
+
+    fun stopMedia(kind: String) = Unit
+
     fun close(reason: DisconnectReason)
 }

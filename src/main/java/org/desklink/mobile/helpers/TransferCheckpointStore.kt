@@ -13,7 +13,7 @@ import android.net.Uri
  * optional transferId/offset metadata and never replaces device identity or
  * pairing preferences.
  */
-data class TransferCheckpoint(
+data class TransferCheckpoint @JvmOverloads constructor(
     val transferId: String,
     val uri: String,
     val offset: Long,
@@ -22,6 +22,10 @@ data class TransferCheckpoint(
     val filename: String? = null,
     val deviceId: String? = null,
     val sha256: String? = null,
+    val transferToken: String? = null,
+    val sessionId: Long? = null,
+    val connectionGeneration: Long? = null,
+    val direction: String? = null,
 )
 
 class TransferCheckpointStore(context: Context) {
@@ -39,6 +43,14 @@ class TransferCheckpointStore(context: Context) {
             filename = preferences.getString(key(transferId, "filename"), null),
             deviceId = preferences.getString(key(transferId, "deviceId"), null),
             sha256 = preferences.getString(key(transferId, "sha256"), null),
+            transferToken = preferences.getString(key(transferId, "token"), null),
+            sessionId = preferences.getLong(key(transferId, "sessionId"), Long.MIN_VALUE)
+                .takeUnless { it == Long.MIN_VALUE },
+            connectionGeneration = preferences.getLong(
+                key(transferId, "generation"),
+                Long.MIN_VALUE,
+            ).takeUnless { it == Long.MIN_VALUE },
+            direction = preferences.getString(key(transferId, "direction"), null),
         )
     }
 
@@ -58,6 +70,15 @@ class TransferCheckpointStore(context: Context) {
             .putString(key(checkpoint.transferId, "filename"), checkpoint.filename)
             .putString(key(checkpoint.transferId, "deviceId"), checkpoint.deviceId)
             .putString(key(checkpoint.transferId, "sha256"), checkpoint.sha256)
+            .putString(key(checkpoint.transferId, "token"), checkpoint.transferToken)
+            .putString(key(checkpoint.transferId, "direction"), checkpoint.direction)
+            .also { editor ->
+                checkpoint.sessionId?.let { editor.putLong(key(checkpoint.transferId, "sessionId"), it) }
+                    ?: editor.remove(key(checkpoint.transferId, "sessionId"))
+                checkpoint.connectionGeneration?.let {
+                    editor.putLong(key(checkpoint.transferId, "generation"), it)
+                } ?: editor.remove(key(checkpoint.transferId, "generation"))
+            }
             .commit()
     }
 
@@ -71,8 +92,21 @@ class TransferCheckpointStore(context: Context) {
             .remove(key(transferId, "filename"))
             .remove(key(transferId, "deviceId"))
             .remove(key(transferId, "sha256"))
+            .remove(key(transferId, "token"))
+            .remove(key(transferId, "sessionId"))
+            .remove(key(transferId, "generation"))
+            .remove(key(transferId, "direction"))
             .commit()
     }
+
+    fun list(): List<TransferCheckpoint> = preferences.all.keys
+        .asSequence()
+        .filter { it.startsWith("transfer.") && it.endsWith(".uri") }
+        .map { it.removePrefix("transfer.").removeSuffix(".uri") }
+        .distinct()
+        .mapNotNull(::load)
+        .sortedBy(TransferCheckpoint::transferId)
+        .toList()
 
     private fun key(transferId: String, field: String) = "transfer.$transferId.$field"
 

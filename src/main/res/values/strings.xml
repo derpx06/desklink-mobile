@@ -582,6 +582,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
   <string name="remote_screen_retry">Retry screen request</string>
   <string name="remote_mode_screen">Screen</string>
   <string name="remote_mode_trackpad">Trackpad</string>
+  <string name="remote_enable_control">Enable control</string>
+  <string name="remote_control_requesting">Requesting remote-control permission</string>
+  <string name="remote_control_unavailable">Remote control is unavailable until WebRTC view is connected</string>
   <string name="remote_live_screen_pending">Live screen will appear here</string>
   <string name="remote_live_screen_hint">Tap or drag on the screen area to control the desktop by absolute position.</string>
   <string name="remote_trackpad_ready">Trackpad mode</string>
@@ -613,6 +616,12 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <string name="enable_udp_broadcast">Enable UDP device discovery</string>
     <string name="enable_bluetooth">Enable bluetooth (beta)</string>
+    <string name="setting_webrtc_transport">WebRTC transport</string>
+    <string name="setting_webrtc_transport_description">Use an authenticated peer connection for paired-device features. LAN remains available only for discovery, pairing, and signaling.</string>
+    <string name="setting_webrtc_stun_servers">STUN servers</string>
+    <string name="setting_webrtc_stun_servers_description">Optional comma-separated stun:// server URIs. No server is configured by default.</string>
+    <string name="setting_webrtc_turn_servers">TURN servers</string>
+    <string name="setting_webrtc_turn_servers_description">Optional comma-separated turn:// or turns:// URIs with temporary credentials. DeskLink does not provide a relay.</string>
 
     <string name="receive_notifications_permission_explanation">Notifications need to be allowed to receive them from other devices</string>
     <string name="findmyphone_notifications_explanation">The notifications permission is needed so the phone can ring when the app is in the background</string>
