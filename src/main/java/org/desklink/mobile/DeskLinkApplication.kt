@@ -108,6 +108,7 @@ class DeskLinkApplication : Application() {
     override fun onTerminate() {
         Log.d("DeskLink/Application", "onTerminate")
         webRtcCoordinators.values.forEach(WebRtcSessionCoordinator::close)
+        devices.values.forEach(Device::closeLifecycle)
         sessionManager.terminateAll()
         super.onTerminate()
     }
@@ -179,6 +180,14 @@ class DeskLinkApplication : Application() {
         getDevice(deviceId)?.let { webRtcCoordinatorFor(it).stopRemoteSession() }
     }
 
+    /** Runs the ordered transport/session invalidation for explicit unpair. */
+    @WorkerThread
+    fun beginDeviceUnpair(device: Device) {
+        webRtcCoordinators.remove(device.deviceId)?.closeForUnpair()
+        device.clearWebRtcBindingsForUnpair()
+        sessionManager.revokePairing(device.deviceId)
+    }
+
     /**
      * Requests a fresh discovery/signaling bootstrap only when WebRTC recovery
      * needs it. This is intentionally not invoked for a healthy WebRTC peer;
@@ -240,7 +249,6 @@ class DeskLinkApplication : Application() {
         }
 
         override fun unpaired(device: Device) {
-            webRtcCoordinators.remove(device.deviceId)?.close()
             onDeviceListChanged()
             if (!device.isReachable) {
                 scheduleForDeletion(device)
@@ -291,7 +299,11 @@ class DeskLinkApplication : Application() {
                         device.setSessionTransport(registration.binding.transport)
                     }
                     device.setControlPacketHandler(coordinator)
-                    coordinator.beginIfSupported()
+                    if (retainedBinding != null) {
+                        coordinator.onBootstrapReconnected()
+                    } else {
+                        coordinator.beginIfSupported()
+                    }
                 }.onFailure { error ->
                     Log.e("DeskLink/Session", "Could not register LAN session", error)
                 }

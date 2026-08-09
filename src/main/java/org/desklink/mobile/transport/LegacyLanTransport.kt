@@ -6,6 +6,7 @@ package org.desklink.mobile.transport
 import org.desklink.mobile.Device
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.backends.lan.LanLink
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.json.JSONException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
@@ -13,9 +14,9 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Adapter around the existing authenticated Java LAN link.
  *
- * This adapter only transports control packets for now. Payload jobs continue
- * to use the existing NetworkPacket/LanLink path until they can be migrated
- * without changing payload framing or transfer behavior.
+ * This adapter is bootstrap-only. Paired feature packets and file bytes must
+ * use the authenticated WebRTC transport and are rejected here as defense in
+ * depth even if a caller bypasses Device.sendPacket().
  */
 class LegacyLanTransport(
     private val link: LanLink,
@@ -52,6 +53,18 @@ class LegacyLanTransport(
         } catch (error: JSONException) {
             callback.onFailure(
                 TransportError(TransportErrorCode.INVALID_PACKET, "Invalid control packet", error),
+            )
+            return
+        }
+        val bootstrapPacket = packet.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
+            packet.type == NetworkPacket.PACKET_TYPE_PAIR ||
+            packet.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        if (!bootstrapPacket) {
+            callback.onFailure(
+                TransportError(
+                    TransportErrorCode.UNSUPPORTED_CHANNEL,
+                    "Legacy LAN is limited to DeskLink identity, pairing, and signed WebRTC signaling",
+                ),
             )
             return
         }

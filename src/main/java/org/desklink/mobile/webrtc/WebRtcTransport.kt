@@ -6,6 +6,7 @@ package org.desklink.mobile.webrtc
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjection
+import android.util.Log
 import org.desklink.mobile.transport.DisconnectReason
 import org.desklink.mobile.transport.LogicalChannel
 import org.desklink.mobile.transport.SessionTransport
@@ -33,6 +34,64 @@ import java.util.concurrent.atomic.AtomicReference
 
 enum class WebRtcPeerHealth { CONNECTED, DISCONNECTED, FAILED, CLOSED }
 
+/**
+ * The initial feature handover is deliberately data-channel only.  Offering
+ * an idle Android screen track before the user requests sharing makes some
+ * native peers negotiate a malformed, codec-less video answer.  Screen media
+ * is added only by the explicit screen-session negotiation path.
+ */
+internal object WebRtcMediaNegotiationPolicy {
+    const val includeScreenTrackInInitialOffer = false
+}
+
+/** State of one local SDP offer operation. A peer must never have two offers
+ * in flight: native WebRTC callbacks are asynchronous and a second offer can
+ * leave the signaling state stuck without producing an error. */
+internal enum class OfferOperationState {
+    IDLE,
+    CREATING,
+    SETTING_LOCAL_DESCRIPTION,
+    COMPLETED,
+    FAILED,
+}
+
+/** Small, testable gate used by the native SDP callbacks. */
+internal class OfferOperationGate {
+    private val stateRef = AtomicReference(OfferOperationState.IDLE)
+
+    fun begin(): Boolean = stateRef.compareAndSet(
+        OfferOperationState.IDLE,
+        OfferOperationState.CREATING,
+    )
+
+    fun beginSettingLocalDescription(): Boolean = stateRef.compareAndSet(
+        OfferOperationState.CREATING,
+        OfferOperationState.SETTING_LOCAL_DESCRIPTION,
+    )
+
+    fun complete(): Boolean = stateRef.compareAndSet(
+        OfferOperationState.SETTING_LOCAL_DESCRIPTION,
+        OfferOperationState.COMPLETED,
+    )
+
+    fun fail(): Boolean {
+        while (true) {
+            val current = stateRef.get()
+            when (current) {
+                OfferOperationState.CREATING,
+                OfferOperationState.SETTING_LOCAL_DESCRIPTION ->
+                    if (stateRef.compareAndSet(current, OfferOperationState.FAILED)) return true
+
+                OfferOperationState.IDLE,
+                OfferOperationState.COMPLETED,
+                OfferOperationState.FAILED -> return false
+            }
+        }
+    }
+
+    fun state(): OfferOperationState = stateRef.get()
+}
+
 /** One authenticated WebRTC peer connection for one DeskLink device session. */
 class WebRtcTransport(
     private val context: Context,
@@ -58,6 +117,7 @@ class WebRtcTransport(
 
     private val stateRef = AtomicReference(TransportState.CONNECTING)
     private val handoverRef = AtomicReference(WebRtcHandoverState.NEGOTIATING)
+    private val offerOperation = OfferOperationGate()
     private val channels = ConcurrentHashMap<String, DataChannel>()
     private val peer: PeerConnection
     private val videoSource: VideoSource = factory.createVideoSource(true).also {
@@ -86,7 +146,9 @@ class WebRtcTransport(
                 peer.createDataChannel(channel.label, init)?.also { installChannel(it) }
             }
         }
-        peer.addTrack(videoTrack, listOf("desklink-screen"))
+        if (WebRtcMediaNegotiationPolicy.includeScreenTrackInInitialOffer) {
+            peer.addTrack(videoTrack, listOf("desklink-screen"))
+        }
     }
 
     override val transportType: TransportType = TransportType.WEBRTC
@@ -214,26 +276,60 @@ class WebRtcTransport(
         )
     }
 
-    fun createOffer() {
+    fun createOffer(): Boolean {
+        if (!offerOperation.begin()) {
+            Log.w(TAG, "Ignoring duplicate WebRTC offer request in state ${offerOperation.state()}")
+            return false
+        }
+        Log.i(TAG, "Creating WebRTC offer")
+        try {
         peer.createOffer(object : SdpObserverAdapter() {
             override fun onCreateSuccess(description: SessionDescription) {
+                if (!offerOperation.beginSettingLocalDescription()) {
+                    Log.w(TAG, "Ignoring stale WebRTC offer creation callback")
+                    return
+                }
+                Log.i(TAG, "WebRTC offer created (${description.description.length} bytes); setting local description")
                 peer.setLocalDescription(object : SdpObserverAdapter() {
                     override fun onSetSuccess() {
+                        if (!offerOperation.complete()) {
+                            Log.w(TAG, "Ignoring stale WebRTC local-description callback")
+                            return
+                        }
+                        Log.i(TAG, "WebRTC local offer description set")
                         observer.onSignalingNeeded(
                             SignalingMessageType.OFFER,
                             JSONObject().put("sdp", description.description),
                         )
                     }
 
-                    override fun onSetFailure(error: String) = observer.onFailure(
-                        IllegalStateException("Could not set local WebRTC offer: $error"),
-                    )
+                    override fun onSetFailure(error: String) {
+                        if (offerOperation.fail()) {
+                            Log.e(TAG, "Could not set local WebRTC offer: $error")
+                            observer.onFailure(
+                                IllegalStateException("Could not set local WebRTC offer: $error"),
+                            )
+                        }
+                    }
                 }, description)
             }
-            override fun onCreateFailure(error: String) = observer.onFailure(
-                IllegalStateException("Could not create WebRTC offer: $error"),
-            )
+            override fun onCreateFailure(error: String) {
+                if (offerOperation.fail()) {
+                    Log.e(TAG, "Could not create WebRTC offer: $error")
+                    observer.onFailure(
+                        IllegalStateException("Could not create WebRTC offer: $error"),
+                    )
+                }
+            }
         }, MediaConstraints())
+        } catch (error: Throwable) {
+            if (offerOperation.fail()) {
+                Log.e(TAG, "Could not start WebRTC offer creation", error)
+                observer.onFailure(error)
+            }
+            return false
+        }
+        return true
     }
 
     fun createAnswer() {
@@ -423,10 +519,16 @@ class WebRtcTransport(
         }
     }
 
+    internal fun offerOperationState(): OfferOperationState = offerOperation.state()
+
     private open class SdpObserverAdapter : SdpObserver {
         override fun onCreateSuccess(description: SessionDescription) = Unit
         override fun onSetSuccess() = Unit
         override fun onCreateFailure(error: String) = Unit
         override fun onSetFailure(error: String) = Unit
+    }
+
+    private companion object {
+        const val TAG = "DeskLink/WebRTC"
     }
 }

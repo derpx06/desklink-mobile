@@ -250,6 +250,7 @@ class DeviceTest {
         device.addPairingCallback(pairingCallback)
 
         device.unpair()
+        device.unpair()
 
         Assert.assertFalse(device.isPaired)
 

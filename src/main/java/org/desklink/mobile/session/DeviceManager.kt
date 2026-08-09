@@ -86,6 +86,13 @@ class DeviceManager {
         true
     }
 
+    /** Removes feature authorization while retaining bootstrap connectivity. */
+    fun revokePairing(deviceId: String): Boolean = synchronized(lock) {
+        val session = sessions[deviceId] ?: return@synchronized false
+        session.revokePairing()
+        true
+    }
+
     fun markReconnectAttempt(deviceId: String, attempt: Int): Boolean = synchronized(lock) {
         val session = sessions[deviceId] ?: return@synchronized false
         if (session.pairingState != PairingState.PAIRED || session.state == SessionState.TERMINATED) {

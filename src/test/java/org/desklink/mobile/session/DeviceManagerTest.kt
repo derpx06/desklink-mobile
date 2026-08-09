@@ -126,4 +126,19 @@ class DeviceManagerTest {
         assertTrue(manager.sessionsSnapshot().isEmpty())
         assertFalse(manager.markReconnectAttempt("missing", 1))
     }
+
+    @Test
+    fun revokingPairingDisablesRecoveryButRetainsBootstrapBinding() {
+        val manager = DeviceManager()
+        val transport = RecordingTransport("bootstrap")
+        val registration = manager.register("phone", transport, PairingState.PAIRED)
+
+        assertTrue(manager.revokePairing("phone"))
+
+        val snapshot = manager.sessionsSnapshot().single()
+        assertEquals(PairingState.NOT_PAIRED, snapshot.pairingState)
+        assertTrue(manager.isCurrent(registration.binding))
+        assertFalse(manager.markReconnectAttempt("phone", 1))
+        assertNull(transport.closeReason)
+    }
 }

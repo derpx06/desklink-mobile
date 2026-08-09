@@ -87,6 +87,20 @@ class DeviceSession internal constructor(
         }
     }
 
+    /**
+     * Revokes feature authorization but retains the LAN bootstrap transport
+     * for pair=false delivery and a later re-pair.
+     */
+    internal fun revokePairing() {
+        synchronized(lock) {
+            if (state != SessionState.TERMINATED) {
+                pairingState = PairingState.NOT_PAIRED
+                reconnectAttempt = 0
+                lastDisconnectReason = DisconnectReason.USER_REQUESTED
+            }
+        }
+    }
+
     internal fun markReconnectAttempt(attempt: Int) {
         synchronized(lock) {
             if (state != SessionState.TERMINATED) {

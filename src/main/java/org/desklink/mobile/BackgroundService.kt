@@ -16,10 +16,12 @@ import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import androidx.annotation.MainThread
 import androidx.core.app.NotificationCompat
@@ -41,6 +43,8 @@ import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.R
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * This class (still) does 3 things:
@@ -55,6 +59,15 @@ class BackgroundService : Service() {
     private var wifiLock: WifiManager.WifiLock? = null
     private var connectionWakeLock: PowerManager.WakeLock? = null
     private val availableNetworks = Collections.newSetFromMap(ConcurrentHashMap<Network, Boolean>())
+    /**
+     * Link-provider network changes close sockets and restart discovery.  That
+     * work is allowed to touch TLS/network objects, so it must never run from
+     * the service main thread (NetworkCallback is normally asynchronous, but
+     * refresh intents and settings actions are not).
+     */
+    private val networkChangeExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "DeskLink-network-change").apply { isDaemon = true }
+    }
 
     private val linkProviders = mutableListOf<BaseLinkProvider>()
 
@@ -83,8 +96,21 @@ class BackgroundService : Service() {
             return
         }
         Log.d(LOG_TAG, "onNetworkChange")
-        for (linkProvider in linkProviders) {
-            linkProvider.onNetworkChange(network)
+        runCatching {
+            networkChangeExecutor.execute {
+                if (!initialized) return@execute
+                for (linkProvider in linkProviders) {
+                    runCatching { linkProvider.onNetworkChange(network) }
+                        .onFailure { error ->
+                            Log.w(LOG_TAG, "Link-provider network refresh failed", error)
+                        }
+                }
+            }
+        }.onFailure { error ->
+            // A refresh can race service teardown. The service is already
+            // stopping in this case, so dropping this refresh is safer than
+            // surfacing RejectedExecutionException to Android.
+            Log.d(LOG_TAG, "Ignoring network refresh during service shutdown", error)
         }
     }
 
@@ -286,6 +312,33 @@ class BackgroundService : Service() {
         else {
             notification.setContentText(getString(R.string.foreground_notification_devices, connectedDevices.joinToString(", ")))
 
+            val powerManager = getSystemService<PowerManager>()
+            val ignoresBatteryOptimizations = powerManager
+                ?.isIgnoringBatteryOptimizations(packageName)
+                ?: false
+            if (
+                BackgroundExecutionPolicy.shouldOfferBatteryExemption(
+                    hasConnectedDevice = true,
+                    ignoresBatteryOptimizations = ignoresBatteryOptimizations,
+                )
+            ) {
+                val exemptionIntent = Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName"),
+                )
+                val exemptionPendingIntent = PendingIntent.getActivity(
+                    this,
+                    4,
+                    exemptionIntent,
+                    UPDATE_IMMUTABLE_FLAGS,
+                )
+                notification.addAction(
+                    0,
+                    getString(R.string.foreground_notification_allow_background),
+                    exemptionPendingIntent,
+                )
+            }
+
             // Adding an action button to send clipboard manually in Android 10 and later.
             if (!ClipboardPlugin.canSyncAutomatically(this)) {
                 val sendClipboard = ClipboardFloatingActivity.getIntent(this, true)
@@ -326,15 +379,29 @@ class BackgroundService : Service() {
         }
         networkCallback = null
         availableNetworks.clear()
+        // Provider shutdown closes sockets and TLS streams. Keep it off the
+        // service main thread as well; stopping a foreground service can race
+        // with a network callback and Android rejects TLS I/O on main.
+        val providersToStop = linkProviders.toList()
+        runCatching {
+            networkChangeExecutor.execute {
+                providersToStop.forEach { linkProvider ->
+                    runCatching { linkProvider.onStop() }
+                        .onFailure { error ->
+                            Log.w(LOG_TAG, "Link-provider shutdown failed", error)
+                        }
+                }
+            }
+        }.onFailure { error ->
+            Log.d(LOG_TAG, "Link providers were already stopping", error)
+        }
+        networkChangeExecutor.shutdown()
         wifiLock?.let { lock ->
             if (lock.isHeld) lock.release()
         }
         wifiLock = null
         releaseConnectionWakeLock()
         connectionWakeLock = null
-        for (linkProvider in linkProviders) {
-            linkProvider.onStop()
-        }
         DeskLinkApplication.getInstance().removeDeviceListChangedCallback("BackgroundService")
         instance = null
         super.onDestroy()
@@ -404,4 +471,12 @@ class BackgroundService : Service() {
             ContextCompat.startForegroundService(context, intent)
         }
     }
+}
+
+/** Pure policy kept separate from Android services so its behavior is unit-testable. */
+internal object BackgroundExecutionPolicy {
+    fun shouldOfferBatteryExemption(
+        hasConnectedDevice: Boolean,
+        ignoresBatteryOptimizations: Boolean,
+    ): Boolean = hasConnectedDevice && !ignoresBatteryOptimizations
 }

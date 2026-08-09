@@ -37,10 +37,12 @@ import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.helpers.TrustedDevices
 import org.desklink.mobile.PairingHandler.PairingCallback
+import org.desklink.mobile.lifecycle.DeviceUnpairCoordinator
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.Plugin.Companion.getPluginKey
 import org.desklink.mobile.plugins.PluginFactory
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.webrtc.BoundedPendingQueue
 import org.desklink.mobile.webrtc.WebRtcFeatureProfile
 import org.desklink.mobile.webrtc.WebRtcTransport
 import org.desklink.mobile.session.PairingState
@@ -56,6 +58,7 @@ import java.util.Vector
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicLong
 
 class Device : PacketReceiver {
 
@@ -108,11 +111,13 @@ class Device : PacketReceiver {
 
     @Volatile
     private var controlPacketHandler: ControlPacketHandler? = null
+    private val controlPacketLock = Any()
+    private val pendingControlPackets = BoundedPendingQueue<NetworkPacket>(8)
 
     /**
-     * The WebRTC coordinator injects generation-bound lease metadata here just
-     * before an input packet is serialized. UI plugins never own a lease and
-     * therefore cannot accidentally reuse one after peer replacement.
+     * The WebRTC coordinator supplies a generation-bound control lease just
+     * before remote-input packets are sent. Plugins never create leases, so a
+     * queued packet cannot be reused after a peer replacement.
      */
     fun interface RemoteInputPacketPreparer {
         fun prepare(packet: NetworkPacket): NetworkPacket
@@ -153,6 +158,10 @@ class Device : PacketReceiver {
 
     private val sendChannel = Channel<NetworkPacketWithCallback>(64)
     private var sendCoroutine : Job? = null
+
+    /** Pairing generation used to make local and remote unpair callbacks idempotent. */
+    private val pairingGeneration = AtomicLong(1)
+    private val lifecycle = DeviceUnpairCoordinator()
 
     /**
      * Constructor for remembered, already-trusted devices.
@@ -263,9 +272,12 @@ class Device : PacketReceiver {
                 // Store as trusted device
                 TrustedDevices.addTrustedDevice(context, deviceInfo.id)
                 updateSessionPairingState(PairingState.PAIRED)
+                val generation = pairingGeneration.incrementAndGet()
 
                 try {
-                    reloadPluginsFromSettings()
+                    lifecycle.enqueue("plugin reload after pairing generation $generation") {
+                        reloadPluginsFromSettings()
+                    }
 
                     pairingCallbacks.forEach(PairingCallback::pairingSuccessful)
                 } catch (e: Exception) {
@@ -284,9 +296,20 @@ class Device : PacketReceiver {
                 TrustedDevices.removeTrustedDevice(context, deviceInfo.id)
                 updateSessionPairingState(PairingState.NOT_PAIRED)
 
-                notifyPluginsOfDeviceUnpaired(context, deviceInfo.id)
-
-                reloadPluginsFromSettings()
+                val generation = pairingGeneration.get()
+                lifecycle.beginUnpair(generation) {
+                    // Close the peer before plugin teardown so late callbacks
+                    // cannot recreate a transport for an untrusted device.
+                    // This runs on the lifecycle worker, never on the menu
+                    // thread.
+                    runCatching {
+                        DeskLinkApplication.getInstance().beginDeviceUnpair(this@Device)
+                    }.onFailure { error ->
+                        Log.e("Device", "Failed to close transports during unpair", error)
+                    }
+                    notifyPluginsOfDeviceUnpaired(context, deviceInfo.id)
+                    reloadPluginsFromSettings()
+                }
 
                 pairingCallbacks.forEach { it.unpaired(this@Device) }
             }
@@ -368,28 +391,17 @@ class Device : PacketReceiver {
         notificationManager.cancel(notificationId)
     }
 
-    /**
-     * A paired device remains reachable while its authenticated WebRTC peer is
-     * alive, even if the short-lived LAN bootstrap socket has gone away.  The
-     * latter is used only for discovery, pairing, and SDP/ICE signaling; using
-     * it as the reachability source caused plugins and their send queue to be
-     * torn down when Android locked the screen.
-     */
+
     val isReachable: Boolean
         get() = links.isNotEmpty() || hasActiveWebRtcFeatureTransport
 
     val hasActiveWebRtcFeatureTransport: Boolean
         get() = webRtcTransport?.isReadyForPackets() == true
 
-    /** True when a LAN socket is available for the bootstrap/signaling path. */
     val hasBootstrapLink: Boolean
         get() = links.isNotEmpty()
 
-    /**
-     * Used only by the foreground-service power lease. A recovery attempt is
-     * not reachable from a feature/UI perspective, but Android must not suspend
-     * the process before its bounded reconnect work has had a chance to run.
-     */
+
     val requiresConnectionPowerLease: Boolean
         get() = hasBootstrapLink || hasActiveWebRtcFeatureTransport || webRtcRecoveryPending
 
@@ -398,14 +410,33 @@ class Device : PacketReceiver {
     }
 
     fun setWebRtcTransport(transport: WebRtcTransport?) {
+        setWebRtcTransport(transport, reloadPlugins = true)
+    }
+
+    fun setWebRtcTransport(transport: WebRtcTransport?, reloadPlugins: Boolean) {
         if (webRtcTransport === transport) return
         webRtcTransport = transport
         // Plugin availability is calculated from reachability. Re-evaluate it
         // when WebRTC becomes ready or is closed so a transient loss of the
         // bootstrap socket cannot disable a live paired feature session.
-        CoroutineScope(Dispatchers.IO).launch {
-            reloadPluginsFromSettings()
+        if (reloadPlugins) {
+            lifecycle.enqueue("plugin reload after WebRTC transport change") {
+                reloadPluginsFromSettings()
+            }
         }
+    }
+
+    /** Clears every WebRTC callback and queued bootstrap packet on unpair. */
+    fun clearWebRtcBindingsForUnpair() {
+        webRtcTransport = null
+        webRtcRecoveryPending = false
+        payloadPacketHandler = null
+        remoteInputPacketPreparer = null
+        val pending = synchronized(controlPacketLock) {
+            controlPacketHandler = null
+            pendingControlPackets.drain()
+        }
+        pending.forEach { it.payload?.close() }
     }
 
     fun setWebRtcRecoveryPending(pending: Boolean) {
@@ -417,7 +448,13 @@ class Device : PacketReceiver {
     }
 
     fun setControlPacketHandler(handler: ControlPacketHandler?) {
-        controlPacketHandler = handler
+        val pending = synchronized(controlPacketLock) {
+            controlPacketHandler = handler
+            if (handler == null) emptyList() else pendingControlPackets.drain()
+        }
+        if (handler != null) {
+            pending.forEach { packet -> deliverControlPacket(handler, packet) }
+        }
     }
 
     fun setWebRtcRemoteInputPreparer(preparer: RemoteInputPacketPreparer?) {
@@ -425,6 +462,21 @@ class Device : PacketReceiver {
     }
 
     fun addLink(link: BaseLink) {
+        // A provider owns one current link for a device. Drop a stale link
+        // from the same provider before adding the replacement; otherwise a
+        // later pairing request can iterate an already-closed socket first
+        // and report the device as unreachable even though the new socket is
+        // healthy.
+        links.filter { it.linkProvider === link.linkProvider && it !== link }
+            .forEach { staleLink ->
+                staleLink.removePacketReceiver(this)
+                links.remove(staleLink)
+                runCatching { staleLink.disconnect() }
+                    .onFailure { error ->
+                        Log.w("DeskLink/Device", "Could not close stale ${staleLink.name} link", error)
+                    }
+            }
+
         synchronized(sendChannel) {
             if (sendCoroutine == null) {
                 sendCoroutine = CoroutineScope(Dispatchers.IO).launch {
@@ -548,9 +600,9 @@ class Device : PacketReceiver {
             np.payload?.close()
             return
         }
-        // LAN is bootstrap-only at every handover stage.  A paired feature
-        // must wait for WebRTC readiness rather than leaking onto the TLS
-        // socket while negotiation or recovery is in progress.
+        // Paired feature traffic is WebRTC-only even while handover is still
+        // incomplete. LAN remains restricted to bootstrap packets so features
+        // cannot silently downgrade to a different transport.
         if (shouldRejectPairedLanFeaturePacket(
                 fromWebRtc = fromWebRtc,
                 paired = isPaired,
@@ -575,10 +627,21 @@ class Device : PacketReceiver {
                 np.payload?.close()
                 return
             }
-            if (controlPacketHandler?.onControlPacket(np) != true) {
-                Log.w("DeskLink/WebRTC", "Rejected or unavailable WebRTC signaling packet")
-                np.payload?.close()
+            Log.i("DeskLink/WebRTC", "Received signed bootstrap signaling from $deviceId")
+            val (handler, evicted) = synchronized(controlPacketLock) {
+                val current = controlPacketHandler
+                if (current == null) {
+                    null to pendingControlPackets.offer(np)
+                } else {
+                    current to null
+                }
             }
+            evicted?.payload?.close()
+            if (handler == null) {
+                Log.i("DeskLink/WebRTC", "Queued signed signaling until the coordinator is attached")
+                return
+            }
+            deliverControlPacket(handler, np)
             return
         }
 
@@ -627,6 +690,13 @@ class Device : PacketReceiver {
             }
     }
 
+    private fun deliverControlPacket(handler: ControlPacketHandler, packet: NetworkPacket) {
+        if (!runCatching { handler.onControlPacket(packet) }.getOrDefault(false)) {
+            Log.w("DeskLink/WebRTC", "Rejected WebRTC signaling packet")
+            packet.payload?.close()
+        }
+    }
+
     abstract class SendPacketStatusCallback {
         abstract fun onSuccess()
 
@@ -661,9 +731,8 @@ class Device : PacketReceiver {
     fun sendPacket(np: NetworkPacket) = sendPacket(np, defaultCallback)
 
     /**
-     * Sends only bootstrap signaling immediately on the current LAN link.
-     * Feature messages never use this method and therefore can never fall
-     * back to LAN while WebRTC is negotiating or recovering.
+     * Sends only discovery/pairing/signaling packets on the bootstrap LAN
+     * link. Paired feature packets must never use this path.
      */
     @AnyThread
     fun sendBootstrapPacket(np: NetworkPacket, callback: SendPacketStatusCallback): Boolean {
@@ -691,22 +760,27 @@ class Device : PacketReceiver {
         callback: SendPacketStatusCallback,
         sendPayloadFromSameThread: Boolean
     ): Boolean {
-        if (!supportsPacketType(np.type)) {
-            Log.e("DeskLink/sendPacket", "Tried to send an unsupported packet type ${np.type} to: ${deviceInfo.name}")
-            return false
-        }
-
-
+        // Bootstrap packets are deliberately independent of the feature
+        // capability list.  In particular, the signed WebRTC SDP/ICE packet
+        // is exchanged before the WebRTC feature profile is confirmed, so it
+        // must not be rejected merely because the peer does not advertise it
+        // as an ordinary plugin capability.
         val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
             np.type == NetworkPacket.PACKET_TYPE_PAIR ||
             np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        if (!bootstrapPacket && !supportsPacketType(np.type)) {
+            Log.e("DeskLink/sendPacket", "Tried to send an unsupported packet type ${np.type} to: ${deviceInfo.name}")
+            callback.onFailure(IllegalArgumentException("Unsupported packet type ${np.type}"))
+            return false
+        }
+
         val transport = webRtcTransport
         val readyTransport = transport?.takeIf { it.isReadyForPackets() }
         val filePayload = np.type == DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST &&
             np.getString("filename").isNotEmpty() && np.payload != null
         if (isPaired && !bootstrapPacket && !WebRtcFeatureProfile.allows(np.type)) {
             val error = IllegalStateException(
-                "${np.type} is not enabled in the initial DeskLink WebRTC feature profile",
+                "${np.type} is not enabled in the current DeskLink WebRTC feature profile",
             )
             callback.onFailure(error)
             np.payload?.close()
@@ -919,8 +993,13 @@ class Device : PacketReceiver {
             // unpair a device while that device is not reachable or 2) the plugin was never initialized
             // for this device, e.g., the plugins that need additional permissions from the user, and those
             // permissions were never granted.
-            val plugin = getPlugin(pluginKey) ?: PluginFactory.instantiatePluginForDevice(context, pluginKey, this)
-            plugin?.onDeviceUnpaired(context, deviceId)
+            runCatching {
+                val plugin = getPlugin(pluginKey)
+                    ?: PluginFactory.instantiatePluginForDevice(context, pluginKey, this)
+                plugin?.onDeviceUnpaired(context, deviceId)
+            }.onFailure { error ->
+                Log.e("DeskLink/DeviceLifecycle", "Plugin $pluginKey failed during unpair", error)
+            }
         }
     }
 
@@ -964,6 +1043,11 @@ class Device : PacketReceiver {
 
     fun disconnect() {
         links.forEach(BaseLink::disconnect)
+    }
+
+    @VisibleForTesting
+    internal fun closeLifecycle() {
+        lifecycle.close()
     }
 
     override fun toString(): String {

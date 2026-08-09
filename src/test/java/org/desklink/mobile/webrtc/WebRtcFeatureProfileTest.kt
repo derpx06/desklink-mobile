@@ -8,12 +8,11 @@ import org.junit.Test
 
 class WebRtcFeatureProfileTest {
     @Test
-    fun initialProfileContainsFileSharingWithPingAndFindPhone() {
+    fun stableProfileContainsOnlyPingAndFindPhone() {
         val capabilities = setOf(
             DeskLinkProtocol.PACKET_TYPE_PING,
             DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST,
-            DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,
-            DeskLinkProtocol.PACKET_TYPE_CLIPBOARD,
+            DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1,
         )
 
@@ -21,13 +20,15 @@ class WebRtcFeatureProfileTest {
             listOf(
                 DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST,
                 DeskLinkProtocol.PACKET_TYPE_PING,
-                DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,
             ),
             WebRtcFeatureProfile.capabilities(capabilities),
         )
         assertTrue(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_PING))
         assertTrue(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST))
-        assertTrue(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST))
+        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST))
         assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_CLIPBOARD))
+        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_NOTIFICATION))
+        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_MPRIS_REQUEST))
+        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST))
     }
 }
