@@ -52,6 +52,7 @@ class WebRtcSessionCoordinator(
     private var handover = HandoverRuntime()
     private var closed = false
     private var recoveryInProgress = false
+    private var offerWatchdog: ScheduledFuture<*>? = null
     private var disconnectedGrace: ScheduledFuture<*>? = null
     private var disconnectedGraceAttemptId: String? = null
     private var remoteHeartbeat: ScheduledFuture<*>? = null
@@ -122,6 +123,44 @@ class WebRtcSessionCoordinator(
             // binding. Dispose the old peer before starting a new signed
             // attempt, otherwise its callbacks can keep a stale session alive.
             if (activeAttemptId != null) closeLocked()
+            startInitiatorLocked(binding)
+        }
+    }
+
+    /**
+     * A newly authenticated bootstrap socket after the previous one was lost
+     * is strong evidence that the peer process or network path was replaced.
+     * The deterministic initiator must not keep an apparently-connected old
+     * PeerConnection until ICE eventually times out: doing so leaves the UI
+     * showing Connected while every feature targets a dead peer.
+     *
+     * LAN carries only the new signed SDP/ICE exchange. Paired feature data
+     * remains blocked until the replacement peer reaches mutual
+     * `feature-ready`.
+     */
+    fun onBootstrapReconnected() {
+        val binding = sessions.currentBinding(device.deviceId) ?: return
+        val localDeviceId = DeviceHelper.getDeviceId(context)
+        if (hasActiveFeatureTransport()) {
+            publish("BootstrapReconnected", "Retaining the active WebRTC feature transport")
+            return
+        }
+        if (!shouldRestartAfterBootstrapReconnect(
+                localDeviceId,
+                device.deviceId,
+                false,
+            )
+        ) {
+            beginIfSupported()
+            return
+        }
+        synchronized(lock) {
+            if (closed || !sessions.isCurrent(binding)) return
+            publish("BootstrapReconnected", "Replacing the stale WebRTC peer")
+            closeLocked()
+            recovery.reset()
+            recoveryInProgress = false
+            device.setWebRtcRecoveryPending(true)
             startInitiatorLocked(binding)
         }
     }
@@ -365,6 +404,19 @@ class WebRtcSessionCoordinator(
                     notifyPeer = false,
                 )
             }
+            SignalingMessageType.RESTART_REQUEST -> synchronized(lock) {
+                val localDeviceId = DeviceHelper.getDeviceId(context)
+                require(shouldInitiateForRestartRequest(localDeviceId, device.deviceId)) {
+                    "Only the deterministic DeskLink initiator may honor a restart request"
+                }
+                require(!closed) { "DeskLink WebRTC coordinator is closed" }
+                closeLocked()
+                recovery.reset()
+                recoveryInProgress = false
+                device.setWebRtcRecoveryPending(false)
+                publish("RestartRequested", "Rebuilding WebRTC after the peer restarted")
+                startInitiatorLocked(binding)
+            }
             SignalingMessageType.CLOSE -> synchronized(lock) {
                 closeLocked()
                 device.setWebRtcRecoveryPending(false)
@@ -385,6 +437,25 @@ class WebRtcSessionCoordinator(
             closeLocked()
             device.setWebRtcRecoveryPending(false)
             recoveryInProgress = false
+        }
+        recoveryExecutor.shutdownNow()
+        fileExecutor.shutdownNow()
+    }
+
+    /**
+     * Explicit-unpair close.  This permanently disables this coordinator
+     * instance and clears all device callbacks so late peer events cannot
+     * recreate WebRTC for an untrusted device.
+     */
+    fun closeForUnpair() {
+        synchronized(lock) {
+            if (!closed) {
+                closed = true
+                closeLocked(reloadPlugins = false)
+                device.clearWebRtcBindingsForUnpair()
+                device.setWebRtcRecoveryPending(false)
+                recoveryInProgress = false
+            }
         }
         recoveryExecutor.shutdownNow()
         fileExecutor.shutdownNow()
@@ -439,7 +510,12 @@ class WebRtcSessionCoordinator(
             override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) {
                 when (type) {
                     SignalingMessageType.OFFER -> synchronized(lock) {
+                        if (closed || activeAttemptId != attemptId || activeBinding != binding) {
+                            Log.w(TAG, "Ignoring stale WebRTC offer callback")
+                            return@synchronized
+                        }
                         handover.offerSdp = payload.getString("sdp")
+                        cancelOfferWatchdogLocked()
                     }
                     SignalingMessageType.ANSWER -> synchronized(lock) {
                         handover.answerSdp = payload.getString("sdp")
@@ -1227,7 +1303,11 @@ class WebRtcSessionCoordinator(
         handover = HandoverRuntime()
         transport = createTransport(binding, attemptId, createLocalChannels = true)
         publish("CreatingOffer", null)
-        transport?.createOffer()
+        if (transport?.createOffer() == true) {
+            armOfferWatchdogLocked(binding, attemptId)
+        } else {
+            publish("Failed", "Could not start WebRTC offer creation")
+        }
     }
 
     private fun scheduleRecovery(
@@ -1239,6 +1319,7 @@ class WebRtcSessionCoordinator(
         val delay = synchronized(lock) {
             if (closed || !sessions.isCurrent(binding) || activeAttemptId != attemptId) return
             cancelDisconnectedGraceLocked()
+            cancelOfferWatchdogLocked()
             val claimed = recovery.claimDelayMillis() ?: return
             device.setWebRtcTransport(null)
             device.setWebRtcRecoveryPending(true)
@@ -1384,9 +1465,10 @@ class WebRtcSessionCoordinator(
         requireNotNull(transport) { "No active WebRTC peer connection" }
     }
 
-    private fun closeLocked() {
+    private fun closeLocked(reloadPlugins: Boolean = true) {
         cancelDisconnectedGraceLocked()
         cancelRemoteHeartbeatLocked()
+        cancelOfferWatchdogLocked()
         fileTransfers.close("WebRTC session closed")
         device.getPlugin(ScreenControlPlugin::class.java)?.clearRemoteVideoTrack()
         transport?.close(org.desklink.mobile.transport.DisconnectReason.REPLACED)
@@ -1395,7 +1477,45 @@ class WebRtcSessionCoordinator(
         activeBinding = null
         activeWireBinding = null
         handover = HandoverRuntime()
-        device.setWebRtcTransport(null)
+        device.setWebRtcTransport(null, reloadPlugins)
+    }
+
+    /** Arms one timeout for the local offer operation. Native WebRTC is
+     * asynchronous and can otherwise leave the UI permanently at
+     * "CreatingOffer" without producing a callback. */
+    private fun armOfferWatchdogLocked(binding: SessionBinding, attemptId: String) {
+        cancelOfferWatchdogLocked()
+        offerWatchdog = recoveryExecutor.schedule({
+            val timedOut = synchronized(lock) {
+                if (
+                    closed ||
+                    !sessions.isCurrent(binding) ||
+                    activeBinding != binding ||
+                    activeAttemptId != attemptId ||
+                    transport?.offerOperationState() == OfferOperationState.COMPLETED
+                ) {
+                    false
+                } else {
+                    offerWatchdog = null
+                    true
+                }
+            }
+            if (timedOut) {
+                Log.w(TAG, "WebRTC offer creation timed out")
+                publish("Failed", "Timed out while creating the WebRTC offer")
+                scheduleRecovery(
+                    binding,
+                    attemptId,
+                    "Timed out while creating the WebRTC offer",
+                    notifyPeer = false,
+                )
+            }
+        }, OFFER_CREATION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun cancelOfferWatchdogLocked() {
+        offerWatchdog?.cancel(false)
+        offerWatchdog = null
     }
 
     private fun acceptRequestId(requestId: String) = synchronized(seenRequestIds) {
@@ -1405,9 +1525,9 @@ class WebRtcSessionCoordinator(
         }
     }
 
-    private fun isEnabled(): Boolean = PreferenceManager
-        .getDefaultSharedPreferences(context)
-        .getBoolean(DeviceHelper.KEY_WEBRTC_ENABLED_PREFERENCE, true)
+    // Paired features have no LAN fallback. Disabling WebRTC would therefore
+    // disable the product while discovery still appeared connected.
+    private fun isEnabled(): Boolean = true
 
     private fun remoteAcceptsSignal(): Boolean = device.deviceInfo.incomingCapabilities
         ?.contains(DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1) == true
@@ -1431,6 +1551,18 @@ class WebRtcSessionCoordinator(
         private const val MAX_CANDIDATE_BYTES = 16 * 1024
         private const val MAX_SEEN_REQUESTS = 4096
         private const val TRANSIENT_DISCONNECT_GRACE_MILLIS = 12_000L
+        private const val OFFER_CREATION_TIMEOUT_MILLIS = 10_000L
         private const val REMOTE_HEARTBEAT_SECONDS = 10L
+
+        @JvmStatic
+        fun shouldInitiateForRestartRequest(localDeviceId: String, remoteDeviceId: String): Boolean =
+            localDeviceId < remoteDeviceId
+
+        @JvmStatic
+        fun shouldRestartAfterBootstrapReconnect(
+            localDeviceId: String,
+            remoteDeviceId: String,
+            hasActiveFeatureTransport: Boolean,
+        ): Boolean = !hasActiveFeatureTransport && localDeviceId < remoteDeviceId
     }
 }

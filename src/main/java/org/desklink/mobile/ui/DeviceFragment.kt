@@ -149,7 +149,13 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
                         removePluginsChangedListener(pluginsChangedListener)
                         unpair()
                     }
-                    (mActivity as? MainActivity)?.onDeviceSelected(null)
+                    // Let PopupWindow finish dispatching this menu click
+                    // before replacing the fragment. Replacing it inline can
+                    // leave the popup handling a stale view tree and trigger
+                    // Android's input-dispatch ANR.
+                    view?.post {
+                        (mActivity as? MainActivity)?.onDeviceSelected(null)
+                    }
                     true
                 }
             }
@@ -335,8 +341,10 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             }
 
             override fun pairingSuccessful() {
-                pairingBinding.pairMessage.announceForAccessibility(getString(R.string.pair_succeeded))
-                mActivity?.runOnUiThread { refreshUI() }
+                mActivity?.runOnUiThread {
+                    pairingBinding.pairMessage.announceForAccessibility(getString(R.string.pair_succeeded))
+                    refreshUI()
+                }
             }
 
             override fun pairingFailed(error: String) {

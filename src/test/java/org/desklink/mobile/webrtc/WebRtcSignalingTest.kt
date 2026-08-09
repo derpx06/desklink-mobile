@@ -63,4 +63,47 @@ class WebRtcSignalingTest {
             message.validateFor("phone", System.currentTimeMillis())
         }
     }
+
+    @Test
+    fun restartRequestUsesTheCrossPlatformEmptyPayloadRecord() {
+        val message = WebRtcSignalingMessage(
+            signalingVersion = 1,
+            requestId = "request-1",
+            sessionAttemptId = "restart-request-attempt",
+            fromDeviceId = "desktop",
+            toDeviceId = "phone",
+            timestamp = 1000,
+            messageType = SignalingMessageType.RESTART_REQUEST,
+            payload = JSONObject(),
+            signature = "signature",
+        )
+
+        assertEquals(
+            "1:19:request-123:restart-request-attempt7:desktop5:phone4:100015:restart_request0:",
+            String(message.canonicalBytes()),
+        )
+    }
+
+    @Test
+    fun onlyTheDeterministicInitiatorHonorsRestartRequests() {
+        assertEquals(true, WebRtcSessionCoordinator.shouldInitiateForRestartRequest("a", "b"))
+        assertEquals(false, WebRtcSessionCoordinator.shouldInitiateForRestartRequest("b", "a"))
+        assertEquals(false, WebRtcSessionCoordinator.shouldInitiateForRestartRequest("a", "a"))
+    }
+
+    @Test
+    fun bootstrapReconnectRebuildsOnlyWhenThePeerIsNotActive() {
+        assertEquals(
+            true,
+            WebRtcSessionCoordinator.shouldRestartAfterBootstrapReconnect("a", "b", false),
+        )
+        assertEquals(
+            false,
+            WebRtcSessionCoordinator.shouldRestartAfterBootstrapReconnect("b", "a", false),
+        )
+        assertEquals(
+            false,
+            WebRtcSessionCoordinator.shouldRestartAfterBootstrapReconnect("a", "b", true),
+        )
+    }
 }

@@ -4,11 +4,12 @@ package org.desklink.mobile.webrtc
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
 /**
- * The production-safe first DeskLink WebRTC feature profile.
+ * The production DeskLink WebRTC feature profile.
  *
- * Paired feature traffic has no LAN fallback.  Keep this list limited to the
- * two capabilities that are exercised by the initial cross-device handover;
- * every later feature must be added here only with its own end-to-end tests.
+ * Paired feature traffic has no LAN fallback. Keep this first production slice
+ * limited to the two handlers exercised by the current cross-platform
+ * handshake. Other packet constants remain available for later migrations but
+ * are deliberately soft-disabled from capability advertisement.
  */
 object WebRtcFeatureProfile {
     private val enabled = setOf(

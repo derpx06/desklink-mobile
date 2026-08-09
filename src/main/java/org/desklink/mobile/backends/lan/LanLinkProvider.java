@@ -90,7 +90,10 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     public void onConnectionLost(BaseLink link) {
         String deviceId = link.getDeviceId();
-        visibleDevices.remove(deviceId);
+        // A replaced socket can finish its reader after the replacement has
+        // already been installed. Do not let that stale callback remove the
+        // current bootstrap link from discovery state.
+        visibleDevices.remove(deviceId, link);
         super.onConnectionLost(link);
         if (listening) {
             ThreadHelper.execute(() -> {
@@ -219,6 +222,15 @@ public class LanLinkProvider extends BaseLinkProvider {
         return false;
     }
 
+    /**
+     * Discovery refreshes peer metadata; it must not replace a healthy
+     * bootstrap socket. Replacing that socket also replaces the session
+     * generation and would make an authenticated WebRTC peer stale.
+     */
+    static boolean shouldOpenDiscoveredBootstrap(boolean hasActiveBootstrap) {
+        return !hasActiveBootstrap;
+    }
+
     //I've received their broadcast and should connect to their TCP socket and send my identity.
     @WorkerThread
     private void udpPacketReceived(DatagramPacket packet) {
@@ -243,6 +255,15 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
         final NetworkPacket identityPacket = pair.first;
         final boolean deviceTrusted = pair.second;
+
+        final String deviceId = identityPacket.getString("deviceId");
+        if (!shouldOpenDiscoveredBootstrap(visibleDevices.containsKey(deviceId))) {
+            Log.d(
+                "DeskLink/LanLinkProvider",
+                "Keeping the active bootstrap link for " + deviceId + " after discovery refresh"
+            );
+            return;
+        }
 
         Log.i("DeskLink/LanLinkProvider", "Broadcast identity packet received from " + identityPacket.getString("deviceName"));
 

@@ -211,7 +211,13 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
     }
 
     fun unpair() {
+        if (state == PairState.NotPaired) {
+            cancelTimer()
+            Log.i("PairingHandler", "Ignoring duplicate local unpair request")
+            return
+        }
         state = PairState.NotPaired
+        cancelTimer()
         if (device.isReachable) {
             val np = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR)
             np["pair"] = false

@@ -65,13 +65,27 @@ class TransportBoundaryTest {
     }
 
     @Test
-    fun legacyLanAdapterInvokesExistingJavaLinkForControlPacket() {
+    fun legacyLanAdapterRejectsPairedFeaturePackets() {
+        val link = mockk<LanLink>()
+        every { link.deviceId } returns "phone"
+        val transport = LegacyLanTransport(link)
+        val callback = RecordingCallback()
+        val packet = NetworkPacket("desklink.ping")
+
+        transport.send(LogicalChannel.CONTROL, packet.serialize().toByteArray(), callback)
+
+        verify(exactly = 0) { link.sendPacket(any(), any(), false) }
+        assertEquals(TransportErrorCode.UNSUPPORTED_CHANNEL, callback.error?.code)
+    }
+
+    @Test
+    fun legacyLanAdapterAllowsBootstrapPackets() {
         val link = mockk<LanLink>()
         every { link.deviceId } returns "phone"
         every { link.sendPacket(any(), any(), false) } returns true
         val transport = LegacyLanTransport(link)
         val callback = RecordingCallback()
-        val packet = NetworkPacket("desklink.ping")
+        val packet = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR)
 
         transport.send(LogicalChannel.CONTROL, packet.serialize().toByteArray(), callback)
 

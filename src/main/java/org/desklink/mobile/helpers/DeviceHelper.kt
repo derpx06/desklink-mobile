@@ -148,15 +148,14 @@ object DeviceHelper {
 
     @JvmStatic
     fun getDeviceInfo(context: Context): DeviceInfo {
-        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
         val incoming = PluginFactory.incomingCapabilities.toMutableSet()
         val outgoing = PluginFactory.outgoingCapabilities.toMutableSet()
-        // Signaling is not a plugin. It is advertised only when its paired
-        // control-packet handler is enabled in this process.
-        if (preferences.getBoolean(KEY_WEBRTC_ENABLED_PREFERENCE, true)) {
-            incoming += DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
-            outgoing += DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
-        }
+        // Signaling is not a plugin. WebRTC is the mandatory paired-feature
+        // transport, so a historical disabled preference must never remove
+        // signaling from the secure identity and leave a paired device in a
+        // misleading bootstrap-only "Connected" state.
+        incoming += DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        outgoing += DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
         return DeviceInfo(
             getDeviceId(context),
             SslHelper.certificate,

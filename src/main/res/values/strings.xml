@@ -24,6 +24,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="foreground_notification_no_devices">Not connected to any device</string>
     <string name="foreground_notification_devices">Connected to: %s</string>
     <string name="foreground_notification_send_clipboard">Send Clipboard</string>
+    <string name="foreground_notification_allow_background">Allow background connection</string>
     <string name="pref_plugin_telephony">Telephony notifier</string>
     <string name="pref_plugin_telephony_desc">Send notifications for incoming calls</string>
     <string name="pref_plugin_battery">Battery report</string>

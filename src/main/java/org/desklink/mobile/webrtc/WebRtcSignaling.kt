@@ -18,7 +18,15 @@ import java.security.Signature
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
-enum class SignalingMessageType { OFFER, ANSWER, ICE_CANDIDATE, END_OF_CANDIDATES, ICE_RESTART, CLOSE }
+enum class SignalingMessageType {
+    OFFER,
+    ANSWER,
+    ICE_CANDIDATE,
+    END_OF_CANDIDATES,
+    ICE_RESTART,
+    RESTART_REQUEST,
+    CLOSE,
+}
 
 data class WebRtcSignalingMessage(
     val signalingVersion: Int,
@@ -111,6 +119,7 @@ data class WebRtcSignalingMessage(
             "sdpMLineIndex=${payload.getInt("sdpMLineIndex")}\ncandidate=${payload.getString("candidate")}"
         SignalingMessageType.END_OF_CANDIDATES,
         SignalingMessageType.ICE_RESTART,
+        SignalingMessageType.RESTART_REQUEST,
         SignalingMessageType.CLOSE -> ""
     }
 
