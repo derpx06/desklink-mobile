@@ -43,13 +43,23 @@ class MdnsDiscovery {
     }
 
     fun stopDiscovering() {
+        if (discoveryListener == null) {
+            return
+        }
         try {
-            if (discoveryListener != null) {
-                mNsdManager.stopServiceDiscovery(discoveryListener)
-                multicastLock.release()
-            }
+            mNsdManager.stopServiceDiscovery(discoveryListener)
         } catch (_: IllegalArgumentException) {
             // Ignore "listener not registered" exception
+        }
+        // Released outside the try. "listener not registered" is the normal
+        // case this catch exists for, and releasing inside it meant the lock
+        // was skipped while the listener was still cleared below. The lock is
+        // reference counted and onNetworkChange stops and starts discovery on
+        // every network change, so the count ratcheted up for the life of the
+        // process and Wi-Fi multicast filtering stayed off — a steady, silent
+        // battery drain.
+        if (multicastLock.isHeld) {
+            multicastLock.release()
         }
         discoveryListener = null
     }

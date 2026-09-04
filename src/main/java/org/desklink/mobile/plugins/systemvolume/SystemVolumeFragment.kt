@@ -94,6 +94,14 @@ class SystemVolumeFragment : BaseFragment<SystemVolumeFragmentBinding>(),
             return
         }
         plugin.removeSinkListener(this@SystemVolumeFragment)
+        // sinksChanged() adds this fragment to every individual Sink as well,
+        // and only the plugin-level listener was ever removed. Each open/back
+        // cycle therefore left another destroyed fragment attached to the
+        // sinks, and the next volume packet called requireActivity() on each
+        // detached one — throwing on the network thread, once per dead fragment.
+        for (sink in plugin.sinks) {
+            sink.removeListener(this@SystemVolumeFragment)
+        }
     }
 
     override fun sinksChanged() {

@@ -20,13 +20,25 @@ data class WebRtcEnvelope(
     val payloadLength: Int,
     val payloadBase64: String,
 ) {
-    fun validate(expectedDeviceId: String, expectedSessionId: Long, expectedGeneration: Long): ByteArray {
+    /**
+     * Checks everything except the payload itself.
+     *
+     * Split out so a caller that only needs to know the envelope belongs to
+     * this session — the replay check, which runs on every message — does not
+     * pay for a base64 decode of up to [MAX_PAYLOAD_BYTES] that the branch
+     * handling the message is about to perform anyway.
+     */
+    fun requireBoundTo(expectedDeviceId: String, expectedSessionId: Long, expectedGeneration: Long) {
         require(protocolVersion == VERSION) { "Unsupported DeskLink WebRTC envelope version" }
         require(deviceId == expectedDeviceId) { "WebRTC envelope device binding mismatch" }
         require(sessionId == expectedSessionId && connectionGeneration == expectedGeneration) {
             "WebRTC envelope generation is stale"
         }
         require(messageId.isNotEmpty() && messageType.isNotEmpty()) { "Malformed WebRTC envelope" }
+    }
+
+    fun validate(expectedDeviceId: String, expectedSessionId: Long, expectedGeneration: Long): ByteArray {
+        requireBoundTo(expectedDeviceId, expectedSessionId, expectedGeneration)
         val bytes = Base64.getDecoder().decode(payloadBase64)
         require(bytes.size == payloadLength) { "WebRTC envelope payload length mismatch" }
         require(bytes.size <= MAX_PAYLOAD_BYTES) { "WebRTC envelope payload is too large" }

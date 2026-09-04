@@ -23,6 +23,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.desklink.mobile.NetworkPacket.Payload
 import org.desklink.mobile.BuildConfig
+import org.desklink.mobile.helpers.isPrivateAddress
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -80,6 +81,9 @@ internal object AlbumArtCache {
      */
     @JvmStatic
     private val REMOTE_FETCH_SCHEMES = listOf("file", "kdeconnect")
+
+    /** Largest album art this will store. Comfortably above any real cover. */
+    private const val MAX_ALBUM_ART_BYTES = 8L * 1024 * 1024
 
     private val cacheScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -352,7 +356,15 @@ internal object AlbumArtCache {
             var bytesRead: Int
             val output = cacheItem.newOutputStream(0)
             if (inputStream != null) {
+                // Bounded. The disk cache's 5 MB limit only trims *after*
+                // commit, so an unbounded copy let a peer-chosen URL write
+                // arbitrarily many gigabytes into cacheDir first.
+                var written = 0L
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    written += bytesRead
+                    if (written > MAX_ALBUM_ART_BYTES) {
+                        throw IOException("Album art exceeds $MAX_ALBUM_ART_BYTES bytes")
+                    }
                     output.write(buffer, 0, bytesRead)
                 }
                 inputStream.close()
@@ -392,6 +404,21 @@ internal object AlbumArtCache {
      *
      * @return True if succeeded
      */
+    /**
+     * Whether [host] resolves only to addresses outside this device's own
+     * networks. Fails closed: an unresolvable host is treated as unsafe.
+     */
+    @WorkerThread
+    private fun isPubliclyRoutable(host: String?): Boolean {
+        if (host.isNullOrBlank()) return false
+        return try {
+            val addresses = java.net.InetAddress.getAllByName(host)
+            addresses.isNotEmpty() && addresses.none { isPrivateAddress(it) || it.isAnyLocalAddress }
+        } catch (_: java.net.UnknownHostException) {
+            false
+        }
+    }
+
     @WorkerThread
     private fun openHttp(url: Uri): InputStream? {
         //Default android behaviour does not follow https -> http urls, so do this manually
@@ -402,6 +429,18 @@ internal object AlbumArtCache {
         var currentUrl = URL(url.toString())
         var connection: HttpURLConnection
         loop@ for (i in 0..4) {
+            // The peer chooses this URL, so without a check the phone can be
+            // pointed at anything its own network can reach — a router admin
+            // page, a metadata endpoint, a printer — and made to issue the
+            // request from inside the LAN. Album art lives on the public
+            // internet; anything local is refused, on every redirect hop too.
+            if (!isPubliclyRoutable(currentUrl.host)) {
+                Log.w(
+                    "DeskLink/Mpris/AlbumArtCache",
+                    "Refusing to fetch album art from a non-public address",
+                )
+                return null
+            }
             connection = currentUrl.openConnection() as HttpURLConnection
             connection.connectTimeout = 10000
             connection.readTimeout = 10000

@@ -260,6 +260,10 @@ class MprisPlugin : Plugin() {
             return true
         }
 
+        // Any other mpris packet that happens to carry a payload would leave it
+        // open — a leaked descriptor and an undeleted temp file per packet.
+        np.payload?.close()
+
         if (np.has("player")) {
             val playerStatus = players[np.getString("player")]
             if (playerStatus != null) {

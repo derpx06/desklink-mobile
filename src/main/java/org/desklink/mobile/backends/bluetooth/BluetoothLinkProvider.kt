@@ -116,9 +116,20 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
 
     fun disconnectedLink(link: BluetoothLink, remoteAddress: BluetoothDevice?) {
         Log.i("BluetoothLinkProvider", "disconnectedLink called")
-        synchronized(sockets) { sockets.remove(remoteAddress) }
-        synchronized(visibleDevices) { visibleDevices.remove(link.deviceId) }
-        onConnectionLost(link)
+        // Remove by value, not by key. `addLink` installs the replacement and
+        // then disconnects the old link, which routes here — so removing by key
+        // evicted the healthy *new* link from `visibleDevices`, dropped its
+        // socket entry, and reported a connected device as lost. LanLinkProvider
+        // already gets this right with the two-argument remove.
+        synchronized(visibleDevices) {
+            if (visibleDevices[link.deviceId] === link) {
+                visibleDevices.remove(link.deviceId)
+                synchronized(sockets) { sockets.remove(remoteAddress) }
+                onConnectionLost(link)
+            } else {
+                Log.i("BluetoothLinkProvider", "Ignoring a stale disconnect for ${link.deviceId}")
+            }
+        }
     }
 
     private inner class ServerRunnable : Runnable {
@@ -179,7 +190,15 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                 throw e
             }
             try {
-                ConnectionMultiplexer(socket).use { connection ->
+                // NOT `use`. The multiplexer owns the RFCOMM socket, and the
+                // BluetoothLink created below keeps using it — closing it when
+                // this block exited tore every inbound connection down
+                // microseconds after registering it, while leaving the entry in
+                // `sockets` so the peer was never retried. It is closed here
+                // only when no link was established.
+                val connection = ConnectionMultiplexer(socket)
+                var linkEstablished = false
+                try {
                     val outputStream = connection.defaultOutputStream
                     val inputStream = connection.defaultInputStream
 
@@ -223,7 +242,12 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                             deviceInfo, this@BluetoothLinkProvider)
                     Log.i("BTLinkProvider/Server", "About to addLink")
                     addLink(identityPacket, link)
+                    linkEstablished = true
                     Log.i("BTLinkProvider/Server", "Link Added")
+                } finally {
+                    if (!linkEstablished) {
+                        connection.close()
+                    }
                 }
             } catch (e: Exception) {
                 synchronized(sockets) {

@@ -39,8 +39,12 @@ object RsaHelper {
                 keyPair = generator.generateKeyPair()
             }
             catch (e: Exception) {
-                Log.e("DeskLink/initializeRsaKeys", "Exception", e)
-                return
+                // Returning quietly left no keys stored, and the failure then
+                // resurfaced as a Base64 decode error on an empty string the
+                // first time a key was needed — far from the real cause, and
+                // after the application had already claimed to be running.
+                Log.e("DeskLink/RsaHelper", "Could not generate the device key pair", e)
+                throw IllegalStateException("DeskLink could not generate its device key pair", e)
             }
 
             val publicKey = keyPair.public.encoded

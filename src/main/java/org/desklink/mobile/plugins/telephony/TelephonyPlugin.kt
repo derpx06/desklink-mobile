@@ -144,10 +144,16 @@ class TelephonyPlugin : Plugin() {
         lastPacket = np
     }
 
+    // `ADJUST_MUTE` and `ADJUST_UNMUTE` are direction constants for
+    // `adjustStreamVolume`, not volume indices. Passing them to
+    // `setStreamVolume` made muting work by accident (`ADJUST_MUTE` is -100,
+    // which clamps to 0) while unmuting set the ring volume to `ADJUST_UNMUTE`
+    // — 100 — clamped to the device maximum. Every remotely muted call that
+    // later unmuted itself destroyed the user's ringer setting.
     private fun unmuteRinger() {
         if (isMuted) {
             val am = ContextCompat.getSystemService(context, AudioManager::class.java) ?: return
-            am.setStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_UNMUTE, 0)
+            am.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_UNMUTE, 0)
             isMuted = false
         }
     }
@@ -155,7 +161,7 @@ class TelephonyPlugin : Plugin() {
     private fun muteRinger() {
         if (!isMuted) {
             val am = ContextCompat.getSystemService(context, AudioManager::class.java) ?: return
-            am.setStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_MUTE, 0)
+            am.adjustStreamVolume(AudioManager.STREAM_RING, AudioManager.ADJUST_MUTE, 0)
             isMuted = true
         }
     }

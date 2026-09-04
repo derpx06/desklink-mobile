@@ -43,13 +43,42 @@ class ReceiveNotificationsPlugin : Plugin() {
         return true
     }
 
+    /**
+     * Power-of-two downscale factor that brings [srcWidth]x[srcHeight] to at
+     * most [targetWidth]x[targetHeight], so a hostile or merely careless icon
+     * cannot size a decode buffer.
+     */
+    private fun sampleSizeFor(
+        srcWidth: Int,
+        srcHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int,
+    ): Int {
+        if (srcWidth <= 0 || srcHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+            return 1
+        }
+        var sampleSize = 1
+        while (srcWidth / sampleSize > targetWidth || srcHeight / sampleSize > targetHeight) {
+            sampleSize *= 2
+        }
+        return sampleSize
+    }
+
     override fun onPacketReceived(np: NetworkPacket): Boolean {
+        // Both of these returned without touching the payload. Over WebRTC a
+        // payload is a FileInputStream over a temp file whose deletion happens
+        // in Payload.close(), so dropping one leaks a file descriptor *and*
+        // leaves the temp file behind. The silent case is the common one:
+        // NotificationsPlugin attaches an icon on every resync and marks it
+        // silent, so each reconnect leaked one per notification.
         if ("ticker" !in np || "appName" !in np || "id" !in np) {
             Log.e("NotificationsPlugin", "Received notification packet lacks properties")
+            np.payload?.close()
             return true
         }
 
         if (np.getBoolean("silent", false)) {
+            np.payload?.close()
             return true
         }
 
@@ -60,9 +89,36 @@ class ReceiveNotificationsPlugin : Plugin() {
         if (payload != null && payload.payloadSize != 0L) {
             val width = context.resources.getDimensionPixelSize(android.R.dimen.notification_large_icon_width)
             val height = context.resources.getDimensionPixelSize(android.R.dimen.notification_large_icon_height)
-            val input = payload.inputStream
-            largeIcon = BitmapFactory.decodeStream(input)
-            payload.close()
+            // Bounded decode. This used to hand the peer's bytes straight to
+            // decodeStream with no dimension cap, so a 20000x20000 PNG asked
+            // for a ~1.6 GB allocation and took the process down with an OOM
+            // before the payload below could even be closed.
+            //
+            // The bytes are read once into memory (payloadSize is already
+            // bounded by the transfer layer) so the bounds pass and the real
+            // decode can both see them without a second stream.
+            val encoded = try {
+                payload.inputStream?.use { it.readBytes() } ?: ByteArray(0)
+            } catch (error: Exception) {
+                Log.w("NotificationsPlugin", "Could not read a notification icon", error)
+                ByteArray(0)
+            } finally {
+                payload.close()
+            }
+
+            if (encoded.isNotEmpty()) {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(encoded, 0, encoded.size, bounds)
+                val options = BitmapFactory.Options().apply {
+                    inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, width, height)
+                }
+                largeIcon = try {
+                    BitmapFactory.decodeByteArray(encoded, 0, encoded.size, options)
+                } catch (error: OutOfMemoryError) {
+                    Log.w("NotificationsPlugin", "Notification icon too large to decode", error)
+                    null
+                }
+            }
 
             if (largeIcon != null) {
                 // Log.i("NotificationsPlugin", "hasPayload: size=${largeIcon.width}/${largeIcon.height} opti=$width/$height")

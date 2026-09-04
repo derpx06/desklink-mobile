@@ -261,14 +261,20 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="RUN_COMMAND_ACTION" />
-            </intent-filter>
 
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/remotecommandplugin_widget" />
         </receiver>
+
+        <!--
+            Not exported: it runs commands on the paired desktop, and it is
+            reached only through a PendingIntent this application creates
+            itself. See RunCommandWidgetActionReceiver.
+        -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.runcommand.RunCommandWidgetActionReceiver"
+            android:exported="false" />
 
         <activity android:name="org.desklink.mobile.plugins.runcommand.RunCommandUrlActivity"
             android:exported="true">

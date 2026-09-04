@@ -104,10 +104,25 @@ class ScreenControlPlugin : Plugin() {
                 latestStatus = np.getString("message", context.getString(R.string.remote_screen_error))
             }
             PACKET_TYPE_SCREEN_STOP -> {
-                context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
-                phoneCaptureRequested = false
+                // `screen.request` carries a `role`; `screen.stop` historically
+                // did not, so stopping either direction stopped both. Closing
+                // the desktop-screen viewer therefore killed the phone's own
+                // MediaProjection capture — which cannot resume without the
+                // user granting Android's consent dialog again.
+                //
+                // `WebRtcSessionCoordinator` already gets this right for the
+                // control-plane path by checking the previous direction; this
+                // is the same rule for the packet path. A stop with no role is
+                // an older peer, and still stops both.
+                val role = np.getString("role", "")
+                if (role != ROLE_DESKTOP_SCREEN) {
+                    context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
+                    phoneCaptureRequested = false
+                }
+                if (role != ROLE_PHONE_SCREEN) {
+                    clearRemoteVideoTrack()
+                }
                 screenSessionActive = false
-                clearRemoteVideoTrack()
                 latestStatus = ""
             }
         }

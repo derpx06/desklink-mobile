@@ -30,6 +30,7 @@ import org.apache.commons.collections4.MultiValuedMap
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap
 import org.desklink.mobile.backends.BaseLink
 import org.desklink.mobile.backends.BaseLink.PacketReceiver
+import org.desklink.mobile.backends.lan.LanLink
 import org.desklink.mobile.DeviceInfo.Companion.loadFromSettings
 import org.desklink.mobile.DeviceStats.countReceived
 import org.desklink.mobile.DeviceStats.countSent
@@ -461,7 +462,49 @@ class Device : PacketReceiver {
         remoteInputPacketPreparer = preparer
     }
 
+    /**
+     * Whether a link may speak for this device.
+     *
+     * The LAN transport proves this during its TLS handshake, by installing the
+     * stored pairing certificate as the only trust anchor. No other transport
+     * does: [org.desklink.mobile.backends.bluetooth.BluetoothLink] takes the
+     * peer's certificate straight out of the identity packet it was handed.
+     *
+     * [dispatchPacket] has no link parameter, so once a link is attached
+     * nothing downstream can tell a pinned socket from an unpinned one — an
+     * unauthenticated peer reached `desklink.pair`, and could unpair this
+     * device and destroy its stored certificate with a single packet. The check
+     * therefore belongs here, where every present and future transport passes.
+     */
+    private fun linkSpeaksForThisDevice(link: BaseLink): Boolean {
+        if (!isPaired) {
+            // Unpaired devices have no certificate to check against yet; the
+            // pairing exchange itself is what establishes one.
+            return true
+        }
+        if (!TrustedDevices.isCertificateStored(context, deviceId)) {
+            // Paired with no stored certificate is the desync SslHelper guards
+            // against. Refuse rather than fall back to trusting the peer.
+            return false
+        }
+        return runCatching {
+            TrustedDevices.getDeviceCertificate(context, deviceId) == link.deviceInfo.certificate
+        }.getOrDefault(false)
+    }
+
     fun addLink(link: BaseLink) {
+        if (!linkSpeaksForThisDevice(link)) {
+            Log.e(
+                "DeskLink/Device",
+                "Rejected a ${link.name} link for $deviceId: its certificate does not match the pairing record",
+            )
+            runCatching { link.disconnect() }
+                .onFailure { error ->
+                    Log.w("DeskLink/Device", "Could not close a rejected ${link.name} link", error)
+                }
+            return
+        }
+
         // A provider owns one current link for a device. Drop a stale link
         // from the same provider before adding the replacement; otherwise a
         // later pairing request can iterate an already-closed socket first
@@ -586,6 +629,10 @@ class Device : PacketReceiver {
 
     private fun dispatchPacket(np: NetworkPacket, fromWebRtc: Boolean) {
         countReceived(deviceId, np.type)
+        Log.d(
+            "DeskLink/Inbound",
+            "${np.type} from $deviceId (webrtc=$fromWebRtc, links=${links.size})",
+        )
 
         val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
             np.type == NetworkPacket.PACKET_TYPE_PAIR ||
@@ -595,14 +642,32 @@ class Device : PacketReceiver {
             np.payload?.close()
             return
         }
-        if (fromWebRtc && !bootstrapPacket && !WebRtcFeatureProfile.allows(np.type)) {
-            Log.w("DeskLink/WebRTC", "Rejected feature outside the active WebRTC profile: ${np.type}")
+        // A feature packet from a peer this side no longer trusts means the peer
+        // missed our unpair — tell it, before any other filtering drops the
+        // packet, so a peer that only ever sends non-profile types is still
+        // corrected.
+        //
+        // Restricted to `NotPaired` on purpose. `Requested` and
+        // `RequestedByPeer` are an in-flight negotiation, not a stale peer:
+        // acting on them would cancel a pairing prompt the user is looking at
+        // and report a failure they did not cause.
+        if (!bootstrapPacket && pairStatus == PairingHandler.PairState.NotPaired) {
+            pairingHandler.notifyPeerNotPaired()
+        }
+        // The feature profile applies to every transport, not only WebRTC.
+        // Gating it on `fromWebRtc` meant that once LAN began carrying features
+        // before handover, it accepted packet types the profile excludes —
+        // `desklink.sms.request`, `desklink.telephony.request`,
+        // `desklink.screen.request` and the rest — and handed them straight to
+        // their plugins.
+        if (!bootstrapPacket && !WebRtcFeatureProfile.allows(np.type)) {
+            Log.w("DeskLink/Device", "Rejected feature outside the active profile: ${np.type}")
             np.payload?.close()
             return
         }
-        // Paired feature traffic is WebRTC-only even while handover is still
-        // incomplete. LAN remains restricted to bootstrap packets so features
-        // cannot silently downgrade to a different transport.
+        // Paired feature traffic moves to WebRTC once the handover completes.
+        // Until then the pinned-TLS bootstrap link carries it, so the product
+        // still works on a network where ICE cannot establish.
         if (shouldRejectPairedLanFeaturePacket(
                 fromWebRtc = fromWebRtc,
                 paired = isPaired,
@@ -650,14 +715,11 @@ class Device : PacketReceiver {
             reloadPluginsFromSettings()
         }
 
-        if (!isPaired) {
-            // If it is pair packet, it should be captured by "if" at start
-            // If not and device is paired, it should be captured by isPaired
-            // Else unpair, this handles the situation when one device unpairs,
-            // but other don't know like unpairing when wi-fi is off.
-
-            unpair()
-        }
+        // The unpair self-heal for a peer that missed our unpair — one device
+        // unpairing while the other is off Wi-Fi — now runs earlier, before the
+        // feature-profile filter, so a peer sending only non-profile types is
+        // still told. `unpair()` is idempotent, so nothing is lost by it having
+        // already run for this packet.
 
         // The following code when `isPaired == false` is NOT USED.
         // It adds support for receiving packets from not trusted devices,
@@ -826,13 +888,65 @@ class Device : PacketReceiver {
         if (isPaired && !bootstrapPacket) {
             val activeTransport = readyTransport
             if (activeTransport == null) {
-                val error = IllegalStateException(
-                    "DeskLink WebRTC feature transport is not ready; paired features are not sent over LAN",
-                )
-                callback.onFailure(error)
-                np.payload?.close()
-                countSent(deviceId, np.type, false)
-                return false
+                // The authenticated WebRTC transport is not up yet. Fall back to
+                // the pinned-TLS bootstrap link rather than dropping the packet:
+                // it is the same mutually authenticated peer, and without this
+                // every paired feature was dead until ICE completed — which on a
+                // network with no reachable STUN/TURN never happened.
+                if (np.payload != null) {
+                    val error = IllegalStateException(
+                        "Payload-bearing ${np.type} requires the WebRTC file channel",
+                    )
+                    callback.onFailure(error)
+                    np.payload?.close()
+                    countSent(deviceId, np.type, false)
+                    return false
+                }
+                // Remote input carries a generation-bound lease that only the
+                // WebRTC coordinator can mint. Falling back without it would let
+                // anyone drive the desktop simply by acting before ICE finished.
+                if (
+                    np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
+                    np.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
+                ) {
+                    callback.onFailure(
+                        IllegalStateException(
+                            "DeskLink remote control requires the authenticated WebRTC transport",
+                        ),
+                    )
+                    countSent(deviceId, np.type, false)
+                    return false
+                }
+                // ONLY the TLS LAN link. `links` can also hold a BluetoothLink,
+                // which writes plaintext over RFCOMM with no certificate
+                // pinning — and this path now carries clipboard contents,
+                // notification bodies, and the SFTP credentials in
+                // `desklink.sftp`. Those must never leave the device unencrypted.
+                val secureLinks = links.filterIsInstance<LanLink>()
+                if (secureLinks.isEmpty()) {
+                    // Nothing ran, so nothing has resolved the caller's
+                    // callback. Every other path is resolved by
+                    // `BaseLink.sendPacket` itself, which reports its own
+                    // failures — calling `onFailure` again there would deliver
+                    // the result twice.
+                    callback.onFailure(
+                        IllegalStateException(
+                            "DeskLink has no encrypted transport for ${np.type}",
+                        ),
+                    )
+                    countSent(deviceId, np.type, false)
+                    return false
+                }
+                val sent = secureLinks.any { link ->
+                    try {
+                        link.sendPacket(np, callback, sendPayloadFromSameThread)
+                    } catch (e: IOException) {
+                        Log.w("DeskLink/sendPacket", "Failed to send packet over LAN", e)
+                        false
+                    }
+                }
+                countSent(deviceId, np.type, sent)
+                return sent
             }
             if (np.payload != null) {
                 val error = IllegalStateException(
@@ -1069,13 +1183,19 @@ class Device : PacketReceiver {
 /**
  * LAN is allowed for paired feature packets only during the authenticated
  * transition to WebRTC.  It becomes bootstrap-only after WebRTC handover.
+ *
+ * The `webRtcFeatureTransportReady` argument used to be accepted and then
+ * ignored, so LAN was rejected unconditionally and the comment above described
+ * behaviour the code never had. Since the LAN link is mutually authenticated
+ * with pinned certificates, refusing it before handover left the product with
+ * no working transport at all whenever ICE could not complete.
  */
 internal fun shouldRejectPairedLanFeaturePacket(
     fromWebRtc: Boolean,
     paired: Boolean,
     bootstrapPacket: Boolean,
     webRtcFeatureTransportReady: Boolean,
-): Boolean = !fromWebRtc && paired && !bootstrapPacket
+): Boolean = !fromWebRtc && paired && !bootstrapPacket && webRtcFeatureTransportReady
 
-/** Paired feature sends are allowed only on the authenticated WebRTC transport. */
+/** Paired feature sends prefer the authenticated WebRTC transport when it is up. */
 internal fun webRtcFeatureTransportShouldHandlePacket(ready: Boolean): Boolean = ready

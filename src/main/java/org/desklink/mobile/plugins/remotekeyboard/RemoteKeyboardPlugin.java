@@ -172,7 +172,10 @@ public class RemoteKeyboardPlugin extends Plugin implements SharedPreferences.On
 
     @Override
     public @NonNull String[] getOutgoingPacketTypes() {
-        return new String[]{PACKET_TYPE_MOUSEPAD_ECHO, PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE};
+        // `keyboardstate` is not advertised because it is no longer sent — see
+        // notifyKeyboardState. Advertising a type nothing emits makes the
+        // capability exchange a description of intentions rather than of code.
+        return new String[]{PACKET_TYPE_MOUSEPAD_ECHO};
     }
 
     private boolean isValidSpecialKey(int key) {
@@ -399,11 +402,24 @@ public class RemoteKeyboardPlugin extends Plugin implements SharedPreferences.On
         return true;
     }
 
+    /**
+     * Records that the remote-keyboard IME appeared or disappeared.
+     *
+     * Deliberately does not transmit. This used to send
+     * {@code desklink.mousepad.keyboardstate} to the desktop on every IME
+     * visibility change, but nothing on the desktop consumes it: the packet
+     * type is not in {@code DESKTOP_INCOMING}, so the dispatcher refused it and
+     * logged an error every single time the keyboard opened or closed. It is
+     * not in {@code WebRtcFeatureProfile.enabled} either, so it could never
+     * have travelled over the feature transport at all.
+     *
+     * The call sites are kept because they are the correct hooks. If the
+     * desktop ever grows a consumer — the natural one is knowing whether the
+     * phone will accept typed input — restore the send here and add the type to
+     * both capability lists together, as a paired edit.
+     */
     public void notifyKeyboardState(boolean state) {
-        Log.d("RemoteKeyboardPlugin", "Keyboardstate changed to " + state);
-        NetworkPacket np = new NetworkPacket(PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE);
-        np.set("state", state);
-        getDevice().sendPacket(np);
+        Log.d("RemoteKeyboardPlugin", "Keyboardstate changed to " + state + " (not transmitted: no desktop consumer)");
     }
 
     String getDeviceId() {

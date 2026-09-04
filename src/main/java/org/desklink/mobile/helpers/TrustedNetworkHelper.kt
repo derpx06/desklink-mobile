@@ -31,8 +31,16 @@ class TrustedNetworkHelper(private val context: Context) {
                 }
         }
 
+    /**
+     * What the user chose, independent of whether it can currently be enforced.
+     *
+     * This used to return `true` whenever location permission was missing, so
+     * revoking that permission silently turned an SSID allowlist into "trust
+     * every network" while the settings screen still displayed the allowlist.
+     * Enforceability is handled in [isTrustedNetwork], which now fails closed.
+     */
     var allNetworksAllowed: Boolean
-        get() = !hasPermissions || PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_CUSTOM_TRUST_ALL_NETWORKS, true)
+        get() = PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_CUSTOM_TRUST_ALL_NETWORKS, true)
         set(value) = PreferenceManager.getDefaultSharedPreferences(context).edit {
                 putBoolean(KEY_CUSTOM_TRUST_ALL_NETWORKS, value)
             }
@@ -58,7 +66,24 @@ class TrustedNetworkHelper(private val context: Context) {
         }
 
     val isTrustedNetwork: Boolean
-        get() = this.allNetworksAllowed || this.currentSSID in this.trustedNetworks
+        get() {
+            if (allNetworksAllowed) {
+                return true
+            }
+            // The user restricted this to named networks. Without location
+            // permission the SSID cannot be read, so the restriction cannot be
+            // evaluated — refuse rather than trusting everything, which is what
+            // previously offered pairing prompts on public Wi-Fi to a user who
+            // had explicitly allowlisted only their home network.
+            if (!hasPermissions) {
+                Log.w(
+                    "TrustedNetworkHelper",
+                    "Trusted networks are configured but location permission is missing; treating this network as untrusted",
+                )
+                return false
+            }
+            return currentSSID in trustedNetworks
+        }
 
     companion object {
         private const val KEY_CUSTOM_TRUSTED_NETWORKS = "trusted_network_preference"

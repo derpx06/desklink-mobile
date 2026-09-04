@@ -89,7 +89,11 @@ public class TelephonyHelper {
             digitCount += count;
         }
         if (maybeNumber.length() > digitCount*4) {
-            Log.d(LOGGING_TAG, "Discarding " + maybeNumber + " because it does not contain a high enough digit ratio to be a real phone number");
+            // The candidate itself is deliberately not logged. This is the SIM's
+            // own number, proguard-rules.pro does not strip Log calls, and a bug
+            // report or any process with log access would carry it verbatim.
+            Log.d(LOGGING_TAG, "Discarding a candidate of length " + maybeNumber.length()
+                    + " because its digit ratio is too low to be a real phone number");
             return null;
         } else {
             return new LocalPhoneNumber(maybeNumber, -1);

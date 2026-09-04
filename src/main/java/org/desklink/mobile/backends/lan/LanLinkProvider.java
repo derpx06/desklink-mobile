@@ -7,7 +7,7 @@
 package org.desklink.mobile.backends.lan;
 
 import static org.desklink.mobile.helpers.NetworkHelperKt.isPrivateAddress;
-import static main.java.org.desklink.mobile.helpers.BoundedLineReaderKt.readLineBounded;
+import static org.desklink.mobile.helpers.BoundedLineReaderKt.readLineBounded;
 
 import android.content.Context;
 import android.net.Network;
@@ -67,6 +67,8 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     final static int MAX_IDENTITY_PACKET_SIZE = 1024 * 512;
     final static int MAX_UDP_PACKET_SIZE = 1024 * 512;
+    /** How long to wait before rebuilding a UDP socket that errored. */
+    final static long UDP_RECOVERY_DELAY_MILLIS = 1000L;
 
     final static long MILLIS_DELAY_BETWEEN_CONNECTIONS_TO_SAME_DEVICE = 1000L;
 
@@ -83,7 +85,7 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     private final MdnsDiscovery mdnsDiscovery;
 
-    private long lastBroadcast = 0;
+    private volatile long lastBroadcast = 0;
     private final static long delayBetweenBroadcasts = 200;
 
     private boolean listening = false;
@@ -155,6 +157,8 @@ public class LanLinkProvider extends BaseLinkProvider {
             Log.i("LanLinkProvider", "Discarding TCP packet from a non-local IP");
             return;
         }
+
+        configureSocket(socket);
 
         if (rateLimitByIp(address)) {
             Log.i("LanLinkProvider", "Discarding second TCP packet from the same ip " + address + " received too quickly");
@@ -296,11 +300,29 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
     }
 
+    /**
+     * Applies the socket options every device link needs.
+     *
+     * This must be called on accepted sockets as well as sockets we open. It
+     * previously ran only on the outgoing path, so a link the desktop
+     * established to this device had no keepalive at all and a vanished peer
+     * was never detected — the link simply sat there looking healthy.
+     *
+     * Java cannot tune the keepalive interval, so the operating system default
+     * applies here; the desktop client sets an aggressive interval on its side,
+     * which is what actually detects a dead link quickly.
+     */
     private void configureSocket(Socket socket) {
         try {
             socket.setKeepAlive(true);
         } catch (SocketException e) {
-            Log.e("LanLink", "Exception", e);
+            Log.e("DeskLink/LanLinkProvider", "Could not enable TCP keepalive", e);
+        }
+        try {
+            // Feature packets are small and latency-sensitive.
+            socket.setTcpNoDelay(true);
+        } catch (SocketException e) {
+            Log.e("DeskLink/LanLinkProvider", "Could not disable Nagle buffering", e);
         }
     }
 
@@ -459,7 +481,26 @@ public class LanLinkProvider extends BaseLinkProvider {
                     });
                 } catch (IOException e) {
                     Log.e("LanLinkProvider", "UdpReceive exception", e);
-                    onNetworkChange(null); // Trigger a UDP broadcast to try to get them to connect to us instead
+                    // Rebuild the socket instead of retrying it. An errored
+                    // DatagramSocket keeps failing immediately, and this used
+                    // to loop straight back with no backoff and no teardown —
+                    // pegging a core while calling onNetworkChange(null), which
+                    // disconnected every LAN link, several times a second and
+                    // forever. udpServer was never cleared either, so the
+                    // `udpServer == null` recovery in onNetworkChange could
+                    // never fire.
+                    try { udpServer.close(); } catch (Exception ignored) {}
+                    udpServer = null;
+                    if (listening) {
+                        try {
+                            Thread.sleep(UDP_RECOVERY_DELAY_MILLIS);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                        setupUdpListener();
+                    }
+                    return;
                 }
             }
             Log.w("UdpListener", "Stopping UDP listener");
@@ -614,12 +655,6 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     @Override
     public void onNetworkChange(@Nullable Network network) {
-        if (System.currentTimeMillis() < lastBroadcast + delayBetweenBroadcasts) {
-            Log.i("LanLinkProvider", "onNetworkChange: relax cowboy");
-            return;
-        }
-        lastBroadcast = System.currentTimeMillis();
-
         if (udpServer == null) {
             setupUdpListener();
         }
@@ -627,10 +662,24 @@ public class LanLinkProvider extends BaseLinkProvider {
         // A socket bound to the previous interface will not recover merely
         // because discovery broadcasts are sent again. Close it now so the
         // device layer can establish one fresh authenticated link.
+        //
+        // Deliberately ahead of the rate limiter. Android delivers network
+        // callbacks in bursts — a VPN coming up while Wi-Fi flaps — and
+        // throttling this too meant the callback that actually moved the
+        // interface could be the one dropped, leaving sockets bound to a dead
+        // interface that nothing ever closed. Clearing twice is harmless; the
+        // second pass has nothing left to disconnect.
         for (LanLink link : visibleDevices.values()) {
             link.disconnect();
         }
         visibleDevices.clear();
+
+        // Only the outbound churn is throttled.
+        if (System.currentTimeMillis() < lastBroadcast + delayBetweenBroadcasts) {
+            Log.i("LanLinkProvider", "onNetworkChange: relax cowboy");
+            return;
+        }
+        lastBroadcast = System.currentTimeMillis();
 
         broadcastUdpIdentityPacket(network);
         synchronized (mdnsDiscovery) {

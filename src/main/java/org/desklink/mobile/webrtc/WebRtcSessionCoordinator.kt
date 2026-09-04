@@ -45,6 +45,7 @@ class WebRtcSessionCoordinator(
 ) : Device.ControlPacketHandler {
     private val lock = Any()
     private val seenRequestIds = LinkedHashSet<String>()
+    private val seenEnvelopeIds = LinkedHashSet<String>()
     private var activeAttemptId: String? = null
     private var activeBinding: SessionBinding? = null
     private var activeWireBinding: WebRtcWireBinding? = null
@@ -368,6 +369,61 @@ class WebRtcSessionCoordinator(
                 }
                 val sdp = requiredString(message.payload, "sdp", MAX_SDP_BYTES)
                 synchronized(lock) {
+                    // An attempt ID is random and carries no ordering, so a
+                    // second offer while one is already installed can only be a
+                    // delayed or duplicated record. Tearing the peer down for it
+                    // discarded a healthy connection; the desktop has always
+                    // rejected this case and Android now matches.
+                    val active = activeAttemptId
+                    if (active == message.sessionAttemptId) {
+                        // A repeated offer for the attempt already installed is
+                        // ignored rather than re-applied.
+                        //
+                        // Re-applying is not safe here. If our answer round is
+                        // still in flight, the pending `setLocalDescription`
+                        // would land against a changed remote description and
+                        // libwebrtc reports that as a set failure, which routes
+                        // into `scheduleRecovery` and tears down a negotiation
+                        // that was about to succeed. If the round has finished,
+                        // a second answer changes `handover.answerSdp`, and that
+                        // SDP is hashed into the authentication transcript both
+                        // peers sign — so re-applying after authentication would
+                        // invalidate a completed handover.
+                        //
+                        // The desktop does not produce this case: its
+                        // `request_local_description` gates offer creation on a
+                        // one-shot flag, so it emits exactly one offer per peer.
+                        Log.i(TAG, "Ignoring a repeated offer for the current WebRTC attempt")
+                        return@synchronized
+                    }
+                    // Reject a stale offer only when it arrives on the SAME
+                    // session generation that already owns an attempt.
+                    //
+                    // The desktop clears its attempt whenever a bootstrap socket
+                    // is replaced, so a legitimate restart always reaches it on a
+                    // fresh generation with nothing installed. This side keeps
+                    // its attempt across a socket replacement when the transport
+                    // still looks healthy, so without the generation check a
+                    // restarted desktop was refused until our own ICE timeout
+                    // and grace window had elapsed — tens of seconds of the
+                    // desktop retrying blind.
+                    //
+                    // A new offer on a new generation is itself the evidence:
+                    // the peer only offers a new attempt when it has no peer.
+                    // Replay cannot exploit this — `acceptRequestId` above
+                    // rejects a repeated request ID, and the ID is covered by
+                    // the signature.
+                    val sameGeneration = activeBinding?.let {
+                        it.sessionId == binding.sessionId &&
+                            it.connectionGeneration == binding.connectionGeneration
+                    } == true
+                    require(
+                        active == null ||
+                            !sameGeneration ||
+                            transport?.isReadyForPackets() != true,
+                    ) {
+                        "Rejected a stale WebRTC offer for a replaced attempt"
+                    }
                     closeLocked()
                     activeAttemptId = message.sessionAttemptId
                     activeBinding = binding
@@ -528,6 +584,23 @@ class WebRtcSessionCoordinator(
             override fun onEnvelope(envelope: WebRtcEnvelope) {
                 runCatching {
                     require(sessions.isCurrent(binding)) { "Stale DeskLink session" }
+                    // Bind the envelope to the current wire before recording its
+                    // ID, so a message that was never entitled to this session
+                    // cannot burn an identifier. This deliberately does NOT
+                    // decode the payload: `validate` base64-decodes up to 128 KB,
+                    // and every branch below decodes again to obtain its bytes —
+                    // doing it here too would double the cost of every file
+                    // chunk on the network callback thread.
+                    val wire = requireNotNull(synchronized(lock) { activeWireBinding }) {
+                        "No active DeskLink WebRTC wire binding"
+                    }
+                    envelope.requireBoundTo(wire.peerDeviceId, wire.sessionId, wire.generation)
+                    // Accept each authenticated envelope exactly once. The
+                    // desktop has always enforced this; without the matching
+                    // check here a duplicated or replayed data-channel message
+                    // was applied again, and the input-realtime channel is
+                    // unordered so duplicates are not merely theoretical.
+                    acceptEnvelopeId(attemptId, envelope.messageId)
                     if (
                         envelope.channel == WebRtcChannel.CONTROL.label &&
                         envelope.messageType == WebRtcHandoverControlMessage.MESSAGE_TYPE
@@ -1524,6 +1597,28 @@ class WebRtcSessionCoordinator(
             seenRequestIds.iterator().run { next(); remove() }
         }
     }
+
+    /**
+     * Records a data-channel envelope ID, rejecting a repeat.
+     *
+     * The attempt ID is part of the key rather than a scalar the cache is reset
+     * on. Two transports are briefly alive during a peer replacement — the old
+     * peer's callbacks are not stopped synchronously — so a single "current
+     * attempt" field was flipped back and forth by interleaved envelopes and
+     * cleared the whole set on nearly every message. That defeated replay
+     * protection precisely during the window it exists to cover.
+     *
+     * `LinkedHashSet` eviction is oldest-first, so a recently seen ID is never
+     * dropped ahead of an old one.
+     */
+    private fun acceptEnvelopeId(attemptId: String, messageId: String) =
+        synchronized(seenEnvelopeIds) {
+            require(messageId.isNotEmpty()) { "WebRTC envelope has no message ID" }
+            require(seenEnvelopeIds.add("$attemptId|$messageId")) { "Replayed WebRTC envelope" }
+            while (seenEnvelopeIds.size > MAX_SEEN_REQUESTS) {
+                seenEnvelopeIds.iterator().run { next(); remove() }
+            }
+        }
 
     // Paired features have no LAN fallback. Disabling WebRTC would therefore
     // disable the product while discovery still appeared connected.

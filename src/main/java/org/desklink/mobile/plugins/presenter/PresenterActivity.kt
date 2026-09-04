@@ -104,7 +104,26 @@ class PresenterActivity : AppCompatActivity(), SensorEventListener, OnSharedPref
         createMediaSession()
     }
 
+    /**
+     * Backstop for any way the pointer gesture can end without a touch event
+     * reaching the button. `SensorManager` holds a strong reference to this
+     * Activity, so a stuck registration both leaks it and keeps streaming
+     * pointer packets to the desktop that the user cannot see they are sending.
+     */
+    private fun releasePointer() {
+        (getSystemService(SENSOR_SERVICE) as? SensorManager)?.unregisterListener(this)
+        if (::plugin.isInitialized) {
+            plugin.stopPointer()
+        }
+    }
+
+    override fun onPause() {
+        releasePointer()
+        super.onPause()
+    }
+
     override fun onDestroy() {
+        releasePointer()
         mediaSession?.release()
         super.onDestroy()
     }
@@ -234,7 +253,13 @@ class PresenterActivity : AppCompatActivity(), SensorEventListener, OnSharedPref
                                         )
                                     }
 
-                                    MotionEvent.ACTION_UP -> {
+                                    // ACTION_CANCEL matters as much as ACTION_UP:
+                                    // a call arriving or the user swiping Home
+                                    // mid-gesture delivers CANCEL, and handling
+                                    // only UP left the gyroscope registered and
+                                    // pointer packets streaming to the desktop
+                                    // while the app was in the background.
+                                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                                         sensorManager.unregisterListener(this@PresenterActivity)
                                         plugin.stopPointer()
                                         false

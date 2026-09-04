@@ -35,6 +35,12 @@ import java.security.cert.CertificateException
 class DeviceTest {
     private val context: Context = mockk()
 
+    /** Temporary stand-in for the app's private data directory. */
+    private lateinit var appDir: java.io.File
+
+    /** A per-device plugin preferences file that unpairing must clear. */
+    private lateinit var stalePluginPrefs: java.io.File
+
     // Creating a paired device before each test case
     @Before
     fun setUp() {
@@ -85,6 +91,20 @@ class DeviceTest {
         // Store an untrusted device
         val untrustedSettings = MockSharedPreference()
         every { context.getSharedPreferences("unpairedTestDevice", Context.MODE_PRIVATE) } returns untrustedSettings
+
+        // Unpairing clears every `<deviceId>_<plugin>_preferences` file, which
+        // means enumerating the app's shared_prefs directory. Point the context
+        // at a real temporary one and plant a stale file, so the cleanup is
+        // exercised rather than silently skipped.
+        appDir = java.nio.file.Files.createTempDirectory("desklink-device-test").toFile()
+        java.io.File(appDir, "files").mkdirs()
+        val sharedPrefsDir = java.io.File(appDir, "shared_prefs")
+        sharedPrefsDir.mkdirs()
+        stalePluginPrefs = java.io.File(sharedPrefsDir, deviceId + "_ping_preferences.xml")
+        stalePluginPrefs.writeText("<map/>")
+        every { context.filesDir } returns java.io.File(appDir, "files")
+        every { context.getSharedPreferences(deviceId + "_ping_preferences", Context.MODE_PRIVATE) } returns
+            MockSharedPreference()
 
         mockkStatic(PreferenceManager::class)
         val defaultSettings = MockSharedPreference()
@@ -257,5 +277,17 @@ class DeviceTest {
         Assert.assertFalse(TrustedDevices.isTrustedDevice(context, device.deviceId))
 
         verify(exactly = 1) { pairingCallback.unpaired(device) }
+
+        // Unpairing must also clear per-device plugin settings. It used to clear
+        // the trust flag and the device record but leave every
+        // `<deviceId>_<plugin>_preferences` file behind, so a device that later
+        // re-paired silently inherited whatever features had been enabled or
+        // denied before it was removed. The stale file planted in setUp proves
+        // the enumeration finds it; clearing is a `SharedPreferences` edit, so
+        // the observable effect is that the file's preferences were opened to be
+        // cleared at all.
+        verify {
+            context.getSharedPreferences("testDevice_ping_preferences", Context.MODE_PRIVATE)
+        }
     }
 }

@@ -601,50 +601,72 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
     }
 
+    /**
+     * Routes strictly on `np.type`.
+     *
+     * This used to be a chain of body-field tests with only the first arm
+     * type-checked, so the action taken had nothing to do with the packet type
+     * declared. A `desklink.notification.request` carrying `requestReplyId` and
+     * `message` **sent a reply** — firing a messaging app's reply intent — and a
+     * `desklink.notification.reply` carrying `cancel` dismissed a notification.
+     * A peer picked which side effect to trigger purely by choosing body keys.
+     */
     override fun onPacketReceived(np: NetworkPacket): Boolean {
-        if (np.type == PACKET_TYPE_NOTIFICATION_ACTION) {
-            val key = np.getString("key")
-            val title = np.getString("action")
-            var intent: PendingIntent? = null
+        when (np.type) {
+            PACKET_TYPE_NOTIFICATION_ACTION -> triggerNotificationAction(np)
 
-            for (a in pendingActions.get(key)) {
-                if (a.title == title) {
-                    intent = a.actionIntent
-                    break
+            // A request either asks for a full resync or dismisses one
+            // notification; both spellings have always arrived on this type.
+            PACKET_TYPE_NOTIFICATION_REQUEST -> when {
+                np.has("cancel") -> dismissNotification(np.getString("cancel"))
+                np.getBoolean("request") -> if (serviceReady) {
+                    NotificationReceiver.RunCommand(context) { service ->
+                        this.sendCurrentNotifications(service)
+                    }
                 }
             }
 
-            if (intent != null) {
-                try {
-                    intent.send()
-                } catch (e: PendingIntent.CanceledException) {
-                    Log.e(TAG, "Triggering action failed", e)
+            PACKET_TYPE_NOTIFICATION_CANCEL -> dismissNotification(np.getString("id"))
+
+            PACKET_TYPE_NOTIFICATION_REPLY -> {
+                if (np.has("requestReplyId") && np.has("message")) {
+                    replyToNotification(np.getString("requestReplyId"), np.getString("message"))
                 }
             }
-        } else if (np.getBoolean("request")) {
-            if (serviceReady) {
-                NotificationReceiver.RunCommand(context) { service ->
-                    this.sendCurrentNotifications(service)
-                }
-            }
-        } else if (np.has("cancel") || np.type == PACKET_TYPE_NOTIFICATION_CANCEL) {
-            val dismissedId = if (np.type == PACKET_TYPE_NOTIFICATION_CANCEL) {
-                np.getString("id")
-            } else {
-                np.getString("cancel")
-            }
-            synchronized(notificationDeliveryLock) {
-                currentNotifications.remove(dismissedId)
-                notificationsIcons.remove(dismissedId)
-            }
-            NotificationReceiver.RunCommand(context) { service ->
-                service.cancelNotification(dismissedId)
-            }
-        } else if (np.has("requestReplyId") && np.has("message")) {
-            replyToNotification(np.getString("requestReplyId"), np.getString("message"))
         }
 
         return true
+    }
+
+    private fun triggerNotificationAction(np: NetworkPacket) {
+        val key = np.getString("key")
+        val title = np.getString("action")
+        var intent: PendingIntent? = null
+
+        for (a in pendingActions.get(key)) {
+            if (a.title == title) {
+                intent = a.actionIntent
+                break
+            }
+        }
+
+        if (intent != null) {
+            try {
+                intent.send()
+            } catch (e: PendingIntent.CanceledException) {
+                Log.e(TAG, "Triggering action failed", e)
+            }
+        }
+    }
+
+    private fun dismissNotification(dismissedId: String) {
+        synchronized(notificationDeliveryLock) {
+            currentNotifications.remove(dismissedId)
+            notificationsIcons.remove(dismissedId)
+        }
+        NotificationReceiver.RunCommand(context) { service ->
+            service.cancelNotification(dismissedId)
+        }
     }
 
     override val permissionExplanationDialog: DialogFragment

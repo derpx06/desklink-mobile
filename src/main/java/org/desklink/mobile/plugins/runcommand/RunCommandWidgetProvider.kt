@@ -51,26 +51,12 @@ class RunCommandWidgetProvider : AppWidgetProvider() {
         super.onDisabled(context)
     }
 
-    override fun onReceive(context: Context, intent: Intent) {
-        Log.d("WidgetProvider", "onReceive " + intent.action)
-
-        if (intent.action == RUN_COMMAND_ACTION) {
-            val targetCommand = intent.getStringExtra(TARGET_COMMAND)
-            val targetDevice = intent.getStringExtra(TARGET_DEVICE)
-            val plugin = DeskLinkApplication.getInstance().getDevicePlugin(targetDevice, RunCommandPlugin::class.java)
-            if (plugin != null) {
-                try {
-                    plugin.runCommand(targetCommand)
-                } catch (ex: Exception) {
-                    Log.e("RunCommandWidget", "Error running command", ex)
-                }
-            } else {
-                Log.w("RunCommandWidget", "Device not available or runcommand plugin disabled")
-            }
-        } else {
-            super.onReceive(context, intent)
-        }
-    }
+    // `RUN_COMMAND_ACTION` is deliberately NOT handled here. This provider is
+    // exported so the system can deliver `APPWIDGET_UPDATE`, and an exported
+    // receiver can be addressed explicitly by any application whatever its
+    // intent filters say — so running commands from here handed every app on
+    // the phone a way to execute arbitrary commands on the paired desktop.
+    // It lives in the non-exported `RunCommandWidgetActionReceiver` instead.
 }
 
 fun getAllWidgetIds(context : Context) : IntArray {
@@ -184,7 +170,7 @@ private fun assignListAdapter(context: Context, appWidgetId: Int, views: RemoteV
  * See [RemoteViews.setOnClickFillInIntent].
  */
 private fun assignListIntent(context: Context, appWidgetId: Int, views: RemoteViews) {
-    val runCommandTemplateIntent = Intent(context, RunCommandWidgetProvider::class.java)
+    val runCommandTemplateIntent = Intent(context, RunCommandWidgetActionReceiver::class.java)
     runCommandTemplateIntent.action = RUN_COMMAND_ACTION
     runCommandTemplateIntent.putExtra(EXTRA_APPWIDGET_ID, appWidgetId)
     // Needs to be mutable because the launcher will modify it to indicate which command was selected

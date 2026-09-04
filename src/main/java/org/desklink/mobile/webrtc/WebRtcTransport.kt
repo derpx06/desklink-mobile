@@ -134,6 +134,12 @@ class WebRtcTransport(
         val configuration = PeerConnection.RTCConfiguration(iceServers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+            // Must match the desktop, which sets webrtcbin's bundle-policy to
+            // max-bundle. libwebrtc defaults to BALANCED, so a data channel plus
+            // a video m-line negotiated two ICE components and two DTLS
+            // handshakes instead of one — slower to connect and one more thing
+            // that can fail on a hostile network.
+            bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
         }
         peer = factory.createPeerConnection(configuration, PeerObserver())
             ?: error("Unable to create DeskLink WebRTC peer connection")
