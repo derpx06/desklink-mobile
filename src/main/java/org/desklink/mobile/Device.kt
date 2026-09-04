@@ -98,6 +98,23 @@ class Device : PacketReceiver {
     @Volatile
     private var webRtcRecoveryPending: Boolean = false
 
+    /**
+     * Packet types that ride the pinned-TLS bootstrap link rather than the
+     * feature transport, and are therefore exempt from the feature profile and
+     * from pairing-state filtering.
+     *
+     * One definition on purpose. This list was written out three separate times
+     * — in dispatch, in `sendBootstrapPacket` and in `sendPacketBlocking` — and
+     * a type added to one copy but not the others is silently accepted on
+     * receive and refused on send, or the reverse. Adding the heartbeat is
+     * exactly the change that would have drifted.
+     */
+    private fun isBootstrapPacketType(type: String): Boolean =
+        type == NetworkPacket.PACKET_TYPE_IDENTITY ||
+            type == NetworkPacket.PACKET_TYPE_PAIR ||
+            type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1 ||
+            type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT
+
     fun interface PayloadPacketHandler {
         fun sendPayload(packet: NetworkPacket, callback: SendPacketStatusCallback): Boolean
     }
@@ -634,12 +651,41 @@ class Device : PacketReceiver {
             "${np.type} from $deviceId (webrtc=$fromWebRtc, links=${links.size})",
         )
 
-        val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
-            np.type == NetworkPacket.PACKET_TYPE_PAIR ||
-            np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        val bootstrapPacket = isBootstrapPacketType(np.type)
         if (fromWebRtc && bootstrapPacket) {
             Log.w("DeskLink/WebRTC", "Rejected bootstrap packet on the WebRTC feature path")
             np.payload?.close()
+            return
+        }
+        // A heartbeat is liveness and nothing else. Answered here and returned,
+        // *before* any of the filtering below, because falling through would
+        // reach notifyPeerNotPaired and tell a perfectly healthy desktop it was
+        // unpaired once every ten seconds -- the mechanism that keeps links
+        // alive turned into one that tears pairings down.
+        //
+        // The reply is what makes the desktop's own silence budget survive an
+        // idle link: it probes when it has heard nothing, and this is what it
+        // hears.
+        if (np.type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT) {
+            if (!fromWebRtc) {
+                sendBootstrapPacket(
+                    NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT),
+                    // Best effort. A failure here means the link is already
+                    // gone, which the desktop's own silence budget will reach
+                    // the same conclusion about a few seconds later.
+                    object : SendPacketStatusCallback() {
+                        override fun onSuccess() = Unit
+                        override fun onFailure(e: Throwable) {
+                            Log.d("DeskLink/Heartbeat", "Could not answer a heartbeat", e)
+                        }
+                    },
+                )
+                // A heartbeat proves the bootstrap link works *right now*, which
+                // makes it the right moment to check that WebRTC exists at all.
+                // Idempotent when a transport is already live.
+                runCatching { DeskLinkApplication.getInstance().onBootstrapHealthy(deviceId) }
+                    .onFailure { Log.d("DeskLink/Heartbeat", "No coordinator to nudge", it) }
+            }
             return
         }
         // A feature packet from a peer this side no longer trusts means the peer
@@ -798,9 +844,7 @@ class Device : PacketReceiver {
      */
     @AnyThread
     fun sendBootstrapPacket(np: NetworkPacket, callback: SendPacketStatusCallback): Boolean {
-        val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
-            np.type == NetworkPacket.PACKET_TYPE_PAIR ||
-            np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        val bootstrapPacket = isBootstrapPacketType(np.type)
         if (!bootstrapPacket) {
             callback.onFailure(IllegalArgumentException("Only DeskLink bootstrap packets may use LAN"))
             return false
@@ -827,9 +871,7 @@ class Device : PacketReceiver {
         // is exchanged before the WebRTC feature profile is confirmed, so it
         // must not be rejected merely because the peer does not advertise it
         // as an ordinary plugin capability.
-        val bootstrapPacket = np.type == NetworkPacket.PACKET_TYPE_IDENTITY ||
-            np.type == NetworkPacket.PACKET_TYPE_PAIR ||
-            np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        val bootstrapPacket = isBootstrapPacketType(np.type)
         if (!bootstrapPacket && !supportsPacketType(np.type)) {
             Log.e("DeskLink/sendPacket", "Tried to send an unsupported packet type ${np.type} to: ${deviceInfo.name}")
             callback.onFailure(IllegalArgumentException("Unsupported packet type ${np.type}"))

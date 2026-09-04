@@ -13,6 +13,22 @@ object DeskLinkProtocol {
 
     const val PACKET_TYPE_IDENTITY = "desklink.identity"
     const val PACKET_TYPE_PAIR = "desklink.pair"
+
+    /**
+     * Liveness probe for the pinned-TLS bootstrap link.
+     *
+     * **The desktop initiates; this device answers.** Deliberately asymmetric.
+     * If both ends probed only when their *inbound* side went quiet they would
+     * deadlock into silence: each other's probe would refresh the listener, so
+     * neither would ever send, and each would then declare the other dead.
+     * One initiator and one responder removes that entirely, and the mains-
+     * powered side is the right one to carry the timer.
+     *
+     * Answering also keeps `LanLink`'s 120s idle reaper from tearing down a
+     * link the desktop still believes in — which is one half of the livelock
+     * this exists to end.
+     */
+    const val PACKET_TYPE_HEARTBEAT = "desklink.heartbeat"
     const val PACKET_TYPE_PING = "desklink.ping"
     const val PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request"
     const val PACKET_TYPE_MOUSEPAD_ECHO = "desklink.mousepad.echo"

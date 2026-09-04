@@ -58,6 +58,26 @@ class DeskLinkApplication : Application() {
     private val legacyLanBindings = ConcurrentHashMap<BaseLink, SessionBinding>()
     private val webRtcCoordinators = ConcurrentHashMap<String, WebRtcSessionCoordinator>()
 
+    /**
+     * The bootstrap link to this device is known-healthy right now, so make sure
+     * a WebRTC session exists.
+     *
+     * Called on every heartbeat, which is the point. WebRTC previously started
+     * only on a *reconnect* — so a link that came up once and then stayed up
+     * had exactly one chance, and if that attempt was lost the session sat in
+     * "Connecting" forever with every WebRTC-gated feature dead. Waiting for the
+     * desktop's `restart_request` was no better: it is one packet, unacked, and
+     * observed not to arrive.
+     *
+     * `onBootstrapReconnected` is idempotent — it returns immediately when a
+     * feature transport is already live — so calling it repeatedly costs a map
+     * lookup and a boolean, and turns the heartbeat into a self-healing tick
+     * rather than only a liveness probe.
+     */
+    fun onBootstrapHealthy(deviceId: String) {
+        webRtcCoordinators[deviceId]?.onBootstrapReconnected()
+    }
+
     private val deviceListChangedCallbacks = ConcurrentHashMap<String, DeviceListChangedCallback>()
 
     override fun onCreate() {
