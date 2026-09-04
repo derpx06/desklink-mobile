@@ -35,13 +35,35 @@ import java.util.concurrent.atomic.AtomicReference
 enum class WebRtcPeerHealth { CONNECTED, DISCONNECTED, FAILED, CLOSED }
 
 /**
- * The initial feature handover is deliberately data-channel only.  Offering
- * an idle Android screen track before the user requests sharing makes some
- * native peers negotiate a malformed, codec-less video answer.  Screen media
- * is added only by the explicit screen-session negotiation path.
+ * The screen track is attached up front, in both roles, so a video m-line
+ * exists from the first exchange.
+ *
+ * This was `false`, on the reasoning that offering an idle track made "some
+ * native peers negotiate a malformed, codec-less video answer", and that screen
+ * media would instead be added by "the explicit screen-session negotiation
+ * path". **That path was never built**, and the flag guarded the only
+ * `addTrack` in the app — so the phone captured pixels into a track attached to
+ * no sender and no video could ever leave it. That is the blank mirror.
+ *
+ * Adding media later is not a smaller change, it is a much larger one:
+ * `onRenegotiationNeeded` is a no-op, a second offer for a live attempt is
+ * refused, and only the deterministic initiator may offer — so a phone that
+ * wanted to start sharing had no way to ask. Negotiating an idle m-line up
+ * front avoids renegotiation entirely.
+ *
+ * Attaching in **both** roles is deliberate. As offerer this puts video in the
+ * offer; as answerer it associates the track with the transceiver `webrtcbin`
+ * auto-creates from the desktop's `sendrecv` offer, which previously went
+ * unanswered and left the phone `recvonly`. Since the initiator is chosen by
+ * device-id comparison, fixing only one role would leave roughly half of all
+ * device pairs unable to mirror.
+ *
+ * The original concern is real but unverified against our only peer. It is
+ * tested directly against `webrtcbin` rather than assumed — see the P0 gate in
+ * the mirroring plan.
  */
 internal object WebRtcMediaNegotiationPolicy {
-    const val includeScreenTrackInInitialOffer = false
+    const val includeScreenTrackInInitialOffer = true
 }
 
 /** State of one local SDP offer operation. A peer must never have two offers
@@ -390,6 +412,20 @@ class WebRtcTransport(
     fun restartIce() = peer.restartIce()
 
     @Synchronized
+    /**
+     * Rounds a capture dimension down to a multiple of 16.
+     *
+     * Android MediaCodec encoders want 16-pixel alignment
+     * ([bugs.webrtc.org/13089]); vendor implementations variously crash, add a
+     * green stripe down the edge, or silently pad. A 1080-wide phone is the
+     * common case and **1080 is not a multiple of 16** — 1080/16 = 67.5. The
+     * resulting 1080 → 1072 loses 0.7% of width and is invisible, which is a
+     * good trade against a device-specific encoder failure.
+     *
+     * Applied to both axes because rotation swaps them.
+     */
+    private fun align16(value: Int): Int = value and 0xF.inv()
+
     fun startScreenCapture(
         permissionData: Intent,
         width: Int = 1280,
@@ -419,8 +455,8 @@ class WebRtcTransport(
         try {
             capturer.initialize(helper, context, videoSource.capturerObserver)
             capturer.startCapture(
-                width.coerceIn(320, 1920),
-                height.coerceIn(240, 1920),
+                align16(width.coerceIn(320, 1920)),
+                align16(height.coerceIn(240, 1920)),
                 fps.coerceIn(1, 30),
             )
         } catch (error: Throwable) {

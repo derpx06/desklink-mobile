@@ -203,9 +203,25 @@ class WebRtcSessionCoordinator(
             require(active.isReadyForPackets()) {
                 "DeskLink WebRTC screen transport is not ready"
             }
-            active.startScreenCapture(permissionData)
-            val remoteSessionId = remoteSession.markScreenReady(WebRtcScreenDirection.PHONE_TO_DESKTOP)
             val display = context.resources.displayMetrics
+            // Capture at the phone's real shape, not the 1280x720 landscape
+            // default. A portrait phone captured into a 16:9 landscape surface
+            // arrives squashed and letterboxed, and the desktop was
+            // simultaneously being told the screen was 1080x2400 in
+            // `screen-ready` below — so the geometry it mapped taps against did
+            // not describe the pixels it was shown.
+            //
+            // The reported geometry stays the *logical* screen size on purpose:
+            // the desktop scales between the decoded video's real dimensions
+            // and this, so 16-pixel alignment shaving a few columns off the
+            // capture does not have to be modelled on both sides.
+            active.startScreenCapture(
+                permissionData,
+                width = display.widthPixels,
+                height = display.heightPixels,
+                fps = 30,
+            )
+            val remoteSessionId = remoteSession.markScreenReady(WebRtcScreenDirection.PHONE_TO_DESKTOP)
             @Suppress("DEPRECATION")
             val rotation = (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
                 ?.defaultDisplay
