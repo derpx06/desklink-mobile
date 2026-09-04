@@ -161,8 +161,14 @@ class WebRtcTransport(
     override val state: TransportState get() = stateRef.get()
 
     private fun installChannel(channel: DataChannel) {
-        require(WebRtcChannel.fromLabel(channel.label()) != null) {
-            "Unknown DeskLink WebRTC data channel: ${channel.label()}"
+        // Refused, not thrown. This runs inside onDataChannel on libwebrtc's
+        // native callback thread, where an exception takes the process down
+        // rather than being reported -- so an unrecognised label from the
+        // desktop must not be a `require`.
+        if (WebRtcChannel.fromLabel(channel.label()) == null) {
+            Log.w("DeskLink/WebRTC", "Ignoring unknown data channel: ${channel.label()}")
+            runCatching { channel.close() }
+            return
         }
         channels[channel.label()] = channel
         channel.registerObserver(object : DataChannel.Observer {
@@ -174,10 +180,16 @@ class WebRtcTransport(
                 }
             }
             override fun onMessage(buffer: DataChannel.Buffer) {
+                // Everything stays inside the runCatching. `Result.onSuccess`
+                // is inline and does **not** catch, so the require and the
+                // validate below used to throw straight out of onMessage into
+                // libwebrtc's native callback thread -- a crash, not a
+                // rejection. A stale-generation envelope arriving during a
+                // peer replacement was enough to trigger it, which is exactly
+                // when it is most likely to happen.
                 runCatching {
                     val bytes = ByteArray(buffer.data.remaining()).also { buffer.data.get(it) }
-                    WebRtcEnvelope.fromJson(String(bytes, Charsets.UTF_8))
-                }.onSuccess { envelope ->
+                    val envelope = WebRtcEnvelope.fromJson(String(bytes, Charsets.UTF_8))
                     require(envelope.channel == channel.label()) {
                         "WebRTC envelope channel does not match its data channel"
                     }

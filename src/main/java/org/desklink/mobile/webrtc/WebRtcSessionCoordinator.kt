@@ -574,6 +574,17 @@ class WebRtcSessionCoordinator(
                         cancelOfferWatchdogLocked()
                     }
                     SignalingMessageType.ANSWER -> synchronized(lock) {
+                        // Same staleness guard the OFFER branch above has, and
+                        // for a sharper reason: answerSdp is hashed into the
+                        // signed authentication transcript. A late createAnswer
+                        // callback from a torn-down transport overwrote the new
+                        // attempt's answer, so the two peers computed different
+                        // transcripts, every signature verification failed, and
+                        // the handover froze there permanently.
+                        if (closed || activeAttemptId != attemptId || activeBinding != binding) {
+                            Log.w(TAG, "Ignoring stale WebRTC answer callback")
+                            return@synchronized
+                        }
                         handover.answerSdp = payload.getString("sdp")
                     }
                     else -> Unit
@@ -1412,6 +1423,19 @@ class WebRtcSessionCoordinator(
                 if (activeAttemptId == attemptId) closeLocked()
             }
             if (DeviceHelper.getDeviceId(context) >= device.deviceId) {
+                // The responder never schedules an initiation, so it has to
+                // release the single-slot claim here -- the initiator's release
+                // lives inside the scheduled block below, which this return
+                // never reaches.
+                //
+                // Returning with the claim still held left `scheduled` true
+                // forever, so every later claimDelayMillis() returned null and
+                // scheduleRecovery bailed at its early return -- *after* having
+                // already cancelled the disconnect grace and the offer
+                // watchdog. The responder became a permanent no-op on failure,
+                // holding a power lease, waiting for an offer that nothing
+                // would ever prompt.
+                recovery.release()
                 publish("WaitingForRecoveryOffer", null)
                 return@execute
             }
@@ -1451,6 +1475,18 @@ class WebRtcSessionCoordinator(
             }
             disconnectedGraceAttemptId = attemptId
             device.setWebRtcRecoveryPending(true)
+            // A rebuild may still be coming, so the session must be retained
+            // for the whole grace window.
+            //
+            // Without this the window protected nothing. ICE DISCONNECTED has
+            // already forced TransportState.FAILED, so isReadyForPackets() is
+            // false throughout -- and shouldRetainSessionAfterBootstrapLoss()
+            // is `recoveryInProgress || (binding current && transport ready)`.
+            // Both halves false meant that if the LAN socket dropped in the
+            // same Wi-Fi blip, the coordinator and its peer were destroyed 12
+            // seconds before the grace timer this function exists to arm would
+            // ever have fired.
+            recoveryInProgress = true
             disconnectedGrace = recoveryExecutor.schedule({
                 val recover = synchronized(lock) {
                     if (
