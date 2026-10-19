@@ -9,6 +9,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Termux's emulator/renderer declare minSdk 24 but use no API above 23 (verified by
+         source audit); the app supports 23. The PTY JNI part is excluded, see build.gradle.kts. -->
+    <uses-sdk tools:overrideLibrary="com.termux.terminal,com.termux.view" />
+
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
@@ -35,6 +39,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required for any LAN traffic once targetSdk reaches 37 (Android 17);
+         ignored by older releases. Declared now so the upgrade can't silently
+         cut discovery, the TLS link and WebRTC host candidates. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
@@ -201,6 +209,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:label="@string/findmyphone_title"
             android:launchMode="singleInstance" />
 
+        <!-- Pairing notification actions. Not exported: no other app may accept or reject a pairing. -->
+        <receiver
+            android:name="org.desklink.mobile.PairingActionReceiver"
+            android:exported="false" />
+
         <receiver android:name="org.desklink.mobile.plugins.findmyphone.FindMyPhoneReceiver"
             android:exported="true">
             <intent-filter>
@@ -305,12 +318,29 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.mousepad.MousePadActivity"
             android:label="@string/pref_plugin_mousepad"
             android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize|stateHidden"
             android:launchMode="singleTop"
             android:parentActivityName="org.desklink.mobile.ui.MainActivity">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="org.desklink.mobile.ui.MainActivity" />
         </activity>
+        <activity
+            android:name="org.desklink.mobile.plugins.terminal.TerminalActivity"
+            android:label="@string/terminal_title"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden"
+            android:windowSoftInputMode="adjustResize"
+            android:parentActivityName="org.desklink.mobile.ui.MainActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="org.desklink.mobile.ui.MainActivity" />
+        </activity>
+        <receiver
+            android:name="org.desklink.mobile.plugins.terminal.TerminalAttentionReceiver"
+            android:exported="false" />
         <activity
             android:name="org.desklink.mobile.plugins.mousepad.ComposeSendActivity"
             android:label="@string/compose_send_title"

@@ -41,7 +41,6 @@ public class MouseReceiverService extends AccessibilityService {
     private Handler runHandler;
     private Runnable hideRunnable;
     private GestureDescription.StrokeDescription swipeStoke;
-    private double scrollSum;
 
     @Override
     public void onCreate() {
@@ -272,24 +271,62 @@ public class MouseReceiverService extends AccessibilityService {
     }
 
 
+    /** Phone pixels a scroll unit moves the content: the desktop sends 3
+     * units per wheel notch, and a notch should move about a line of text. */
+    private static final float SCROLL_PIXELS_PER_UNIT = 30f;
+    /** Wheel events arriving within this window become one swipe: each new
+     * gesture cancels the one in progress, so a swipe per event stuttered. */
+    private static final long SCROLL_BATCH_MS = 50;
+    private float pendingScrollX;
+    private float pendingScrollY;
+    private boolean scrollFlushScheduled;
+
+    /**
+     * Scrolls where the pointer is, by a finger swipe as long as the wheel
+     * moved. It used to wait for 500 units (some 170 wheel notches) and then
+     * jump a whole page in whichever scrollable node a tree walk found first —
+     * on a phone being controlled from the desktop, scrolling barely worked.
+     */
     public static boolean scroll(int dx, int dy) {
         if (instance == null) return false;
+        final MouseReceiverService service = instance;
+        service.pendingScrollX += dx;
+        service.pendingScrollY += dy;
+        if (!service.scrollFlushScheduled) {
+            service.scrollFlushScheduled = true;
+            new Handler(service.getMainLooper()).postDelayed(service::flushScroll, SCROLL_BATCH_MS);
+        }
+        return true;
+    }
 
-        instance.scrollSum += dy;
-        if (Math.signum(dy) != Math.signum(instance.scrollSum)) instance.scrollSum = dy;
-        if (Math.abs(instance.scrollSum) < 500) return false;
-        instance.scrollSum = 0;
+    private void flushScroll() {
+        scrollFlushScheduled = false;
+        float dx = pendingScrollX * SCROLL_PIXELS_PER_UNIT;
+        float dy = pendingScrollY * SCROLL_PIXELS_PER_UNIT;
+        pendingScrollX = 0;
+        pendingScrollY = 0;
+        if (dx == 0 && dy == 0) return;
+        DisplayMetrics metrics = new DisplayMetrics();
+        windowManager.getDefaultDisplay().getRealMetrics(metrics);
+        float startX = clamp(getX(), 1, metrics.widthPixels - 2);
+        float startY = clamp(getY(), 1, metrics.heightPixels - 2);
+        // Wheel up (positive dy) shows earlier content: the finger moves down.
+        float endX = clamp(startX + dx, 1, metrics.widthPixels - 2);
+        float endY = clamp(startY + dy, 1, metrics.heightPixels - 2);
+        Path path = new Path();
+        path.moveTo(startX, startY);
+        path.lineTo(endX, endY);
+        float distance = (float) Math.hypot(endX - startX, endY - startY);
+        if (distance < 1) return;
+        // Slow enough not to fling: the content moves by the swipe, not more.
+        long duration = Math.max(60, (long) (distance / 1.5f));
+        dispatchGesture(new GestureDescription.Builder()
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))
+                .build(), null, null);
+    }
 
-        AccessibilityNodeInfo scrollable = instance.findNodeByAciton(instance.getRootInActiveWindow(),
-                dy > 0 ? AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD
-                        : AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD);
-
-        if (scrollable == null) return false;
-
-        return scrollable.performAction(dy > 0
-                ? AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD.getId()
-                : AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD.getId()
-        );
+    private static float clamp(float value, float low, float high) {
+        return Math.max(low, Math.min(high, value));
     }
 
     // https://codelabs.developers.google.com/codelabs/developing-android-a11y-service/#6

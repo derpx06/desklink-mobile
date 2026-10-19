@@ -90,7 +90,7 @@ class DeviceTest {
 
         // Store an untrusted device
         val untrustedSettings = MockSharedPreference()
-        every { context.getSharedPreferences("unpairedTestDevice", Context.MODE_PRIVATE) } returns untrustedSettings
+        every { context.getSharedPreferences("_da179a91_f064_478e_be8c_1935d7544d54_", Context.MODE_PRIVATE) } returns untrustedSettings
 
         // Unpairing clears every `<deviceId>_<plugin>_preferences` file, which
         // means enumerating the app's shared_prefs directory. Point the context
@@ -204,7 +204,9 @@ class DeviceTest {
     @Throws(CertificateException::class)
     fun testPairingDone() {
         val fakeNetworkPacket = NetworkPacket(NetworkPacket.PACKET_TYPE_IDENTITY)
-        val deviceId = "unpairedTestDevice"
+        // The certificate below is issued to this id (its CN); an unpaired
+        // link must present a certificate for the id it claims.
+        val deviceId = "_da179a91_f064_478e_be8c_1935d7544d54_"
         fakeNetworkPacket["deviceId"] = deviceId
         fakeNetworkPacket["deviceName"] = "Unpaired Test Device"
         fakeNetworkPacket["protocolVersion"] = DeviceHelper.PROTOCOL_VERSION

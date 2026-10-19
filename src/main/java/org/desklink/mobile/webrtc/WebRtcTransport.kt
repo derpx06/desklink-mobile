@@ -19,8 +19,10 @@ import org.desklink.mobile.NetworkPacket
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
+import org.webrtc.MediaStreamTrack
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
+import org.webrtc.RtpParameters
 import org.webrtc.ScreenCapturerAndroid
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
@@ -62,6 +64,21 @@ enum class WebRtcPeerHealth { CONNECTED, DISCONNECTED, FAILED, CLOSED }
  * tested directly against `webrtcbin` rather than assumed — see the P0 gate in
  * the mirroring plan.
  */
+/** Sort key for the screen codecs: H.264 (constrained baseline, non-interleaved
+ * first — what every hardware encoder and desktop decoder handles), then the
+ * rest in libwebrtc's order. `sortedBy` is stable, so ties keep that order. */
+internal fun h264Rank(codec: org.webrtc.RtpCapabilities.CodecCapability): Int {
+    if (!codec.name.equals("H264", ignoreCase = true)) return 3
+    val params = codec.parameters.orEmpty()
+    val nonInterleaved = params["packetization-mode"] == "1"
+    val baseline = params["profile-level-id"]?.startsWith("42e0", ignoreCase = true) == true
+    return when {
+        nonInterleaved && baseline -> 0
+        nonInterleaved -> 1
+        else -> 2
+    }
+}
+
 internal object WebRtcMediaNegotiationPolicy {
     const val includeScreenTrackInInitialOffer = true
 }
@@ -174,9 +191,36 @@ class WebRtcTransport(
                 peer.createDataChannel(channel.label, init)?.also { installChannel(it) }
             }
         }
+        if (org.desklink.mobile.BuildConfig.DEBUG) startInboundStatsLog()
         if (WebRtcMediaNegotiationPolicy.includeScreenTrackInInitialOffer) {
-            peer.addTrack(videoTrack, listOf("desklink-screen"))
+            val sender = peer.addTrack(videoTrack, listOf("desklink-screen"))
+            preferHardwareH264(sender)
         }
+    }
+
+    /**
+     * Puts H.264 first when this phone can **encode** it. libwebrtc offers its
+     * software codecs first, so the screen went out as software VP8 even on
+     * phones with a hardware H.264 encoder — and hardware VP8 is rare (a
+     * Snapdragon 6-series has none). On Android 10+ libwebrtc only offers
+     * H.264 for sending when `MediaCodecInfo.isHardwareAccelerated()`, so a
+     * phone without one keeps its current order and stays on VP8. Receive
+     * capabilities are what `setCodecPreferences` accepts; VP8 stays in the
+     * list because the desktop sends VP8.
+     */
+    private fun preferHardwareH264(sender: org.webrtc.RtpSender?) {
+        sender ?: return
+        runCatching {
+            val canEncodeH264 = factory
+                .getRtpSenderCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)
+                .codecs.any { it.name.equals("H264", ignoreCase = true) }
+            if (!canEncodeH264) return
+            val transceiver = peer.transceivers.firstOrNull { it.sender.id() == sender.id() } ?: return
+            val codecs = factory
+                .getRtpReceiverCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)
+                .codecs
+            transceiver.setCodecPreferences(codecs.sortedBy { h264Rank(it) })
+        }.onFailure { Log.w(TAG, "Could not prefer H.264 for the screen", it) }
     }
 
     override val transportType: TransportType = TransportType.WEBRTC
@@ -411,7 +455,6 @@ class WebRtcTransport(
 
     fun restartIce() = peer.restartIce()
 
-    @Synchronized
     /**
      * Rounds a capture dimension down to a multiple of 16.
      *
@@ -454,15 +497,131 @@ class WebRtcTransport(
         activeScreenCaptureEpoch = captureEpoch
         try {
             capturer.initialize(helper, context, videoSource.capturerObserver)
+            // Scale proportionally so the long side is at most 1280. Clamping
+            // each side separately squashed a tall phone (2400 → 1920 high,
+            // width untouched), and encoding the full panel cost twice the
+            // bandwidth and encoder time for no gain on a desktop window.
+            val scale = minOf(1.0, MAX_CAPTURE_LONG_SIDE.toDouble() / maxOf(width, height, 1))
             capturer.startCapture(
-                align16(width.coerceIn(320, 1920)),
-                align16(height.coerceIn(240, 1920)),
+                align16((width * scale).toInt().coerceAtLeast(240)),
+                align16((height * scale).toInt().coerceAtLeast(240)),
                 fps.coerceIn(1, 30),
             )
         } catch (error: Throwable) {
             releaseScreenCaptureLocked(stopCapture = true)
             throw error
         }
+        configureScreenSender(fps.coerceIn(1, 30))
+        if (org.desklink.mobile.BuildConfig.DEBUG) startScreenStatsLog()
+    }
+
+    /**
+     * The desktop's screen track on this peer, as libwebrtc announced it.
+     *
+     * Kept from `onAddTrack` rather than fetched with `peer.transceivers`:
+     * every `getTransceivers()` call disposes the wrappers the previous call
+     * returned, and disposing a `VideoTrack` wrapper detaches all its
+     * renderers — a picture that decodes and is never drawn.
+     */
+    @Volatile
+    private var announcedRemoteTrack: org.webrtc.VideoTrack? = null
+
+    fun remoteVideoTrack(): org.webrtc.VideoTrack? = announcedRemoteTrack
+
+    private var screenStatsTimer: java.util.Timer? = null
+    private var inboundStatsTimer: java.util.Timer? = null
+    private val debugFramesAtTrack = java.util.concurrent.atomic.AtomicLong()
+
+    /** Debug builds: the desktop's screen as this phone receives it, every
+     * 2 s while packets arrive — "waiting for the first picture" otherwise
+     * gives no hint whether nothing arrives or nothing decodes. */
+    private fun startInboundStatsLog() {
+        var lastPackets = -1L
+        inboundStatsTimer = java.util.Timer("DeskLink-inbound-stats", true).apply {
+            schedule(object : java.util.TimerTask() {
+                override fun run() {
+                    runCatching {
+                        peer.getStats { report ->
+                            val inbound = report.statsMap.values.firstOrNull {
+                                it.type == "inbound-rtp" && it.members["kind"] == "video"
+                            } ?: return@getStats
+                            val m = inbound.members
+                            val packets = (m["packetsReceived"] as? Number)?.toLong() ?: 0L
+                            if (packets == lastPackets) return@getStats
+                            lastPackets = packets
+                            val codec = (m["codecId"] as? String)?.let { report.statsMap[it]?.members?.get("mimeType") }
+                            Log.i(
+                                TAG,
+                                "inbound-stats codec=$codec decoder=${m["decoderImplementation"]} " +
+                                    "packets=$packets lost=${m["packetsLost"]} framesReceived=${m["framesReceived"]} " +
+                                    "framesDecoded=${m["framesDecoded"]} keyFramesDecoded=${m["keyFramesDecoded"]} " +
+                                    "framesDropped=${m["framesDropped"]} nack=${m["nackCount"]} pli=${m["pliCount"]} " +
+                                    "size=${m["frameWidth"]}x${m["frameHeight"]} framesAtTrack=${debugFramesAtTrack.get()}",
+                            )
+                        }
+                    }
+                }
+            }, 2_000, 2_000)
+        }
+    }
+
+    /** Debug builds: one line every 2 s of what the screen sender is doing —
+     * the only way to see why libwebrtc holds frames back on a real network. */
+    private fun startScreenStatsLog() {
+        screenStatsTimer?.cancel()
+        screenStatsTimer = java.util.Timer("DeskLink-screen-stats", true).apply {
+            schedule(object : java.util.TimerTask() {
+                override fun run() {
+                    runCatching {
+                        peer.getStats { report ->
+                            val out = report.statsMap.values.firstOrNull {
+                                it.type == "outbound-rtp" && it.members["kind"] == "video"
+                            }?.members ?: return@getStats
+                            val pair = report.statsMap.values.firstOrNull {
+                                it.type == "candidate-pair" && it.members["nominated"] == true &&
+                                    it.members["state"] == "succeeded"
+                            }?.members
+                            val source = report.statsMap.values.firstOrNull {
+                                it.type == "media-source" && it.members["kind"] == "video"
+                            }?.members
+                            Log.i(
+                                TAG,
+                                "screen-stats encoder=${out["encoderImplementation"]} " +
+                                    "srcFps=${source?.get("framesPerSecond")} encFps=${out["framesPerSecond"]} " +
+                                    "framesEncoded=${out["framesEncoded"]} framesSent=${out["framesSent"]} " +
+                                    "target=${out["targetBitrate"]} availOut=${pair?.get("availableOutgoingBitrate")} " +
+                                    "rtt=${pair?.get("currentRoundTripTime")} limit=${out["qualityLimitationReason"]} " +
+                                    "nack=${out["nackCount"]} pli=${out["pliCount"]} fir=${out["firCount"]} " +
+                                    "keyframes=${out["keyFramesEncoded"]} packets=${out["packetsSent"]} " +
+                                    "retx=${out["retransmittedPacketsSent"]} " +
+                                    "sendDelay=${out["totalPacketSendDelay"]} size=${out["frameWidth"]}x${out["frameHeight"]}",
+                            )
+                        }
+                    }
+                }
+            }, 2_000, 2_000)
+        }
+    }
+
+    /**
+     * libwebrtc otherwise starts the screen at ~300 kbps with no ceiling and
+     * takes seconds to look sharp. Its congestion control still adapts inside
+     * these bounds; screen content prefers keeping text readable (drop frames
+     * before resolution).
+     */
+    private fun configureScreenSender(fps: Int) {
+        runCatching { peer.setBitrate(MIN_SCREEN_BITRATE, START_SCREEN_BITRATE, MAX_SCREEN_BITRATE) }
+        val sender = peer.senders.firstOrNull { it.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND } ?: return
+        runCatching {
+            val parameters = sender.parameters
+            parameters.degradationPreference = RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+            parameters.encodings.forEach { encoding ->
+                encoding.minBitrateBps = MIN_SCREEN_BITRATE
+                encoding.maxBitrateBps = MAX_SCREEN_BITRATE
+                encoding.maxFramerate = fps
+            }
+            sender.parameters = parameters
+        }.onFailure { Log.w(TAG, "Could not set screen sender parameters", it) }
     }
 
     /**
@@ -500,6 +659,8 @@ class WebRtcTransport(
 
     /** Caller holds this instance monitor. */
     private fun releaseScreenCaptureLocked(stopCapture: Boolean) {
+        screenStatsTimer?.cancel()
+        screenStatsTimer = null
         val capturer = screenCapturer
         val helper = screenTextureHelper
         screenCapturer = null
@@ -514,6 +675,7 @@ class WebRtcTransport(
         val previous = stateRef.getAndSet(TransportState.CLOSING)
         if (previous == TransportState.CLOSED || previous == TransportState.CLOSING) return
         stopScreenCapture()
+        inboundStatsTimer?.cancel()
         videoTrack.dispose()
         videoSource.dispose()
         channels.values.forEach(DataChannel::dispose)
@@ -563,7 +725,26 @@ class WebRtcTransport(
         override fun onDataChannel(dataChannel: DataChannel) = installChannel(dataChannel)
         override fun onRenegotiationNeeded() = Unit
         override fun onAddTrack(receiver: org.webrtc.RtpReceiver, mediaStreams: Array<out org.webrtc.MediaStream>) {
-            (receiver.track() as? VideoTrack)?.let(observer::onRemoteVideoTrack)
+            Log.i(TAG, "onAddTrack ${receiver.track()?.kind()} streams=${mediaStreams.size}")
+            (receiver.track() as? VideoTrack)?.let(::announceRemoteTrack)
+        }
+
+        // Unified Plan's callback. The legacy onAddTrack is not reliably
+        // delivered for a webrtcbin answer; without one of them the desktop's
+        // picture decoded but no renderer was ever given its track.
+        override fun onTrack(transceiver: org.webrtc.RtpTransceiver) {
+            Log.i(TAG, "onTrack ${transceiver.mediaType} mid=${transceiver.mid}")
+            (transceiver.receiver.track() as? VideoTrack)?.let(::announceRemoteTrack)
+        }
+
+        private fun announceRemoteTrack(track: VideoTrack) {
+            if (announcedRemoteTrack?.id() == track.id()) return
+            announcedRemoteTrack = track
+            Log.i(TAG, "Remote video track ${track.id()} enabled=${track.enabled()} state=${track.state()}")
+            if (org.desklink.mobile.BuildConfig.DEBUG) {
+                runCatching { track.addSink { debugFramesAtTrack.incrementAndGet() } }
+            }
+            observer.onRemoteVideoTrack(track)
         }
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState) {
             if (newState == PeerConnection.PeerConnectionState.FAILED) {
@@ -584,5 +765,9 @@ class WebRtcTransport(
 
     private companion object {
         const val TAG = "DeskLink/WebRTC"
+        const val MAX_CAPTURE_LONG_SIDE = 1280
+        const val MIN_SCREEN_BITRATE = 300_000
+        const val START_SCREEN_BITRATE = 2_500_000
+        const val MAX_SCREEN_BITRATE = 8_000_000
     }
 }

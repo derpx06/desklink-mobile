@@ -48,7 +48,7 @@ class WebRtcPhoneFileBrowser(
         return runCatching {
             val result = when (request.getString("action")) {
                 "roots" -> roots()
-                "list" -> list(requiredEntryId(request))
+                "list" -> list(requiredEntryId(request), requestedOffset(request))
                 "metadata" -> metadata(requiredEntryId(request))
                 "create-folder" -> createFolder(requiredEntryId(request), requiredName(request))
                 "rename" -> rename(requiredEntryId(request), requiredName(request))
@@ -124,19 +124,52 @@ class WebRtcPhoneFileBrowser(
         return JSONObject().put("entries", roots)
     }
 
-    private fun list(entryId: String): JSONObject {
+    /**
+     * One page of a folder. A page ends at [MAX_ENTRIES] or when the next entry
+     * would push the reply past [PAGE_BYTES], whichever comes first, and says
+     * where the next page starts so the peer never sees a silently short list.
+     * Listing from the top revokes the ids handed out for that folder before;
+     * later pages leave them alone.
+     */
+    private fun list(entryId: String, offset: Int): JSONObject {
         val parent = entry(entryId)
         require(parent.document.isDirectory && parent.document.canRead()) { "Entry is not a readable folder" }
+        if (offset == 0) forgetChildrenOf(entryId)
+        val sorted = parent.document.listFiles().sortedWith(
+            compareByDescending<DocumentFile> { it.isDirectory }
+                .thenBy { it.name?.lowercase() }
+                .thenBy { it.name },
+        )
         val children = JSONArray()
-        parent.document.listFiles()
-            .sortedWith(compareByDescending<DocumentFile> { it.isDirectory }.thenBy { it.name?.lowercase() })
-            .take(MAX_ENTRIES)
-            .forEach { child ->
-                val id = opaqueId()
-                entries[id] = Entry(parent.rootId, entryId, child)
-                children.put(entryJson(id, child.name ?: "Unnamed", entries.getValue(id)))
-            }
-        return JSONObject().put("parentId", entryId).put("entries", children)
+        var next = offset
+        var bytes = 0
+        while (next < sorted.size && children.length() < MAX_ENTRIES) {
+            val child = sorted[next]
+            val id = opaqueId()
+            val entry = Entry(parent.rootId, entryId, child)
+            val json = entryJson(id, child.name ?: "Unnamed", entry)
+            bytes += json.toString().toByteArray(Charsets.UTF_8).size + 1
+            // Always take one entry, so a page can never be empty and stall.
+            if (children.length() > 0 && bytes > PAGE_BYTES) break
+            entries[id] = entry
+            children.put(json)
+            next++
+        }
+        return JSONObject()
+            .put("parentId", entryId)
+            .put("offset", offset)
+            .put("entries", children)
+            .apply { if (next < sorted.size) put("nextOffset", next) }
+    }
+
+    /** Drops every id below [folderId], at any depth, so re-listing cannot leak them. */
+    private fun forgetChildrenOf(folderId: String) {
+        var parents = setOf(folderId)
+        while (parents.isNotEmpty()) {
+            val gone = entries.filterValues { it.parentId in parents }.keys
+            gone.forEach(entries::remove)
+            parents = gone
+        }
     }
 
     private fun downloadInfo(entryId: String, transferId: String): JSONObject {
@@ -230,6 +263,9 @@ class WebRtcPhoneFileBrowser(
 
     private fun entry(id: String): Entry = requireNotNull(entries[id]) { "Unknown or stale phone-file entry ID" }
 
+    private fun requestedOffset(request: JSONObject): Int =
+        if (request.has("offset")) request.getInt("offset").also { require(it >= 0) { "Invalid listing offset" } } else 0
+
     private fun requiredEntryId(request: JSONObject): String = request.getString("entryId")
         .also { require(it.length in 1..128) { "Invalid phone-file entry ID" } }
 
@@ -259,9 +295,11 @@ class WebRtcPhoneFileBrowser(
         const val MESSAGE_TYPE = "desklink.file.browser.v1"
         private const val VERSION = 1
         private const val MAX_ROOTS = 32
-        // Keeps one JSON response comfortably below the 128 KiB WebRTC
-        // envelope limit even when names and metadata are near their maxima.
         private const val MAX_ENTRIES = 256
+
+        // Entry JSON per page. Well under the 128 KiB envelope payload limit so
+        // the reply's own fields (a 128-character request id, ids) always fit.
+        private const val PAGE_BYTES = 96 * 1024
         private const val MAX_NAME_LENGTH = 255
         private const val MAX_TRANSFER_BYTES = 4L * 1024L * 1024L * 1024L
     }

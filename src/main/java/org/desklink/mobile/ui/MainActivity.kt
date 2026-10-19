@@ -239,18 +239,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     private fun onPairResultFromNotification(deviceId: String?, pairStatus: String): String? {
         assert(deviceId != null)
-        if (pairStatus != PAIRING_PENDING) {
-            val device = DeskLinkApplication.getInstance().getDevice(deviceId)
-            if (device == null) {
-                Log.w(this::class.simpleName, "Reject pairing - device no longer exists: $deviceId")
-                return null
-            }
-            when (pairStatus) {
-                PAIRING_ACCEPTED -> device.acceptPairing()
-                PAIRING_REJECTED -> device.cancelPairing()
-            }
-        }
-        return if (pairStatus == PAIRING_ACCEPTED || pairStatus == PAIRING_PENDING) deviceId else null
+        // Navigation only. This activity is exported, so it must never act on
+        // pairing: accept/reject now go through the non-exported
+        // PairingActionReceiver. Any other status from an outside caller is
+        // ignored.
+        return if (pairStatus == PAIRING_PENDING) deviceId else null
     }
 
     private fun deviceIdToMenuEntryId(deviceId: String?): Int {
@@ -424,8 +417,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     companion object {
         const val EXTRA_DEVICE_ID = "deviceId"
         const val PAIR_REQUEST_STATUS = "pair_req_status"
-        const val PAIRING_ACCEPTED = "accepted"
-        const val PAIRING_REJECTED = "rejected"
         const val PAIRING_PENDING = "pending"
         const val RESULT_NEEDS_RELOAD = RESULT_FIRST_USER
         const val RESULT_NOTIFICATIONS_ENABLED = RESULT_FIRST_USER+1

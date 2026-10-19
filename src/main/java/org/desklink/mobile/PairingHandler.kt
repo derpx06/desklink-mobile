@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.bouncycastle.util.Arrays
 import org.desklink.mobile.helpers.DeviceHelper
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.R
 import java.security.MessageDigest
@@ -44,6 +45,26 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
     private val pairingJob = SupervisorJob()
     private val pairingScope = CoroutineScope(Dispatchers.IO + pairingJob)
     private var pairingTimestamp = 0L
+
+    /** The negotiation a pairing notification was shown for; see [acceptPairing]. */
+    val negotiationTimestamp: Long
+        get() = pairingTimestamp
+
+    // Serialises the accept/reject/timeout race. The timeout coroutine and a
+    // notification tap used to interleave so the phone sent pair:false, then
+    // pair:true, and ended up Paired while the desktop had already given up.
+    private val stateLock = Any()
+
+    /**
+     * The certificate this negotiation is for: the one on the link when the
+     * user accepted, or the one whose fingerprint the scanned QR code vouched
+     * for. Completion is refused if the link changed since, and it is exactly
+     * this certificate that gets pinned — not whatever link happens to be
+     * first when the confirmation lands.
+     */
+    @Volatile
+    var negotiatedCertificate: Certificate? = null
+        private set
     private var lastNotPairedNotice = 0L
 
     // Whether this device takes the leading role against the peer.
@@ -65,8 +86,13 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         cancelTimer()
         pairingScope.launch {
             delay(pairTimeoutSeconds.seconds)
+            val expired = synchronized(stateLock) {
+                val negotiating = state == PairState.Requested || state == PairState.RequestedByPeer
+                if (negotiating) this@PairingHandler.state = PairState.NotPaired
+                negotiating
+            }
+            if (!expired) return@launch
             Log.w("PairingHandler", "Pairing timed out")
-            this@PairingHandler.state = PairState.NotPaired
             // Tell the peer rather than failing silently, so its prompt is
             // withdrawn instead of being left on screen.
             sendPairFalse()
@@ -276,8 +302,25 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         device.sendPacket(np, statusCallback)
     }
 
-    fun acceptPairing() {
-        cancelTimer()
+    /**
+     * Accepts the peer's pending request — only that, and only the negotiation
+     * the user was shown when [expectedTimestamp] is given. Without the guard a
+     * tap (or any app firing the old exported intent) paired a device in any
+     * state, including one that had never asked.
+     */
+    fun acceptPairing(expectedTimestamp: Long? = null) {
+        synchronized(stateLock) {
+            if (state != PairState.RequestedByPeer) {
+                Log.w("PairingHandler", "Ignoring accept: no pairing request is pending")
+                return
+            }
+            if (expectedTimestamp != null && expectedTimestamp != pairingTimestamp) {
+                Log.w("PairingHandler", "Ignoring accept for a superseded pairing request")
+                return
+            }
+            negotiatedCertificate = device.certificate
+            cancelTimer()
+        }
         val stateCallback = object : Device.SendPacketStatusCallback() {
             override fun onSuccess() {
                 pairingDone()
@@ -292,6 +335,57 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         val np = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR)
         np["pair"] = true
         device.sendPacket(np, stateCallback)
+    }
+
+    /**
+     * QR pairing: send the scanned code's proof instead of a prompt request.
+     * The desktop answers with a plain `pair:true` (handled by the Requested
+     * branch of [packetReceived], completing via [pairingDone]) or `pair:false`.
+     */
+    fun requestPairingWithProof(mac: String, verifiedCertificate: Certificate) {
+        synchronized(stateLock) {
+            // Already paired with this very desktop: still send the proof, so a
+            // desktop that lost its record is repaired, but leave our state.
+            if (state != PairState.Paired) {
+                negotiatedCertificate = verifiedCertificate
+                state = PairState.Requested
+                armTimer()
+            }
+        }
+        val np = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_PAIR_QR)
+        np["mac"] = mac
+        device.sendPacket(np, object : Device.SendPacketStatusCallback() {
+            override fun onSuccess() = Unit
+            override fun onFailure(e: Throwable) {
+                synchronized(stateLock) { state = PairState.NotPaired }
+                cancelTimer()
+                callback.pairingFailed(device.context.getString(R.string.error_not_reachable))
+            }
+        })
+    }
+
+    /** A link with a different certificate replaced the one being negotiated on. */
+    fun abandonNegotiation() {
+        val abandoned = synchronized(stateLock) {
+            val negotiating = state == PairState.Requested || state == PairState.RequestedByPeer
+            if (negotiating) {
+                cancelTimer()
+                state = PairState.NotPaired
+            }
+            negotiating
+        }
+        if (abandoned) {
+            device.hidePairingNotification()
+            callback.pairingFailed(device.context.getString(R.string.error_canceled_by_other_peer))
+        }
+    }
+
+    /** Rejects the pending request the notification was shown for, if still pending. */
+    fun rejectPairingRequest(expectedTimestamp: Long) {
+        synchronized(stateLock) {
+            if (state != PairState.RequestedByPeer || expectedTimestamp != pairingTimestamp) return
+        }
+        cancelPairing()
     }
 
     fun cancelPairing() {
@@ -311,6 +405,23 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
 
     @VisibleForTesting
     fun pairingDone() {
+        val linkUnchanged = synchronized(stateLock) {
+            val expected = negotiatedCertificate
+            val unchanged = expected == null ||
+                runCatching { device.certificate == expected }.getOrDefault(false)
+            if (!unchanged) {
+                state = PairState.NotPaired
+                negotiatedCertificate = null
+            }
+            unchanged
+        }
+        if (!linkUnchanged) {
+            // The link was replaced between the approval and its confirmation:
+            // pinning now could pin someone else (CVE-2020-26164's pattern).
+            Log.w("PairingHandler", "Refusing to complete pairing: the link changed")
+            callback.pairingFailed(device.context.getString(R.string.error_canceled_by_other_peer))
+            return
+        }
         Log.i("PairingHandler", "Pairing done")
         state = PairState.Paired
         kotlin.runCatching {

@@ -13,6 +13,8 @@ object DeskLinkProtocol {
 
     const val PACKET_TYPE_IDENTITY = "desklink.identity"
     const val PACKET_TYPE_PAIR = "desklink.pair"
+    /** QR pairing proof (phone → desktop), LAN bootstrap only. Must match `packet.rs`. */
+    const val PACKET_TYPE_PAIR_QR = "desklink.pair.qr"
 
     /**
      * Liveness probe for the pinned-TLS bootstrap link.

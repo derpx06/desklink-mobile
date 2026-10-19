@@ -5,7 +5,6 @@ package org.desklink.mobile.webrtc
 
 import android.content.Context
 import org.webrtc.DefaultVideoDecoderFactory
-import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
 import org.webrtc.PeerConnectionFactory
 import java.util.concurrent.atomic.AtomicBoolean
@@ -47,9 +46,9 @@ object WebRtcRuntime {
         return PeerConnectionFactory.builder()
             .setOptions(PeerConnectionFactory.Options())
             .setVideoEncoderFactory(
-                DefaultVideoEncoderFactory(
+                // libwebrtc's encoders, with hardware ones in low-latency mode.
+                org.webrtc.DeskLinkVideoEncoderFactories.create(
                     egl.eglBaseContext,
-                    /* enableIntelVp8Encoder = */ false,
                     /* enableH264HighProfile = */ true,
                 ),
             )

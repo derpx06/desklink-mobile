@@ -55,6 +55,7 @@ import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.R
 import java.io.IOException
 import java.security.cert.Certificate
+import org.desklink.mobile.helpers.security.SslHelper
 import java.util.Vector
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
@@ -68,7 +69,8 @@ class Device : PacketReceiver {
     val context: Context
 
     @VisibleForTesting
-    val deviceInfo: DeviceInfo
+    var deviceInfo: DeviceInfo
+        private set
 
     /**
      * The notification ID for the pairing notification.
@@ -98,6 +100,10 @@ class Device : PacketReceiver {
     @Volatile
     private var webRtcRecoveryPending: Boolean = false
 
+    /** When recovery started pending; bounds how long it may hold the wake lock. */
+    @Volatile
+    private var webRtcRecoveryPendingSince = 0L
+
     /**
      * Packet types that ride the pinned-TLS bootstrap link rather than the
      * feature transport, and are therefore exempt from the feature profile and
@@ -112,6 +118,7 @@ class Device : PacketReceiver {
     private fun isBootstrapPacketType(type: String): Boolean =
         type == NetworkPacket.PACKET_TYPE_IDENTITY ||
             type == NetworkPacket.PACKET_TYPE_PAIR ||
+            type == DeskLinkProtocol.PACKET_TYPE_PAIR_QR ||
             type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1 ||
             type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT
 
@@ -131,6 +138,18 @@ class Device : PacketReceiver {
     private var controlPacketHandler: ControlPacketHandler? = null
     private val controlPacketLock = Any()
     private val pendingControlPackets = BoundedPendingQueue<NetworkPacket>(8)
+
+    /** The peer's last seen restart epoch; see [DeviceInfo.instanceId]. */
+    @Volatile
+    var peerInstanceId: String? = null
+    // Feature packets waiting for the WebRTC transport; see sendPacketBlocking.
+    private val pendingFeaturePackets = BoundedPendingQueue<QueuedFeature>(256)
+
+    private class QueuedFeature(
+        val packet: NetworkPacket,
+        val callback: SendPacketStatusCallback,
+        val queuedAt: Long = android.os.SystemClock.elapsedRealtime(),
+    )
 
     /**
      * The WebRTC coordinator supplies a generation-bound control lease just
@@ -236,8 +255,15 @@ class Device : PacketReceiver {
     val deviceId: String
         get() = deviceInfo.id
 
+    // While unpaired, the certificate that counts is the current link's: the
+    // verification key is derived from it and it is what gets pinned. The one
+    // captured when this Device was created can belong to an older link.
     val certificate: Certificate
-        get() = deviceInfo.certificate
+        get() = if (isPaired) {
+            deviceInfo.certificate
+        } else {
+            links.firstOrNull()?.deviceInfo?.certificate ?: deviceInfo.certificate
+        }
 
     val verificationKey: String?
         get() = pairingHandler.verificationKey()
@@ -261,9 +287,13 @@ class Device : PacketReceiver {
     fun unpair() = pairingHandler.unpair()
 
     /* This method is called after accepting pair request form GUI */
-    fun acceptPairing() {
+    fun acceptPairing(expectedTimestamp: Long? = null) {
         Log.i("Device", "Accepted pair request started by the other device")
-        pairingHandler.acceptPairing()
+        pairingHandler.acceptPairing(expectedTimestamp)
+    }
+
+    fun rejectPairingRequest(expectedTimestamp: Long) {
+        pairingHandler.rejectPairingRequest(expectedTimestamp)
     }
 
     /* This method is called after rejecting pairing from GUI */
@@ -284,10 +314,17 @@ class Device : PacketReceiver {
 
                 hidePairingNotification()
 
-                // Store current device certificate so we can check it in the future (TOFU)
+                // Pin the certificate of the link the pairing was negotiated
+                // on, then mark trusted — certificate first, both committed
+                // synchronously. Two async writes could land half-done, and a
+                // trusted flag with no certificate refuses every future link.
+                // (Read from the link directly: the state is already Paired
+                // here, so `certificate` would return the stale one.)
+                val negotiated = pairingHandler.negotiatedCertificate
+                    ?: links.firstOrNull()?.deviceInfo?.certificate
+                    ?: deviceInfo.certificate
+                deviceInfo = deviceInfo.copy(certificate = negotiated)
                 deviceInfo.saveInSettings(context)
-
-                // Store as trusted device
                 TrustedDevices.addTrustedDevice(context, deviceInfo.id)
                 updateSessionPairingState(PairingState.PAIRED)
                 val generation = pairingGeneration.incrementAndGet()
@@ -358,32 +395,29 @@ class Device : PacketReceiver {
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            1,
+            notificationId + 2,
             intent,
             PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val acceptIntent = Intent(context, MainActivity::class.java).apply {
-            putExtra(MainActivity.EXTRA_DEVICE_ID, deviceId)
-            putExtra(MainActivity.PAIR_REQUEST_STATUS, MainActivity.PAIRING_ACCEPTED)
-        }
-        val rejectIntent = Intent(context, MainActivity::class.java).apply {
-            putExtra(MainActivity.EXTRA_DEVICE_ID, deviceId)
-            putExtra(MainActivity.PAIR_REQUEST_STATUS, MainActivity.PAIRING_REJECTED)
-        }
-
-        val acceptedPendingIntent = PendingIntent.getActivity(
+        // Accept/Reject go to a non-exported receiver (no other app can send
+        // them), carry the negotiation they were shown for, and use request
+        // codes unique to this notification: with fixed codes, a second
+        // device's Accept reused the first one's PendingIntent (extras don't
+        // count for PendingIntent identity) and accepted the wrong desktop.
+        val timestamp = pairingHandler.negotiationTimestamp
+        fun pairingAction(action: String, requestCode: Int) = PendingIntent.getBroadcast(
             context,
-            2,
-            acceptIntent,
-            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            requestCode,
+            Intent(context, PairingActionReceiver::class.java).apply {
+                this.action = action
+                putExtra(PairingActionReceiver.EXTRA_DEVICE_ID, deviceId)
+                putExtra(PairingActionReceiver.EXTRA_TIMESTAMP, timestamp)
+            },
+            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val rejectedPendingIntent = PendingIntent.getActivity(
-            context,
-            4,
-            rejectIntent,
-            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val acceptedPendingIntent = pairingAction(PairingActionReceiver.ACTION_ACCEPT, notificationId)
+        val rejectedPendingIntent = pairingAction(PairingActionReceiver.ACTION_REJECT, notificationId + 1)
 
         val res = context.resources
 
@@ -419,9 +453,19 @@ class Device : PacketReceiver {
     val hasBootstrapLink: Boolean
         get() = links.isNotEmpty()
 
+    /** The preferred link is pinned TLS over the LAN (not, e.g., Bluetooth). */
+    val hasLanLink: Boolean
+        get() = links.firstOrNull() is org.desklink.mobile.backends.lan.LanLink
 
+
+    // A pending recovery with no bootstrap link is waiting for a peer that may
+    // be switched off; holding a partial wake lock for that indefinitely
+    // drained the battery while the PC was off. Discovery wakes us again.
     val requiresConnectionPowerLease: Boolean
-        get() = hasBootstrapLink || hasActiveWebRtcFeatureTransport || webRtcRecoveryPending
+        get() = hasBootstrapLink || hasActiveWebRtcFeatureTransport || (
+            webRtcRecoveryPending &&
+                android.os.SystemClock.elapsedRealtime() - webRtcRecoveryPendingSince < RECOVERY_POWER_LEASE_MS
+            )
 
     fun setSessionTransport(transport: SessionTransport?) {
         sessionTransport = transport
@@ -434,6 +478,7 @@ class Device : PacketReceiver {
     fun setWebRtcTransport(transport: WebRtcTransport?, reloadPlugins: Boolean) {
         if (webRtcTransport === transport) return
         webRtcTransport = transport
+        if (transport?.isReadyForPackets() == true) flushPendingFeaturePackets()
         // Plugin availability is calculated from reachability. Re-evaluate it
         // when WebRTC becomes ready or is closed so a transient loss of the
         // bootstrap socket cannot disable a live paired feature session.
@@ -444,9 +489,68 @@ class Device : PacketReceiver {
         }
     }
 
+    /**
+     * Sends, in order, what was queued while WebRTC was down. Anything older
+     * than [PENDING_FEATURE_MAX_AGE_MS] fails instead: "Lock" or "Ring" must
+     * not fire long after the user gave up on it. Mirrors the desktop queue.
+     */
+    //
+    // Sends synchronously on the calling thread, never through `sendChannel`:
+    // a full 256-entry queue would overflow that 64-slot channel. Queued
+    // packets never carry a payload, so nothing here blocks on file I/O.
+    fun flushPendingFeaturePackets() = synchronized(sendOrderLock) {
+        // Loop: a producer may queue more while a batch is being sent.
+        while (true) {
+            val batch = pendingFeaturePackets.drain()
+            if (batch.isEmpty()) break
+            val now = android.os.SystemClock.elapsedRealtime()
+            batch.forEach { queued ->
+                if (now - queued.queuedAt > PENDING_FEATURE_MAX_AGE_MS) {
+                    queued.callback.onFailure(
+                        IllegalStateException("DeskLink dropped stale queued ${queued.packet.type}"),
+                    )
+                } else {
+                    sendPacketBlocking(queued.packet, queued.callback)
+                }
+            }
+            if (webRtcTransport?.isReadyForPackets() != true) break
+        }
+    }
+
+    private val sendOrderLock = Any()
+
+    private fun sendOnTransport(
+        transport: WebRtcTransport,
+        packet: NetworkPacket,
+        type: String,
+        callback: SendPacketStatusCallback,
+    ): Boolean = try {
+        transport.sendPacket(
+            packet,
+            object : TransportCallback {
+                override fun onSuccess() = callback.onSuccess()
+
+                override fun onFailure(error: TransportError) = callback.onFailure(error)
+
+                override fun onProgress(percent: Int) {
+                    callback.onPayloadProgressChanged(percent)
+                }
+            },
+        )
+        countSent(deviceId, type, true)
+        true
+    } catch (e: Exception) {
+        callback.onFailure(e)
+        countSent(deviceId, type, false)
+        false
+    }
+
     /** Clears every WebRTC callback and queued bootstrap packet on unpair. */
     fun clearWebRtcBindingsForUnpair() {
         webRtcTransport = null
+        pendingFeaturePackets.drain().forEach { queued ->
+            queued.callback.onFailure(IllegalStateException("Device was unpaired"))
+        }
         webRtcRecoveryPending = false
         payloadPacketHandler = null
         remoteInputPacketPreparer = null
@@ -458,6 +562,9 @@ class Device : PacketReceiver {
     }
 
     fun setWebRtcRecoveryPending(pending: Boolean) {
+        if (pending && !webRtcRecoveryPending) {
+            webRtcRecoveryPendingSince = android.os.SystemClock.elapsedRealtime()
+        }
         webRtcRecoveryPending = pending
     }
 
@@ -495,9 +602,14 @@ class Device : PacketReceiver {
      */
     private fun linkSpeaksForThisDevice(link: BaseLink): Boolean {
         if (!isPaired) {
-            // Unpaired devices have no certificate to check against yet; the
-            // pairing exchange itself is what establishes one.
-            return true
+            // No certificate to pin yet, but it must at least claim this id:
+            // the desktop checks the CN too, and without it a link could
+            // present anyone's certificate under a broadcast device id.
+            return runCatching {
+                SslHelper.getCommonNameFromCertificate(
+                    link.deviceInfo.certificate as java.security.cert.X509Certificate,
+                ) == deviceId
+            }.getOrDefault(false)
         }
         if (!TrustedDevices.isCertificateStored(context, deviceId)) {
             // Paired with no stored certificate is the desync SslHelper guards
@@ -520,6 +632,13 @@ class Device : PacketReceiver {
                     Log.w("DeskLink/Device", "Could not close a rejected ${link.name} link", error)
                 }
             return
+        }
+
+        // A pairing negotiation belongs to the certificate it was started on;
+        // the user compares a key derived from it. A link with a different
+        // certificate abandons it (the desktop does the same, CVE-2020-26164).
+        if (!isPaired && runCatching { link.deviceInfo.certificate != certificate }.getOrDefault(true)) {
+            pairingHandler.abandonNegotiation()
         }
 
         // A provider owns one current link for a device. Drop a stale link
@@ -652,7 +771,9 @@ class Device : PacketReceiver {
         )
 
         val bootstrapPacket = isBootstrapPacketType(np.type)
-        if (fromWebRtc && bootstrapPacket) {
+        // The heartbeat is the one bootstrap type that is also legal on WebRTC:
+        // it is the data-channel liveness probe, answered just below.
+        if (fromWebRtc && bootstrapPacket && np.type != DeskLinkProtocol.PACKET_TYPE_HEARTBEAT) {
             Log.w("DeskLink/WebRTC", "Rejected bootstrap packet on the WebRTC feature path")
             np.payload?.close()
             return
@@ -667,7 +788,22 @@ class Device : PacketReceiver {
         // idle link: it probes when it has heard nothing, and this is what it
         // hears.
         if (np.type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT) {
-            if (!fromWebRtc) {
+            if (fromWebRtc) {
+                // Data-channel liveness probe from the desktop: answer it on the
+                // same transport. A reply is never answered, or the two sides
+                // would ping-pong forever. Arriving at all already refreshed the
+                // coordinator's own silence clock.
+                if (!np.getBoolean("reply", false)) {
+                    val reply = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT)
+                    reply["reply"] = true
+                    webRtcTransport?.sendPacket(reply, object : TransportCallback {
+                        override fun onSuccess() = Unit
+                        override fun onFailure(error: TransportError) {
+                            Log.d("DeskLink/Heartbeat", "Could not answer a WebRTC heartbeat: ${error.message}")
+                        }
+                    })
+                }
+            } else {
                 sendBootstrapPacket(
                     NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT),
                     // Best effort. A failure here means the link is already
@@ -711,14 +847,11 @@ class Device : PacketReceiver {
             np.payload?.close()
             return
         }
-        // Paired feature traffic moves to WebRTC once the handover completes.
-        // Until then the pinned-TLS bootstrap link carries it, so the product
-        // still works on a network where ICE cannot establish.
+        // Paired feature traffic is WebRTC-only; see shouldRejectPairedLanFeaturePacket.
         if (shouldRejectPairedLanFeaturePacket(
                 fromWebRtc = fromWebRtc,
                 paired = isPaired,
                 bootstrapPacket = bootstrapPacket,
-                webRtcFeatureTransportReady = webRtcTransport?.isReadyForPackets() == true,
             )
         ) {
             Log.w("DeskLink/Device", "Rejected paired feature packet on the LAN bootstrap path: ${np.type}")
@@ -735,6 +868,11 @@ class Device : PacketReceiver {
         if (np.type == DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1) {
             if (!isPaired) {
                 Log.w("DeskLink/WebRTC", "Rejected signaling from an unpaired device")
+                // Signaling is all a peer that missed our unpair still sends now
+                // that features never use LAN, so this is where it must be told
+                // (damped, and only in NotPaired). Without it the desktop showed
+                // "Connecting" forever.
+                pairingHandler.notifyPeerNotPaired()
                 np.payload?.close()
                 return
             }
@@ -774,6 +912,8 @@ class Device : PacketReceiver {
     }
 
     private fun notifyPluginPacketReceived(np: NetworkPacket) {
+        // Type only, never the body. tools/device_e2e.sh asserts on this line.
+        Log.i("DeskLink/Feature", "Received ${np.type} from $deviceId")
         val targetPlugins = pluginsByIncomingInterface[np.type] // Returns an empty collection if the key doesn't exist
         if (targetPlugins.isEmpty()) {
             Log.w("Device", "Ignoring packet with type ${np.type} because no plugin can handle it")
@@ -817,8 +957,17 @@ class Device : PacketReceiver {
         override fun onSuccess() {
         }
 
+        // Rejected input (an expired lease, a stopped session) fails once per
+        // gesture event, at pointer rate. A stack trace for each buried the log
+        // and hid everything else, so this reports at most every few seconds.
+        private var lastFailureLoggedNanos = 0L
+
         override fun onFailure(e: Throwable) {
-            Log.e("Device", "Send packet exception", e)
+            val now = System.nanoTime()
+            if (now - lastFailureLoggedNanos >= SEND_FAILURE_LOG_INTERVAL_NANOS) {
+                lastFailureLoggedNanos = now
+                Log.w("Device", "Send packet failed: ${e.message}", e)
+            }
         }
     }
 
@@ -930,23 +1079,17 @@ class Device : PacketReceiver {
         if (isPaired && !bootstrapPacket) {
             val activeTransport = readyTransport
             if (activeTransport == null) {
-                // The authenticated WebRTC transport is not up yet. Fall back to
-                // the pinned-TLS bootstrap link rather than dropping the packet:
-                // it is the same mutually authenticated peer, and without this
-                // every paired feature was dead until ICE completed — which on a
-                // network with no reachable STUN/TURN never happened.
-                if (np.payload != null) {
-                    val error = IllegalStateException(
-                        "Payload-bearing ${np.type} requires the WebRTC file channel",
-                    )
-                    callback.onFailure(error)
-                    np.payload?.close()
-                    countSent(deviceId, np.type, false)
-                    return false
-                }
-                // Remote input carries a generation-bound lease that only the
-                // WebRTC coordinator can mint. Falling back without it would let
-                // anyone drive the desktop simply by acting before ICE finished.
+                // WebRTC is the only feature transport. The LAN socket used to
+                // carry features until the handover finished, but each side
+                // judged "finished" by its own state, so after a restart the
+                // phone sent over LAN while the desktop — still holding the old
+                // peer — rejected everything arriving there. Notifications and
+                // battery were lost in silence. Queue instead; the queue is
+                // flushed in order the moment the transport is ready.
+                //
+                // Remote input is never queued: a stale tap replayed seconds
+                // later is worse than a dropped one, and its lease can only be
+                // minted by the WebRTC coordinator anyway.
                 if (
                     np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
                     np.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
@@ -959,36 +1102,15 @@ class Device : PacketReceiver {
                     countSent(deviceId, np.type, false)
                     return false
                 }
-                // ONLY the TLS LAN link. `links` can also hold a BluetoothLink,
-                // which writes plaintext over RFCOMM with no certificate
-                // pinning — and this path now carries clipboard contents,
-                // notification bodies, and the SFTP credentials in
-                // `desklink.sftp`. Those must never leave the device unencrypted.
-                val secureLinks = links.filterIsInstance<LanLink>()
-                if (secureLinks.isEmpty()) {
-                    // Nothing ran, so nothing has resolved the caller's
-                    // callback. Every other path is resolved by
-                    // `BaseLink.sendPacket` itself, which reports its own
-                    // failures — calling `onFailure` again there would deliver
-                    // the result twice.
-                    callback.onFailure(
-                        IllegalStateException(
-                            "DeskLink has no encrypted transport for ${np.type}",
-                        ),
+                pendingFeaturePackets.offer(QueuedFeature(np, callback))?.let { dropped ->
+                    dropped.callback.onFailure(
+                        IllegalStateException("DeskLink dropped queued ${dropped.packet.type}: queue full"),
                     )
-                    countSent(deviceId, np.type, false)
-                    return false
                 }
-                val sent = secureLinks.any { link ->
-                    try {
-                        link.sendPacket(np, callback, sendPayloadFromSameThread)
-                    } catch (e: IOException) {
-                        Log.w("DeskLink/sendPacket", "Failed to send packet over LAN", e)
-                        false
-                    }
-                }
-                countSent(deviceId, np.type, sent)
-                return sent
+                // Close the race with a transport that became ready between the
+                // check above and the offer.
+                if (webRtcTransport?.isReadyForPackets() == true) flushPendingFeaturePackets()
+                return true
             }
             if (np.payload != null) {
                 val error = IllegalStateException(
@@ -999,42 +1121,37 @@ class Device : PacketReceiver {
                 countSent(deviceId, np.type, false)
                 return false
             }
-            val packetForTransport = try {
-                if (
-                    np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
-                    np.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
-                ) {
-                    requireNotNull(remoteInputPacketPreparer) {
-                        "DeskLink remote-control lease is not active"
-                    }.prepare(np)
-                } else {
-                    np
+            val remoteInput = np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
+                np.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
+            if (!remoteInput) {
+                // Ordered against the flush: older queued packets go first, and
+                // no direct send may overtake a batch being flushed. Remote
+                // input stays outside this lock — it is never queued, its
+                // channel is unordered anyway, and its lease preparer takes the
+                // coordinator lock, which a flush may already hold (deadlock).
+                synchronized(sendOrderLock) {
+                    if (!pendingFeaturePackets.isEmpty()) {
+                        pendingFeaturePackets.offer(QueuedFeature(np, callback))?.let { dropped ->
+                            dropped.callback.onFailure(
+                                IllegalStateException("DeskLink dropped queued ${dropped.packet.type}: queue full"),
+                            )
+                        }
+                        flushPendingFeaturePackets()
+                        return true
+                    }
+                    return sendOnTransport(activeTransport, np, np.type, callback)
                 }
+            }
+            val packetForTransport = try {
+                requireNotNull(remoteInputPacketPreparer) {
+                    "DeskLink remote-control lease is not active"
+                }.prepare(np)
             } catch (error: Throwable) {
                 callback.onFailure(error)
                 countSent(deviceId, np.type, false)
                 return false
             }
-            return try {
-                activeTransport.sendPacket(
-                    packetForTransport,
-                    object : TransportCallback {
-                        override fun onSuccess() = callback.onSuccess()
-
-                        override fun onFailure(error: TransportError) = callback.onFailure(error)
-
-                        override fun onProgress(percent: Int) {
-                            callback.onPayloadProgressChanged(percent)
-                        }
-                    },
-                )
-                countSent(deviceId, np.type, true)
-                true
-            } catch (e: Exception) {
-                callback.onFailure(e)
-                countSent(deviceId, np.type, false)
-                false
-            }
+            return sendOnTransport(activeTransport, packetForTransport, np.type, callback)
         }
 
         val success = links.any { link ->
@@ -1232,12 +1349,21 @@ class Device : PacketReceiver {
  * with pinned certificates, refusing it before handover left the product with
  * no working transport at all whenever ICE could not complete.
  */
+/**
+ * LAN carries only identity, pairing, signaling and heartbeats. Paired features
+ * travel exclusively over the authenticated WebRTC transport, before and after
+ * the handover alike, so both sides always agree about where a feature lives.
+ */
+/** Longest a pending WebRTC recovery alone may keep the wake lock. */
+internal const val RECOVERY_POWER_LEASE_MS = 5 * 60_000L
+
+/** Queued features older than this are failed, not sent. Matches the desktop. */
+internal const val PENDING_FEATURE_MAX_AGE_MS = 30_000L
+
 internal fun shouldRejectPairedLanFeaturePacket(
     fromWebRtc: Boolean,
     paired: Boolean,
     bootstrapPacket: Boolean,
-    webRtcFeatureTransportReady: Boolean,
-): Boolean = !fromWebRtc && paired && !bootstrapPacket && webRtcFeatureTransportReady
+): Boolean = !fromWebRtc && paired && !bootstrapPacket
 
-/** Paired feature sends prefer the authenticated WebRTC transport when it is up. */
-internal fun webRtcFeatureTransportShouldHandlePacket(ready: Boolean): Boolean = ready
+private const val SEND_FAILURE_LOG_INTERVAL_NANOS = 5_000_000_000L

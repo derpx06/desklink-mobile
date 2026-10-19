@@ -53,8 +53,13 @@ public class LanLink extends BaseLink {
      * Tuning knob: long enough that a genuinely quiet link is not churned,
      * short enough to be worth having. Android's own TCP keepalive would
      * take about two hours and cannot be configured from Java.
+     *
+     * The desktop probes after 10 s of silence (daemon/mod.rs HEARTBEAT_IDLE),
+     * so a live link is never quiet for long; 35 s is three missed probes.
+     * At 120 s a zombie socket outlived a network switch by two minutes while
+     * this side ignored the desktop's beacons and signaled into the dead link.
      */
-    final static long IDLE_TIMEOUT_MILLIS = 120_000L;
+    final static long IDLE_TIMEOUT_MILLIS = 35_000L;
     final static long MAX_PAYLOAD_SIZE = 4L * 1024L * 1024L * 1024L;
     public enum ConnectionStarted {
         Locally, Remotely

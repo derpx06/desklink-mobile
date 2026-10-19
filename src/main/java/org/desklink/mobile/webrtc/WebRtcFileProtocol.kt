@@ -35,8 +35,15 @@ data class WebRtcFileControl(
     val totalSize: Long? = null,
     val sha256: String? = null,
     val offset: Long,
+    /** Always [LEGACY_CHUNK_BYTES] on the wire, so older peers validate. */
     val chunkSize: Int,
     val error: String? = null,
+    /**
+     * Chunk-size upgrade, ignored by older peers (mirrors the desktop's
+     * `max_chunk_size`): the Offer carries the largest chunk the sender can
+     * send, and a receiver that understands it echoes what it accepts.
+     */
+    val maxChunkSize: Int? = null,
 ) {
     fun validate(wire: WebRtcWireBinding) {
         require(protocolVersion == VERSION) { "Unsupported DeskLink WebRTC file version" }
@@ -48,6 +55,12 @@ data class WebRtcFileControl(
         validateId(transferId)
         validateToken(transferToken)
         require(chunkSize in 1..MAX_CHUNK_BYTES) { "Invalid DeskLink WebRTC file chunk size" }
+        require(maxChunkSize == null || maxChunkSize in 1..MAX_CHUNK_BYTES) {
+            "Invalid DeskLink WebRTC file chunk size"
+        }
+        // The desktop's `offset` is a u64: a negative one is never legitimate,
+        // whether or not the record announces a size.
+        require(offset >= 0) { "Invalid DeskLink WebRTC transfer size or offset" }
         totalSize?.let {
             require(it in 0..MAX_TRANSFER_BYTES && offset in 0..it) {
                 "Invalid DeskLink WebRTC transfer size or offset"
@@ -82,13 +95,18 @@ data class WebRtcFileControl(
             totalSize?.let { value.put("totalSize", it) }
             sha256?.let { value.put("sha256", it) }
             error?.let { value.put("error", it) }
+            maxChunkSize?.let { value.put("maxChunkSize", it) }
         }
 
     companion object {
         const val VERSION = 1
         const val CONTROL_MESSAGE_TYPE = "desklink.file.control.v1"
         const val CHUNK_MESSAGE_TYPE = "desklink.file.chunk.v1"
-        const val MAX_CHUNK_BYTES = 16 * 1024
+        // Matches the desktop's MAX_FILE_CHUNK_BYTES: the whole message (DLF1
+        // header, base64, JSON envelope) must fit webrtcbin's default 64 KiB
+        // data-channel maximum. Builds before the upgrade only take 16 KiB.
+        const val MAX_CHUNK_BYTES = 45 * 1024
+        const val LEGACY_CHUNK_BYTES = 16 * 1024
         const val MAX_TRANSFER_BYTES = 4L * 1024 * 1024 * 1024
 
         fun fromJson(value: JSONObject): WebRtcFileControl = WebRtcFileControl(
@@ -105,6 +123,7 @@ data class WebRtcFileControl(
             offset = value.getLong("offset"),
             chunkSize = value.getInt("chunkSize"),
             error = value.optString("error").takeIf(String::isNotEmpty),
+            maxChunkSize = value.optInt("maxChunkSize").takeIf { value.has("maxChunkSize") },
         )
     }
 }
@@ -174,9 +193,10 @@ data class WebRtcFileChunk(
     }
 }
 
-private fun validateId(value: String) {
+/** ASCII `[A-Za-z0-9_-]{1,128}`, exactly what the desktop accepts. IDs name files, so no Unicode letters. */
+internal fun validateId(value: String) {
     require(value.isNotEmpty() && value.length <= 128 && value.all {
-        it.isLetterOrDigit() || it == '-' || it == '_'
+        it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_'
     }) { "Invalid DeskLink transfer ID" }
 }
 
@@ -186,9 +206,11 @@ private fun validateToken(value: String) {
     }
 }
 
-private fun validateFilename(value: String) {
+/** One path component, at most 255 UTF-8 *bytes* (the desktop counts bytes, not characters). */
+internal fun validateFilename(value: String) {
     require(
-        value.isNotEmpty() && value.length <= 255 && value != "." && value != ".." &&
+        value.isNotEmpty() && value.toByteArray(StandardCharsets.UTF_8).size <= 255 &&
+            value != "." && value != ".." &&
             '/' !in value && '\\' !in value && '\u0000' !in value
     ) { "Unsafe DeskLink transfer filename" }
 }

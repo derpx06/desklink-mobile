@@ -72,6 +72,11 @@ android {
         resources {
             merges += listOf("META-INF/DEPENDENCIES", "META-INF/LICENSE", "META-INF/NOTICE")
         }
+        jniLibs {
+            // Termux's PTY JNI library. Unused: the terminal runs on the desktop, only the
+            // emulator/renderer classes are used. It is also not built for 16 KB pages.
+            excludes += "**/libtermux.so"
+        }
     }
     signingConfigs {
         getByName("debug") {
@@ -312,7 +317,14 @@ dependencies {
 
     implementation(libs.univocity.parsers)
     implementation(libs.okhttp)
+    implementation(libs.zxing.android.embedded) { isTransitive = false }
+    implementation(libs.zxing.core)
     implementation(libs.webrtc)
+
+    // Terminal emulation (Apache-2.0). Only the emulator core and TerminalRenderer are
+    // used: there is no local PTY, output comes from the desktop over WebRTC.
+    implementation(libs.termux.terminal.emulator)
+    implementation(libs.termux.terminal.view)
 
     // Kotlin
     implementation(libs.kotlin.stdlib.jdk8)

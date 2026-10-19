@@ -369,7 +369,12 @@ public class RemoteKeyboardPlugin extends Plugin implements SharedPreferences.On
         }
 
         if (RemoteKeyboardService.instance == null) {
-            Log.i("RemoteKeyboardPlugin", "Remote keyboard is not the currently selected input method, dropping key");
+            // Any other keyboard is active: type through the accessibility
+            // service into the focused field instead of dropping the key.
+            if (org.desklink.mobile.plugins.mousereceiver.AccessibilityTyping.INSTANCE.handle(np)) {
+                return true;
+            }
+            Log.i("RemoteKeyboardPlugin", "No DeskLink keyboard and no focused editable field, dropping key");
             return false;
         }
 

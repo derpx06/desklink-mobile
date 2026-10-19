@@ -32,6 +32,7 @@ import org.desklink.mobile.transport.LegacyLanTransport
 import org.desklink.mobile.ui.ThemeUtil
 import org.desklink.mobile.webrtc.WebRtcSessionCoordinator
 import org.desklink.mobile.webrtc.WebRtcScreenDirection
+import org.desklink.mobile.webrtc.terminal.TerminalClient
 import org.desklink.mobile.BuildConfig
 import org.slf4j.impl.HandroidLoggerAdapter
 import java.security.cert.CertificateException
@@ -76,6 +77,11 @@ class DeskLinkApplication : Application() {
      */
     fun onBootstrapHealthy(deviceId: String) {
         webRtcCoordinators[deviceId]?.onBootstrapReconnected()
+    }
+
+    /** The local interface moved: every live WebRTC peer's candidates are stale. */
+    fun onLocalNetworkMoved() {
+        webRtcCoordinators.values.forEach(WebRtcSessionCoordinator::onLocalNetworkMoved)
     }
 
     private val deviceListChangedCallbacks = ConcurrentHashMap<String, DeviceListChangedCallback>()
@@ -196,6 +202,14 @@ class DeskLinkApplication : Application() {
         }.getOrDefault(false)
     }
 
+    /** The terminal client of a paired device; it outlives any activity, so rotation keeps sessions. */
+    fun terminalClient(deviceId: String?): TerminalClient? =
+        getDevice(deviceId)?.takeIf { it.isPaired }?.let { webRtcCoordinatorFor(it).terminal }
+
+    fun switchRemoteScreen(deviceId: String?) {
+        getDevice(deviceId)?.let { webRtcCoordinatorFor(it).switchRemoteScreen() }
+    }
+
     fun stopRemoteSession(deviceId: String?) {
         getDevice(deviceId)?.let { webRtcCoordinatorFor(it).stopRemoteSession() }
     }
@@ -217,7 +231,7 @@ class DeskLinkApplication : Application() {
     fun requestBootstrapReconnect() {
         val service = BackgroundService.instance
         if (service != null) {
-            service.onNetworkChange(null)
+            service.refreshDiscovery()
         } else {
             runCatching { BackgroundService.ForceRefreshConnections(this) }
                 .onFailure { error ->
@@ -279,6 +293,7 @@ class DeskLinkApplication : Application() {
     val connectionListener: ConnectionReceiver = object : ConnectionReceiver {
         @WorkerThread
         override fun onConnectionReceived(link: BaseLink) {
+            val previousInstance = devices[link.deviceId]?.peerInstanceId
             val device = devices[link.deviceId]?.also { existing ->
                 existing.addLink(link)
             } ?: run {
@@ -295,9 +310,18 @@ class DeskLinkApplication : Application() {
                     PairingState.NOT_PAIRED
                 }
                 val coordinator = webRtcCoordinatorFor(device)
+                val newInstance = link.deviceInfo.instanceId
+                // The desktop restarted: its previous process's WebRTC peer is
+                // dead, so drop ours now instead of after the 15 s silence budget.
+                val restarted = DeviceInfo.peerRestarted(previousInstance, newInstance)
+                if (newInstance != null) device.peerInstanceId = newInstance
+                if (restarted) {
+                    Log.i("DeskLink/Session", "${link.deviceId} restarted; replacing its WebRTC session")
+                    coordinator.onPeerRestarted()
+                }
                 runCatching {
                     val retainedBinding = sessionManager.currentBinding(link.deviceId)
-                        ?.takeIf { coordinator.hasActiveFeatureTransport() }
+                        ?.takeIf { !restarted && coordinator.hasActiveFeatureTransport() }
                     if (retainedBinding != null) {
                         // A replacement LAN connection is bootstrap/signaling
                         // capacity only. Re-registering it would invalidate a
@@ -385,7 +409,18 @@ class DeskLinkApplication : Application() {
         override fun onConnectionReplaced(link: BaseLink) {
             if (link !is org.desklink.mobile.backends.lan.LanLink) return
             val device = devices[link.deviceId] ?: return
-            webRtcCoordinatorFor(device).onBootstrapLinkReplaced()
+            val coordinator = webRtcCoordinatorFor(device)
+            // A replaced link (LanLink.reset) skips onConnectionReceived, so the
+            // restart check must happen here too: a desktop that died without
+            // a FIN leaves its stale link in place, and the new one arrives as
+            // a replacement carrying the new epoch.
+            val newInstance = link.deviceInfo.instanceId
+            if (DeviceInfo.peerRestarted(device.peerInstanceId, newInstance)) {
+                Log.i("DeskLink/Session", "${link.deviceId} restarted; replacing its WebRTC session")
+                coordinator.onPeerRestarted()
+            }
+            if (newInstance != null) device.peerInstanceId = newInstance
+            coordinator.onBootstrapLinkReplaced()
         }
     }
 

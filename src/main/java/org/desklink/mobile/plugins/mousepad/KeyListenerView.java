@@ -11,6 +11,7 @@ import android.util.AttributeSet;
 import android.util.SparseIntArray;
 import android.view.KeyEvent;
 import android.view.View;
+import androidx.annotation.Nullable;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 
@@ -64,6 +65,14 @@ public class KeyListenerView extends View {
         deviceId = id;
     }
 
+    @Nullable
+    private StickyModifiers stickyModifiers;
+
+    /** Ctrl/Alt/Super toggled on screen apply to the next key. */
+    public void setStickyModifiers(@Nullable StickyModifiers modifiers) {
+        stickyModifiers = modifiers;
+    }
+
     public KeyListenerView(Context context, AttributeSet set) {
         super(context, set);
 
@@ -73,7 +82,17 @@ public class KeyListenerView extends View {
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
-        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN;
+        // A compact keyboard in landscape too: without NO_EXTRACT_UI Android
+        // replaces the whole screen with its own editing box, hiding the
+        // desktop being typed into.
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN | EditorInfo.IME_FLAG_NO_EXTRACT_UI;
+        // Plain text without suggestions: keys go out as they are typed, and
+        // the keyboard keeps its microphone — voice typing composes, then
+        // commits (KeyInputConnection sends both). A raw-key type hid the
+        // microphone; a password type made Android 15+ treat the keyboard as
+        // sensitive (screenshots black) and lost typed text.
+        outAttrs.inputType = android.text.InputType.TYPE_CLASS_TEXT
+            | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
         return new KeyInputConnection(this, true);
     }
 
@@ -87,6 +106,17 @@ public class KeyListenerView extends View {
         if (plugin == null) {
             return;
         }
+        if (stickyModifiers != null && stickyModifiers.getAny()) {
+            // A shortcut: the modifiers go with the first character only.
+            final NetworkPacket np = new NetworkPacket(MousePadPlugin.PACKET_TYPE_MOUSEPAD_REQUEST);
+            np.set("key", chars.subSequence(0, 1).toString().toLowerCase());
+            stickyModifiers.applyTo(np);
+            plugin.sendPacket(np);
+            if (chars.length() > 1) {
+                plugin.sendText(chars.subSequence(1, chars.length()).toString());
+            }
+            return;
+        }
         plugin.sendText(chars.toString());
     }
 
@@ -94,6 +124,9 @@ public class KeyListenerView extends View {
         MousePadPlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
         if (plugin == null) {
             return;
+        }
+        if (stickyModifiers != null) {
+            stickyModifiers.applyTo(np);
         }
         plugin.sendPacket(np);
     }

@@ -30,6 +30,7 @@ import org.desklink.mobile.extensions.setupBottomPadding
 import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.battery.BatteryPlugin
+import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.screen.device.PluginsScreen
 import org.desklink.mobile.R
@@ -290,7 +291,7 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
                 if (device.isReachable) {
                     val context = requireContext()
                     val pluginsWithButtons =
-                        device.loadedPlugins.values.flatMap { it.getUiButtons() }
+                        device.loadedPlugins.values.flatMap { it.getUiButtons() } + terminalButtons(device)
                     val pluginsNeedPermissions =
                         device.pluginsWithoutPermissions.values.filter { device.isPluginEnabled(it.pluginKey) }
                     val pluginsNeedOptionalPermissions =
@@ -332,6 +333,19 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             }
         }
         mActivity?.invalidateOptionsMenu()
+    }
+
+    /**
+     * Terminal is not a plugin (it rides its own WebRTC data channel, like the file browser), so
+     * its entry point is added here, and only while the authenticated WebRTC transport is ready.
+     */
+    private fun terminalButtons(device: Device): List<Plugin.PluginUiButton> {
+        if (!device.isPaired || !device.hasActiveWebRtcFeatureTransport) return emptyList()
+        return listOf(
+            Plugin.PluginUiButton(getString(R.string.terminal_open), R.drawable.ic_terminal_24dp) { parentActivity ->
+                parentActivity.startActivity(TerminalActivity.intent(parentActivity, device.deviceId))
+            },
+        )
     }
 
     private val pairingCallback: PairingHandler.PairingCallback =

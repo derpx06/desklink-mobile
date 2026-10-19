@@ -54,11 +54,15 @@ object NotificationHelper {
             .setLightsEnabled(false)
             .setSound(null, null)
             .build()
+        // Registered here, not lazily by the terminal code: the delete below would remove it at every start.
+        val terminalAttentionChannel = NotificationChannelCompat.Builder(Channels.TERMINAL_ATTENTION, NotificationManagerCompat.IMPORTANCE_HIGH)
+            .setName(context.getString(R.string.terminal_attention_channel))
+            .build()
         val channels = listOf(
             persistentChannel,
             defaultChannel, mediaChannel, fileTransferDownloadChannel, fileTransferDownloadCompleteChannel, fileTransferUploadChannel,
             fileTransferErrorChannel, receiveNotificationChannel, highPriorityChannel,
-            continueWatchingChannel
+            continueWatchingChannel, terminalAttentionChannel
         )
 
         val nm = NotificationManagerCompat.from(context)
@@ -96,5 +100,6 @@ object NotificationHelper {
         const val RECEIVENOTIFICATION: String = "receive"
         const val HIGHPRIORITY: String = "highpriority"
         const val CONTINUEWATCHING: String = "continuewatching"
+        const val TERMINAL_ATTENTION: String = "terminal_attention"
     }
 }

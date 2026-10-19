@@ -9,75 +9,33 @@ import org.junit.Test
 
 class DeviceTransportRoutingTest {
     /**
-     * The bootstrap link is mutually authenticated with pinned certificates, so
-     * it is a valid carrier until the WebRTC transport takes over. Rejecting it
-     * here left the application with no transport at all on any network where
-     * ICE could not complete.
+     * WebRTC is the only feature transport. Accepting LAN features before the
+     * handover let the two sides disagree about which transport was live, and
+     * a restarted phone's notifications were dropped by a desktop that still
+     * believed the old handover was complete.
      */
     @Test
-    fun `paired LAN feature is accepted before WebRTC handover`() {
-        assertFalse(
-            shouldRejectPairedLanFeaturePacket(
-                fromWebRtc = false,
-                paired = true,
-                bootstrapPacket = false,
-                webRtcFeatureTransportReady = false,
-            ),
+    fun `paired LAN feature is always rejected`() {
+        assertTrue(
+            shouldRejectPairedLanFeaturePacket(fromWebRtc = false, paired = true, bootstrapPacket = false),
         )
     }
 
-    /**
-     * This gate is about the paired transport transition only. An unpaired
-     * device is handled separately by `dispatchPacket`'s `unpair()` path, so
-     * this gate deliberately passes it through rather than rejecting it.
-     */
+    /** Unpaired traffic is handled by dispatchPacket's unpair path instead. */
     @Test
     fun `unpaired traffic is left to the unpaired handling path`() {
         assertFalse(
-            shouldRejectPairedLanFeaturePacket(
-                fromWebRtc = false,
-                paired = false,
-                bootstrapPacket = false,
-                webRtcFeatureTransportReady = false,
-            ),
+            shouldRejectPairedLanFeaturePacket(fromWebRtc = false, paired = false, bootstrapPacket = false),
         )
     }
 
     @Test
-    fun `paired LAN feature is rejected after WebRTC handover`() {
-        assertTrue(
-            shouldRejectPairedLanFeaturePacket(
-                fromWebRtc = false,
-                paired = true,
-                bootstrapPacket = false,
-                webRtcFeatureTransportReady = true,
-            ),
-        )
-    }
-
-    @Test
-    fun `ordinary feature has no transport before WebRTC handover`() {
-        assertFalse(webRtcFeatureTransportShouldHandlePacket(false))
-        assertTrue(webRtcFeatureTransportShouldHandlePacket(true))
-    }
-
-    @Test
-    fun `bootstrap and WebRTC packets are never rejected by LAN transition gate`() {
+    fun `bootstrap and WebRTC packets are never rejected by the LAN gate`() {
         assertFalse(
-            shouldRejectPairedLanFeaturePacket(
-                fromWebRtc = false,
-                paired = true,
-                bootstrapPacket = true,
-                webRtcFeatureTransportReady = true,
-            ),
+            shouldRejectPairedLanFeaturePacket(fromWebRtc = false, paired = true, bootstrapPacket = true),
         )
         assertFalse(
-            shouldRejectPairedLanFeaturePacket(
-                fromWebRtc = true,
-                paired = true,
-                bootstrapPacket = false,
-                webRtcFeatureTransportReady = true,
-            ),
+            shouldRejectPairedLanFeaturePacket(fromWebRtc = true, paired = true, bootstrapPacket = false),
         )
     }
 }

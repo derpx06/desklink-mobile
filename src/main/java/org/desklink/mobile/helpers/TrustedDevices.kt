@@ -20,7 +20,7 @@ object TrustedDevices {
 
     fun addTrustedDevice(context: Context, deviceId: String) {
         val preferences = context.getSharedPreferences("trusted_devices", MODE_PRIVATE)
-        preferences.edit { putBoolean(deviceId, true) }
+        preferences.edit(commit = true) { putBoolean(deviceId, true) }
     }
 
     fun removeTrustedDevice(context: Context, deviceId: String) {

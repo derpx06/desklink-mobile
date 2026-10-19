@@ -91,18 +91,18 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="mousepad_single_tap_settings_title">Set one finger tap action</string>
     <string name="mousepad_double_tap_settings_title">Set two finger tap action</string>
     <string name="mousepad_triple_tap_settings_title">Set three finger tap action</string>
-    <string name="mousepad_sensitivity_settings_title">Set touchpad sensitivity</string>
+    <string name="mousepad_sensitivity_settings_title">Pointer speed</string>
     <string name="mousepad_mouse_buttons_title">Show mouse buttons</string>
-    <string name="mousepad_acceleration_profile_settings_title">Set pointer acceleration</string>
+    <string name="mousepad_acceleration_profile_settings_title">Pointer acceleration</string>
     <string name="mousepad_single_tap_key" translatable="false">mousepad_single_tap_key</string>
     <string name="mousepad_double_tap_key" translatable="false">mousepad_double_tap_key</string>
     <string name="mousepad_triple_tap_key" translatable="false">mousepad_triple_tap_key</string>
     <string name="mousepad_sensitivity_key" translatable="false">mousepad_sensitivity_key</string>
     <string name="mousepad_acceleration_profile_key" translatable="false">mousepad_acceleration_profile_key</string>
-    <string name="mousepad_scroll_direction_title">Reverse Scrolling Direction</string>
+    <string name="mousepad_scroll_direction_title">Reverse scroll direction</string>
     <string name="mousepad_scroll_direction" translatable="false">mousepad_scroll_direction</string>
     <string name="mousepad_scroll_sensitivity" translatable="false">mousepad_scroll_sensitivity</string>
-    <string name="mousepad_scroll_sensitivity_title">Scroll sensitivity</string>
+    <string name="mousepad_scroll_sensitivity_title">Scroll speed (%)</string>
     <string name="gyro_mouse_enabled" translatable="false">gyro_mouse_enabled</string>
     <string name="mousepad_mouse_buttons_enabled_pref" translatable="false">mouse_buttons_enabled</string>
     <string name="mousepad_doubletap_drag_enabled_pref" translatable="false">doubletap_drag_enabled</string>
@@ -210,6 +210,13 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="error_clocks_not_match">Device clocks are out of sync</string>
     <string name="error_canceled_by_user">Canceled by user</string>
     <string name="error_canceled_by_other_peer">Canceled by other peer</string>
+    <string name="qr_scan_to_pair">Scan QR code</string>
+    <string name="qr_scan_prompt">Scan the code shown in DeskLink on your computer</string>
+    <string name="qr_not_a_pairing_code">That is not a DeskLink pairing code</string>
+    <string name="qr_pairing_started">Pairing with your computer…</string>
+    <string name="qr_replace_pairing_title">Replace the pairing with %1$s?</string>
+    <string name="qr_replace_pairing_message">This code shows a different identity for a computer you already paired with. Only continue if you reinstalled DeskLink on that computer.</string>
+    <string name="qr_replace_pairing_confirm">Replace</string>
     <string name="encryption_info_title">Encryption Info</string>
     <string name="my_device_fingerprint">SHA256 fingerprint of your device certificate is:</string>
     <string name="remote_device_fingerprint">SHA256 fingerprint of remote device certificate is:</string>
@@ -577,16 +584,37 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
   <string name="compose_send_title">Compose send</string>
   <string name="open_compose_send">Compose text</string>
   <string name="remote_screen_requesting">Requesting live screen</string>
+  <string name="remote_key_keyboard">Keyboard</string>
+  <string name="remote_zoom_fit">Fit</string>
+  <string name="remote_switch_screen">Switch screen</string>
+  <string name="remote_close">Close remote control</string>
+  <string name="remote_mode_touch">Touch</string>
+  <string name="remote_zoom_fill">Edge to edge</string>
+  <string name="remote_fullscreen">Full screen</string>
+  <string name="remote_exit_fullscreen">Exit full screen</string>
+  <string name="remote_show_controls">Show controls</string>
+  <string name="screen_share_prompt_title">%1$s wants to see your screen</string>
+  <string name="screen_share_prompt_text">Tap to allow screen sharing</string>
   <string name="remote_screen_connected">Live screen connected</string>
   <string name="remote_screen_error">Could not show live screen</string>
   <string name="notification_channel_screen_sharing">Screen sharing</string>
   <string name="remote_screen_plugin_missing">Screen sharing unavailable on this device</string>
   <string name="remote_screen_retry">Retry screen request</string>
+  <string name="remote_screen_waiting_frame">Screen approved, waiting for the first picture…</string>
+  <string name="remote_screen_stopped">Screen sharing stopped</string>
+  <string name="remote_screen_paused">Screen sharing paused</string>
+  <string name="remote_screen_timeout">The computer has not answered. Approve the screen-sharing prompt on your computer, then tap Retry.</string>
+  <string name="remote_control_timeout">The computer has not answered the control request. Approve it on your computer, then tap Enable control again.</string>
+  <string name="remote_screen_interrupted">The connection to the computer was interrupted</string>
+  <string name="remote_screen_not_ready">Not connected to the computer yet. Wait for the connection, then retry.</string>
   <string name="remote_mode_screen">Screen</string>
   <string name="remote_mode_trackpad">Trackpad</string>
   <string name="remote_enable_control">Enable control</string>
   <string name="remote_control_requesting">Requesting remote-control permission</string>
   <string name="remote_control_unavailable">Remote control is unavailable until WebRTC view is connected</string>
+  <string name="remote_control_enabled">Remote control enabled</string>
+  <string name="remote_control_denied">Desktop did not grant remote-control permission</string>
+  <string name="remote_control_denied_reason">Control not granted: %1$s</string>
   <string name="remote_live_screen_pending">Live screen will appear here</string>
   <string name="remote_live_screen_hint">Tap or drag on the screen area to control the desktop by absolute position.</string>
   <string name="remote_trackpad_ready">Trackpad mode</string>
@@ -655,4 +683,91 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="presenter_volume_keys_foreground_tip">You can leave the screen on to use the volume keys to go to the previous/next slide</string>
     <string name="presenter_volume_keys_tip">You can leave the screen on or lock your device to use the volume keys to go to the previous/next slide</string>
 
+    <!-- Terminal -->
+    <string name="terminal_open">Terminal</string>
+    <string name="terminal_title">Terminal</string>
+    <string name="terminal_device_unavailable">This device is not available for terminal sessions</string>
+    <string name="terminal_status_connected">Connected</string>
+    <string name="terminal_status_reconnecting">Reconnecting…</string>
+    <string name="terminal_reconnecting">Reconnecting…</string>
+    <string name="terminal_loading">Loading terminal sessions</string>
+    <string name="terminal_refresh">Refresh sessions</string>
+    <string name="terminal_retry">Retry</string>
+    <string name="terminal_new_session">New session</string>
+    <string name="terminal_empty_title">No terminal sessions</string>
+    <string name="terminal_empty_message">Start a session to run commands on your desktop, including full-screen programs like vim or htop.</string>
+    <string name="terminal_not_allowed_title">Terminal access is turned off</string>
+    <string name="terminal_not_allowed_message">Allow terminal access from this phone in DeskLink on your computer, then tap Retry.</string>
+    <string name="terminal_rename">Rename session</string>
+    <string name="terminal_rename_hint">Name</string>
+    <string name="terminal_close_session">Close session</string>
+    <string name="terminal_close_title">Close this session?</string>
+    <string name="terminal_close_message">The shell and any program running in it will be ended on your desktop.</string>
+    <string name="terminal_close_confirm">Close session</string>
+    <string name="terminal_back_to_sessions">Back to sessions</string>
+    <string name="terminal_reattach">Reconnect to this session</string>
+    <string name="terminal_chip_running">Running</string>
+    <string name="terminal_chip_exited">Exited (%1$d)</string>
+    <string name="terminal_chip_ended">Ended</string>
+    <string name="terminal_chip_disconnected">Disconnected</string>
+    <string name="terminal_exited">Exited with status %1$d</string>
+    <string name="terminal_view_description">Terminal</string>
+    <string name="terminal_copy">Copy</string>
+    <string name="terminal_select_all">Select all</string>
+    <string name="terminal_clip_label">Terminal text</string>
+    <string name="terminal_paste">Paste</string>
+    <string name="terminal_paste_empty">Nothing to paste</string>
+    <string name="terminal_paste_too_large">The clipboard is too large to paste into the terminal</string>
+    <string name="terminal_show_keyboard">Show keyboard</string>
+    <string name="terminal_hide_keyboard">Hide keyboard</string>
+    <string name="terminal_key_escape">Escape</string>
+    <string name="terminal_key_tab">Tab</string>
+    <string name="terminal_key_ctrl">Control</string>
+    <string name="terminal_key_alt">Alt</string>
+    <string name="terminal_key_armed">armed for the next key</string>
+    <string name="terminal_key_locked">locked</string>
+    <string name="terminal_key_left">Left arrow</string>
+    <string name="terminal_key_right">Right arrow</string>
+    <string name="terminal_key_up">Up arrow</string>
+    <string name="terminal_key_down">Down arrow</string>
+    <string name="terminal_key_home">Home</string>
+    <string name="terminal_key_end">End</string>
+    <string name="terminal_key_page_up">Page up</string>
+    <string name="terminal_key_page_down">Page down</string>
+    <string name="terminal_key_function">Function key %1$d</string>
+    <string name="terminal_key_function_row">Show or hide function keys</string>
+    <string name="terminal_attention_channel">Terminal attention</string>
+    <string name="terminal_attention_waiting">Terminal is waiting for you</string>
+    <string name="terminal_attention_finished">Terminal finished</string>
+    <string name="terminal_notification_open">Open</string>
+    <string name="terminal_notification_yes">Yes</string>
+    <string name="terminal_notification_no">No</string>
+
+    <string name="remote_prefs_screen_category">Remote control</string>
+    <string name="remote_prefs_scroll_category">Two-finger scrolling</string>
+    <string name="remote_prefs_trackpad_category">Trackpad mode</string>
+    <string name="remote_pref_default_mode" translatable="false">remote_default_mode</string>
+    <string name="remote_pref_default_mode_title">Start in</string>
+    <string-array name="remote_mode_entries">
+        <item>Touch: tap where you want to click</item>
+        <item>Trackpad: move the pointer like a laptop touchpad</item>
+    </string-array>
+    <string-array name="remote_mode_values" translatable="false">
+        <item>touch</item>
+        <item>trackpad</item>
+    </string-array>
+    <string name="remote_pref_edge_to_edge" translatable="false">remote_edge_to_edge</string>
+    <string name="remote_pref_edge_to_edge_title">Start edge to edge</string>
+    <string name="remote_pref_edge_to_edge_summary">Fill the phone screen, cropping the desktop\'s edges slightly. Off shows the whole desktop.</string>
+    <string name="remote_pref_auto_keyboard" translatable="false">remote_auto_keyboard</string>
+    <string name="remote_pref_auto_keyboard_title">Open the keyboard automatically</string>
+    <string name="remote_pref_auto_keyboard_summary">When a text field or terminal on the computer is selected</string>
+    <string name="remote_pref_autohide_controls" translatable="false">remote_autohide_controls</string>
+    <string name="remote_pref_autohide_controls_title">Hide controls automatically</string>
+    <string name="remote_pref_autohide_controls_summary">After a few seconds; the arrow button brings them back</string>
+    <string name="remote_pref_keep_screen_on" translatable="false">remote_keep_screen_on</string>
+    <string name="remote_pref_keep_screen_on_title">Keep the phone screen on</string>
+    <string name="remote_pref_haptics" translatable="false">remote_haptics</string>
+    <string name="remote_pref_haptics_title">Vibrate on touch</string>
+    <string name="remote_pref_haptics_summary">On clicks and long presses</string>
 </resources>

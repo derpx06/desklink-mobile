@@ -338,7 +338,9 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
 
     private long receiveFile(InputStream input, OutputStream output, String transferId, String uri,
                              long resumeOffset, long totalSize, String expectedSha256) throws IOException {
-        byte[] data = new byte[4096];
+        // Large reads: on SAF/FUSE each call is costly, and 4 KiB made the
+        // copy into Downloads take longer than the transfer itself.
+        byte[] data = new byte[256 * 1024];
         int count;
         long received = resumeOffset;
 

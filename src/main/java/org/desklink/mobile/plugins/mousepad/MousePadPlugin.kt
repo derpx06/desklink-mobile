@@ -111,6 +111,16 @@ class MousePadPlugin : Plugin() {
         sendPacket(np)
     }
 
+    /** A double-click at the tapped position. Without the position it lands
+     * wherever the pointer last was, which is not where the user tapped. */
+    fun sendScreenDoubleClick(x: Int, y: Int) {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["x"] = x
+        np["y"] = y
+        np["doubleclick"] = true
+        sendPacket(np)
+    }
+
     fun hasMicPermission(): Boolean {
         return isPermissionGranted(Manifest.permission.RECORD_AUDIO)
     }

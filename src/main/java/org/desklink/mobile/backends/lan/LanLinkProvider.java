@@ -79,6 +79,10 @@ public class LanLinkProvider extends BaseLinkProvider {
     final static int MAX_RATE_LIMIT_ENTRIES = 255;
     final ConcurrentHashMap<String, Long> lastConnectionTimeByDeviceId = new ConcurrentHashMap<>();
     final ConcurrentHashMap<InetAddress, Long> lastConnectionTimeByIp = new ConcurrentHashMap<>();
+    // TCP accepts are limited separately: sharing one map with UDP beacons
+    // discarded the desktop's dial-back that arrives within a second of its
+    // own beacon — exactly the connection discovery is trying to make.
+    final ConcurrentHashMap<InetAddress, Long> lastTcpConnectionTimeByIp = new ConcurrentHashMap<>();
 
     private ServerSocket tcpServer;
     private DatagramSocket udpServer;
@@ -88,7 +92,7 @@ public class LanLinkProvider extends BaseLinkProvider {
     private volatile long lastBroadcast = 0;
     private final static long delayBetweenBroadcasts = 200;
 
-    private boolean listening = false;
+    private volatile boolean listening = false;
 
     public void onConnectionLost(BaseLink link) {
         String deviceId = link.getDeviceId();
@@ -112,17 +116,18 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
     }
 
-    Pair<NetworkPacket, Boolean> unserializeReceivedIdentityPacket(String message) {
+    Pair<NetworkPacket, Boolean> unserializeReceivedIdentityPacket(String message, Object source) {
         NetworkPacket identityPacket;
         try {
             identityPacket = NetworkPacket.unserialize(message);
         } catch (JSONException e) {
-            Log.w("DeskLink/LanLinkProvider", "Invalid identity packet received: " + e.getMessage());
+            Log.w("DeskLink/LanLinkProvider", "Invalid identity packet from " + source + ": " + e.getMessage());
             return null;
         }
 
         if (!DeviceInfo.isValidIdentityPacket(identityPacket)) {
-            Log.w("DeskLink/LanLinkProvider", "Invalid identity packet received.");
+            // Type only, never the body.
+            Log.w("DeskLink/LanLinkProvider", "Invalid identity packet from " + source + " (type " + identityPacket.getType() + ")");
             return null;
         }
 
@@ -139,7 +144,11 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
 
         boolean deviceTrusted = TrustedDevices.isTrustedDevice(context, deviceId);
-        if (!deviceTrusted && !TrustedNetworkHelper.isTrustedNetwork(context)) {
+        // The desktop whose QR code the user just scanned is let through: the
+        // scan itself is the user's consent, and its certificate is verified
+        // against the code's fingerprint before anything is sent to it.
+        boolean qrPairing = deviceId.equals(org.desklink.mobile.QrPairing.getPendingDesktopId());
+        if (!deviceTrusted && !qrPairing && !TrustedNetworkHelper.isTrustedNetwork(context)) {
             Log.i("DeskLink/LanLinkProvider", "Ignoring identity packet because the device is not trusted and I'm not on a trusted network.");
             return null;
         }
@@ -155,13 +164,18 @@ public class LanLinkProvider extends BaseLinkProvider {
 
         if (!isPrivateAddress(address)) {
             Log.i("LanLinkProvider", "Discarding TCP packet from a non-local IP");
+            closeQuietly(socket);
             return;
         }
 
         configureSocket(socket);
+        // Until it has identified itself a peer gets 5 s per read: without a
+        // timeout a silent connection pinned this thread and socket forever.
+        socket.setSoTimeout(5000);
 
-        if (rateLimitByIp(address)) {
+        if (rateLimit(lastTcpConnectionTimeByIp, address)) {
             Log.i("LanLinkProvider", "Discarding second TCP packet from the same ip " + address + " received too quickly");
+            closeQuietly(socket);
             return;
         }
 
@@ -174,11 +188,13 @@ public class LanLinkProvider extends BaseLinkProvider {
             //Log.e("TcpListener", "Received TCP packet: " + message);
         } catch (Exception e) {
             Log.e("DeskLink/LanLinkProvider", "Exception while receiving TCP packet", e);
+            closeQuietly(socket);
             return;
         }
 
-        final Pair<NetworkPacket, Boolean> pair = unserializeReceivedIdentityPacket(message);
+        final Pair<NetworkPacket, Boolean> pair = unserializeReceivedIdentityPacket(message, socket.getInetAddress());
         if (pair == null) {
+            closeQuietly(socket);
             return;
         }
         final NetworkPacket identityPacket = pair.first;
@@ -190,10 +206,12 @@ public class LanLinkProvider extends BaseLinkProvider {
         Integer targetProtocolVersion = identityPacket.getIntOrNull("targetProtocolVersion");
         if (targetDeviceId != null && !targetDeviceId.equals(DeviceHelper.getDeviceId(context))) {
             Log.e("DeskLink/LanLinkProvider","Received a connection request for a device that isn't me: " + targetDeviceId);
+            closeQuietly(socket);
             return;
         }
         if (targetProtocolVersion != null && targetProtocolVersion != DeviceHelper.PROTOCOL_VERSION) {
             Log.e("DeskLink/LanLinkProvider","Received a connection request for a protocol version that isn't mine: " + targetProtocolVersion);
+            closeQuietly(socket);
             return;
         }
 
@@ -201,16 +219,24 @@ public class LanLinkProvider extends BaseLinkProvider {
     }
 
     boolean rateLimitByIp(InetAddress address) {
+        return rateLimit(lastConnectionTimeByIp, address);
+    }
+
+    private static boolean rateLimit(ConcurrentHashMap<InetAddress, Long> times, InetAddress address) {
         long now = System.currentTimeMillis();
-        Long last = lastConnectionTimeByIp.get(address);
+        Long last = times.get(address);
         if (last != null && (last + MILLIS_DELAY_BETWEEN_CONNECTIONS_TO_SAME_DEVICE > now)) {
             return true;
         }
-        lastConnectionTimeByIp.put(address, now);
-        if (lastConnectionTimeByIp.size() > MAX_RATE_LIMIT_ENTRIES) {
-            lastConnectionTimeByIp.entrySet().removeIf(e -> e.getValue() + MILLIS_DELAY_BETWEEN_CONNECTIONS_TO_SAME_DEVICE < now);
+        times.put(address, now);
+        if (times.size() > MAX_RATE_LIMIT_ENTRIES) {
+            times.entrySet().removeIf(e -> e.getValue() + MILLIS_DELAY_BETWEEN_CONNECTIONS_TO_SAME_DEVICE < now);
         }
         return false;
+    }
+
+    private static void closeQuietly(Socket socket) {
+        try { socket.close(); } catch (IOException ignored) { }
     }
 
     boolean rateLimitByDeviceId(String deviceId) {
@@ -253,7 +279,7 @@ public class LanLinkProvider extends BaseLinkProvider {
 
         String message = new String(packet.getData(), Charsets.UTF_8);
 
-        final Pair<NetworkPacket, Boolean> pair = unserializeReceivedIdentityPacket(message);
+        final Pair<NetworkPacket, Boolean> pair = unserializeReceivedIdentityPacket(message, address);
         if (pair == null) {
             return;
         }
@@ -261,7 +287,12 @@ public class LanLinkProvider extends BaseLinkProvider {
         final boolean deviceTrusted = pair.second;
 
         final String deviceId = identityPacket.getString("deviceId");
-        if (!shouldOpenDiscoveredBootstrap(visibleDevices.containsKey(deviceId))) {
+        // A beacon from a restarted desktop must open a fresh link even though
+        // one is "active": that one belongs to the dead previous process.
+        final LanLink existing = visibleDevices.get(deviceId);
+        final boolean restarted = existing != null && DeviceInfo.peerRestarted(
+                existing.getDeviceInfo().instanceId, identityPacket.getString("instanceId", ""));
+        if (!restarted && !shouldOpenDiscoveredBootstrap(existing != null)) {
             Log.d(
                 "DeskLink/LanLinkProvider",
                 "Keeping the active bootstrap link for " + deviceId + " after discovery refresh"
@@ -279,7 +310,10 @@ public class LanLinkProvider extends BaseLinkProvider {
 
         Socket socket = null;
         try {
-            socket = SocketFactory.getDefault().createSocket(address, tcpPort);
+            // Bounded: an unconnected socket plus explicit timeout, since the
+            // default connect waits out the OS SYN retries (minutes).
+            socket = SocketFactory.getDefault().createSocket();
+            socket.connect(new java.net.InetSocketAddress(address, tcpPort), 3000);
             configureSocket(socket);
 
             DeviceInfo myDeviceInfo = DeviceHelper.getDeviceInfo(context);
@@ -343,11 +377,13 @@ public class LanLinkProvider extends BaseLinkProvider {
 
         if (deviceTrusted && isProtocolDowngrade(deviceId, protocolVersion)) {
             Log.w("DeskLink/LanLinkProvider", "Refusing to connect to a device using an older protocol version:" + protocolVersion);
+            closeQuietly(socket);
             return;
         }
 
         if (deviceTrusted && !TrustedDevices.isCertificateStored(context, deviceId)) {
             Log.e("DeskLink/LanLinkProvider", "Device trusted but no cert stored. This should not happen.");
+            closeQuietly(socket);
             return;
         }
 
@@ -674,18 +710,51 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
         visibleDevices.clear();
 
+        announceBurst(network);
+    }
+
+    @Override
+    public void refreshDiscovery() {
+        if (udpServer == null) {
+            setupUdpListener();
+        }
+        announceBurst(null);
+    }
+
+    // A single beacon is easily lost — UDP, a desktop listener not up yet, an
+    // access point still settling — and the desktop's periodic beacon is 15 s
+    // away, which was most of a cold start. So announce at 0, 0.3, 1, 3 and 7
+    // s. A newer burst supersedes an older one instead of stacking with it.
+    private static final long[] BURST_OFFSETS_MILLIS = {0, 300, 1_000, 3_000, 7_000};
+    private final java.util.concurrent.atomic.AtomicLong burstGeneration =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    private void announceBurst(@Nullable Network network) {
         // Only the outbound churn is throttled.
         if (System.currentTimeMillis() < lastBroadcast + delayBetweenBroadcasts) {
-            Log.i("LanLinkProvider", "onNetworkChange: relax cowboy");
+            Log.i("LanLinkProvider", "announceBurst: relax cowboy");
             return;
         }
         lastBroadcast = System.currentTimeMillis();
-
-        broadcastUdpIdentityPacket(network);
         synchronized (mdnsDiscovery) {
             mdnsDiscovery.stopDiscovering();
             mdnsDiscovery.startDiscovering();
         }
+        final long generation = burstGeneration.incrementAndGet();
+        ThreadHelper.execute(() -> {
+            long elapsed = 0;
+            for (long offset : BURST_OFFSETS_MILLIS) {
+                try {
+                    Thread.sleep(offset - elapsed);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                elapsed = offset;
+                if (!listening || burstGeneration.get() != generation) return;
+                broadcastUdpIdentityPacket(network);
+            }
+        });
     }
 
     @Override

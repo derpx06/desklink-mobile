@@ -31,7 +31,18 @@ data class TransferCheckpoint @JvmOverloads constructor(
 class TransferCheckpointStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
 
-    fun load(transferId: String): TransferCheckpoint? {
+    /** True if anything is recorded for [transferId], even an entry too damaged for [load] to read. */
+    fun exists(transferId: String): Boolean =
+        isSafeId(transferId) && preferences.contains(key(transferId, "uri"))
+
+    /** A checkpoint whose stored values have the wrong type is corrupt: report it as absent, never throw. */
+    fun load(transferId: String): TransferCheckpoint? = try {
+        read(transferId)
+    } catch (_: ClassCastException) {
+        null
+    }
+
+    private fun read(transferId: String): TransferCheckpoint? {
         if (!isSafeId(transferId)) return null
         val uri = preferences.getString(key(transferId, "uri"), null) ?: return null
         return TransferCheckpoint(

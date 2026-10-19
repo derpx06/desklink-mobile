@@ -29,6 +29,12 @@ data class DeviceInfo(
     @JvmField var protocolVersion: Int = 0,
     @JvmField var incomingCapabilities: Set<String>? = null,
     @JvmField var outgoingCapabilities: Set<String>? = null,
+    /**
+     * The peer's restart epoch: random per process start, absent from older
+     * builds. A different one means the peer restarted and any WebRTC peer of
+     * its previous process is dead. Mirrors the desktop's `instance_id`.
+     */
+    @JvmField var instanceId: String? = null,
 ) {
 
     /**
@@ -39,7 +45,7 @@ data class DeviceInfo(
     fun saveInSettings(context: Context) {
         try {
             val encodedCertificate = Base64.encodeToString(certificate.encoded, 0)
-            TrustedDevices.getDeviceSettings(context, id).edit {
+            TrustedDevices.getDeviceSettings(context, id).edit(commit = true) {
                 putString("certificate", encodedCertificate)
                 putString("deviceName", name)
                 putString("deviceType", type.toString())
@@ -63,9 +69,18 @@ data class DeviceInfo(
             np["deviceType"] = type.toString()
             np["incomingCapabilities"] = incomingCapabilities!!
             np["outgoingCapabilities"] = outgoingCapabilities!!
+            np["instanceId"] = PROCESS_INSTANCE_ID
         }
 
     companion object {
+        /** This process's restart epoch; see [instanceId]. */
+        @JvmField
+        val PROCESS_INSTANCE_ID: String = java.util.UUID.randomUUID().toString().replace("-", "")
+
+        /** Whether two epochs prove a restart. Unknown on either side means no. */
+        @JvmStatic
+        fun peerRestarted(previous: String?, current: String?): Boolean =
+            !previous.isNullOrEmpty() && !current.isNullOrEmpty() && previous != current
 
         /**
          * Recreates a DeviceInfo object that was persisted using saveInSettings()
@@ -106,7 +121,8 @@ data class DeviceInfo(
                     certificate = certificate,
                     protocolVersion = getInt("protocolVersion"),
                     incomingCapabilities = getStringSet("incomingCapabilities"),
-                    outgoingCapabilities = getStringSet("outgoingCapabilities")
+                    outgoingCapabilities = getStringSet("outgoingCapabilities"),
+                    instanceId = getString("instanceId", "").takeIf { it.isNotEmpty() && it.length <= 64 },
                 )
             }
 

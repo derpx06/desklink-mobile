@@ -42,7 +42,12 @@ swiperefreshlayout = "1.2.0"
 uiToolingPreview = "1.11.2"
 univocityParsers = "2.9.1"
 okhttp = "5.3.0"
+# QR pairing scanner. 4.x needs minSdk 24 unless paired with zxing core 3.3.0
+# and non-transitive, which is the README's documented path for API 23.
+zxingAndroidEmbedded = "4.3.0"
+zxingCore = "3.3.0"
 webrtc = "144.7559.05"
+termux = "v0.118.1"
 
 [libraries]
 android-desugarJdkLibsNio = { module = "com.android.tools:desugar_jdk_libs_nio", version.ref = "androidDesugarJdkLibs" }
@@ -92,7 +97,11 @@ robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectr
 rxjava = { module = "io.reactivex.rxjava2:rxjava", version.ref = "rxjava" }
 univocity-parsers = { module = "com.univocity:univocity-parsers", version.ref = "univocityParsers" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingAndroidEmbedded" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxingCore" }
 webrtc = { module = "io.github.webrtc-sdk:android", version.ref = "webrtc" }
+termux-terminal-emulator = { module = "com.github.termux.termux-app:terminal-emulator", version.ref = "termux" }
+termux-terminal-view = { module = "com.github.termux.termux-app:terminal-view", version.ref = "termux" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 slf4j-handroid = { module = "com.gitlab.mvysny.slf4j:slf4j-handroid", version.ref = "slf4j-handroid" }

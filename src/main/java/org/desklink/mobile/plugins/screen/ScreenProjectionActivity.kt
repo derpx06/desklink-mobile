@@ -10,8 +10,20 @@ import org.desklink.mobile.DeskLinkApplication
 class ScreenProjectionActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        getSystemService(android.app.NotificationManager::class.java)
+            ?.cancel(ScreenControlPlugin.PROMPT_NOTIFICATION_ID)
         val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CAPTURE)
+        // The whole display, never "share one app": a remote view of a single
+        // app cannot show the launcher, the shade or the app switcher, and
+        // control of the rest of the phone would be blind.
+        val intent = if (android.os.Build.VERSION.SDK_INT >= 34) {
+            manager.createScreenCaptureIntent(
+                android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay(),
+            )
+        } else {
+            manager.createScreenCaptureIntent()
+        }
+        startActivityForResult(intent, REQUEST_CAPTURE)
     }
 
     @Suppress("DEPRECATION")

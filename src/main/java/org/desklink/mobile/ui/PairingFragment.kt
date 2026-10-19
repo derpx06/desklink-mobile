@@ -55,6 +55,17 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
 
         override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
             return when (menuItem.itemId) {
+                R.id.menu_scan_qr -> {
+                    qrScanner.launch(
+                        com.journeyapps.barcodescanner.ScanOptions()
+                            .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
+                            .setPrompt(getString(R.string.qr_scan_prompt))
+                            .setBeepEnabled(false)
+                            .setOrientationLocked(false),
+                    )
+                    true
+                }
+
                 R.id.menu_refresh -> {
                     viewModel.onRefresh()
                     true
@@ -72,6 +83,41 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
 
                 else -> false
             }
+        }
+    }
+
+    // QR pairing: one scan, nothing to compare (see QrPairing / pairing_qr.rs).
+    private val qrScanner = registerForActivityResult(com.journeyapps.barcodescanner.ScanContract()) { result ->
+        val text = result.contents ?: return@registerForActivityResult
+        val context = requireContext().applicationContext
+        val code = org.desklink.mobile.QrPairing.parse(text)
+        if (code == null) {
+            android.widget.Toast.makeText(context, R.string.qr_not_a_pairing_code, android.widget.Toast.LENGTH_LONG).show()
+            return@registerForActivityResult
+        }
+        val application = org.desklink.mobile.DeskLinkApplication.getInstance()
+        fun start(replaceExisting: Boolean) {
+            android.widget.Toast.makeText(context, R.string.qr_pairing_started, android.widget.Toast.LENGTH_SHORT).show()
+            org.desklink.mobile.QrPairing.pair(application, code, replaceExisting) { error ->
+                if (error != null) {
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+        // A code can name any desktop's public id, so replacing an existing
+        // pairing is the user's decision, never the scan's.
+        val conflict = org.desklink.mobile.QrPairing.conflictingPairing(application, code)
+        if (conflict == null) {
+            start(replaceExisting = false)
+        } else {
+            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle(getString(R.string.qr_replace_pairing_title, conflict.name))
+                .setMessage(R.string.qr_replace_pairing_message)
+                .setPositiveButton(R.string.qr_replace_pairing_confirm) { _, _ -> start(replaceExisting = true) }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
     }
 
