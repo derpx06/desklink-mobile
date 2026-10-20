@@ -514,18 +514,35 @@ class DeskLinkApplication : Application() {
         }
     }
 
-    private fun webRtcCoordinatorFor(device: Device): WebRtcSessionCoordinator =
-        webRtcCoordinators.computeIfAbsent(device.deviceId) {
-            WebRtcSessionCoordinator(
-                this,
-                device,
-                sessionManager,
-                sessionPasswords.computeIfAbsent(device.deviceId) { AtomicReference() },
-                screenResumes.computeIfAbsent(device.deviceId) { java.util.concurrent.atomic.AtomicBoolean() },
-            ) { state, detail ->
-                Log.i("DeskLink/WebRTC", "${device.deviceId}: $state${detail?.let { " ($it)" } ?: ""}")
-                onDeviceListChanged()
-            }
+    /**
+     * The device's coordinator, created on first use. A new one is attached as
+     * the device's signaling handler at once: unpair closes the old one and
+     * clears the handler, and re-pairing over the still-open link (QR, or
+     * accepting a request) registers no new bootstrap session. Without this the
+     * desktop's answers queued forever and the device read "Connecting…".
+     */
+    private fun webRtcCoordinatorFor(device: Device): WebRtcSessionCoordinator {
+        var created = false
+        val coordinator = webRtcCoordinators.computeIfAbsent(device.deviceId) {
+            created = true
+            newWebRtcCoordinator(device)
+        }
+        // Outside computeIfAbsent: attaching delivers queued signaling, which
+        // may look the coordinator up again.
+        if (created) device.setControlPacketHandler(coordinator)
+        return coordinator
+    }
+
+    private fun newWebRtcCoordinator(device: Device): WebRtcSessionCoordinator =
+        WebRtcSessionCoordinator(
+            this,
+            device,
+            sessionManager,
+            sessionPasswords.computeIfAbsent(device.deviceId) { AtomicReference() },
+            screenResumes.computeIfAbsent(device.deviceId) { java.util.concurrent.atomic.AtomicBoolean() },
+        ) { state, detail ->
+            Log.i("DeskLink/WebRTC", "${device.deviceId}: $state${detail?.let { " ($it)" } ?: ""}")
+            onDeviceListChanged()
         }
 
     companion object {
