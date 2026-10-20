@@ -44,7 +44,7 @@ object WebRtcRuntime {
         // context is rejected the factory silently disables texture support and
         // only says so in logcat.
         return PeerConnectionFactory.builder()
-            .setOptions(PeerConnectionFactory.Options())
+            .setOptions(iceNetworkOptions())
             .setVideoEncoderFactory(
                 // libwebrtc's encoders, with hardware ones in low-latency mode.
                 org.webrtc.DeskLinkVideoEncoderFactories.create(
@@ -55,6 +55,24 @@ object WebRtcRuntime {
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(egl.eglBaseContext))
             .createPeerConnectionFactory()
             .also { factory = it }
+    }
+
+    /**
+     * Gather ICE candidates on every interface the kernel has, not only the
+     * networks Android reports.
+     *
+     * libwebrtc's Android network monitor lists `ConnectivityManager` networks
+     * that have internet capability. A laptop on this phone's hotspot reaches
+     * it through the tethering interface, which is not such a network, so the
+     * phone offered only loopback and mobile-data candidates and the direct
+     * link failed every time while the LAN bootstrap kept working. Without the
+     * monitor libwebrtc enumerates interfaces itself (refreshed every 2 s), the
+     * hotspot included. Loopback candidates never reach the desk, so they are
+     * dropped.
+     */
+    internal fun iceNetworkOptions() = PeerConnectionFactory.Options().apply {
+        disableNetworkMonitor = true
+        networkIgnoreMask = PeerConnectionFactory.Options.ADAPTER_TYPE_LOOPBACK
     }
 
     @Synchronized
