@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 DeskLink contributors
+
+SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+-->
+<!-- Strings of the redesigned screens. -->
+<resources>
+    <!-- Connection states -->
+    <string name="connection_local">Local network</string>
+    <string name="connection_away">Away from home</string>
+    <string name="connection_connected">Connected</string>
+    <string name="connection_connecting">Connecting…</string>
+    <string name="connection_offline">Offline</string>
+
+    <string name="battery_percent">%1$d%%</string>
+    <string name="battery_description">Battery %1$d%%</string>
+    <string name="battery_charging_description">Battery %1$d%%, charging</string>
+
+    <!-- Home -->
+    <string name="home_your_computers">Your computers</string>
+    <string name="home_ready_to_pair">Ready to pair</string>
+    <string name="home_nearby_summary">On your network · not paired</string>
+    <string name="home_pair">Pair</string>
+    <string name="home_empty_title">Connect your computer</string>
+    <string name="home_empty_body">Open DeskLink on your computer and scan the pairing code it shows. That is all it takes.</string>
+    <string name="home_same_wifi_hint">On the same Wi‑Fi, computers also appear here by themselves.</string>
+    <string name="home_add_another">Pair another computer</string>
+    <string name="home_action_files">Files</string>
+    <string name="device_desc_local">Ready · secure link on your network</string>
+    <string name="device_desc_away">Ready · end-to-end encrypted through the relay</string>
+    <string name="device_desc_connected">Ready</string>
+    <string name="device_desc_connecting">Setting up a secure connection</string>
+    <string name="device_desc_offline">Start DeskLink on it to reconnect</string>
+    <!-- One-line descriptions under the device screen\'s control tiles -->
+    <string name="tile_desc_remote">See and control the screen</string>
+    <string name="tile_desc_terminal">Shell and coding agents</string>
+    <string name="tile_desc_files">Send from this phone</string>
+    <string name="tile_desc_clipboard">Copy to the computer</string>
+    <string name="tile_desc_presenter">Slides from your hand</string>
+    <string name="tile_desc_runcommand">Saved commands</string>
+    <string name="tile_desc_media">Control playback</string>
+    <string name="tile_desc_digitizer">Draw with your finger</string>
+    <string name="tile_desc_tv">TV-style remote</string>
+    <string name="navigate_up">Back</string>
+
+    <!-- Device -->
+    <string name="device_section_controls">Controls</string>
+    <string name="device_section_quick">Quick actions</string>
+    <string name="device_section_permissions">Needs a permission</string>
+    <string name="device_section_optional_permissions">Optional permissions</string>
+    <string name="device_section_connection">Connection</string>
+    <string name="device_section_manage">Manage</string>
+    <string name="device_path">Path</string>
+    <string name="device_protocol">Protocol</string>
+    <string name="device_protocol_value">DeskLink v%1$d</string>
+    <string name="device_encryption">Encryption</string>
+    <string name="device_encryption_value">Verify certificate fingerprints</string>
+    <string name="device_unpair_title">Unpair %1$s?</string>
+    <string name="device_unpair_message">The two devices will stop trusting each other. You can pair again at any time.</string>
+    <string name="device_unpair_summary">Forget this computer and its certificate</string>
+    <string name="device_offline_title">Can\'t reach this computer</string>
+    <string name="device_offline_body">Make sure DeskLink is running on the computer. On another network, turn on Connect away from home in Settings.</string>
+    <string name="device_try_again">Try again</string>
+    <string name="device_tap_permission">Tap to grant</string>
+
+    <!-- Pairing -->
+    <string name="pair_title_request">Pair with %1$s?</string>
+    <string name="pair_title_incoming">%1$s wants to pair</string>
+    <string name="pair_title_waiting">Waiting for %1$s</string>
+    <string name="pair_code_label">Verification code</string>
+    <string name="pair_code_hint">Check that your computer shows the same code before you accept.</string>
+    <string name="pair_waiting_hint">Accept the request on your computer. Both screens show the same code.</string>
+    <string name="pair_code_description">Verification code %1$s</string>
+    <string name="qr_scan_hint">Point the camera at the code in DeskLink on your computer</string>
+
+    <!-- Terminal -->
+    <string name="terminal_new_session_choose">Start a session</string>
+    <string name="terminal_session_size">%1$d×%2$d</string>
+    <string name="terminal_sessions_title">Sessions</string>
+    <string name="terminal_session_options">Options for %1$s</string>
+
+    <!-- Remote screen -->
+    <string name="remote_path_chip_description">Connection: %1$s</string>
+    <string name="remote_path_direct">Over the internet</string>
+    <string name="remote_path_turn">Through a relay server</string>
+    <string name="remote_path_with_rtt">%1$s · %2$d ms</string>
+
+    <!-- Settings -->
+    <string name="settings_category_general">General</string>
+    <string name="settings_category_connection">Connection</string>
+    <string name="settings_category_away">Away from home</string>
+    <string name="settings_category_notifications">Notifications</string>
+    <string name="settings_category_advanced">Advanced</string>
+    <string name="settings_category_debug">Debug</string>
+    <string name="setting_dynamic_colors">Use wallpaper colors</string>
+    <string name="setting_dynamic_colors_summary">Match the system palette. Off uses DeskLink\'s own colors.</string>
+</resources>

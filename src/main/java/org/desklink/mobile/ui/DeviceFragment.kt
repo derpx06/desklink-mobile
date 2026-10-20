@@ -9,35 +9,36 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import androidx.activity.OnBackPressedCallback
-import androidx.annotation.StringRes
 import androidx.annotation.UiThread
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.core.view.MenuProvider
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.Device
 import org.desklink.mobile.Device.PluginsChangedListener
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.PairingHandler
 import org.desklink.mobile.base.BaseFragment
-import org.desklink.mobile.extensions.setupBottomPadding
 import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.plugins.Plugin
-import org.desklink.mobile.plugins.battery.BatteryPlugin
 import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.ui.compose.DeskLinkTheme
-import org.desklink.mobile.ui.compose.screen.device.PluginsScreen
+import org.desklink.mobile.ui.compose.extensions.device.toUiModel
+import org.desklink.mobile.ui.compose.screen.device.DeviceScreen
+import org.desklink.mobile.ui.compose.screen.device.DeviceScreenActions
+import org.desklink.mobile.ui.compose.screen.device.DeviceScreenState
+import org.desklink.mobile.ui.compose.screen.device.QuickActionItem
 import org.desklink.mobile.R
 import org.desklink.mobile.databinding.ActivityDeviceBinding
 
 /**
- * Main view. Displays the current device and its plugins
+ * One device: its pairing request, or, once paired, what it can do from here.
  */
 class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
 
@@ -45,6 +46,7 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
         private const val ARG_DEVICE_ID = "deviceId"
         private const val ARG_FROM_DEVICE_LIST = "fromDeviceList"
         private const val TAG = "DeskLink/DeviceFragment"
+        private const val STATUS_POLL_MS = 2_000L
         fun newInstance(deviceId: String?, fromDeviceList: Boolean): DeviceFragment {
             val frag = DeviceFragment()
             val args = Bundle()
@@ -53,9 +55,23 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             frag.arguments = args
             return frag
         }
+
+        /** The order tiles appear in: the remote and the terminal first, by their icons. */
+        private val CONTROL_ORDER = listOf(
+            R.drawable.touchpad_plugin_action_24dp,
+            R.drawable.ic_terminal_24dp,
+            R.drawable.share_plugin_action_24dp,
+            R.drawable.ic_baseline_content_paste_24,
+            R.drawable.ic_presenter_24dp,
+            R.drawable.run_command_plugin_icon_24dp,
+            R.drawable.mpris_plugin_action_24dp,
+            R.drawable.ic_draw_24dp,
+            R.drawable.tv_remote_24px,
+        )
     }
 
-    override fun getActionBarTitle() = null
+    // The screen title is the device's own name, in the hero below the app bar.
+    override fun getActionBarTitle() = ""
 
     val deviceId: String by lazy {
         arguments?.getString(ARG_DEVICE_ID)
@@ -64,142 +80,70 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
 
     private val device by lazy { DeskLinkApplication.getInstance().getDevice(deviceId) }
 
-    /**
-     * Not-yet-paired ViewBinding.
-     *
-     * Used to start and retry pairing.
-     */
-    private val pairingBinding get() = binding.pairRequest
+    private val screenState = mutableStateOf<DeviceScreenState?>(null)
 
-    /**
-     * Cannot-communicate ViewBinding.
-     *
-     * Used when the remote device is unreachable.
-     */
-    private val errorBinding get() = binding.pairError
+    /** Set by a pairing failure or unpair; cleared when pairing starts again. */
+    private var pairMessage: String? = null
+    private var isRefreshing = false
+    private var statusPoll: Job? = null
 
     override fun onInflateBinding(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): ActivityDeviceBinding {
-        val fromDeviceList = requireArguments().getBoolean(ARG_FROM_DEVICE_LIST, false)
-        if (fromDeviceList) {
-            val callback = object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    // Handle back button, so we go to the list of devices in case we came from there
-                    (mActivity as? MainActivity)?.onDeviceSelected(null)
-                }
-            }
-            requireActivity().onBackPressedDispatcher.addCallback(getViewLifecycleOwner(), callback)
-        }
-        return ActivityDeviceBinding.inflate(inflater, container, false)
-    }
-
-    private val menuProvider = object : MenuProvider {
-        override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-            menu.clear()
-            val device = device ?: return
-
-            //Plugins button list
-            val menuEntries: Collection<Plugin.PluginUiMenuEntry> =
-                device.loadedPlugins.values.flatMap { it.getUiMenuEntries() }
-            for (p in menuEntries) {
-                menu.add(p.name).setOnMenuItemClickListener {
-                    p.onClick(mActivity!!)
-                    true
-                }
-            }
-            val intent = Intent(mActivity, PluginSettingsActivity::class.java)
-            intent.putExtra("deviceId", deviceId)
-            menu.add(R.string.device_menu_plugins).setOnMenuItemClickListener {
-                startActivity(intent)
-                true
-            }
-            if (device.isReachable) {
-                val builder = MaterialAlertDialogBuilder(requireContext())
-                builder.setTitle(requireContext().resources.getString(R.string.encryption_info_title))
-                builder.setPositiveButton(requireContext().resources.getString(R.string.ok)) { dialog, _ ->
-                    dialog.dismiss()
-                }
-                builder.setMessage(
-                    "${
-                        requireContext().resources.getString(R.string.my_device_fingerprint)
-                    } \n ${
-                        SslHelper.getCertificateHash(SslHelper.certificate)
-                    } \n\n ${
-                        requireContext().resources.getString(R.string.remote_device_fingerprint)
-                    } \n ${
-                        SslHelper.getCertificateHash(device.certificate)
-                    } \n\n ${
-                        requireContext().resources.getString(R.string.protocol_version)
-                    } ${
-                        device.protocolVersion
-                    }"
-                )
-                menu.add(R.string.encryption_info_title).setOnMenuItemClickListener {
-                    builder.show()
-                    true
-                }
-            }
-            if (device.isPaired) {
-                menu.add(R.string.device_menu_unpair).setOnMenuItemClickListener {
-                    device.apply {
-                        // Remove listener so buttons don't show for an instant before changing the view
-                        removePairingCallback(pairingCallback)
-                        removePluginsChangedListener(pluginsChangedListener)
-                        unpair()
-                    }
-                    // Let PopupWindow finish dispatching this menu click
-                    // before replacing the fragment. Replacing it inline can
-                    // leave the popup handling a stale view tree and trigger
-                    // Android's input-dispatch ANR.
-                    view?.post {
-                        (mActivity as? MainActivity)?.onDeviceSelected(null)
-                    }
-                    true
-                }
-            }
-            if (device.pairStatus == PairingHandler.PairState.Requested) {
-                menu.add(R.string.cancel_pairing).setOnMenuItemClickListener {
-                    device.cancelPairing()
-                    true
-                }
-            }
-        }
-
-        override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
-            return true
-        }
-    }
+    ): ActivityDeviceBinding = ActivityDeviceBinding.inflate(inflater, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        binding.deviceView.setupBottomPadding()
-        errorBinding.errorMessageContainer.setOnRefreshListener {
-            this.refreshDevicesAction()
-        }
-        pairingBinding.pairButton.setOnClickListener {
-            device?.requestPairing()
-            refreshUI()
-        }
-        pairingBinding.acceptButton.setOnClickListener {
-            device?.apply {
-                acceptPairing()
-                pairingBinding.pairingButtons.visibility = View.GONE
+        val actions = DeviceScreenActions(
+            onControl = { button -> mActivity?.let(button.onClick) },
+            onQuickAction = { entry -> mActivity?.let(entry.onClick) },
+            onRequiredPermission = { plugin ->
+                PluginPermissionDialogSelector.requiredPermissionDialog(plugin).show(childFragmentManager, null)
+            },
+            onOptionalPermission = { plugin ->
+                PluginPermissionDialogSelector.optionalPermissionDialog(plugin).show(childFragmentManager, null)
+            },
+            onRequestPairing = {
+                pairMessage = null
+                device?.requestPairing()
+                refreshUI()
+            },
+            onAcceptPairing = { device?.acceptPairing() },
+            onRejectPairing = {
+                device?.apply {
+                    // Remove listener so buttons don't show for an instant before changing the view
+                    removePluginsChangedListener(pluginsChangedListener)
+                    removePairingCallback(pairingCallback)
+                    cancelPairing()
+                }
+                (mActivity as? MainActivity)?.onDeviceSelected(null)
+            },
+            onCancelPairing = { device?.cancelPairing() },
+            onRefresh = ::refreshDevicesAction,
+            onEncryptionInfo = ::showEncryptionInfo,
+            onPluginSettings = {
+                startActivity(Intent(mActivity, PluginSettingsActivity::class.java).putExtra("deviceId", deviceId))
+            },
+            onUnpair = {
+                device?.apply {
+                    // Remove listener so buttons don't show for an instant before changing the view
+                    removePairingCallback(pairingCallback)
+                    removePluginsChangedListener(pluginsChangedListener)
+                    unpair()
+                }
+                view.post { (mActivity as? MainActivity)?.onDeviceSelected(null) }
+            },
+        )
+        binding.deviceViewCompose.apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DeskLinkTheme(context) {
+                    screenState.value?.let { DeviceScreen(it, actions) }
+                }
             }
-        }
-        pairingBinding.rejectButton.setOnClickListener {
-            device?.apply {
-                // Remove listener so buttons don't show for an instant before changing the view
-                removePluginsChangedListener(pluginsChangedListener)
-                removePairingCallback(pairingCallback)
-                cancelPairing()
-            }
-            (mActivity as? MainActivity)?.onDeviceSelected(null)
         }
         device?.apply {
-            mActivity?.supportActionBar?.title = name
             removePairingCallback(pairingCallback)
             addPairingCallback(pairingCallback)
             removePluginsChangedListener(pluginsChangedListener)
@@ -208,23 +152,47 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             Log.e(TAG, "Trying to display a device fragment but the device is not present")
             (mActivity as? MainActivity)?.onDeviceSelected(null)
         }
-        mActivity?.addMenuProvider(menuProvider, viewLifecycleOwner)
         refreshUI()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Battery, reachability and the WebRTC handover change without a plugins callback.
+        statusPoll = viewLifecycleOwner.lifecycleScope.launch {
+            while (true) {
+                delay(STATUS_POLL_MS)
+                refreshUI()
+            }
+        }
+    }
+
+    override fun onStop() {
+        statusPoll?.cancel()
+        super.onStop()
     }
 
     private fun refreshDevicesAction() {
         BackgroundService.ForceRefreshConnections(requireContext())
-        errorBinding.errorMessageContainer.isRefreshing = true
-        errorBinding.errorMessageContainer.postDelayed({
-            if (isResumed && !isDetached) { // the view might be destroyed by now
-                errorBinding.errorMessageContainer.isRefreshing = false
-            }
+        isRefreshing = true
+        refreshUI()
+        view?.postDelayed({
+            isRefreshing = false
+            if (hasBinding) refreshUI()
         }, 1500)
     }
 
-    override fun onPause() {
-        errorBinding.errorMessageContainer.isRefreshing = false
-        super.onPause()
+    private fun showEncryptionInfo() {
+        val device = device ?: return
+        val context = requireContext()
+        MaterialAlertDialogBuilder(context)
+            .setTitle(R.string.encryption_info_title)
+            .setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss() }
+            .setMessage(
+                "${context.getString(R.string.my_device_fingerprint)}\n${SslHelper.getCertificateHash(SslHelper.certificate)}\n\n" +
+                    "${context.getString(R.string.remote_device_fingerprint)}\n${SslHelper.getCertificateHash(device.certificate)}\n\n" +
+                    "${context.getString(R.string.protocol_version)} ${device.protocolVersion}",
+            )
+            .show()
     }
 
     private val pluginsChangedListener =
@@ -254,85 +222,51 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
         //Once in-app, there is no point in keep displaying the notification if any
         device.hidePairingNotification()
 
-        when (device.pairStatus) {
-            PairingHandler.PairState.NotPaired -> {
-                errorBinding.errorMessageContainer.visibility = View.GONE
-                binding.deviceView.visibility = View.GONE
-                pairingBinding.pairingButtons.visibility = View.VISIBLE
-                pairingBinding.pairVerification.visibility = View.GONE
-            }
+        val model = device.toUiModel()
+        val paired = device.pairStatus == PairingHandler.PairState.Paired
+        val live = paired && device.isReachable
+        screenState.value = DeviceScreenState(
+            name = device.name,
+            icon = device.iconDrawable,
+            pairState = device.pairStatus,
+            reachable = device.isReachable,
+            connection = model.connection,
+            batteryPercent = model.batteryPercent,
+            charging = model.charging,
+            verificationKey = device.verificationKey,
+            pairMessage = pairMessage,
+            protocolVersion = device.protocolVersion,
+            controls = if (live) {
+                (device.loadedPlugins.values.flatMap { it.getUiButtons() } + terminalButtons(device))
+                    .sortedBy { CONTROL_ORDER.indexOf(it.iconRes).let { i -> if (i < 0) CONTROL_ORDER.size else i } }
+            } else {
+                emptyList()
+            },
+            quickActions = if (live) {
+                device.loadedPlugins.values.flatMap { it.getUiMenuEntries() }.map { QuickActionItem(it, quickActionIcon(it.name)) }
+            } else {
+                emptyList()
+            },
+            needPermissions = if (live) {
+                device.pluginsWithoutPermissions.values.filter { device.isPluginEnabled(it.pluginKey) }
+            } else {
+                emptyList()
+            },
+            optionalPermissions = if (live) {
+                device.pluginsWithoutOptionalPermissions.values.filter { device.isPluginEnabled(it.pluginKey) }
+            } else {
+                emptyList()
+            },
+            isRefreshing = isRefreshing,
+        )
+    }
 
-            PairingHandler.PairState.Requested -> {
-                with(pairingBinding) {
-                    pairButton.visibility = View.GONE
-                    pairMessage.text = getString(R.string.pair_requested)
-                    pairProgress.visibility = View.VISIBLE
-                    pairVerification.text = device.verificationKey
-                    pairVerification.visibility = View.VISIBLE
-                }
-            }
-
-            PairingHandler.PairState.RequestedByPeer -> {
-                with(pairingBinding) {
-                    pairMessage.setText(R.string.pair_requested)
-                    pairVerification.visibility = View.VISIBLE
-                    pairingButtons.visibility = View.VISIBLE
-                    pairProgress.visibility = View.GONE
-                    pairButton.visibility = View.GONE
-                    pairRequestButtons.visibility = View.VISIBLE
-                    pairVerification.text = device.verificationKey
-                    pairVerification.visibility = View.VISIBLE
-                }
-                binding.deviceView.visibility = View.GONE
-            }
-
-            PairingHandler.PairState.Paired -> {
-                pairingBinding.pairingButtons.visibility = View.GONE
-                if (device.isReachable) {
-                    val context = requireContext()
-                    val pluginsWithButtons =
-                        device.loadedPlugins.values.flatMap { it.getUiButtons() } + terminalButtons(device)
-                    val pluginsNeedPermissions =
-                        device.pluginsWithoutPermissions.values.filter { device.isPluginEnabled(it.pluginKey) }
-                    val pluginsNeedOptionalPermissions =
-                        device.pluginsWithoutOptionalPermissions.values.filter {
-                            device.isPluginEnabled(it.pluginKey)
-                        }
-                    errorBinding.errorMessageContainer.visibility = View.GONE
-                    binding.deviceView.visibility = View.VISIBLE
-                    binding.deviceViewCompose.apply {
-                        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
-                        setContent {
-                            DeskLinkTheme(context) {
-                                PluginsScreen(
-                                    pluginsWithButtons = pluginsWithButtons,
-                                    pluginsNeedPermissions = pluginsNeedPermissions,
-                                    pluginsNeedOptionalPermissions = pluginsNeedOptionalPermissions,
-                                    onButtonClick = { button -> button.onClick(mActivity!!) },
-                                    onRequiredPermissionClick = { plugin ->
-                                        PluginPermissionDialogSelector.requiredPermissionDialog(plugin).show(
-                                            childFragmentManager,
-                                            null
-                                        )
-                                    },
-                                    onOptionalPermissionClick = { plugin ->
-                                        PluginPermissionDialogSelector.optionalPermissionDialog(plugin).show(
-                                            childFragmentManager,
-                                            null
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    displayBatteryInfoIfPossible()
-                } else {
-                    errorBinding.errorMessageContainer.visibility = View.VISIBLE
-                    binding.deviceView.visibility = View.GONE
-                }
-            }
-        }
-        mActivity?.invalidateOptionsMenu()
+    private fun quickActionIcon(name: String): Int = when (name) {
+        getString(R.string.ring) -> R.drawable.ic_vibration_24dp
+        getString(R.string.send_ping) -> R.drawable.ic_wifi_tethering_24dp
+        getString(R.string.lock_remote_device) -> R.drawable.ic_lock_24dp
+        getString(R.string.send_clipboard) -> R.drawable.ic_baseline_content_paste_24
+        else -> R.drawable.ic_phonelink_36dp
     }
 
     /**
@@ -351,66 +285,32 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
     private val pairingCallback: PairingHandler.PairingCallback =
         object : PairingHandler.PairingCallback {
             override fun incomingPairRequest() {
-                mActivity?.runOnUiThread { refreshUI() }
+                mActivity?.runOnUiThread {
+                    pairMessage = null
+                    refreshUI()
+                }
             }
 
             override fun pairingSuccessful() {
                 mActivity?.runOnUiThread {
-                    pairingBinding.pairMessage.announceForAccessibility(getString(R.string.pair_succeeded))
+                    view?.announceForAccessibility(getString(R.string.pair_succeeded))
+                    pairMessage = null
                     refreshUI()
                 }
             }
 
             override fun pairingFailed(error: String) {
                 mActivity?.runOnUiThread {
-                    with(pairingBinding) {
-                        pairMessage.text = error
-                        pairProgress.visibility = View.GONE
-                        pairButton.visibility = View.VISIBLE
-                        pairRequestButtons.visibility = View.GONE
-                    }
+                    pairMessage = error
                     refreshUI()
                 }
             }
 
             override fun unpaired(device: Device) {
                 mActivity?.runOnUiThread {
-                    with(pairingBinding) {
-                        pairMessage.setText(R.string.device_not_paired)
-                        pairProgress.visibility = View.GONE
-                        pairButton.visibility = View.VISIBLE
-                        pairRequestButtons.visibility = View.GONE
-                    }
+                    pairMessage = getString(R.string.device_not_paired)
                     refreshUI()
                 }
             }
         }
-
-
-    /**
-     * This method tries to display battery info for the remote device. Includes
-     *
-     *  * Current charge as a percentage
-     *  * Whether the remote device is low on power
-     *  * Whether the remote device is currently charging
-     *
-     */
-    private fun displayBatteryInfoIfPossible() {
-        val batteryPlugin = device?.getPlugin(BatteryPlugin::class.java)
-
-        val info = batteryPlugin?.remoteBatteryInfo
-        if (info != null) {
-
-            @StringRes
-            val resId = when {
-                info.isCharging -> R.string.battery_status_charging_format
-                BatteryPlugin.isLowBattery(info) -> R.string.battery_status_low_format
-                else -> R.string.battery_status_format
-            }
-
-            mActivity?.supportActionBar?.subtitle = mActivity?.getString(resId, info.currentCharge)
-        } else {
-            mActivity?.supportActionBar?.subtitle = null
-        }
-    }
 }

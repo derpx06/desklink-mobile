@@ -9,8 +9,6 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Configuration
-import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -21,11 +19,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import androidx.core.net.toUri
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.preference.EditTextPreference
+import androidx.annotation.DrawableRes
 import androidx.preference.ListPreference
+import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceScreen
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreference
@@ -62,24 +64,51 @@ class SettingsFragment : PreferenceFragmentCompat() {
         val context = preferenceManager.context
         val screen = preferenceManager.createPreferenceScreen(context)
 
-        listOf(
-            deviceNamePref(context),
-            themePref(context),
-            persistentNotificationPref(context),
-            trustedNetworkPref(context),
-            devicesByIpPref(context),
-            bluetoothSupportPref(context),
-            relayEnabledPref(context),
-            relayUrlPref(context),
-            relayUseTurnPref(context),
-            webRtcStunServersPref(context),
-            webRtcTurnServersPref(context),
-            exportLogsPref(context),
-            moreSettingsPref(context),
-        ).forEach(screen::addPreference)
+        // Categories must be on the screen before preferences are added to them.
+        screen.category(
+            context,
+            R.string.settings_category_general,
+            deviceNamePref(context).withIcon(R.drawable.ic_device_phone_32dp),
+            themePref(context).withIcon(R.drawable.ic_brightness_24dp),
+            *listOfNotNull(dynamicColorsPref(context)?.withIcon(R.drawable.ic_palette_24dp)).toTypedArray(),
+        )
+        screen.category(
+            context,
+            R.string.settings_category_connection,
+            trustedNetworkPref(context).withIcon(R.drawable.ic_shield_24dp),
+            devicesByIpPref(context).withIcon(R.drawable.ic_desktop_24dp),
+            bluetoothSupportPref(context).withIcon(R.drawable.ic_bluetooth_24dp),
+        )
+        screen.category(
+            context,
+            R.string.settings_category_away,
+            relayEnabledPref(context).withIcon(R.drawable.ic_cloud_24dp),
+            relayUrlPref(context).withIcon(R.drawable.ic_link_24dp),
+            relayUseTurnPref(context).withIcon(R.drawable.ic_swap_horiz_24dp),
+            webRtcStunServersPref(context).withIcon(R.drawable.ic_dns_24dp),
+            webRtcTurnServersPref(context).withIcon(R.drawable.ic_dns_24dp),
+        )
+        screen.category(
+            context,
+            R.string.settings_category_notifications,
+            persistentNotificationPref(context).withIcon(R.drawable.ic_notifications_24dp),
+        )
+        screen.category(
+            context,
+            R.string.settings_category_advanced,
+            exportLogsPref(context).withIcon(R.drawable.ic_download_24dp),
+            privacyPolicyPref(context).withIcon(R.drawable.ic_policy_24dp),
+            moreSettingsPref(context).withIcon(R.drawable.ic_info_24dp),
+        )
         if (BuildConfig.DEBUG) {
-            screen.addPreference(relayDebugPref(context, RelaySettings.KEY_FORCE_RELAY, R.string.setting_relay_force_relay, R.string.setting_relay_force_relay_description))
-            screen.addPreference(relayDebugPref(context, RelaySettings.KEY_FORCE_TURN, R.string.setting_relay_force_turn, R.string.setting_relay_force_turn_description))
+            screen.category(
+                context,
+                R.string.settings_category_debug,
+                relayDebugPref(context, RelaySettings.KEY_FORCE_RELAY, R.string.setting_relay_force_relay, R.string.setting_relay_force_relay_description)
+                    .withIcon(R.drawable.ic_baseline_bug_report_24),
+                relayDebugPref(context, RelaySettings.KEY_FORCE_TURN, R.string.setting_relay_force_turn, R.string.setting_relay_force_turn_description)
+                    .withIcon(R.drawable.ic_baseline_bug_report_24),
+            )
         }
 
         preferenceScreen = screen
@@ -88,6 +117,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         listView.setupBottomPadding()
+        setDivider(null) // sections are separated by their titles, not rules
         RelayLinkProvider.statusLive.observe(viewLifecycleOwner) { status ->
             relayEnabledPref?.summary = getString(R.string.setting_relay_disclosure) + "\n" + getString(
                 when (status) {
@@ -167,13 +197,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
             val name = new as String?
             if (name.isNullOrBlank()) {
                 if (view != null) {
-                    val snackbar = Snackbar.make(requireView(), R.string.invalid_device_name, Snackbar.LENGTH_LONG)
-                    val currentTheme = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
-                    if (currentTheme != Configuration.UI_MODE_NIGHT_YES) {
-                        // white color is set to the background of snackbar if dark mode is off
-                        snackbar.view.setBackgroundColor(Color.WHITE)
-                    }
-                    snackbar.show()
+                    // Material 3 snackbars already contrast with either theme.
+                    Snackbar.make(requireView(), R.string.invalid_device_name, Snackbar.LENGTH_LONG).show()
                 }
                 false
             }
@@ -183,6 +208,32 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
     }
+
+    private fun PreferenceScreen.category(context: Context, title: Int, vararg preferences: Preference) {
+        val category = PreferenceCategory(context).apply { setTitle(title) }
+        addPreference(category)
+        preferences.forEach(category::addPreference)
+    }
+
+    /** Icons in the theme's primary: one accent down the list, as in the system's own settings. */
+    private fun <T : Preference> T.withIcon(@DrawableRes icon: Int): T = apply {
+        val tint = com.google.android.material.color.MaterialColors.getColor(context, androidx.appcompat.R.attr.colorPrimary, 0)
+        this.icon = androidx.core.content.ContextCompat.getDrawable(context, icon)?.mutate()?.also { it.setTint(tint) }
+    }
+
+    /** Android 12+ only: older systems have no wallpaper palette to follow. */
+    private fun dynamicColorsPref(context: Context): Preference? =
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) null else SwitchPreference(context).apply {
+            key = ThemeUtil.KEY_DYNAMIC_COLORS
+            setDefaultValue(true)
+            setTitle(R.string.setting_dynamic_colors)
+            setSummary(R.string.setting_dynamic_colors_summary)
+            onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, _ ->
+                // Saved after this returns; recreate once it is, so the new palette applies here too.
+                view?.post { activity?.recreate() }
+                true
+            }
+        }
 
     private fun themePref(context: Context) = ListPreference(context).apply {
         key = KEY_APP_THEME
@@ -324,6 +375,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 IOUtils.copy(reader, it, Charsets.UTF_8)
             }
         }
+    }
+
+    private fun privacyPolicyPref(context: Context) = Preference(context).apply {
+        isPersistent = false
+        setTitle(R.string.privacy_policy)
+        setSummary(R.string.privacy_policy_summary)
+        intent = Intent(Intent.ACTION_VIEW, context.getString(R.string.privacy_policy_url).toUri())
     }
 
     private fun moreSettingsPref(context: Context) = Preference(context).apply {

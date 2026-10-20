@@ -14,27 +14,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.view.Menu
-import android.view.MenuItem
-import android.view.View
-import android.widget.ImageView
-import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import androidx.core.view.GravityCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.get
-import androidx.core.view.size
-import androidx.core.view.updatePadding
-import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import androidx.preference.PreferenceManager
-import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,50 +30,37 @@ import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.Device
 import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.DeskLinkApplication
-import org.desklink.mobile.extensions.setOnApplyWindowInsetsListenerCompat
 import org.desklink.mobile.plugins.share.ShareSettingsFragment
 import org.desklink.mobile.ui.about.AboutFragment
 import org.desklink.mobile.ui.about.getApplicationAboutData
 import org.desklink.mobile.R
 import org.desklink.mobile.databinding.ActivityMainBinding
 
-private const val MENU_ENTRY_ADD_DEVICE = 1 //0 means no-selection
-private const val MENU_ENTRY_SETTINGS = 2
-private const val MENU_ENTRY_ABOUT = 3
-private const val MENU_ENTRY_DEVICE_FIRST_ID = 1000 //All subsequent ids are devices in the menu
-private const val MENU_ENTRY_DEVICE_UNKNOWN = 9999 //It's still a device, but we don't know which one yet
 private const val STORAGE_LOCATION_CONFIGURED = 2020
-private const val STATE_SELECTED_MENU_ENTRY = "selected_entry" //Saved only in onSaveInstanceState
+private const val STATE_SCREEN = "screen" //Saved only in onSaveInstanceState
 private const val STATE_SELECTED_DEVICE = "selected_device" //Saved persistently in preferences
 
+/**
+ * Home-first navigation: the device list is the root; a device, Settings and About sit one level
+ * below it with an Up arrow, and Back from any of them returns to the list.
+ */
 class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
-    private val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
-    private val mNavigationView: NavigationView by lazy { binding.navigationDrawer }
-    private var mDrawerLayout: DrawerLayout? = null
+    private enum class Screen { HOME, DEVICE, SETTINGS, ABOUT }
 
-    private lateinit var mNavViewDeviceName: TextView
+    private val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
 
     private var mCurrentDevice: String? = null
-    private var mCurrentMenuEntry = 0
+    private var screen = Screen.HOME
         set(value) {
             field = value
-            //Enabling "go to default fragment on back" callback when user in settings or "about" fragment
-            mainFragmentCallback.isEnabled = value == MENU_ENTRY_SETTINGS || value == MENU_ENTRY_ABOUT
+            backToHomeCallback.isEnabled = value != Screen.HOME
+            supportActionBar?.setDisplayHomeAsUpEnabled(value != Screen.HOME)
         }
     private val preferences: SharedPreferences by lazy { getSharedPreferences("stored_menu_selection", MODE_PRIVATE) }
-    private val mMapMenuToDeviceId = HashMap<MenuItem, String>()
 
-    private val closeDrawerCallback = object : OnBackPressedCallback(false) {
+    private val backToHomeCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
-            mDrawerLayout?.closeDrawer(mNavigationView)
-        }
-    }
-
-    private val mainFragmentCallback = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() {
-            mCurrentMenuEntry = mCurrentDevice?.let { deviceIdToMenuEntryId(it) } ?: MENU_ENTRY_ADD_DEVICE
-            mNavigationView.setCheckedItem(mCurrentMenuEntry)
-            setContentFragment(mCurrentDevice?.let { DeviceFragment.newInstance(it, false) } ?: PairingFragment())
+            onDeviceSelected(null)
         }
     }
 
@@ -95,90 +69,37 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         super.onCreate(savedInstanceState)
         DeviceHelper.initializeDeviceId(this)
 
-        val root = binding.root
-        setContentView(root)
-        mDrawerLayout = root as? DrawerLayout
-
-        // Pad the drawer header directly: DrawerLayout's default child dispatch stops at
-        // AppBarLayout (which consumes the insets via its own fitsSystemWindows), so neither
-        // NavigationView nor its header ever receive a dispatch.
-        root.setOnApplyWindowInsetsListenerCompat { _, insets ->
-            mNavigationView.getHeaderView(0)?.updatePadding(
-                top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
-            )
-            insets
-        }
-
-        val mDrawerHeader = mNavigationView.getHeaderView(0)
-        mNavViewDeviceName = mDrawerHeader.findViewById(R.id.device_name)
-        val mNavViewDeviceType = mDrawerHeader.findViewById<ImageView>(R.id.device_type)
-
+        setContentView(binding.root)
         setSupportActionBar(binding.toolbarLayout.toolbar)
-        mDrawerLayout?.let {
-            supportActionBar?.setDisplayHomeAsUpEnabled(true)
-            val mDrawerToggle = DrawerToggle(it).apply { syncState() }
-            it.addDrawerListener(mDrawerToggle)
-            it.setDrawerShadow(R.drawable.drawer_shadow, GravityCompat.START)
-        } ?: {
-            supportActionBar?.setDisplayShowHomeEnabled(false)
-            supportActionBar?.setHomeButtonEnabled(false)
-        }
+        supportActionBar?.setHomeActionContentDescription(R.string.navigate_up)
+        onBackPressedDispatcher.addCallback(this, backToHomeCallback)
 
         // Note: The preference changed listener should be registered before getting the name, because getting
         // it can trigger a background fetch from the internet that will eventually update the preference
         PreferenceManager.getDefaultSharedPreferences(this).registerOnSharedPreferenceChangeListener(this)
-        val deviceName = DeviceHelper.getDeviceName(this)
-        mNavViewDeviceType?.setImageDrawable(DeviceHelper.deviceType.getIcon(this))
-        mNavViewDeviceName.text = deviceName
-        mNavigationView.setNavigationItemSelectedListener { menuItem: MenuItem ->
-            mCurrentMenuEntry = menuItem.itemId
-            when (mCurrentMenuEntry) {
-                MENU_ENTRY_ADD_DEVICE -> {
-                    mCurrentDevice = null
-                    preferences.edit { putString(STATE_SELECTED_DEVICE, null) }
-                    setContentFragment(PairingFragment())
-                }
+        DeviceHelper.getDeviceName(this)
 
-                MENU_ENTRY_SETTINGS -> {
-                    preferences.edit { putString(STATE_SELECTED_DEVICE, null) }
-                    setContentFragment(SettingsFragment())
-                }
-
-                MENU_ENTRY_ABOUT -> {
-                    preferences.edit { putString(STATE_SELECTED_DEVICE, null) }
-                    setContentFragment(AboutFragment.newInstance(getApplicationAboutData(this)))
-                }
-
-                else -> {
-                    val deviceId = mMapMenuToDeviceId[menuItem]
-                    onDeviceSelected(deviceId)
-                }
-            }
-            mDrawerLayout?.closeDrawer(mNavigationView)
-            true
-        }
-
-        // Decide which menu entry should be selected at start
+        // Decide which screen should be shown at start
         var savedDevice: String?
-        var savedMenuEntry: Int
+        var savedScreen: Screen
         when {
             intent.hasExtra(FLAG_FORCE_OVERVIEW) -> {
                 Log.i(this::class.simpleName, "Requested to start main overview")
                 savedDevice = null
-                savedMenuEntry = MENU_ENTRY_ADD_DEVICE
+                savedScreen = Screen.HOME
             }
 
             intent.hasExtra(EXTRA_DEVICE_ID) -> {
                 Log.i(this::class.simpleName, "Loading selected device from parameter")
                 savedDevice = intent.getStringExtra(EXTRA_DEVICE_ID)
-                savedMenuEntry = MENU_ENTRY_DEVICE_UNKNOWN
+                savedScreen = Screen.DEVICE
                 // If pairStatus is not empty, then the user has accepted/reject the pairing from the notification
                 val pairStatus = intent.getStringExtra(PAIR_REQUEST_STATUS)
                 if (pairStatus != null) {
                     Log.i(this::class.simpleName, "Pair status is $pairStatus")
                     savedDevice = onPairResultFromNotification(savedDevice, pairStatus)
                     if (savedDevice == null) {
-                        savedMenuEntry = MENU_ENTRY_ADD_DEVICE
+                        savedScreen = Screen.HOME
                     }
                 }
             }
@@ -186,18 +107,18 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             savedInstanceState != null -> {
                 Log.i(this::class.simpleName, "Loading selected device from saved activity state")
                 savedDevice = savedInstanceState.getString(STATE_SELECTED_DEVICE)
-                savedMenuEntry = savedInstanceState.getInt(STATE_SELECTED_MENU_ENTRY, MENU_ENTRY_ADD_DEVICE)
+                savedScreen = savedInstanceState.getString(STATE_SCREEN)
+                    ?.let { name -> Screen.entries.firstOrNull { it.name == name } } ?: Screen.HOME
             }
 
             else -> {
                 Log.i(this::class.simpleName, "Loading selected device from persistent storage")
                 savedDevice = preferences.getString(STATE_SELECTED_DEVICE, null)
-                savedMenuEntry = if (savedDevice != null) MENU_ENTRY_DEVICE_UNKNOWN else MENU_ENTRY_ADD_DEVICE
+                savedScreen = if (savedDevice != null) Screen.DEVICE else Screen.HOME
             }
         }
-        mCurrentMenuEntry = savedMenuEntry
         mCurrentDevice = savedDevice
-        mNavigationView.setCheckedItem(savedMenuEntry)
+        screen = savedScreen
 
         //FragmentManager will restore whatever fragment was there
         if (savedInstanceState != null) {
@@ -205,15 +126,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             if (frag !is DeviceFragment || frag.deviceId == savedDevice) return
         }
 
-        // Activate the chosen fragment and select the entry in the menu
-        if (savedMenuEntry >= MENU_ENTRY_DEVICE_FIRST_ID && savedDevice != null) {
-            onDeviceSelected(savedDevice)
-        } else {
-            when (mCurrentMenuEntry) {
-                MENU_ENTRY_SETTINGS -> setContentFragment(SettingsFragment())
-                MENU_ENTRY_ABOUT -> setContentFragment(AboutFragment.newInstance(getApplicationAboutData(this)))
-                else -> setContentFragment(PairingFragment())
-            }
+        // Activate the chosen fragment
+        when {
+            savedScreen == Screen.DEVICE && savedDevice != null -> onDeviceSelected(savedDevice)
+            savedScreen == Screen.SETTINGS -> openSettings()
+            savedScreen == Screen.ABOUT -> openAbout()
+            else -> onDeviceSelected(null)
         }
 
         val missingPermissions = mutableListOf<String>()
@@ -232,6 +150,18 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         }
     }
 
+    fun openSettings() {
+        preferences.edit { putString(STATE_SELECTED_DEVICE, null) }
+        screen = Screen.SETTINGS
+        setContentFragment(SettingsFragment())
+    }
+
+    fun openAbout() {
+        preferences.edit { putString(STATE_SELECTED_DEVICE, null) }
+        screen = Screen.ABOUT
+        setContentFragment(AboutFragment.newInstance(getApplicationAboutData(this)))
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         PreferenceManager.getDefaultSharedPreferences(this).unregisterOnSharedPreferenceChangeListener(this)
@@ -246,90 +176,29 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         return if (pairStatus == PAIRING_PENDING) deviceId else null
     }
 
-    private fun deviceIdToMenuEntryId(deviceId: String?): Int {
-        for ((key, value) in mMapMenuToDeviceId) {
-            if (value == deviceId) {
-                return key.itemId
-            }
-        }
-        return MENU_ENTRY_DEVICE_UNKNOWN
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return if (item.itemId == android.R.id.home) {
-            mDrawerLayout?.openDrawer(mNavigationView)
-            true
-        } else {
-            super.onOptionsItemSelected(item)
-        }
-    }
-
-    private fun updateDeviceList() {
-        val menu = mNavigationView.menu
-        menu.clear()
-        mMapMenuToDeviceId.clear()
-        val devicesMenu = menu.addSubMenu(R.string.devices)
-        var id = MENU_ENTRY_DEVICE_FIRST_ID
-        val devices: Collection<Device> = DeskLinkApplication.getInstance().devices.values
-        for (device in devices) {
-            if (device.isReachable && device.isPaired) {
-                val item = devicesMenu.add(Menu.FIRST, id++, 1, device.name)
-                item.icon = device.icon
-                item.isCheckable = true
-                mMapMenuToDeviceId[item] = device.deviceId
-            }
-        }
-        val addDeviceItem = devicesMenu.add(Menu.FIRST, MENU_ENTRY_ADD_DEVICE, 1000, R.string.pair_new_device)
-        addDeviceItem.setIcon(R.drawable.ic_action_content_add_circle_outline_32dp)
-        addDeviceItem.isCheckable = true
-        val settingsItem = menu.add(Menu.FIRST, MENU_ENTRY_SETTINGS, 1000, R.string.settings)
-        settingsItem.setIcon(R.drawable.ic_settings_white_32dp)
-        settingsItem.isCheckable = true
-        val aboutItem = menu.add(Menu.FIRST, MENU_ENTRY_ABOUT, 1000, R.string.about)
-        aboutItem.setIcon(R.drawable.ic_baseline_info_24)
-        aboutItem.isCheckable = true
-
-        //Ids might have changed
-        if (mCurrentMenuEntry >= MENU_ENTRY_DEVICE_FIRST_ID) {
-            mCurrentMenuEntry = deviceIdToMenuEntryId(mCurrentDevice)
-        }
-        mNavigationView.setCheckedItem(mCurrentMenuEntry)
-    }
-
     override fun onStart() {
         super.onStart()
         BackgroundService.Start(applicationContext)
-        DeskLinkApplication.getInstance().addDeviceListChangedCallback(this::class.simpleName!!) { runOnUiThread { updateDeviceList() } }
-        updateDeviceList()
-        onBackPressedDispatcher.addCallback(mainFragmentCallback)
-        onBackPressedDispatcher.addCallback(closeDrawerCallback)
-        if (mDrawerLayout == null) closeDrawerCallback.isEnabled = false
     }
 
-    override fun onStop() {
-        DeskLinkApplication.getInstance().removeDeviceListChangedCallback(this::class.simpleName!!)
-        mainFragmentCallback.remove()
-        closeDrawerCallback.remove()
-        super.onStop()
-    }
-
+    /** Opens [deviceId]'s screen, or the device list for null. [fromDeviceList] is kept for callers; Back always returns to the list. */
+    @Suppress("UNUSED_PARAMETER")
     @JvmOverloads
     fun onDeviceSelected(deviceId: String?, fromDeviceList: Boolean = false) {
         mCurrentDevice = deviceId
         preferences.edit { putString(STATE_SELECTED_DEVICE, deviceId) }
-        if (mCurrentDevice != null) {
-            mCurrentMenuEntry = deviceIdToMenuEntryId(deviceId)
-            if (mCurrentMenuEntry == MENU_ENTRY_DEVICE_UNKNOWN) {
-                uncheckAllMenuItems(mNavigationView.menu)
-            } else {
-                mNavigationView.setCheckedItem(mCurrentMenuEntry)
-            }
-            setContentFragment(DeviceFragment.newInstance(deviceId, fromDeviceList))
+        if (deviceId != null) {
+            screen = Screen.DEVICE
+            setContentFragment(DeviceFragment.newInstance(deviceId, true))
         } else {
-            mCurrentMenuEntry = MENU_ENTRY_ADD_DEVICE
-            mNavigationView.setCheckedItem(mCurrentMenuEntry)
+            screen = Screen.HOME
             setContentFragment(PairingFragment())
         }
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        onBackPressedDispatcher.onBackPressed()
+        return true
     }
 
     private fun setContentFragment(fragment: Fragment) {
@@ -342,7 +211,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_SELECTED_DEVICE, mCurrentDevice)
-        outState.putInt(STATE_SELECTED_MENU_ENTRY, mCurrentMenuEntry)
+        outState.putString(STATE_SCREEN, screen.name)
     }
 
     @Deprecated("Deprecated in Java")
@@ -382,12 +251,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 PreferenceManager.getDefaultSharedPreferences(this).edit {
                     putBoolean(SettingsFragment.KEY_BLUETOOTH_ENABLED, true)
                 }
-                setContentFragment(SettingsFragment())
+                openSettings()
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && isPermissionGranted(permissions, grantResults, Manifest.permission.POST_NOTIFICATIONS)) {
                 // If PairingFragment is active, reload it
-                if (mCurrentDevice == null) {
+                if (screen == Screen.HOME) {
                     setContentFragment(PairingFragment())
                 }
             }
@@ -401,16 +270,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, key: String?) {
         if (DeviceHelper.KEY_DEVICE_NAME_PREFERENCE == key) {
-            mNavViewDeviceName.text = DeviceHelper.getDeviceName(this)
             BackgroundService.ForceRefreshConnections(this) //Re-send our identity packet
-        }
-    }
-
-    private fun uncheckAllMenuItems(menu: Menu) {
-        val size = menu.size
-        for (i in 0 until size) {
-            val item = menu[i]
-            item.subMenu?.let { uncheckAllMenuItems(it) } ?: item.setChecked(false)
         }
     }
 
@@ -422,22 +282,4 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         const val RESULT_NOTIFICATIONS_ENABLED = RESULT_FIRST_USER+1
         const val FLAG_FORCE_OVERVIEW = "forceOverview"
     }
-
-    private inner class DrawerToggle(drawerLayout: DrawerLayout) : ActionBarDrawerToggle(
-        this,  /* host Activity */
-        drawerLayout,  /* DrawerLayout object */
-        R.string.open,  /* "open drawer" description */
-        R.string.close /* "close drawer" description */
-    ) {
-        override fun onDrawerClosed(drawerView: View) {
-            super.onDrawerClosed(drawerView)
-            closeDrawerCallback.isEnabled = false
-        }
-
-        override fun onDrawerOpened(drawerView: View) {
-            super.onDrawerOpened(drawerView)
-            closeDrawerCallback.isEnabled = true
-        }
-    }
-
 }

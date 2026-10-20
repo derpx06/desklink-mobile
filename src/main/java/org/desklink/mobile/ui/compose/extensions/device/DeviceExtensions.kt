@@ -7,18 +7,37 @@
 package org.desklink.mobile.ui.compose.extensions.device
 
 import org.desklink.mobile.Device
-import org.desklink.mobile.DeviceType.LAPTOP
-import org.desklink.mobile.DeviceType.PHONE
-import org.desklink.mobile.DeviceType.TABLET
-import org.desklink.mobile.DeviceType.TV
+import org.desklink.mobile.plugins.battery.BatteryPlugin
+import org.desklink.mobile.plugins.mousepad.MousePadPlugin
+import org.desklink.mobile.plugins.share.SharePlugin
+import org.desklink.mobile.ui.compose.model.device.DeviceConnection
 import org.desklink.mobile.ui.compose.model.device.DeviceUiModel
 import org.desklink.mobile.R
 
-fun Device.toUiModel() = DeviceUiModel(
-    id = deviceId,
-    icon = iconDrawable,
-    name = name,
-    summaryRes = if (compareProtocolVersion() > 0) R.string.protocol_version_newer else 0,
-    isReachable = isReachable,
-    isPaired = isPaired
-)
+fun Device.toUiModel(): DeviceUiModel {
+    val battery = getPlugin(BatteryPlugin::class.java)?.remoteBatteryInfo
+    val featuresReady = hasActiveWebRtcFeatureTransport
+    return DeviceUiModel(
+        id = deviceId,
+        icon = iconDrawable,
+        name = name,
+        summaryRes = if (compareProtocolVersion() > 0) R.string.protocol_version_newer else 0,
+        isReachable = isReachable,
+        isPaired = isPaired,
+        connection = deviceConnection(isReachable, featuresReady, hasLanLink, relayLink != null),
+        batteryPercent = battery?.currentCharge,
+        charging = battery?.isCharging == true,
+        canOpenTerminal = isPaired && featuresReady,
+        canControlScreen = isPaired && isReachable && getPlugin(MousePadPlugin::class.java) != null,
+        canSendFiles = isPaired && isReachable && getPlugin(SharePlugin::class.java) != null,
+    )
+}
+
+/** A LAN link wins over the relay: when both exist the handover prefers the LAN. */
+fun deviceConnection(reachable: Boolean, featuresReady: Boolean, lan: Boolean, relay: Boolean): DeviceConnection = when {
+    !reachable -> DeviceConnection.OFFLINE
+    !featuresReady -> DeviceConnection.CONNECTING
+    lan -> DeviceConnection.LOCAL
+    relay -> DeviceConnection.AWAY
+    else -> DeviceConnection.CONNECTED
+}

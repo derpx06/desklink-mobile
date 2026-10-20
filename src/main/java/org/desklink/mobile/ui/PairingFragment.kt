@@ -33,7 +33,15 @@ import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.base.BaseFragment
 import org.desklink.mobile.helpers.TrustedNetworkHelper.Companion.isTrustedNetwork
 import org.desklink.mobile.ui.compose.DeskLinkTheme
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.desklink.mobile.plugins.mousepad.MousePadPlugin
+import org.desklink.mobile.plugins.share.SharePlugin
+import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.ui.compose.screen.pairing.PairingScreen
+import org.desklink.mobile.ui.compose.screen.pairing.QuickAction
 import org.desklink.mobile.ui.compose.screen.pairing.PairingViewModel
 import org.desklink.mobile.R
 import org.desklink.mobile.databinding.DevicesListBinding
@@ -56,13 +64,17 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
         override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
             return when (menuItem.itemId) {
                 R.id.menu_scan_qr -> {
-                    qrScanner.launch(
-                        com.journeyapps.barcodescanner.ScanOptions()
-                            .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
-                            .setPrompt(getString(R.string.qr_scan_prompt))
-                            .setBeepEnabled(false)
-                            .setOrientationLocked(false),
-                    )
+                    scanQr()
+                    true
+                }
+
+                R.id.menu_settings -> {
+                    (mActivity as? MainActivity)?.openSettings()
+                    true
+                }
+
+                R.id.menu_about -> {
+                    (mActivity as? MainActivity)?.openAbout()
                     true
                 }
 
@@ -86,23 +98,31 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
         }
     }
 
+    private fun scanQr() {
+        qrScanner.launch(
+            com.journeyapps.barcodescanner.ScanOptions()
+                .setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE)
+                .setPrompt(getString(R.string.qr_scan_hint))
+                .setBeepEnabled(false)
+                .setOrientationLocked(false),
+        )
+    }
+
     // QR pairing: one scan, nothing to compare (see QrPairing / pairing_qr.rs).
     private val qrScanner = registerForActivityResult(com.journeyapps.barcodescanner.ScanContract()) { result ->
         val text = result.contents ?: return@registerForActivityResult
         val context = requireContext().applicationContext
         val code = org.desklink.mobile.QrPairing.parse(text)
         if (code == null) {
-            android.widget.Toast.makeText(context, R.string.qr_not_a_pairing_code, android.widget.Toast.LENGTH_LONG).show()
+            showMessage(getString(R.string.qr_not_a_pairing_code))
             return@registerForActivityResult
         }
         val application = org.desklink.mobile.DeskLinkApplication.getInstance()
         fun start(replaceExisting: Boolean) {
-            android.widget.Toast.makeText(context, R.string.qr_pairing_started, android.widget.Toast.LENGTH_SHORT).show()
+            showMessage(getString(R.string.qr_pairing_started))
             org.desklink.mobile.QrPairing.pair(application, code, replaceExisting) { error ->
                 if (error != null) {
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
-                    }
+                    android.os.Handler(android.os.Looper.getMainLooper()).post { showMessage(error) }
                 }
             }
         }
@@ -121,7 +141,17 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
         }
     }
 
-    override fun getActionBarTitle() = getString(R.string.pairing_title)
+    /** A snackbar while this screen is up; a toast once it is gone (pairing can outlive it). */
+    private fun showMessage(message: String) {
+        val root = view
+        if (root != null && isAdded) {
+            com.google.android.material.snackbar.Snackbar.make(root, message, com.google.android.material.snackbar.Snackbar.LENGTH_LONG).show()
+        } else {
+            android.widget.Toast.makeText(DeskLinkApplication.getInstance(), message, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun getActionBarTitle() = getString(R.string.app_name)
 
     override fun onInflateBinding(
         inflater: LayoutInflater,
@@ -167,10 +197,23 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
                         onDuplicateNamesClick = {
                             // TODO: Define action for duplicate names if needed
                         },
-                        onRefresh = { viewModel.onRefresh() }
+                        onRefresh = { viewModel.onRefresh() },
+                        onScanQr = ::scanQr,
+                        onQuickAction = ::quickAction,
                     )
                 }
             }
+        }
+    }
+
+    /** The same entry points as the device screen's tiles, one tap from the list. */
+    private fun quickAction(deviceId: String, action: QuickAction) {
+        val activity = mActivity ?: return
+        val device = viewModel.getDeviceById(deviceId) ?: return
+        when (action) {
+            QuickAction.TERMINAL -> startActivity(TerminalActivity.intent(activity, deviceId))
+            QuickAction.SCREEN -> device.getPlugin(MousePadPlugin::class.java)?.getUiButtons()?.firstOrNull()?.onClick?.invoke(activity)
+            QuickAction.FILES -> device.getPlugin(SharePlugin::class.java)?.getUiButtons()?.firstOrNull()?.onClick?.invoke(activity)
         }
     }
 
@@ -212,16 +255,16 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
         }
 
         try {
-            val allDevices = DeskLinkApplication.getInstance().devices.values.filter {
-                it.isReachable || it.isPaired
-            }
-
-            viewModel.buildUiState(devices = allDevices)
+            viewModel.buildUiState(devices = visibleDevices())
         } catch (_: IllegalStateException) {
             // Ignore: The activity was closed while we were trying to update it
         } finally {
             listRefreshCalledThisFrame = false
         }
+    }
+
+    private fun visibleDevices() = DeskLinkApplication.getInstance().devices.values.filter {
+        it.isReachable || it.isPaired
     }
 
     private fun updateConnectivityInfoHeader(isConnectedToNonCellularNetwork: Boolean) {
@@ -249,10 +292,21 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
         }
         ForceRefreshConnections(requireContext()) // force a network re-discover
         updateDeviceList()
+        // Battery and the WebRTC handover change without a device-list callback; the cards show both.
+        // ponytail: a 2 s poll while visible, a per-device change listener if it ever matters.
+        statusPoll = viewLifecycleOwner.lifecycleScope.launch {
+            while (true) {
+                delay(STATUS_POLL_MS)
+                viewModel.buildUiState(visibleDevices())
+            }
+        }
     }
+
+    private var statusPoll: Job? = null
 
     override fun onStop() {
         DeskLinkApplication.getInstance().removeDeviceListChangedCallback("PairingFragment")
+        statusPoll?.cancel()
         super.onStop()
     }
 
@@ -276,5 +330,6 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
 
     companion object {
         private const val RESULT_PAIRING_SUCCESFUL = Activity.RESULT_FIRST_USER
+        private const val STATUS_POLL_MS = 2_000L
     }
 }

@@ -83,7 +83,18 @@ import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.screen.ScreenCoordinateMapper
 import org.desklink.mobile.plugins.screen.ScreenPoint
 import org.desklink.mobile.ui.PluginSettingsActivity
-import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.DeskLinkDarkTheme
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.heightIn
 import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
 import org.desklink.mobile.ui.compose.SessionPasswordDialog
 
@@ -131,7 +142,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
         setContent {
-            DeskLinkTheme(this) {
+            DeskLinkDarkTheme(this) {
                 RemoteControlScreen()
             }
         }
@@ -368,19 +379,38 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 )
             }
             if (plugin?.remoteLive != true || !controlEnabled) {
-                Text(
-                    text = ScreenControlPlugin.latestStatus.ifBlank {
-                        stringResource(R.string.remote_live_screen_pending)
-                    },
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
-                    textAlign = TextAlign.Center,
+                val live = plugin?.remoteLive == true
+                Glass(
+                    shape = RoundedCornerShape(if (live) 24.dp else 28.dp),
                     modifier = Modifier
-                        .align(if (plugin?.remoteLive == true) Alignment.TopCenter else Alignment.Center)
-                        .padding(12.dp)
-                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                )
+                        .align(if (live) Alignment.TopCenter else Alignment.Center)
+                        .padding(top = if (live) 72.dp else 0.dp, start = 24.dp, end = 24.dp)
+                        .widthIn(max = 520.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = if (live) 10.dp else 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (!live) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White,
+                            )
+                            Spacer(Modifier.width(14.dp))
+                        }
+                        Text(
+                            text = ScreenControlPlugin.latestStatus.ifBlank {
+                                stringResource(R.string.remote_live_screen_pending)
+                            },
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 4,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        )
+                    }
+                }
             }
         }
     }
@@ -404,7 +434,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         )
     }
 
-    /** Keys a phone keyboard lacks, and the keyboard itself. */
+    /** Keys a phone keyboard lacks, and the keyboard itself, as one floating glass strip. */
     @Composable
     private fun KeyBar(controlEnabled: Boolean, modifier: Modifier = Modifier, onUsed: () -> Unit = {}) {
         val pad = { mousePadPlugin() }
@@ -415,40 +445,154 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             stickyModifiers.applyTo(np)
             pad()?.sendPacket(np)
         }
-        Row(
-            modifier = modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            FilledTonalButton(onClick = { onUsed(); toggleKeyboard() }, enabled = controlEnabled) {
-                Text(stringResource(R.string.remote_key_keyboard))
-            }
-            FilterChip(
-                selected = stickyModifiers.ctrl,
-                onClick = { onUsed(); stickyModifiers.ctrl = !stickyModifiers.ctrl },
-                label = { Text("Ctrl") },
-                enabled = controlEnabled,
-            )
-            FilterChip(
-                selected = stickyModifiers.alt,
-                onClick = { onUsed(); stickyModifiers.alt = !stickyModifiers.alt },
-                label = { Text("Alt") },
-                enabled = controlEnabled,
-            )
-            OutlinedButton(onClick = { special(SPECIAL_SUPER) }, enabled = controlEnabled) { Text("Super") }
-            OutlinedButton(onClick = { special(SPECIAL_ESCAPE) }, enabled = controlEnabled) { Text("Esc") }
-            OutlinedButton(onClick = { special(SPECIAL_TAB) }, enabled = controlEnabled) { Text("Tab") }
-            OutlinedButton(onClick = { special(SPECIAL_LEFT) }, enabled = controlEnabled) { Text("←") }
-            OutlinedButton(onClick = { special(SPECIAL_UP) }, enabled = controlEnabled) { Text("↑") }
-            OutlinedButton(onClick = { special(SPECIAL_DOWN) }, enabled = controlEnabled) { Text("↓") }
-            OutlinedButton(onClick = { special(SPECIAL_RIGHT) }, enabled = controlEnabled) { Text("→") }
-            if (zoomTransform.scale > 1f) {
-                OutlinedButton(onClick = { onUsed(); fillScreen = false; zoomTransform = DesktopViewTransform() }) {
-                    Text(stringResource(R.string.remote_zoom_fit))
+        Glass(shape = RoundedCornerShape(28.dp), modifier = modifier) {
+            Row(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(6.dp)
+                    .alpha(if (controlEnabled) 1f else 0.45f),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                GlassIconButton(
+                    painterResource(R.drawable.ic_action_keyboard_24dp),
+                    stringResource(R.string.remote_key_keyboard),
+                    enabled = controlEnabled,
+                    filled = true,
+                ) { onUsed(); toggleKeyboard() }
+                GlassKey("Ctrl", controlEnabled, selected = stickyModifiers.ctrl) { onUsed(); stickyModifiers.ctrl = !stickyModifiers.ctrl }
+                GlassKey("Alt", controlEnabled, selected = stickyModifiers.alt) { onUsed(); stickyModifiers.alt = !stickyModifiers.alt }
+                GlassKey("Super", controlEnabled) { special(SPECIAL_SUPER) }
+                GlassKey("Esc", controlEnabled) { special(SPECIAL_ESCAPE) }
+                GlassKey("Tab", controlEnabled) { special(SPECIAL_TAB) }
+                GlassKey("←", controlEnabled, description = stringResource(R.string.terminal_key_left)) { special(SPECIAL_LEFT) }
+                GlassKey("↑", controlEnabled, description = stringResource(R.string.terminal_key_up)) { special(SPECIAL_UP) }
+                GlassKey("↓", controlEnabled, description = stringResource(R.string.terminal_key_down)) { special(SPECIAL_DOWN) }
+                GlassKey("→", controlEnabled, description = stringResource(R.string.terminal_key_right)) { special(SPECIAL_RIGHT) }
+                if (zoomTransform.scale > 1f) {
+                    GlassKey(stringResource(R.string.remote_zoom_fit), true) { onUsed(); fillScreen = false; zoomTransform = DesktopViewTransform() }
                 }
             }
+        }
+    }
+
+    /** Translucent dark glass over the picture: legible on any desktop, light or dark. */
+    @Composable
+    private fun Glass(shape: androidx.compose.ui.graphics.Shape, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+        Surface(
+            shape = shape,
+            color = Color(0xFF0B0D12).copy(alpha = 0.72f),
+            contentColor = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+            modifier = modifier,
+            content = content,
+        )
+    }
+
+    @Composable
+    private fun GlassKey(
+        label: String,
+        enabled: Boolean,
+        selected: Boolean = false,
+        description: String? = null,
+        onClick: () -> Unit,
+    ) {
+        Surface(
+            onClick = onClick,
+            enabled = enabled,
+            shape = CircleShape,
+            color = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.08f),
+            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else Color.White,
+            modifier = Modifier
+                .heightIn(min = 44.dp)
+                .widthIn(min = 48.dp)
+                .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier)
+                .semantics { this.selected = selected },
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 14.dp)) {
+                Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            }
+        }
+    }
+
+    @Composable
+    private fun GlassIconButton(
+        icon: androidx.compose.ui.graphics.painter.Painter,
+        description: String,
+        enabled: Boolean = true,
+        filled: Boolean = false,
+        onClick: () -> Unit,
+    ) {
+        Surface(
+            onClick = onClick,
+            enabled = enabled,
+            shape = CircleShape,
+            color = if (filled) MaterialTheme.colorScheme.primary else Color.Transparent,
+            contentColor = if (filled) MaterialTheme.colorScheme.onPrimary else Color.White,
+            modifier = Modifier.size(44.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = description, modifier = Modifier.size(22.dp))
+            }
+        }
+    }
+
+    /** Touch | Trackpad, as one segmented capsule. */
+    @Composable
+    private fun ModeSwitch(onUsed: () -> Unit) {
+        Row(
+            Modifier
+                .padding(4.dp)
+                .background(Color.White.copy(alpha = 0.08f), CircleShape)
+                .padding(3.dp),
+        ) {
+            listOf(ControlMode.Touch to R.string.remote_mode_touch, ControlMode.Trackpad to R.string.remote_mode_trackpad).forEach { (mode, label) ->
+                val selected = controlMode == mode
+                Surface(
+                    onClick = { onUsed(); controlMode = mode },
+                    shape = CircleShape,
+                    color = if (selected) Color.White else Color.Transparent,
+                    contentColor = if (selected) Color.Black else Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier
+                        .heightIn(min = 40.dp)
+                        .semantics { this.selected = selected },
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 14.dp)) {
+                        Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+    }
+
+    /** The live path and round trip, polled while the screen is open. */
+    @Composable
+    private fun ConnectionChip() {
+        var stats by remember { mutableStateOf<org.desklink.mobile.webrtc.WebRtcConnectionStats?>(null) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                DeskLinkApplication.getInstance().getDevice(deviceId)?.requestConnectionStats { s -> runOnUiThread { stats = s } }
+                kotlinx.coroutines.delay(STATS_POLL_MS)
+            }
+        }
+        val current = stats ?: return
+        val statusColors = org.desklink.mobile.ui.compose.LocalStatusColors.current
+        val (label, dot) = when (current.path) {
+            org.desklink.mobile.webrtc.WebRtcConnectionPath.LAN -> stringResource(R.string.connection_local) to statusColors.online
+            org.desklink.mobile.webrtc.WebRtcConnectionPath.DIRECT -> stringResource(R.string.remote_path_direct) to statusColors.away
+            org.desklink.mobile.webrtc.WebRtcConnectionPath.TURN -> stringResource(R.string.remote_path_turn) to statusColors.pending
+        }
+        val text = current.roundTripTimeMs?.let { stringResource(R.string.remote_path_with_rtt, label, it) } ?: label
+        val description = stringResource(R.string.remote_path_chip_description, text)
+        Row(
+            Modifier
+                .padding(horizontal = 12.dp)
+                .semantics(mergeDescendants = true) { contentDescription = description },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            org.desklink.mobile.ui.compose.components.StatusDot(dot)
+            Spacer(Modifier.width(8.dp))
+            Text(text, style = MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 1)
         }
     }
 
@@ -485,7 +629,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 controlsVisible = false
             }
         }
-        val scrim = Color.Black.copy(alpha = 0.55f)
+        val deviceName = remember { DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty() }
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             DesktopScreen(
                 modifier = Modifier.fillMaxSize(),
@@ -499,97 +643,75 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             )
             androidx.compose.animation.AnimatedVisibility(
                 visible = controlsVisible,
-                modifier = Modifier.align(Alignment.TopCenter),
-                enter = androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { -it / 2 },
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { -it / 2 },
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(scrim)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = { finish() }) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = stringResource(R.string.remote_close),
-                            tint = Color.White,
-                        )
-                    }
-                    Text(
-                        text = status,
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if ((screenControlPlugin()?.remoteScreenCount ?: 1) > 1) {
-                        androidx.compose.material3.TextButton(onClick = {
-                            touch()
-                            DeskLinkApplication.getInstance().switchRemoteScreen(deviceId)
-                        }) {
-                            Text(stringResource(R.string.remote_switch_screen), color = Color.White)
+                    Glass(shape = CircleShape) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            GlassIconButton(rememberVectorPainter(Icons.Default.Close), stringResource(R.string.remote_close)) { finish() }
+                            Text(
+                                deviceName,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Color.White,
+                                maxLines = 1,
+                                modifier = Modifier.padding(start = 4.dp, end = 4.dp).widthIn(max = 220.dp),
+                            )
+                            ConnectionChip()
                         }
                     }
-                    androidx.compose.material3.TextButton(onClick = {
-                        touch()
-                        controlMode = if (controlMode == ControlMode.Touch) ControlMode.Trackpad else ControlMode.Touch
-                    }) {
-                        Text(
-                            stringResource(
-                                if (controlMode == ControlMode.Touch) R.string.remote_mode_trackpad else R.string.remote_mode_touch,
-                            ),
-                            color = Color.White,
-                        )
-                    }
-                    androidx.compose.material3.TextButton(onClick = { touch(); fillScreen = !fillScreen }) {
-                        Text(
-                            stringResource(if (fillScreen) R.string.remote_zoom_fit else R.string.remote_zoom_fill),
-                            color = Color.White,
-                        )
-                    }
-                    IconButton(onClick = { touch(); requestDesktopScreen() }) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.remote_screen_retry),
-                            tint = Color.White,
-                        )
-                    }
-                    IconButton(onClick = { touch(); openSettings() }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.settings),
-                            tint = Color.White,
-                        )
+                    Spacer(Modifier.weight(1f))
+                    Glass(shape = CircleShape) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ModeSwitch(onUsed = touch)
+                            if ((screenControlPlugin()?.remoteScreenCount ?: 1) > 1) {
+                                GlassIconButton(painterResource(R.drawable.ic_desktop_24dp), stringResource(R.string.remote_switch_screen)) {
+                                    touch()
+                                    DeskLinkApplication.getInstance().switchRemoteScreen(deviceId)
+                                }
+                            }
+                            GlassIconButton(
+                                painterResource(R.drawable.ic_open_in_full_24dp),
+                                stringResource(if (fillScreen) R.string.remote_zoom_fit else R.string.remote_zoom_fill),
+                            ) { touch(); fillScreen = !fillScreen }
+                            GlassIconButton(rememberVectorPainter(Icons.Default.Refresh), stringResource(R.string.remote_screen_retry)) {
+                                touch(); requestDesktopScreen()
+                            }
+                            GlassIconButton(rememberVectorPainter(Icons.Default.Settings), stringResource(R.string.settings)) {
+                                touch(); openSettings()
+                            }
+                        }
                     }
                 }
             }
             androidx.compose.animation.AnimatedVisibility(
                 visible = controlsVisible,
                 modifier = Modifier.align(Alignment.BottomCenter),
-                enter = androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.fadeOut(),
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
             ) {
                 KeyBar(
                     controlEnabled = controlEnabled,
-                    modifier = Modifier.background(scrim).padding(horizontal = 8.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     onUsed = touch,
                 )
             }
             if (!controlsVisible) {
-                androidx.compose.material3.SmallFloatingActionButton(
-                    onClick = { controlsVisible = true; touch() },
-                    containerColor = scrim,
-                    contentColor = Color.White,
+                Glass(
+                    shape = CircleShape,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(12.dp),
+                        .padding(16.dp),
                 ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowUp,
-                        contentDescription = stringResource(R.string.remote_show_controls),
-                    )
+                    GlassIconButton(rememberVectorPainter(Icons.Default.KeyboardArrowUp), stringResource(R.string.remote_show_controls)) {
+                        controlsVisible = true; touch()
+                    }
                 }
             }
         }
@@ -756,6 +878,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         private const val TEXT_CHUNK_CHARS = 200
         private const val CONTROL_RETRY_MS = 3_000L
         private const val CONTROLS_HIDE_MS = 4_000L
+        private const val STATS_POLL_MS = 2_000L
         // Desktop `specialKey` codes (KeyListenerView.SpecialKeysMap, and the
         // desktop's `special_key_to_keysym`).
         private const val SPECIAL_TAB = 2

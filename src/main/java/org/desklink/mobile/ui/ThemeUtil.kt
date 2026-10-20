@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.preference.PreferenceManager
 import com.google.android.material.color.DynamicColors
+import com.google.android.material.color.DynamicColorsOptions
 
 /**
  * Utilities for working with android [Themes][android.content.res.Resources.Theme].
@@ -21,6 +22,9 @@ object ThemeUtil {
     @Suppress("MemberVisibilityCanBePrivate")
     const val DARK_MODE: String = "dark"
     const val DEFAULT_MODE: String = "default"
+
+    /** Use the wallpaper's colors (Android 12+); off uses the DeskLink palette. */
+    const val KEY_DYNAMIC_COLORS: String = "dynamic_colors"
 
     fun applyTheme(themePref: String) {
         when (themePref) {
@@ -55,7 +59,15 @@ object ThemeUtil {
         val appTheme = PreferenceManager
             .getDefaultSharedPreferences(application)
             .getString("theme_pref", DEFAULT_MODE)!!
-        DynamicColors.applyToActivitiesIfAvailable(application)
+        // Read at each activity's creation, so turning it off applies to the next screen opened.
+        DynamicColors.applyToActivitiesIfAvailable(
+            application,
+            DynamicColorsOptions.Builder()
+                .setPrecondition { activity, _ ->
+                    PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(KEY_DYNAMIC_COLORS, true)
+                }
+                .build(),
+        )
         applyTheme(appTheme)
     }
 }
