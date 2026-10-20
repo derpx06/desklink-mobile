@@ -55,13 +55,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     </style>
 
     <!-- Transparent, so the app bar's lift-on-scroll color reaches under the status bar too. -->
-    <style name="DeskLinkToolbar" parent="Widget.Material3.Toolbar">
-        <item name="titleTextAppearance">@style/DeskLinkToolbarTitle</item>
-    </style>
+    <style name="DeskLinkToolbar" parent="Widget.Material3.Toolbar" />
 
-    <style name="DeskLinkToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
-        <item name="android:textStyle">bold</item>
-    </style>
 
     <style name="DeskLinkDialogStyle" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:layout" tools:ignore="PrivateResource">@layout/m3_alert_dialog</item>

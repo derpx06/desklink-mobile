@@ -33,7 +33,14 @@ import org.desklink.mobile.ui.compose.extensions.device.toUiModel
 import org.desklink.mobile.ui.compose.screen.device.DeviceScreen
 import org.desklink.mobile.ui.compose.screen.device.DeviceScreenActions
 import org.desklink.mobile.ui.compose.screen.device.DeviceScreenState
-import org.desklink.mobile.ui.compose.screen.device.QuickActionItem
+import org.desklink.mobile.ui.compose.screen.device.ActiveSession
+import org.desklink.mobile.ui.compose.screen.device.FeatureRow
+import org.desklink.mobile.ui.compose.components.SessionPreviews
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
+import androidx.core.view.MenuProvider
+import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.R
 import org.desklink.mobile.databinding.ActivityDeviceBinding
 
@@ -56,17 +63,43 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             return frag
         }
 
-        /** The order tiles appear in: the remote and the terminal first, by their icons. */
-        private val CONTROL_ORDER = listOf(
+        /** Features in the order both apps list them, by the icon each plugin gives its button. */
+        private val FEATURE_ORDER = listOf(
             R.drawable.touchpad_plugin_action_24dp,
-            R.drawable.ic_terminal_24dp,
             R.drawable.share_plugin_action_24dp,
             R.drawable.ic_baseline_content_paste_24,
+            R.drawable.ic_terminal_24dp,
             R.drawable.ic_presenter_24dp,
             R.drawable.run_command_plugin_icon_24dp,
             R.drawable.mpris_plugin_action_24dp,
             R.drawable.ic_draw_24dp,
             R.drawable.tv_remote_24px,
+        )
+
+        /** The one line under each feature card's title. */
+        private val FEATURE_DESCRIPTIONS = mapOf(
+            R.drawable.touchpad_plugin_action_24dp to R.string.feature_desc_screen,
+            R.drawable.share_plugin_action_24dp to R.string.feature_desc_files,
+            R.drawable.ic_baseline_content_paste_24 to R.string.feature_desc_clipboard,
+            R.drawable.ic_terminal_24dp to R.string.feature_desc_terminal,
+            R.drawable.ic_presenter_24dp to R.string.feature_desc_presenter,
+            R.drawable.run_command_plugin_icon_24dp to R.string.feature_desc_run_command,
+            R.drawable.mpris_plugin_action_24dp to R.string.feature_desc_media,
+            R.drawable.ic_draw_24dp to R.string.feature_desc_digitizer,
+            R.drawable.tv_remote_24px to R.string.feature_desc_tv,
+        )
+
+        /** One icon family in the list: each plugin icon's Material Symbols counterpart. */
+        private val FEATURE_ICONS = mapOf(
+            R.drawable.touchpad_plugin_action_24dp to R.drawable.sym_cast,
+            R.drawable.share_plugin_action_24dp to R.drawable.sym_upload_file,
+            R.drawable.ic_baseline_content_paste_24 to R.drawable.sym_content_paste,
+            R.drawable.ic_terminal_24dp to R.drawable.sym_terminal,
+            R.drawable.ic_presenter_24dp to R.drawable.sym_co_present,
+            R.drawable.run_command_plugin_icon_24dp to R.drawable.sym_bolt,
+            R.drawable.mpris_plugin_action_24dp to R.drawable.sym_play_circle,
+            R.drawable.ic_draw_24dp to R.drawable.sym_draw,
+            R.drawable.tv_remote_24px to R.drawable.sym_settings_remote,
         )
     }
 
@@ -96,8 +129,15 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         val actions = DeviceScreenActions(
-            onControl = { button -> mActivity?.let(button.onClick) },
-            onQuickAction = { entry -> mActivity?.let(entry.onClick) },
+            onRow = { row -> mActivity?.let(row.onClick) },
+            onOpenSession = { id ->
+                mActivity?.let { startActivity(TerminalActivity.intent(it, deviceId).putExtra(TerminalActivity.EXTRA_TERMINAL_ID, id)) }
+            },
+            onNewSession = { command ->
+                // The terminal screen opens the new session as soon as the computer reports it.
+                DeskLinkApplication.getInstance().terminalClient(deviceId)?.create(24, 80, command?.let(::listOf))
+                mActivity?.let { startActivity(TerminalActivity.intent(it, deviceId)) }
+            },
             onRequiredPermission = { plugin ->
                 PluginPermissionDialogSelector.requiredPermissionDialog(plugin).show(childFragmentManager, null)
             },
@@ -122,9 +162,7 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             onCancelPairing = { device?.cancelPairing() },
             onRefresh = ::refreshDevicesAction,
             onEncryptionInfo = ::showEncryptionInfo,
-            onPluginSettings = {
-                startActivity(Intent(mActivity, PluginSettingsActivity::class.java).putExtra("deviceId", deviceId))
-            },
+            onFeatureSettings = ::openFeatureSettings,
             onUnpair = {
                 device?.apply {
                     // Remove listener so buttons don't show for an instant before changing the view
@@ -134,7 +172,17 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
                 }
                 view.post { (mActivity as? MainActivity)?.onDeviceSelected(null) }
             },
+            onEndSession = {
+                DeskLinkApplication.getInstance().stopRemoteSession(deviceId)
+                DeskLinkApplication.getInstance().terminalClient(deviceId)?.detachAll()
+                refreshUI()
+            },
+            onHeroHidden = { hidden ->
+                // The name moves into the app bar once the hero has scrolled away.
+                mActivity?.supportActionBar?.title = if (hidden) device?.name else ""
+            },
         )
+        mActivity?.addMenuProvider(menuProvider, viewLifecycleOwner)
         binding.deviceViewCompose.apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
@@ -185,7 +233,7 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
         val device = device ?: return
         val context = requireContext()
         MaterialAlertDialogBuilder(context)
-            .setTitle(R.string.encryption_info_title)
+            .setTitle(R.string.device_encryption)
             .setPositiveButton(R.string.ok) { dialog, _ -> dialog.dismiss() }
             .setMessage(
                 "${context.getString(R.string.my_device_fingerprint)}\n${SslHelper.getCertificateHash(SslHelper.certificate)}\n\n" +
@@ -225,7 +273,9 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
         val model = device.toUiModel()
         val paired = device.pairStatus == PairingHandler.PairState.Paired
         val live = paired && device.isReachable
+        val menuEntries = if (live) device.loadedPlugins.values.flatMap { it.getUiMenuEntries() } else emptyList()
         screenState.value = DeviceScreenState(
+            deviceId = deviceId,
             name = device.name,
             icon = device.iconDrawable,
             pairState = device.pairStatus,
@@ -235,18 +285,17 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             charging = model.charging,
             verificationKey = device.verificationKey,
             pairMessage = pairMessage,
-            protocolVersion = device.protocolVersion,
-            controls = if (live) {
-                (device.loadedPlugins.values.flatMap { it.getUiButtons() } + terminalButtons(device))
-                    .sortedBy { CONTROL_ORDER.indexOf(it.iconRes).let { i -> if (i < 0) CONTROL_ORDER.size else i } }
+            fingerprint = if (paired) shortFingerprint(device) else null,
+            features = if (live) featureRows(device) + menuEntries.filter { it.name == getString(R.string.send_clipboard) }.map { entry ->
+                FeatureRow(entry.name, R.drawable.sym_content_paste, opensScreen = false, onClick = entry.onClick, description = getString(R.string.feature_desc_clipboard))
             } else {
                 emptyList()
             },
-            quickActions = if (live) {
-                device.loadedPlugins.values.flatMap { it.getUiMenuEntries() }.map { QuickActionItem(it, quickActionIcon(it.name)) }
-            } else {
-                emptyList()
-            },
+            quickActions = if (live) quickActions(device, menuEntries) else emptyList(),
+            terminalReady = live && device.hasActiveWebRtcFeatureTransport,
+            sessions = if (live) SessionPreviews.of(requireContext(), deviceId) else emptyList(),
+            launchers = DeskLinkApplication.getInstance().terminalClient(deviceId)?.takeIf { live }?.state?.value?.launchers.orEmpty()
+                .mapNotNull { launcher -> SessionPreviews.agentName(requireContext(), launcher)?.let { it to launcher } },
             needPermissions = if (live) {
                 device.pluginsWithoutPermissions.values.filter { device.isPluginEnabled(it.pluginKey) }
             } else {
@@ -257,30 +306,89 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
             } else {
                 emptyList()
             },
+            activeSession = if (live) activeSession() else null,
             isRefreshing = isRefreshing,
+        )
+        val overflow = menuEntries.filter {
+            it.name !in setOf(getString(R.string.ring), getString(R.string.lock_remote_device), getString(R.string.send_ping), getString(R.string.send_clipboard))
+        }
+        // Rebuilt only when it changes: the status poll would otherwise close an open menu.
+        if (overflow.map { it.name } != overflowEntries.map { it.name }) {
+            overflowEntries = overflow
+            mActivity?.invalidateMenu()
+        } else {
+            overflowEntries = overflow
+        }
+    }
+
+    /** Ring, Lock, Ping and Send files: the pill buttons under the name. */
+    private fun quickActions(device: Device, menuEntries: List<Plugin.PluginUiMenuEntry>): List<FeatureRow> {
+        val byName = menuEntries.associateBy { it.name }
+        return listOfNotNull(
+            byName[getString(R.string.ring)]?.let { FeatureRow(getString(R.string.device_ring), R.drawable.sym_vibration, false, it.onClick) },
+            byName[getString(R.string.lock_remote_device)]?.let { FeatureRow(getString(R.string.device_lock), R.drawable.sym_lock, false, it.onClick) },
+            byName[getString(R.string.send_ping)]?.let { FeatureRow(getString(R.string.device_ping), R.drawable.sym_wifi_tethering, false, it.onClick) },
+            device.loadedPlugins.values.flatMap { it.getUiButtons() }.firstOrNull { it.iconRes == R.drawable.share_plugin_action_24dp }
+                ?.let { FeatureRow(getString(R.string.send_files), R.drawable.sym_upload_file, true, it.onClick) },
         )
     }
 
-    private fun quickActionIcon(name: String): Int = when (name) {
-        getString(R.string.ring) -> R.drawable.ic_vibration_24dp
-        getString(R.string.send_ping) -> R.drawable.ic_wifi_tethering_24dp
-        getString(R.string.lock_remote_device) -> R.drawable.ic_lock_24dp
-        getString(R.string.send_clipboard) -> R.drawable.ic_baseline_content_paste_24
-        else -> R.drawable.ic_phonelink_36dp
+    /** Anything a plugin offers that has no button of its own. */
+    private var overflowEntries: List<Plugin.PluginUiMenuEntry> = emptyList()
+
+    private val menuProvider = object : MenuProvider {
+        override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+            overflowEntries.forEach { entry ->
+                menu.add(entry.name).setOnMenuItemClickListener {
+                    mActivity?.let(entry.onClick)
+                    true
+                }
+            }
+            menu.add(R.string.device_features).setOnMenuItemClickListener {
+                openFeatureSettings()
+                true
+            }
+        }
+
+        override fun onMenuItemSelected(menuItem: MenuItem): Boolean = false
+    }
+
+    private fun openFeatureSettings() {
+        startActivity(Intent(mActivity, PluginSettingsActivity::class.java).putExtra("deviceId", deviceId))
     }
 
     /**
-     * Terminal is not a plugin (it rides its own WebRTC data channel, like the file browser), so
-     * its entry point is added here, and only while the authenticated WebRTC transport is ready.
+     * The features as list rows, in the order and with the names both apps use: Computer screen,
+     * Send files, Clipboard, Terminal, then the rest. A row opens a screen unless it acts at once.
      */
-    private fun terminalButtons(device: Device): List<Plugin.PluginUiButton> {
-        if (!device.isPaired || !device.hasActiveWebRtcFeatureTransport) return emptyList()
-        return listOf(
-            Plugin.PluginUiButton(getString(R.string.terminal_open), R.drawable.ic_terminal_24dp) { parentActivity ->
-                parentActivity.startActivity(TerminalActivity.intent(parentActivity, device.deviceId))
-            },
-        )
+    private fun featureRows(device: Device): List<FeatureRow> =
+        device.loadedPlugins.values.flatMap { it.getUiButtons() }
+            .sortedBy { FEATURE_ORDER.indexOf(it.iconRes).let { i -> if (i < 0) FEATURE_ORDER.size else i } }
+            .map { button ->
+                FeatureRow(
+                    title = when (button.iconRes) {
+                        R.drawable.touchpad_plugin_action_24dp -> getString(R.string.feature_computer_screen)
+                        R.drawable.run_command_plugin_icon_24dp -> getString(R.string.feature_run_command)
+                        else -> button.name
+                    },
+                    icon = FEATURE_ICONS[button.iconRes] ?: button.iconRes,
+                    opensScreen = button.iconRes != R.drawable.ic_baseline_content_paste_24,
+                    onClick = button.onClick,
+                    description = FEATURE_DESCRIPTIONS[button.iconRes]?.let(::getString),
+                )
+            }
+
+    /** The screen being viewed and the terminals attached right now, or null when nothing is. */
+    private fun activeSession(): ActiveSession? {
+        val app = DeskLinkApplication.getInstance()
+        val screen = app.getDevicePlugin(deviceId, ScreenControlPlugin::class.java)?.remoteLive == true
+        val terminals = app.terminalClient(deviceId)?.state?.value?.sessions?.count { it.attached } ?: 0
+        return if (screen || terminals > 0) ActiveSession(screen, terminals) else null
     }
+
+    /** "3F2A 91C0…": enough of the fingerprint to recognise, the whole of it one tap away. */
+    private fun shortFingerprint(device: Device): String =
+        SslHelper.getCertificateHash(device.certificate).filter { it.isLetterOrDigit() }.uppercase().take(8).chunked(4).joinToString(" ") + "…"
 
     private val pairingCallback: PairingHandler.PairingCallback =
         object : PairingHandler.PairingCallback {
@@ -293,9 +401,13 @@ class DeviceFragment : BaseFragment<ActivityDeviceBinding>() {
 
             override fun pairingSuccessful() {
                 mActivity?.runOnUiThread {
-                    view?.announceForAccessibility(getString(R.string.pair_succeeded))
                     pairMessage = null
                     refreshUI()
+                    view?.let {
+                        com.google.android.material.snackbar.Snackbar
+                            .make(it, getString(R.string.pair_paired_with, device?.name.orEmpty()), com.google.android.material.snackbar.Snackbar.LENGTH_SHORT)
+                            .show()
+                    }
                 }
             }
 

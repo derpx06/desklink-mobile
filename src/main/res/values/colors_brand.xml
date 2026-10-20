@@ -4,30 +4,30 @@ SPDX-FileCopyrightText: 2026 DeskLink contributors
 
 SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 -->
-<!-- The DeskLink palette, used when the wallpaper's colors are not (before Android 12, or turned
-     off). Mirrors LightBrand/DarkBrand in ui/compose/DeskLinkTheme.kt. -->
+<!-- DeskLink's tokens (design v3), used unless wallpaper colors are turned on. Mirrors
+     ui/compose/DeskLinkTheme.kt. -->
 <resources>
-    <color name="brand_primary">#2557E0</color>
+    <color name="brand_primary">#3B6CF6</color>
     <color name="brand_on_primary">#FFFFFF</color>
-    <color name="brand_primary_container">#DCE4FF</color>
-    <color name="brand_on_primary_container">#00174B</color>
-    <color name="brand_secondary">#4F5B78</color>
+    <color name="brand_primary_container">#E4EAFE</color>
+    <color name="brand_on_primary_container">#1C3A99</color>
+    <color name="brand_secondary">#5E616A</color>
     <color name="brand_on_secondary">#FFFFFF</color>
-    <color name="brand_secondary_container">#DDE3F6</color>
-    <color name="brand_on_secondary_container">#14213D</color>
-    <color name="brand_tertiary">#006B59</color>
+    <color name="brand_secondary_container">#E4EAFE</color>
+    <color name="brand_on_secondary_container">#1C3A99</color>
+    <color name="brand_tertiary">#13A57A</color>
     <color name="brand_on_tertiary">#FFFFFF</color>
-    <color name="brand_tertiary_container">#B4F1E2</color>
-    <color name="brand_on_tertiary_container">#00201A</color>
-    <color name="brand_background">#F7F8FC</color>
-    <color name="brand_on_background">#151A24</color>
-    <color name="brand_surface_variant">#E1E5EF</color>
-    <color name="brand_on_surface_variant">#545C6E</color>
-    <color name="brand_outline">#8790A3</color>
-    <color name="brand_outline_variant">#D3D8E3</color>
+    <color name="brand_tertiary_container">#D3F2E8</color>
+    <color name="brand_on_tertiary_container">#07533C</color>
+    <color name="brand_background">#F6F6F4</color>
+    <color name="brand_on_background">#121317</color>
+    <color name="brand_surface_variant">#F0F0EE</color>
+    <color name="brand_on_surface_variant">#5E616A</color>
+    <color name="brand_outline">#D6D6D1</color>
+    <color name="brand_outline_variant">#E4E4E0</color>
     <color name="brand_surface_container_lowest">#FFFFFF</color>
-    <color name="brand_surface_container_low">#F1F3F9</color>
-    <color name="brand_surface_container">#EBEEF5</color>
-    <color name="brand_surface_container_high">#E5E8F0</color>
-    <color name="brand_surface_container_highest">#DFE3EC</color>
+    <color name="brand_surface_container_low">#FFFFFF</color>
+    <color name="brand_surface_container">#FFFFFF</color>
+    <color name="brand_surface_container_high">#F0F0EE</color>
+    <color name="brand_surface_container_highest">#E9E9E6</color>
 </resources>

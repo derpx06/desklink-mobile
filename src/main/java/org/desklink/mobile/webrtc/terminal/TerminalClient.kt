@@ -220,6 +220,9 @@ class TerminalClient(
         }
     }
 
+    /** The screen for [id] if one already exists, for read-only previews; never creates or attaches one. */
+    fun screenIfOpen(id: String): TerminalSink? = sinks[id]
+
     fun refresh() = post { if (linkUp) sendControl(TerminalAction.LIST) }
 
     /** Asks for a new session running the login shell, or [command] as an argument vector. */

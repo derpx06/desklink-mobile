@@ -19,3 +19,14 @@ class DeviceConnectionTest {
         assertEquals(DeviceConnection.CONNECTED, deviceConnection(reachable = true, featuresReady = true, lan = false, relay = false))
     }
 }
+
+class DeviceTypeGlyphTest {
+    /** The desktop sends exactly these two values (DeskLink/src/device_links/device_info.rs). */
+    @Test
+    fun laptopsAndDesktopsGetTheirOwnGlyph() {
+        assertEquals(org.desklink.mobile.R.drawable.ic_device_laptop_32dp, org.desklink.mobile.DeviceType.fromString("laptop").toDrawableId())
+        assertEquals(org.desklink.mobile.R.drawable.ic_device_desktop_32dp, org.desklink.mobile.DeviceType.fromString("desktop").toDrawableId())
+        // Anything unreported falls back to the generic computer, the monitor.
+        assertEquals(org.desklink.mobile.R.drawable.ic_device_desktop_32dp, org.desklink.mobile.DeviceType.fromString("").toDrawableId())
+    }
+}

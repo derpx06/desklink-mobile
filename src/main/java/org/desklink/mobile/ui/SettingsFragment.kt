@@ -1,365 +1,112 @@
 /*
  * SPDX-FileCopyrightText: 2023 Albert Vaca Cintora <albertvaka@gmail.com>
+ * SPDX-FileCopyrightText: 2026 DeskLink contributors
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 */
 package org.desklink.mobile.ui
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.text.InputFilter
-import android.text.InputFilter.LengthFilter
-import android.text.Spanned
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
-import androidx.core.net.toUri
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.preference.EditTextPreference
-import androidx.annotation.DrawableRes
-import androidx.preference.ListPreference
-import androidx.preference.PreferenceCategory
-import androidx.preference.PreferenceScreen
-import androidx.preference.Preference
-import androidx.preference.PreferenceFragmentCompat
-import androidx.preference.SwitchPreference
+import androidx.core.content.edit
+import androidx.core.net.toUri
+import androidx.fragment.app.Fragment
+import androidx.preference.PreferenceManager
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.commons.io.IOUtils
 import org.desklink.mobile.BackgroundService
+import org.desklink.mobile.BuildConfig
+import org.desklink.mobile.R
 import org.desklink.mobile.backends.relay.RelayLinkProvider
 import org.desklink.mobile.backends.relay.RelaySettings
 import org.desklink.mobile.helpers.CreateFileParams
 import org.desklink.mobile.helpers.CreateFileResultContract
 import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.DeviceHelper.filterInvalidCharactersFromDeviceName
-import org.desklink.mobile.helpers.DeviceHelper.getDeviceName
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.ui.ThemeUtil.applyTheme
-import org.desklink.mobile.extensions.setupBottomPadding
-import org.desklink.mobile.BuildConfig
-import org.desklink.mobile.R
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.components.DeskCard
+import org.desklink.mobile.ui.compose.components.SectionHeader
+import org.desklink.mobile.ui.compose.tokens
+import androidx.compose.foundation.layout.Arrangement
 import java.io.InputStreamReader
 
-class SettingsFragment : PreferenceFragmentCompat() {
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        if (activity != null) {
-            (activity as? MainActivity)?.supportActionBar?.setTitle(R.string.settings)
-            (activity as? MainActivity)?.supportActionBar?.subtitle = null
-        }
-        return super.onCreateView(inflater, container, savedInstanceState)
-    }
+/**
+ * The app's settings as plain Material list rows, grouped under section titles. The network
+ * details live one level down, under "Advanced network". Every row reads and writes the same
+ * preference keys the rest of the app reads.
+ */
+class SettingsFragment : Fragment() {
+    private val prefs: SharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(requireContext()) }
 
-    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        val context = preferenceManager.context
-        val screen = preferenceManager.createPreferenceScreen(context)
+    /** Bumped whenever something outside Compose changed what a row shows. */
+    private var revision by mutableIntStateOf(0)
+    private var advanced by mutableStateOf(false)
+    private var relayStatus by mutableStateOf(RelayLinkProvider.Status.OFF)
 
-        // Categories must be on the screen before preferences are added to them.
-        screen.category(
-            context,
-            R.string.settings_category_general,
-            deviceNamePref(context).withIcon(R.drawable.ic_device_phone_32dp),
-            themePref(context).withIcon(R.drawable.ic_brightness_24dp),
-            *listOfNotNull(dynamicColorsPref(context)?.withIcon(R.drawable.ic_palette_24dp)).toTypedArray(),
-        )
-        screen.category(
-            context,
-            R.string.settings_category_connection,
-            trustedNetworkPref(context).withIcon(R.drawable.ic_shield_24dp),
-            devicesByIpPref(context).withIcon(R.drawable.ic_desktop_24dp),
-            bluetoothSupportPref(context).withIcon(R.drawable.ic_bluetooth_24dp),
-        )
-        screen.category(
-            context,
-            R.string.settings_category_away,
-            relayEnabledPref(context).withIcon(R.drawable.ic_cloud_24dp),
-            relayUrlPref(context).withIcon(R.drawable.ic_link_24dp),
-            relayUseTurnPref(context).withIcon(R.drawable.ic_swap_horiz_24dp),
-            webRtcStunServersPref(context).withIcon(R.drawable.ic_dns_24dp),
-            webRtcTurnServersPref(context).withIcon(R.drawable.ic_dns_24dp),
-        )
-        screen.category(
-            context,
-            R.string.settings_category_notifications,
-            persistentNotificationPref(context).withIcon(R.drawable.ic_notifications_24dp),
-        )
-        screen.category(
-            context,
-            R.string.settings_category_advanced,
-            exportLogsPref(context).withIcon(R.drawable.ic_download_24dp),
-            privacyPolicyPref(context).withIcon(R.drawable.ic_policy_24dp),
-            moreSettingsPref(context).withIcon(R.drawable.ic_info_24dp),
-        )
-        if (BuildConfig.DEBUG) {
-            screen.category(
-                context,
-                R.string.settings_category_debug,
-                relayDebugPref(context, RelaySettings.KEY_FORCE_RELAY, R.string.setting_relay_force_relay, R.string.setting_relay_force_relay_description)
-                    .withIcon(R.drawable.ic_baseline_bug_report_24),
-                relayDebugPref(context, RelaySettings.KEY_FORCE_TURN, R.string.setting_relay_force_turn, R.string.setting_relay_force_turn_description)
-                    .withIcon(R.drawable.ic_baseline_bug_report_24),
-            )
-        }
-
-        preferenceScreen = screen
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        listView.setupBottomPadding()
-        setDivider(null) // sections are separated by their titles, not rules
-        RelayLinkProvider.statusLive.observe(viewLifecycleOwner) { status ->
-            relayEnabledPref?.summary = getString(R.string.setting_relay_disclosure) + "\n" + getString(
-                when (status) {
-                    RelayLinkProvider.Status.CONNECTING -> R.string.relay_status_connecting
-                    RelayLinkProvider.Status.ONLINE -> R.string.relay_status_online
-                    RelayLinkProvider.Status.UNAVAILABLE -> R.string.relay_status_unavailable
-                    RelayLinkProvider.Status.UPDATE_REQUIRED -> R.string.relay_status_update_required
-                    else -> R.string.relay_status_off
-                },
-            )
-        }
-    }
-
-    private var relayEnabledPref: Preference? = null
-
-    /** Applies a relay setting once the preference has been saved (change listeners run before). */
-    private val relaySettingChanged = Preference.OnPreferenceChangeListener { _, _ ->
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            BackgroundService.instance?.onRelaySettingsChanged()
-        }
-        true
-    }
-
-    private fun relayEnabledPref(context: Context) = SwitchPreference(context).apply {
-        relayEnabledPref = this
-        key = RelaySettings.KEY_ENABLED
-        setDefaultValue(true)
-        setTitle(R.string.setting_relay_enabled)
-        setSummary(R.string.setting_relay_disclosure)
-        onPreferenceChangeListener = relaySettingChanged
-    }
-
-    private fun relayUrlPref(context: Context) = EditTextPreference(context).apply {
-        key = RelaySettings.KEY_URL
-        setTitle(R.string.setting_relay_url)
-        summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
-            pref.text?.trim()?.takeIf(String::isNotEmpty)
-                ?: getString(R.string.setting_relay_url_default, BuildConfig.DEFAULT_RELAY_URL)
-        }
-        setOnBindEditTextListener(EditText::setSingleLine)
-        onPreferenceChangeListener = relaySettingChanged
-    }
-
-    private fun relayUseTurnPref(context: Context) = SwitchPreference(context).apply {
-        key = RelaySettings.KEY_USE_TURN
-        setDefaultValue(true)
-        setTitle(R.string.setting_relay_use_turn)
-    }
-
-    private fun relayDebugPref(context: Context, prefKey: String, title: Int, summary: Int) = SwitchPreference(context).apply {
-        key = prefKey
-        setDefaultValue(false)
-        setTitle(title)
-        setSummary(summary)
-    }
-
-    private fun deviceNamePref(context: Context) = EditTextPreference(context).apply {
-        key = DeviceHelper.KEY_DEVICE_NAME_PREFERENCE
-        isSelectable = true
-        setOnBindEditTextListener(EditText::setSingleLine)
-        setOnBindEditTextListener { editText: EditText ->
-            editText.filters = arrayOf(
-                InputFilter { source: CharSequence, start: Int, end: Int, _: Spanned?, _: Int, _: Int ->
-                    filterInvalidCharactersFromDeviceName(source.subSequence(start, end).toString())
-                },
-                LengthFilter(DeviceHelper.MAX_DEVICE_NAME_LENGTH),
-            )
-        }
-        val deviceName = getDeviceName(context)
-        setTitle(R.string.settings_rename)
-        summary = deviceName
-        setDialogTitle(R.string.device_rename_title)
-        text = deviceName
-        setPositiveButtonText(R.string.device_rename_confirm)
-        setNegativeButtonText(R.string.cancel)
-        onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _: Preference?, new: Any? ->
-            val name = new as String?
-            if (name.isNullOrBlank()) {
-                if (view != null) {
-                    // Material 3 snackbars already contrast with either theme.
-                    Snackbar.make(requireView(), R.string.invalid_device_name, Snackbar.LENGTH_LONG).show()
-                }
-                false
-            }
-            else {
-                summary = new
-                true
-            }
-        }
-    }
-
-    private fun PreferenceScreen.category(context: Context, title: Int, vararg preferences: Preference) {
-        val category = PreferenceCategory(context).apply { setTitle(title) }
-        addPreference(category)
-        preferences.forEach(category::addPreference)
-    }
-
-    /** Icons in the theme's primary: one accent down the list, as in the system's own settings. */
-    private fun <T : Preference> T.withIcon(@DrawableRes icon: Int): T = apply {
-        val tint = com.google.android.material.color.MaterialColors.getColor(context, androidx.appcompat.R.attr.colorPrimary, 0)
-        this.icon = androidx.core.content.ContextCompat.getDrawable(context, icon)?.mutate()?.also { it.setTint(tint) }
-    }
-
-    /** Android 12+ only: older systems have no wallpaper palette to follow. */
-    private fun dynamicColorsPref(context: Context): Preference? =
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) null else SwitchPreference(context).apply {
-            key = ThemeUtil.KEY_DYNAMIC_COLORS
-            setDefaultValue(true)
-            setTitle(R.string.setting_dynamic_colors)
-            setSummary(R.string.setting_dynamic_colors_summary)
-            onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, _ ->
-                // Saved after this returns; recreate once it is, so the new palette applies here too.
-                view?.post { activity?.recreate() }
-                true
-            }
-        }
-
-    private fun themePref(context: Context) = ListPreference(context).apply {
-        key = KEY_APP_THEME
-        setTitle(R.string.theme_dialog_title)
-        setDialogTitle(R.string.theme_dialog_title)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) setEntries(R.array.theme_list_v28) else setEntries(R.array.theme_list)
-        setEntryValues(R.array.theme_list_values)
-        setDefaultValue(ThemeUtil.DEFAULT_MODE)
-        summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
-        onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _: Preference?, new: Any? ->
-            if (new is String) {
-                applyTheme(new)
-            }
-            true
-        }
-    }
-
-    private fun persistentNotificationPref(context: Context): Preference =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Preference(context).apply {
-            setTitle(R.string.setting_persistent_notification_oreo)
-            setSummary(R.string.setting_persistent_notification_description)
-            onPreferenceClickListener = Preference.OnPreferenceClickListener {
-                val intent = Intent()
-                intent.setAction("android.settings.APP_NOTIFICATION_SETTINGS")
-                intent.putExtra("android.provider.extra.APP_PACKAGE", context.packageName)
-                context.startActivity(intent)
-                true
-            }
-        }
-        // Persistent notification toggle for Android Versions below Oreo
-        else SwitchPreference(context).apply {
-            isPersistent = false
-            isChecked = NotificationHelper.isPersistentNotificationEnabled(context)
-            setTitle(R.string.setting_persistent_notification)
-            onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _: Preference?, new: Any ->
-                val isChecked = new as Boolean
-                NotificationHelper.setPersistentNotificationEnabled(context, isChecked)
-                BackgroundService.instance?.changePersistentNotificationVisibility(isChecked)
-                NotificationHelper.setPersistentNotificationEnabled(context, isChecked)
-                true
-            }
-        }
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> revision++ }
 
     val activityLauncherWithDevicesByIpRefresh = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        updateDevicesByIpSummary()
+        revision++
     }
-
-    private fun trustedNetworkPref(context: Context) = Preference(context).apply {
-        isPersistent = false
-        setTitle(R.string.trusted_networks)
-        setSummary(R.string.trusted_networks_desc)
-        onPreferenceClickListener = Preference.OnPreferenceClickListener {
-            activityLauncherWithNetworkRefresh.launch(Intent(context, TrustedNetworksActivity::class.java))
-            true
-        }
-    }
-
-    private lateinit var devicesByIpPref : Preference
 
     val activityLauncherWithNetworkRefresh = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         BackgroundService.instance?.onNetworkChange(null)
-    }
-
-    /** Opens activity to configure device by IP when clicked */
-    private fun devicesByIpPref(context: Context) = Preference(context).apply {
-        devicesByIpPref = this
-        isPersistent = false
-        setTitle(R.string.custom_device_list)
-        updateDevicesByIpSummary()
-        onPreferenceClickListener = Preference.OnPreferenceClickListener {
-            activityLauncherWithDevicesByIpRefresh.launch(Intent(context, CustomDevicesActivity::class.java))
-            true
-        }
-    }
-
-    private fun updateDevicesByIpSummary() {
-        devicesByIpPref.setSummary(getString(
-            R.string.custom_devices_settings_summary,
-            CustomDevicesActivity.getCustomDeviceList(context).size
-        ))
-    }
-
-    private fun bluetoothSupportPref(context: Context) = SwitchPreference(context).apply {
-        setDefaultValue(true)
-        key = KEY_BLUETOOTH_ENABLED
-        setTitle(R.string.enable_bluetooth)
-        onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _: Preference?, newValue: Any ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && newValue as Boolean) {
-                val permissions = arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
-                val permissionsGranted = permissions.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
-                if (!permissionsGranted) {
-                    PermissionsAlertDialogFragment.Builder()
-                        .setTitle(R.string.location_permission_needed_title)
-                        .setMessage(R.string.bluetooth_permission_needed_desc)
-                        .setPermissions(permissions)
-                        .setRequestCode(2)
-                        .create().show(childFragmentManager, null)
-                    return@OnPreferenceChangeListener false
-                }
-            }
-            true
-        }
-    }
-
-    private fun webRtcStunServersPref(context: Context) = EditTextPreference(context).apply {
-        key = DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE
-        setTitle(R.string.setting_webrtc_stun_servers)
-        setSummary(R.string.setting_webrtc_stun_servers_description)
-        setOnBindEditTextListener(EditText::setSingleLine)
-    }
-
-    private fun webRtcTurnServersPref(context: Context) = EditTextPreference(context).apply {
-        key = DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE
-        setTitle(R.string.setting_webrtc_turn_servers)
-        setSummary(R.string.setting_webrtc_turn_servers_description)
-        setOnBindEditTextListener(EditText::setSingleLine)
-    }
-
-    private fun exportLogsPref(context: Context) = Preference(context).apply {
-        isPersistent = false
-        setTitle(R.string.settings_export_logs)
-        setSummary(R.string.settings_export_logs_text)
-        onPreferenceClickListener = Preference.OnPreferenceClickListener {
-            exportLogs.launch(CreateFileParams("text/plain", "desklink-log.txt"))
-            true
-        }
     }
 
     private val exportLogs: ActivityResultLauncher<CreateFileParams> = registerForActivityResult(
@@ -377,18 +124,385 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
-    private fun privacyPolicyPref(context: Context) = Preference(context).apply {
-        isPersistent = false
-        setTitle(R.string.privacy_policy)
-        setSummary(R.string.privacy_policy_summary)
-        intent = Intent(Intent.ACTION_VIEW, context.getString(R.string.privacy_policy_url).toUri())
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
+        ComposeView(requireContext()).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                DeskLinkTheme(context) {
+                    BackHandler(enabled = advanced) { showAdvanced(false) }
+                    if (advanced) AdvancedNetworkScreen() else SettingsScreen()
+                }
+            }
+        }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        showAdvanced(advanced)
+        RelayLinkProvider.statusLive.observe(viewLifecycleOwner) { relayStatus = it }
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
     }
 
-    private fun moreSettingsPref(context: Context) = Preference(context).apply {
-        isPersistent = false
-        isSelectable = false
-        setTitle(R.string.settings_more_settings_title)
-        setSummary(R.string.settings_more_settings_text)
+    override fun onResume() {
+        super.onResume()
+        revision++ // permissions and notification settings may have changed elsewhere
+    }
+
+    override fun onDestroyView() {
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        super.onDestroyView()
+    }
+
+    private fun showAdvanced(on: Boolean) {
+        advanced = on
+        (activity as? MainActivity)?.supportActionBar?.apply {
+            setTitle(if (on) R.string.setting_advanced_network else R.string.settings)
+            subtitle = null
+        }
+    }
+
+    // ---- screens ------------------------------------------------------------------------------------
+
+    @Composable
+    private fun SettingsScreen() {
+        @Suppress("UNUSED_VARIABLE") val r = revision // re-read the preferences on every revision
+        val context = requireContext()
+        var editingName by remember { mutableStateOf(false) }
+        var choosingTheme by remember { mutableStateOf(false) }
+
+        SettingsColumn {
+            Group(stringResource(R.string.settings_category_general)) {
+            Row(
+                title = stringResource(R.string.settings_rename),
+                summary = DeviceHelper.getDeviceName(context),
+                onClick = { editingName = true },
+            )
+            val themeValues = stringArrayResource(R.array.theme_list_values)
+            val themeNames = stringArrayResource(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) R.array.theme_list_v28 else R.array.theme_list)
+            val theme = prefs.getString(KEY_APP_THEME, ThemeUtil.DEFAULT_MODE) ?: ThemeUtil.DEFAULT_MODE
+            Row(
+                title = stringResource(R.string.setting_appearance),
+                summary = themeNames.getOrNull(themeValues.indexOf(theme)),
+                onClick = { choosingTheme = true },
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                SwitchRow(
+                    title = stringResource(R.string.setting_dynamic_colors),
+                    checked = prefs.getBoolean(ThemeUtil.KEY_DYNAMIC_COLORS, false),
+                ) { on ->
+                    prefs.edit { putBoolean(ThemeUtil.KEY_DYNAMIC_COLORS, on) }
+                    // The XML theme reads it at creation: recreate so this screen changes too.
+                    view?.post { activity?.recreate() }
+                }
+            }
+            }
+
+            Group(stringResource(R.string.settings_category_connection)) {
+            Row(
+                title = stringResource(R.string.trusted_networks),
+                summary = stringResource(R.string.trusted_networks_desc),
+                onClick = { activityLauncherWithNetworkRefresh.launch(Intent(context, TrustedNetworksActivity::class.java)) },
+            )
+            Row(
+                title = stringResource(R.string.custom_device_list),
+                summary = getString(R.string.custom_devices_settings_summary, CustomDevicesActivity.getCustomDeviceList(context).size),
+                onClick = { activityLauncherWithDevicesByIpRefresh.launch(Intent(context, CustomDevicesActivity::class.java)) },
+            )
+            SwitchRow(
+                title = stringResource(R.string.setting_bluetooth),
+                // What BluetoothLinkProvider acts on, which is off until turned on here.
+                checked = prefs.getBoolean(KEY_BLUETOOTH_ENABLED, false),
+                onChange = ::setBluetooth,
+            )
+            }
+
+            Group(stringResource(R.string.settings_category_away)) {
+            val relayOn = prefs.getBoolean(RelaySettings.KEY_ENABLED, true)
+            SwitchRow(
+                title = stringResource(R.string.setting_relay_enabled),
+                summary = listOfNotNull(stringResource(R.string.setting_relay_summary), relayStatusText().takeIf { relayOn }).joinToString("\n"),
+                checked = relayOn,
+            ) { on ->
+                prefs.edit { putBoolean(RelaySettings.KEY_ENABLED, on) }
+                relaySettingChanged()
+            }
+            Row(
+                title = stringResource(R.string.setting_advanced_network),
+                summary = stringResource(R.string.setting_advanced_network_summary),
+                onClick = { showAdvanced(true) },
+            )
+            }
+
+            Group(stringResource(R.string.settings_category_notifications)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Row(
+                    title = stringResource(R.string.setting_persistent_notification_oreo),
+                    summary = stringResource(R.string.setting_persistent_notification_description),
+                    trailingIcon = R.drawable.sym_open_in_new,
+                    onClick = {
+                        // Straight to this channel's own settings, not the app's list of channels.
+                        startActivity(
+                            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                .putExtra(Settings.EXTRA_CHANNEL_ID, NotificationHelper.Channels.PERSISTENT),
+                        )
+                    },
+                )
+            } else {
+                SwitchRow(
+                    title = stringResource(R.string.setting_persistent_notification),
+                    checked = NotificationHelper.isPersistentNotificationEnabled(context),
+                ) { on ->
+                    NotificationHelper.setPersistentNotificationEnabled(context, on)
+                    BackgroundService.instance?.changePersistentNotificationVisibility(on)
+                    revision++
+                }
+            }
+            }
+
+            Group(stringResource(R.string.settings_category_help)) {
+            Row(
+                title = stringResource(R.string.settings_export_logs),
+                summary = stringResource(R.string.settings_export_logs_text),
+                onClick = { exportLogs.launch(CreateFileParams("text/plain", "desklink-log.txt")) },
+            )
+            Row(
+                title = stringResource(R.string.privacy_policy),
+                summary = stringResource(R.string.privacy_policy_summary),
+                trailingIcon = R.drawable.sym_open_in_new,
+                onClick = { startActivity(Intent(Intent.ACTION_VIEW, getString(R.string.privacy_policy_url).toUri())) },
+            )
+            }
+
+            if (BuildConfig.DEBUG) {
+                Group(stringResource(R.string.settings_category_debug)) {
+                    DebugSwitch(RelaySettings.KEY_FORCE_RELAY, R.string.setting_relay_force_relay, R.string.setting_relay_force_relay_description)
+                    DebugSwitch(RelaySettings.KEY_FORCE_TURN, R.string.setting_relay_force_turn, R.string.setting_relay_force_turn_description)
+                }
+            }
+        }
+
+        if (editingName) {
+            TextDialog(
+                title = stringResource(R.string.device_rename_title),
+                initial = DeviceHelper.getDeviceName(context),
+                confirm = stringResource(R.string.device_rename_confirm),
+                filter = { filterInvalidCharactersFromDeviceName(it).take(DeviceHelper.MAX_DEVICE_NAME_LENGTH) },
+                onDismiss = { editingName = false },
+            ) { name ->
+                editingName = false
+                if (name.isBlank()) {
+                    view?.let { Snackbar.make(it, R.string.invalid_device_name, Snackbar.LENGTH_LONG).show() }
+                } else {
+                    // MainActivity listens for this key and announces the new name.
+                    prefs.edit { putString(DeviceHelper.KEY_DEVICE_NAME_PREFERENCE, name) }
+                }
+            }
+        }
+        if (choosingTheme) {
+            val values = stringArrayResource(R.array.theme_list_values)
+            val names = stringArrayResource(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) R.array.theme_list_v28 else R.array.theme_list)
+            ChoiceDialog(
+                title = stringResource(R.string.setting_appearance),
+                options = names.toList(),
+                selected = values.indexOf(prefs.getString(KEY_APP_THEME, ThemeUtil.DEFAULT_MODE)),
+                onDismiss = { choosingTheme = false },
+            ) { index ->
+                choosingTheme = false
+                val value = values[index]
+                prefs.edit { putString(KEY_APP_THEME, value) }
+                applyTheme(value)
+            }
+        }
+    }
+
+    @Composable
+    private fun AdvancedNetworkScreen() {
+        @Suppress("UNUSED_VARIABLE") val r = revision
+        var editing by remember { mutableStateOf<String?>(null) }
+        SettingsColumn {
+            Group(stringResource(R.string.settings_category_away)) {
+            Row(
+                title = stringResource(R.string.setting_relay_url),
+                summary = prefs.getString(RelaySettings.KEY_URL, null)?.trim()?.takeIf(String::isNotEmpty)
+                    ?: stringResource(R.string.setting_relay_url_default, BuildConfig.DEFAULT_RELAY_URL),
+                onClick = { editing = RelaySettings.KEY_URL },
+            )
+            SwitchRow(
+                title = stringResource(R.string.setting_relay_use_turn),
+                checked = prefs.getBoolean(RelaySettings.KEY_USE_TURN, true),
+            ) { on -> prefs.edit { putBoolean(RelaySettings.KEY_USE_TURN, on) } }
+            }
+
+            Group(stringResource(R.string.setting_webrtc_transport)) {
+            Row(
+                title = stringResource(R.string.setting_webrtc_stun_servers),
+                summary = prefs.getString(DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE, null)?.takeIf(String::isNotBlank)
+                    ?: stringResource(R.string.setting_webrtc_stun_servers_description),
+                onClick = { editing = DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE },
+            )
+            Row(
+                title = stringResource(R.string.setting_webrtc_turn_servers),
+                summary = prefs.getString(DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE, null)?.takeIf(String::isNotBlank)
+                    ?: stringResource(R.string.setting_webrtc_turn_servers_description),
+                onClick = { editing = DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE },
+            )
+            }
+        }
+        editing?.let { key ->
+            TextDialog(
+                title = stringResource(
+                    when (key) {
+                        RelaySettings.KEY_URL -> R.string.setting_relay_url
+                        DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE -> R.string.setting_webrtc_stun_servers
+                        else -> R.string.setting_webrtc_turn_servers
+                    },
+                ),
+                initial = prefs.getString(key, "").orEmpty(),
+                confirm = stringResource(android.R.string.ok),
+                onDismiss = { editing = null },
+            ) { value ->
+                editing = null
+                prefs.edit { putString(key, value) }
+                if (key == RelaySettings.KEY_URL) relaySettingChanged()
+            }
+        }
+    }
+
+    // ---- behaviour --------------------------------------------------------------------------------
+
+    /** Applies a relay setting once it has been saved. */
+    private fun relaySettingChanged() {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            BackgroundService.instance?.onRelaySettingsChanged()
+        }
+    }
+
+    private fun setBluetooth(on: Boolean) {
+        val context = requireContext()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && on) {
+            val permissions = arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+            val granted = permissions.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+            if (!granted) {
+                // MainActivity turns the setting on once both are granted.
+                PermissionsAlertDialogFragment.Builder()
+                    .setTitle(R.string.location_permission_needed_title)
+                    .setMessage(R.string.bluetooth_permission_needed_desc)
+                    .setPermissions(permissions)
+                    .setRequestCode(2)
+                    .create().show(childFragmentManager, null)
+                return
+            }
+        }
+        prefs.edit { putBoolean(KEY_BLUETOOTH_ENABLED, on) }
+    }
+
+    @Composable
+    private fun relayStatusText(): String? = when (relayStatus) {
+        RelayLinkProvider.Status.CONNECTING -> stringResource(R.string.relay_status_connecting)
+        RelayLinkProvider.Status.ONLINE -> stringResource(R.string.setting_relay_connected)
+        RelayLinkProvider.Status.UNAVAILABLE -> stringResource(R.string.relay_status_unavailable)
+        RelayLinkProvider.Status.UPDATE_REQUIRED -> stringResource(R.string.relay_status_update_required)
+        else -> null
+    }
+
+    // ---- rows -----------------------------------------------------------------------------------------
+
+    @Composable
+    private fun SettingsColumn(content: @Composable () -> Unit) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .nestedScroll(rememberNestedScrollInteropConnection())
+                .verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, bottom = 24.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
+        ) { content() }
+    }
+
+    /**
+     * A titled group of rows on one card. The card is drawn in the hairline color and its rows in the
+     * surface color, 1dp apart, so the hairlines between rows come for free.
+     */
+    @Composable
+    private fun Group(title: String, content: @Composable () -> Unit) {
+        SectionHeader(title)
+        DeskCard(Modifier.fillMaxWidth(), color = tokens.hairline) {
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) { content() }
+        }
+    }
+
+    @Composable
+    private fun Row(title: String, summary: String? = null, trailingIcon: Int? = null, onClick: () -> Unit) {
+        ListItem(
+            headlineContent = { Text(title) },
+            supportingContent = summary?.let { { Text(it, maxLines = 3) } },
+            trailingContent = trailingIcon?.let { { Icon(painterResource(it), contentDescription = null) } },
+            colors = rowColors(),
+            modifier = Modifier.clickable(onClick = onClick),
+        )
+    }
+
+    @Composable
+    private fun rowColors() = androidx.compose.material3.ListItemDefaults.colors(
+        containerColor = tokens.surface,
+        supportingColor = tokens.textDim,
+        trailingIconColor = tokens.textFaint,
+    )
+
+    @Composable
+    private fun SwitchRow(title: String, checked: Boolean, summary: String? = null, onChange: (Boolean) -> Unit) {
+        ListItem(
+            headlineContent = { Text(title) },
+            supportingContent = summary?.let { { Text(it, maxLines = 3) } },
+            // The row is the control; the switch only shows its state.
+            trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+            colors = rowColors(),
+            modifier = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+        )
+    }
+
+    @Composable
+    private fun DebugSwitch(key: String, title: Int, summary: Int) {
+        SwitchRow(stringResource(title), prefs.getBoolean(key, false), stringResource(summary)) { on -> prefs.edit { putBoolean(key, on) } }
+    }
+
+    @Composable
+    private fun TextDialog(
+        title: String,
+        initial: String,
+        confirm: String,
+        filter: (String) -> String = { it },
+        onDismiss: () -> Unit,
+        onConfirm: (String) -> Unit,
+    ) {
+        var text by remember { mutableStateOf(initial) }
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(title) },
+            text = { OutlinedTextField(value = text, onValueChange = { text = filter(it) }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
+            confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }) { Text(confirm) } },
+            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
+    @Composable
+    private fun ChoiceDialog(title: String, options: List<String>, selected: Int, onDismiss: () -> Unit, onChoose: (Int) -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(title) },
+            text = {
+                Column(Modifier.selectableGroup()) {
+                    options.forEachIndexed { index, option ->
+                        ListItem(
+                            headlineContent = { Text(option) },
+                            leadingContent = { RadioButton(selected = index == selected, onClick = null) },
+                            colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                            modifier = Modifier.selectable(selected = index == selected, role = Role.RadioButton) { onChoose(index) },
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 
     companion object {

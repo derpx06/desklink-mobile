@@ -84,6 +84,11 @@ import org.desklink.mobile.plugins.screen.ScreenCoordinateMapper
 import org.desklink.mobile.plugins.screen.ScreenPoint
 import org.desklink.mobile.ui.PluginSettingsActivity
 import org.desklink.mobile.ui.compose.DeskLinkDarkTheme
+import androidx.compose.material3.SegmentedButton
+import org.desklink.mobile.ui.compose.components.TabularNumbers
+import org.desklink.mobile.ui.compose.components.connectionStatsLabel
+import org.desklink.mobile.ui.compose.components.rememberConnectionStats
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.alpha
@@ -379,41 +384,74 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 )
             }
             if (plugin?.remoteLive != true || !controlEnabled) {
-                val live = plugin?.remoteLive == true
-                Glass(
-                    shape = RoundedCornerShape(if (live) 24.dp else 28.dp),
+                StatusOverlay(live = plugin?.remoteLive == true, modifier = Modifier.align(if (plugin?.remoteLive == true) Alignment.TopCenter else Alignment.Center))
+            }
+        }
+    }
+
+    /**
+     * Before the picture: a spinner and "Connecting to manas-82xf…", with the stage below. A stage
+     * that is not progress (a refusal, a timeout) shows without the spinner, with Try again. Once
+     * the picture is up, a control refusal sits in a bar at the top.
+     */
+    @Composable
+    private fun StatusOverlay(live: Boolean, modifier: Modifier) {
+        val stage = ScreenControlPlugin.latestStatus
+        val waiting = stage.isBlank() || stage in setOf(
+            getString(R.string.remote_screen_requesting),
+            getString(R.string.remote_screen_waiting_frame),
+            getString(R.string.remote_control_requesting),
+            getString(R.string.remote_screen_connected),
+        )
+        if (live) {
+            if (stage.isBlank()) return
+            Bar(modifier.padding(top = 80.dp, start = 24.dp, end = 24.dp).widthIn(max = 520.dp)) {
+                Text(
+                    stage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
                     modifier = Modifier
-                        .align(if (live) Alignment.TopCenter else Alignment.Center)
-                        .padding(top = if (live) 72.dp else 0.dp, start = 24.dp, end = 24.dp)
-                        .widthIn(max = 520.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = if (live) 10.dp else 18.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (!live) {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = Color.White,
-                            )
-                            Spacer(Modifier.width(14.dp))
-                        }
-                        Text(
-                            text = ScreenControlPlugin.latestStatus.ifBlank {
-                                stringResource(R.string.remote_live_screen_pending)
-                            },
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 4,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                        )
-                    }
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            return
+        }
+        Column(
+            modifier.padding(32.dp).widthIn(max = 520.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (waiting) {
+                androidx.compose.material3.CircularProgressIndicator(Modifier.size(32.dp))
+                Spacer(Modifier.height(16.dp))
+            }
+            Text(
+                stringResource(R.string.remote_connecting_to, deviceName()),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            if (stage.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 4,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            if (!waiting) {
+                Spacer(Modifier.height(16.dp))
+                androidx.compose.material3.FilledTonalButton(onClick = { requestDesktopScreen() }) {
+                    Text(stringResource(R.string.device_try_again))
                 }
             }
         }
     }
+
+    private fun deviceName(): String = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
 
     @Composable
     private fun RemoteDesktopView(modifier: Modifier) {
@@ -434,7 +472,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         )
     }
 
-    /** Keys a phone keyboard lacks, and the keyboard itself, as one floating glass strip. */
+    /** Keys a phone keyboard lacks, and the keyboard itself, on one bar. */
     @Composable
     private fun KeyBar(controlEnabled: Boolean, modifier: Modifier = Modifier, onUsed: () -> Unit = {}) {
         val pad = { mousePadPlugin() }
@@ -445,154 +483,102 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             stickyModifiers.applyTo(np)
             pad()?.sendPacket(np)
         }
-        Glass(shape = RoundedCornerShape(28.dp), modifier = modifier) {
+        Bar(modifier) {
             Row(
                 modifier = Modifier
                     .horizontalScroll(rememberScrollState())
-                    .padding(6.dp)
-                    .alpha(if (controlEnabled) 1f else 0.45f),
+                    .padding(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                GlassIconButton(
-                    painterResource(R.drawable.ic_action_keyboard_24dp),
-                    stringResource(R.string.remote_key_keyboard),
-                    enabled = controlEnabled,
-                    filled = true,
-                ) { onUsed(); toggleKeyboard() }
-                GlassKey("Ctrl", controlEnabled, selected = stickyModifiers.ctrl) { onUsed(); stickyModifiers.ctrl = !stickyModifiers.ctrl }
-                GlassKey("Alt", controlEnabled, selected = stickyModifiers.alt) { onUsed(); stickyModifiers.alt = !stickyModifiers.alt }
-                GlassKey("Super", controlEnabled) { special(SPECIAL_SUPER) }
-                GlassKey("Esc", controlEnabled) { special(SPECIAL_ESCAPE) }
-                GlassKey("Tab", controlEnabled) { special(SPECIAL_TAB) }
-                GlassKey("←", controlEnabled, description = stringResource(R.string.terminal_key_left)) { special(SPECIAL_LEFT) }
-                GlassKey("↑", controlEnabled, description = stringResource(R.string.terminal_key_up)) { special(SPECIAL_UP) }
-                GlassKey("↓", controlEnabled, description = stringResource(R.string.terminal_key_down)) { special(SPECIAL_DOWN) }
-                GlassKey("→", controlEnabled, description = stringResource(R.string.terminal_key_right)) { special(SPECIAL_RIGHT) }
+                BarIconButton(R.drawable.sym_keyboard, stringResource(R.string.remote_key_keyboard), enabled = controlEnabled) { onUsed(); toggleKeyboard() }
+                BarKey("Ctrl", controlEnabled, selected = stickyModifiers.ctrl) { onUsed(); stickyModifiers.ctrl = !stickyModifiers.ctrl }
+                BarKey("Alt", controlEnabled, selected = stickyModifiers.alt) { onUsed(); stickyModifiers.alt = !stickyModifiers.alt }
+                BarKey("Super", controlEnabled) { special(SPECIAL_SUPER) }
+                BarKey("Esc", controlEnabled) { special(SPECIAL_ESCAPE) }
+                BarKey("Tab", controlEnabled) { special(SPECIAL_TAB) }
+                BarIconButton(R.drawable.sym_arrow_back, stringResource(R.string.terminal_key_left), enabled = controlEnabled) { special(SPECIAL_LEFT) }
+                BarIconButton(R.drawable.sym_arrow_upward, stringResource(R.string.terminal_key_up), enabled = controlEnabled) { special(SPECIAL_UP) }
+                BarIconButton(R.drawable.sym_arrow_downward, stringResource(R.string.terminal_key_down), enabled = controlEnabled) { special(SPECIAL_DOWN) }
+                BarIconButton(R.drawable.sym_arrow_forward, stringResource(R.string.terminal_key_right), enabled = controlEnabled) { special(SPECIAL_RIGHT) }
                 if (zoomTransform.scale > 1f) {
-                    GlassKey(stringResource(R.string.remote_zoom_fit), true) { onUsed(); fillScreen = false; zoomTransform = DesktopViewTransform() }
+                    BarKey(stringResource(R.string.remote_zoom_fit), true) { onUsed(); fillScreen = false; zoomTransform = DesktopViewTransform() }
                 }
             }
         }
     }
 
-    /** Translucent dark glass over the picture: legible on any desktop, light or dark. */
+    /** A control bar over the picture: one solid tone, nearly opaque, so it reads on any desktop. */
     @Composable
-    private fun Glass(shape: androidx.compose.ui.graphics.Shape, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    private fun Bar(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
         Surface(
-            shape = shape,
-            color = Color(0xFF0B0D12).copy(alpha = 0.72f),
-            contentColor = Color.White,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+            shape = RoundedCornerShape(percent = 50),
+            color = org.desklink.mobile.ui.compose.tokens.surface2.copy(alpha = 0.92f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, org.desklink.mobile.ui.compose.tokens.hairline),
             modifier = modifier,
             content = content,
         )
     }
 
+    /** A key; full strength even before control is granted, only a latched modifier is tinted. */
     @Composable
-    private fun GlassKey(
+    private fun BarKey(
         label: String,
         enabled: Boolean,
         selected: Boolean = false,
-        description: String? = null,
         onClick: () -> Unit,
     ) {
         Surface(
             onClick = onClick,
             enabled = enabled,
-            shape = CircleShape,
-            color = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.08f),
-            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else Color.White,
+            shape = RoundedCornerShape(percent = 50),
+            color = if (selected) org.desklink.mobile.ui.compose.tokens.accent.copy(alpha = 0.18f) else Color.Transparent,
+            contentColor = if (selected) org.desklink.mobile.ui.compose.tokens.accent else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
-                .heightIn(min = 44.dp)
+                .heightIn(min = 48.dp)
                 .widthIn(min = 48.dp)
-                .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier)
                 .semantics { this.selected = selected },
         ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 14.dp)) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
                 Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
             }
         }
     }
 
     @Composable
-    private fun GlassIconButton(
-        icon: androidx.compose.ui.graphics.painter.Painter,
+    private fun BarIconButton(
+        @androidx.annotation.DrawableRes icon: Int,
         description: String,
         enabled: Boolean = true,
-        filled: Boolean = false,
         onClick: () -> Unit,
     ) {
-        Surface(
+        IconButton(
             onClick = onClick,
             enabled = enabled,
-            shape = CircleShape,
-            color = if (filled) MaterialTheme.colorScheme.primary else Color.Transparent,
-            contentColor = if (filled) MaterialTheme.colorScheme.onPrimary else Color.White,
-            modifier = Modifier.size(44.dp),
+            colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                disabledContentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+            modifier = Modifier.size(48.dp),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = description, modifier = Modifier.size(22.dp))
-            }
+            Icon(painterResource(icon), contentDescription = description)
         }
     }
 
-    /** Touch | Trackpad, as one segmented capsule. */
+    /** Touch or Trackpad, as Material's segmented buttons. */
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
     @Composable
     private fun ModeSwitch(onUsed: () -> Unit) {
-        Row(
-            Modifier
-                .padding(4.dp)
-                .background(Color.White.copy(alpha = 0.08f), CircleShape)
-                .padding(3.dp),
-        ) {
-            listOf(ControlMode.Touch to R.string.remote_mode_touch, ControlMode.Trackpad to R.string.remote_mode_trackpad).forEach { (mode, label) ->
-                val selected = controlMode == mode
-                Surface(
+        val modes = listOf(ControlMode.Touch to R.string.remote_mode_touch, ControlMode.Trackpad to R.string.remote_mode_trackpad)
+        androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 8.dp)) {
+            modes.forEachIndexed { index, (mode, label) ->
+                SegmentedButton(
+                    selected = controlMode == mode,
                     onClick = { onUsed(); controlMode = mode },
-                    shape = CircleShape,
-                    color = if (selected) Color.White else Color.Transparent,
-                    contentColor = if (selected) Color.Black else Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier
-                        .heightIn(min = 40.dp)
-                        .semantics { this.selected = selected },
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 14.dp)) {
-                        Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
-                    }
-                }
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, modes.size),
+                ) { Text(stringResource(label)) }
             }
-        }
-    }
-
-    /** The live path and round trip, polled while the screen is open. */
-    @Composable
-    private fun ConnectionChip() {
-        var stats by remember { mutableStateOf<org.desklink.mobile.webrtc.WebRtcConnectionStats?>(null) }
-        LaunchedEffect(Unit) {
-            while (true) {
-                DeskLinkApplication.getInstance().getDevice(deviceId)?.requestConnectionStats { s -> runOnUiThread { stats = s } }
-                kotlinx.coroutines.delay(STATS_POLL_MS)
-            }
-        }
-        val current = stats ?: return
-        val statusColors = org.desklink.mobile.ui.compose.LocalStatusColors.current
-        val (label, dot) = when (current.path) {
-            org.desklink.mobile.webrtc.WebRtcConnectionPath.LAN -> stringResource(R.string.connection_local) to statusColors.online
-            org.desklink.mobile.webrtc.WebRtcConnectionPath.DIRECT -> stringResource(R.string.remote_path_direct) to statusColors.away
-            org.desklink.mobile.webrtc.WebRtcConnectionPath.TURN -> stringResource(R.string.remote_path_turn) to statusColors.pending
-        }
-        val text = current.roundTripTimeMs?.let { stringResource(R.string.remote_path_with_rtt, label, it) } ?: label
-        val description = stringResource(R.string.remote_path_chip_description, text)
-        Row(
-            Modifier
-                .padding(horizontal = 12.dp)
-                .semantics(mergeDescendants = true) { contentDescription = description },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            org.desklink.mobile.ui.compose.components.StatusDot(dot)
-            Spacer(Modifier.width(8.dp))
-            Text(text, style = MaterialTheme.typography.labelLarge, color = Color.White, maxLines = 1)
         }
     }
 
@@ -629,7 +615,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 controlsVisible = false
             }
         }
-        val deviceName = remember { DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty() }
+        val deviceName = remember { deviceName() }
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             DesktopScreen(
                 modifier = Modifier.fillMaxSize(),
@@ -653,37 +639,40 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Glass(shape = CircleShape) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            GlassIconButton(rememberVectorPainter(Icons.Default.Close), stringResource(R.string.remote_close)) { finish() }
-                            Text(
-                                deviceName,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = Color.White,
-                                maxLines = 1,
-                                modifier = Modifier.padding(start = 4.dp, end = 4.dp).widthIn(max = 220.dp),
-                            )
-                            ConnectionChip()
+                    Bar {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 16.dp)) {
+                            BarIconButton(R.drawable.sym_close, stringResource(R.string.remote_close)) { finish() }
+                            Column(Modifier.widthIn(max = 280.dp)) {
+                                Text(deviceName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                rememberConnectionStats(deviceId)?.let {
+                                    Text(
+                                        connectionStatsLabel(it),
+                                        style = MaterialTheme.typography.bodySmall.merge(TabularNumbers),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    Glass(shape = CircleShape) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Bar {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
                             ModeSwitch(onUsed = touch)
                             if ((screenControlPlugin()?.remoteScreenCount ?: 1) > 1) {
-                                GlassIconButton(painterResource(R.drawable.ic_desktop_24dp), stringResource(R.string.remote_switch_screen)) {
+                                BarIconButton(R.drawable.sym_desktop_windows, stringResource(R.string.remote_switch_screen)) {
                                     touch()
                                     DeskLinkApplication.getInstance().switchRemoteScreen(deviceId)
                                 }
                             }
-                            GlassIconButton(
-                                painterResource(R.drawable.ic_open_in_full_24dp),
+                            BarIconButton(
+                                if (fillScreen) R.drawable.sym_fullscreen_exit else R.drawable.sym_fullscreen,
                                 stringResource(if (fillScreen) R.string.remote_zoom_fit else R.string.remote_zoom_fill),
                             ) { touch(); fillScreen = !fillScreen }
-                            GlassIconButton(rememberVectorPainter(Icons.Default.Refresh), stringResource(R.string.remote_screen_retry)) {
+                            BarIconButton(R.drawable.sym_refresh, stringResource(R.string.remote_screen_retry)) {
                                 touch(); requestDesktopScreen()
                             }
-                            GlassIconButton(rememberVectorPainter(Icons.Default.Settings), stringResource(R.string.settings)) {
+                            BarIconButton(R.drawable.sym_settings, stringResource(R.string.settings)) {
                                 touch(); openSettings()
                             }
                         }
@@ -703,13 +692,12 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 )
             }
             if (!controlsVisible) {
-                Glass(
-                    shape = CircleShape,
-                    modifier = Modifier
+                Bar(
+                    Modifier
                         .align(Alignment.BottomEnd)
                         .padding(16.dp),
                 ) {
-                    GlassIconButton(rememberVectorPainter(Icons.Default.KeyboardArrowUp), stringResource(R.string.remote_show_controls)) {
+                    BarIconButton(R.drawable.sym_expand_less, stringResource(R.string.remote_show_controls)) {
                         controlsVisible = true; touch()
                     }
                 }
@@ -878,7 +866,6 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         private const val TEXT_CHUNK_CHARS = 200
         private const val CONTROL_RETRY_MS = 3_000L
         private const val CONTROLS_HIDE_MS = 4_000L
-        private const val STATS_POLL_MS = 2_000L
         // Desktop `specialKey` codes (KeyListenerView.SpecialKeysMap, and the
         // desktop's `special_key_to_keysym`).
         private const val SPECIAL_TAB = 2

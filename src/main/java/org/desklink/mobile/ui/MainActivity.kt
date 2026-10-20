@@ -21,6 +21,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentTransaction
 import androidx.preference.PreferenceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -192,7 +193,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             setContentFragment(DeviceFragment.newInstance(deviceId, true))
         } else {
             screen = Screen.HOME
-            setContentFragment(PairingFragment())
+            setContentFragment(PairingFragment(), toHome = true)
         }
     }
 
@@ -201,9 +202,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         return true
     }
 
-    private fun setContentFragment(fragment: Fragment) {
+    /** Swaps the screen with the platform's own open/close motion; none for the first one shown. */
+    private fun setContentFragment(fragment: Fragment, toHome: Boolean = false) {
+        val first = supportFragmentManager.findFragmentById(R.id.container) == null
         supportFragmentManager
             .beginTransaction()
+            .apply {
+                if (!first) setTransition(if (toHome) FragmentTransaction.TRANSIT_FRAGMENT_CLOSE else FragmentTransaction.TRANSIT_FRAGMENT_OPEN)
+            }
             .replace(R.id.container, fragment)
             .commit()
     }

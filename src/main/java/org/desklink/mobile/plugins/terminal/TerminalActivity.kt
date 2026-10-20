@@ -115,10 +115,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import org.desklink.mobile.ui.compose.DeskLinkDarkTheme
-import org.desklink.mobile.ui.compose.LocalStatusColors
-import org.desklink.mobile.ui.compose.components.SectionTitle
-import org.desklink.mobile.ui.compose.components.StatusDot
+import android.view.HapticFeedbackConstants
+import androidx.annotation.DrawableRes
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.ListItem
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextDecoration
+import org.desklink.mobile.ui.compose.components.TabularNumbers
+import org.desklink.mobile.ui.compose.components.connectionStatsLabel
+import org.desklink.mobile.ui.compose.components.rememberConnectionStats
+import org.desklink.mobile.ui.compose.DeskLinkType
+import org.desklink.mobile.ui.compose.tokens
+import org.desklink.mobile.ui.compose.components.EmptyState
+import org.desklink.mobile.ui.compose.components.EmptyTerminalTile
+import org.desklink.mobile.ui.compose.components.Hairline
+import org.desklink.mobile.ui.compose.components.LabelChip
+import org.desklink.mobile.ui.compose.components.SessionPreview
+import org.desklink.mobile.ui.compose.components.SessionPreviews
+import org.desklink.mobile.ui.compose.components.TerminalTile
+import org.desklink.mobile.ui.compose.components.shimmer
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.DeskLinkTheme
@@ -164,6 +179,9 @@ class TerminalActivity : AppCompatActivity() {
             return
         }
         client = terminalClient
+        TerminalPalette.apply(
+            (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES,
+        )
         openId = savedInstanceState?.getString(STATE_OPEN_ID) ?: intent.getStringExtra(EXTRA_TERMINAL_ID)
         loadLabels()
         fullscreen = getSharedPreferences(LABEL_PREFS, MODE_PRIVATE).getBoolean(KEY_FULLSCREEN, true)
@@ -277,8 +295,10 @@ class TerminalActivity : AppCompatActivity() {
         LaunchedEffect(state.endedByComputer) {
             if (state.endedByComputer) {
                 openId?.let { leaveTerminal(client, it) }
-                client.consumeEnded()
+                // Shown before the event is consumed: consuming changes this effect's key, which
+                // would cancel it mid-way and the message would never appear.
                 snackbar.showSnackbar(getString(R.string.terminal_ended_by_computer))
+                client.consumeEnded()
             }
         }
 
@@ -289,20 +309,7 @@ class TerminalActivity : AppCompatActivity() {
             SessionListScreen(client, state, snackbar) { passwordDismissed = false }
         } else {
             BackHandler { leaveTerminal(client, current) }
-            val view = androidx.compose.ui.platform.LocalView.current
-            val lightBars = !androidx.compose.foundation.isSystemInDarkTheme()
-            DisposableEffect(Unit) {
-                val controller = WindowCompat.getInsetsController(window, view)
-                controller.isAppearanceLightStatusBars = false
-                controller.isAppearanceLightNavigationBars = false
-                onDispose {
-                    controller.isAppearanceLightStatusBars = lightBars
-                    controller.isAppearanceLightNavigationBars = lightBars
-                }
-            }
-            DeskLinkDarkTheme(this) {
-                TerminalScreenUi(client, state, current, snackbar)
-            }
+            TerminalScreenUi(client, state, current, snackbar)
         }
 
         val needed = state.passwordNeeded
@@ -354,7 +361,7 @@ class TerminalActivity : AppCompatActivity() {
                     navigationIcon = {
                         IconButton(onClick = { finish() }) {
                             Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
+                                painterResource(R.drawable.sym_arrow_back),
                                 contentDescription = getString(androidx.appcompat.R.string.abc_action_bar_up_description),
                             )
                         }
@@ -362,17 +369,34 @@ class TerminalActivity : AppCompatActivity() {
                     title = {
                         Column {
                             Text(stringResource(R.string.terminal_title))
-                            LinkStatus(connected)
+                            Text(
+                                stringResource(if (connected) R.string.terminal_status_connected else R.string.terminal_status_reconnecting),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     },
                     actions = {
                         IconButton(onClick = { client.refresh() }, enabled = connected) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.terminal_refresh))
+                            Icon(painterResource(R.drawable.sym_refresh), contentDescription = stringResource(R.string.terminal_refresh))
                         }
                     },
                 )
             },
             snackbarHost = { SnackbarHost(snackbar) },
+            floatingActionButton = {
+                if (!state.notAllowed && !locked) {
+                    NewSession(client, state.launchers) { open ->
+                        ExtendedFloatingActionButton(
+                            onClick = { if (connected) open() },
+                            icon = { Icon(painterResource(R.drawable.sym_add), contentDescription = null) },
+                            text = { Text(stringResource(R.string.terminal_new_session)) },
+                            containerColor = tokens.accent,
+                            contentColor = tokens.onAccent,
+                        )
+                    }
+                }
+            },
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
                 if (!connected) ReconnectingBanner()
@@ -385,24 +409,49 @@ class TerminalActivity : AppCompatActivity() {
                     )
                     state.passwordNeeded != null -> Locked(state.passwordNeeded, onEnterPassword, onRetry = { client.refresh() })
                     connected && !state.listLoaded -> CenteredProgress()
-                    else -> LazyColumn(
-                        Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        item { NewSessionPanel(client, state.launchers, connected) }
-                        if (state.sessions.isEmpty()) {
-                            item { EmptyState() }
-                        } else {
-                            item { SectionTitle(stringResource(R.string.terminal_sessions_title)) }
+                    state.sessions.isEmpty() -> Column(Modifier.padding(16.dp)) {
+                        EmptyTerminalTile(
+                            launchers = listOf(stringResource(R.string.terminal_launch_shell) to { client.create(DEFAULT_ROWS, DEFAULT_COLS, null) }) +
+                                state.launchers.mapNotNull { launcher -> agentName(launcher)?.let { it to { client.create(DEFAULT_ROWS, DEFAULT_COLS, listOf(launcher)) } } },
+                            enabled = connected,
+                        )
+                    }
+                    else -> {
+                        // Previews re-read the screens now and then: output arrives without a state change.
+                        var tick by remember { mutableStateOf(0) }
+                        LaunchedEffect(Unit) {
+                            while (true) {
+                                kotlinx.coroutines.delay(PREVIEW_REFRESH_MS)
+                                tick++
+                            }
+                        }
+                        val previews = remember(state, tick, labels.toMap()) { SessionPreviews.of(this@TerminalActivity, deviceId) }.associateBy { it.id }
+                        LazyColumn(
+                            Modifier.fillMaxSize(),
+                            // Clear of the floating button.
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
                             items(state.sessions, key = { it.id }) { session ->
-                                SessionCard(
+                                val preview = previews[session.id] ?: SessionPreview(
+                                    id = session.id,
+                                    name = labels[session.id] ?: agentName(session.title) ?: session.title.ifBlank { session.id.take(8) },
+                                    badge = SessionPreviews.badgeOf(session.title),
+                                    live = false,
+                                    lines = emptyList(),
+                                    size = stringResource(R.string.terminal_session_size, session.cols, session.rows),
+                                )
+                                SessionTile(
                                     session = session,
-                                    label = labels[session.id],
+                                    preview = preview,
                                     connected = connected,
                                     onOpen = { openId = session.id },
                                     onRename = { renaming = session },
                                     onClose = { closing = session },
+                                    onRestart = {
+                                        client.close(session.id)
+                                        client.create(DEFAULT_ROWS, DEFAULT_COLS, session.title.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }?.let(::listOf))
+                                    },
                                 )
                             }
                         }
@@ -438,76 +487,26 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
-    @Composable
-    private fun LinkStatus(connected: Boolean) {
-        val status = LocalStatusColors.current
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusDot(if (connected) status.online else status.pending, pulsing = !connected, size = 7.dp)
-            Spacer(Modifier.width(6.dp))
-            Text(
-                stringResource(if (connected) R.string.terminal_status_connected else R.string.terminal_status_reconnecting),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-
     /**
-     * A shell, or one of the agent CLIs the desktop says it has installed. Agent sessions are
-     * titled by their command, which [agentName] turns back into a name.
+     * [button] starts a shell, or opens a plain menu of the agent CLIs the desktop says it has
+     * installed. Those sessions are titled by their command, which [agentName] turns back into a name.
      */
     @Composable
-    private fun NewSessionPanel(client: TerminalClient, launchers: List<String>, connected: Boolean) {
-        val create = { command: List<String>? -> client.create(DEFAULT_ROWS, DEFAULT_COLS, command) }
-        Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-            Column(Modifier.padding(16.dp)) {
-                Text(stringResource(R.string.terminal_new_session_choose), style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    LauncherTile(
-                        kind = SessionKind.SHELL,
-                        name = stringResource(R.string.terminal_launch_shell),
-                        enabled = connected,
-                        modifier = Modifier.weight(1f),
-                    ) { create(null) }
-                    launchers.forEach { launcher ->
-                        agentName(launcher)?.let { name ->
-                            LauncherTile(
-                                kind = sessionKind(launcher),
-                                name = name,
-                                enabled = connected,
-                                modifier = Modifier.weight(1f),
-                            ) { create(listOf(launcher)) }
-                        }
+    private fun NewSession(client: TerminalClient, launchers: List<String>, button: @Composable (open: () -> Unit) -> Unit) {
+        var menu by remember { mutableStateOf(false) }
+        val create = { command: List<String>? ->
+            menu = false
+            client.create(DEFAULT_ROWS, DEFAULT_COLS, command)
+        }
+        Box {
+            button { if (launchers.isEmpty()) create(null) else menu = true }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.terminal_launch_shell)) }, onClick = { create(null) })
+                launchers.forEach { launcher ->
+                    agentName(launcher)?.let { name ->
+                        DropdownMenuItem(text = { Text(name) }, onClick = { create(listOf(launcher)) })
                     }
                 }
-            }
-        }
-    }
-
-    @Composable
-    private fun LauncherTile(kind: SessionKind, name: String, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
-        val description = stringResource(R.string.terminal_new_session) + ": " + name
-        Surface(
-            onClick = onClick,
-            enabled = enabled,
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceBright,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-            modifier = modifier
-                .heightIn(min = 96.dp)
-                .semantics { contentDescription = description },
-        ) {
-            Column(
-                Modifier
-                    .padding(12.dp)
-                    .alpha(if (enabled) 1f else 0.5f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                AgentBadge(kind, size = 40.dp)
-                Spacer(Modifier.height(10.dp))
-                Text(name, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -519,80 +518,56 @@ class TerminalActivity : AppCompatActivity() {
         else -> null
     }
 
+    /** A session as a dark terminal tile with its last lines; finished ones offer Restart. */
     @Composable
-    private fun SessionCard(
+    private fun SessionTile(
         session: TerminalSessionState,
-        label: String?,
+        preview: SessionPreview,
         connected: Boolean,
         onOpen: () -> Unit,
         onRename: () -> Unit,
         onClose: () -> Unit,
+        onRestart: () -> Unit,
     ) {
-        val name = label ?: agentName(session.title) ?: session.title.ifBlank { session.id.take(8) }
+        val finished = session.gone || session.exitStatus != null
         var menu by remember { mutableStateOf(false) }
-        Surface(
-            onClick = onOpen,
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                Modifier.padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AgentBadge(sessionKind(session.title), size = 44.dp)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SessionStatus(session, connected)
-                        Text(
-                            "  ·  ",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                        Text(
-                            stringResource(R.string.terminal_session_size, session.cols, session.rows),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+        Column {
+            TerminalTile(
+                preview,
+                Modifier.fillMaxWidth(),
+                menu = {
+                    Box {
+                        IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) {
+                            Icon(
+                                painterResource(R.drawable.sym_more_vert),
+                                contentDescription = stringResource(R.string.terminal_session_options, preview.name),
+                                tint = Color(0xFFB8BBC4),
+                            )
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.terminal_rename)) }, onClick = { menu = false; onRename() })
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.terminal_close_session)) },
+                                enabled = connected,
+                                onClick = { menu = false; onClose() },
+                            )
+                        }
                     }
-                }
-                Box {
-                    IconButton(onClick = { menu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.terminal_session_options, name))
-                    }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.terminal_rename)) },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                            onClick = { menu = false; onRename() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.terminal_close_session), color = MaterialTheme.colorScheme.error) },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                            enabled = connected,
-                            onClick = { menu = false; onClose() },
-                        )
-                    }
+                },
+                onClick = onOpen,
+            )
+            if (finished) {
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (session.gone) stringResource(R.string.terminal_chip_ended) else stringResource(R.string.terminal_chip_exited, session.exitStatus ?: 0L),
+                        style = DeskLinkType.mono,
+                        color = tokens.textDim,
+                        modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    )
+                    if (connected) TextButton(onClick = onRestart) { Text(stringResource(R.string.terminal_restart)) }
                 }
             }
         }
-    }
-
-    @Composable
-    private fun SessionStatus(session: TerminalSessionState, connected: Boolean) {
-        val status = LocalStatusColors.current
-        val (text, color) = when {
-            session.gone -> stringResource(R.string.terminal_chip_ended) to MaterialTheme.colorScheme.error
-            session.exitStatus != null -> stringResource(R.string.terminal_chip_exited, session.exitStatus) to MaterialTheme.colorScheme.outline
-            !connected -> stringResource(R.string.terminal_chip_disconnected) to status.pending
-            else -> stringResource(R.string.terminal_chip_running) to status.online
-        }
-        StatusDot(color, size = 7.dp)
-        Spacer(Modifier.width(6.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 
     /** The desktop wants its session password. During a lockout only a retry is offered. */
@@ -614,57 +589,36 @@ class TerminalActivity : AppCompatActivity() {
     /** A centred explanation with one way forward: access turned off, or a password wanted. */
     @Composable
     private fun StatePanel(title: String, message: String, action: String, onAction: () -> Unit) {
-        Column(
-            Modifier.fillMaxSize().padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(80.dp)) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EmptyState(icon = R.drawable.sym_lock, title = title, body = message) {
+                Button(onClick = onAction) { Text(action) }
             }
-            Spacer(Modifier.height(24.dp))
-            Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(8.dp))
-            Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(28.dp))
-            Button(onClick = onAction, modifier = Modifier.heightIn(min = 48.dp)) { Text(action) }
         }
     }
 
-    @Composable
-    private fun EmptyState() {
-        Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(stringResource(R.string.terminal_empty_title), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.terminal_empty_message),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-
+    /** Loading the list: tiles shaped like the real ones, with a sheen. */
     @Composable
     private fun CenteredProgress() {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(modifier = Modifier.semantics { contentDescription = getString(R.string.terminal_loading) })
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .semantics { contentDescription = getString(R.string.terminal_loading) },
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            repeat(3) {
+                Box(Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(14.dp)).shimmer())
+            }
         }
     }
 
     @Composable
     private fun ReconnectingBanner() {
-        val status = LocalStatusColors.current
-        Surface(color = status.pendingContainer, contentColor = status.onPendingContainer, modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = status.pending)
+        Surface(color = tokens.surface2, modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.size(12.dp))
-                Text(stringResource(R.string.terminal_reconnecting), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.terminal_reconnecting), style = MaterialTheme.typography.bodyMedium, color = tokens.textDim)
             }
         }
     }
@@ -696,7 +650,12 @@ class TerminalActivity : AppCompatActivity() {
         val context = LocalContext.current
         val session = state.sessions.firstOrNull { it.id == id }
         val connected = state.link == TerminalLinkState.CONNECTED
-        val screen = remember(id) { client.sink(id, DEFAULT_ROWS, DEFAULT_COLS) as TerminalScreen }
+        val screen = remember(id) {
+            (client.sink(id, DEFAULT_ROWS, DEFAULT_COLS) as TerminalScreen).also { s ->
+                // A screen made before the palette was set keeps the stock one until reset.
+                s.withEmulator { it.mColors.reset() }
+            }
+        }
         var ctrl by remember { mutableStateOf(Sticky.OFF) }
         var alt by remember { mutableStateOf(Sticky.OFF) }
         var viewRef by remember { mutableStateOf<TerminalView?>(null) }
@@ -731,13 +690,9 @@ class TerminalActivity : AppCompatActivity() {
             session.exitStatus != null -> stringResource(R.string.terminal_chip_exited, session.exitStatus)
             else -> stringResource(R.string.terminal_chip_running)
         }
-        val status = LocalStatusColors.current
-        val subtitleDot = when {
-            !connected -> status.pending
-            session == null || session.gone -> MaterialTheme.colorScheme.error
-            session.exitStatus != null -> MaterialTheme.colorScheme.outline
-            else -> status.online
-        }
+        val running = connected && session != null && !session.gone && session.exitStatus == null
+        val stats = rememberConnectionStats(deviceId)
+        var switcher by remember { mutableStateOf(false) }
 
         // Typed like the key bar's symbols, armed modifiers included, and never followed by Enter:
         // the person reads what was recognised before running it.
@@ -758,27 +713,55 @@ class TerminalActivity : AppCompatActivity() {
         }
 
         Scaffold(
-            // The camera cutout strip stays clear of text; it is black like the terminal.
-            modifier = Modifier.background(TerminalBlack).safeDrawingPadding(),
-            containerColor = TerminalBlack,
+            // The chrome follows the theme; the terminal itself stays dark (see below).
+            modifier = Modifier.background(MaterialTheme.colorScheme.background).safeDrawingPadding(),
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 if (!fullscreen) TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = TerminalBlack),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                     navigationIcon = {
                         IconButton(onClick = { leaveTerminal(client, id) }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.terminal_back_to_sessions))
+                            Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.terminal_back_to_sessions))
                         }
                     },
                     title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            AgentBadge(sessionKind(session?.title.orEmpty()), size = 32.dp)
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // Tapping the title switches to another session.
+                        Box {
+                            Column(
+                                Modifier
+                                    .clickable(enabled = state.sessions.size > 1, onClickLabel = stringResource(R.string.terminal_switch_session)) { switcher = true }
+                                    .padding(vertical = 4.dp),
+                            ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    StatusDot(subtitleDot, pulsing = !connected, size = 7.dp)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    LabelChip(SessionPreviews.badgeOf(session?.title.orEmpty()), onDark = false)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (running) {
+                                        Box(Modifier.size(7.dp).background(tokens.mint, CircleShape))
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    Text(
+                                        listOfNotNull(subtitle, stats?.takeIf { connected }?.let { connectionStatsLabel(it) }).joinToString(" · "),
+                                        style = DeskLinkType.mono,
+                                        color = tokens.textDim,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                            DropdownMenu(expanded = switcher, onDismissRequest = { switcher = false }) {
+                                state.sessions.filter { it.id != id }.forEach { other ->
+                                    val otherName = labels[other.id] ?: agentName(other.title) ?: other.title.ifBlank { other.id.take(8) }
+                                    DropdownMenuItem(
+                                        text = { Text(otherName) },
+                                        onClick = {
+                                            switcher = false
+                                            leaveTerminal(client, id)
+                                            openId = other.id
+                                        },
+                                    )
                                 }
                             }
                         }
@@ -787,11 +770,11 @@ class TerminalActivity : AppCompatActivity() {
                         // Shown when the session is not receiving output and nothing is about to change that.
                         if (connected && !state.notAllowed && session != null && !session.gone && !session.wanted && !session.attached && session.exitStatus == null) {
                             IconButton(onClick = { client.reattach(id) }) {
-                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.terminal_reattach))
+                                Icon(painterResource(R.drawable.sym_refresh), contentDescription = stringResource(R.string.terminal_reattach))
                             }
                         }
                         IconButton(onClick = { rememberFullscreen(true) }) {
-                            Icon(painterResource(R.drawable.ic_open_in_full_24dp), contentDescription = stringResource(R.string.remote_fullscreen))
+                            Icon(painterResource(R.drawable.sym_open_in_full), contentDescription = stringResource(R.string.remote_fullscreen))
                         }
                     },
                 )
@@ -811,7 +794,11 @@ class TerminalActivity : AppCompatActivity() {
                     ReconnectingBanner()
                 }
                 AndroidView(
-                    modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 4.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(tokens.terminalBg)
+                        .padding(horizontal = 4.dp),
                     factory = { ctx -> TerminalView(ctx, host).also { it.attach(screen); viewRef = it } },
                 )
                 KeyBar(
@@ -857,9 +844,6 @@ class TerminalActivity : AppCompatActivity() {
 
     // ---- key bar ------------------------------------------------------------------------------------------
 
-    // The Left/Right keys send fixed bytes, so their arrows must not mirror in RTL layouts: the
-    // auto-mirrored variants the deprecation points to would.
-    @Suppress("DEPRECATION")
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
     private fun KeyBar(
@@ -879,25 +863,29 @@ class TerminalActivity : AppCompatActivity() {
         onKeyboard: () -> Unit,
     ) {
         var functionRow by remember { mutableStateOf(false) }
-        Surface(color = KeyBarBackground) {
-            Column {
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+        Surface(color = tokens.surface) {
+            Column(Modifier.padding(vertical = 6.dp)) {
+                Hairline(Modifier.padding(bottom = 6.dp))
                 if (functionRow) {
-                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         TerminalKeys.FUNCTION_KEYS.forEachIndexed { index, keyCode ->
                             Key("F${index + 1}", stringResource(R.string.terminal_key_function, index + 1)) { onKey(keyCode) }
                         }
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Row(
                         Modifier
                             .weight(1f)
                             .horizontalScroll(rememberScrollState())
-                            .padding(start = 6.dp),
+                            .padding(start = 8.dp, end = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         // The app bar is hidden in full screen; this is the way back to it.
-                        if (fullscreen) IconKey(painterResource(R.drawable.ic_open_in_full_24dp), stringResource(R.string.remote_exit_fullscreen), onClick = onExitFullscreen)
+                        if (fullscreen) IconKey(R.drawable.sym_close_fullscreen, stringResource(R.string.remote_exit_fullscreen), onExitFullscreen)
                         Key("Esc", stringResource(R.string.terminal_key_escape)) { onKey(KeyEvent.KEYCODE_ESCAPE) }
                         Key("Tab", stringResource(R.string.terminal_key_tab)) { onKey(KeyEvent.KEYCODE_TAB) }
                         Key(
@@ -914,10 +902,11 @@ class TerminalActivity : AppCompatActivity() {
                             onLongClick = onAltLong,
                             onClick = onAlt,
                         )
-                        IconKey(Icons.Default.KeyboardArrowLeft, stringResource(R.string.terminal_key_left)) { onKey(KeyEvent.KEYCODE_DPAD_LEFT) }
-                        IconKey(Icons.Default.KeyboardArrowDown, stringResource(R.string.terminal_key_down)) { onKey(KeyEvent.KEYCODE_DPAD_DOWN) }
-                        IconKey(Icons.Default.KeyboardArrowUp, stringResource(R.string.terminal_key_up)) { onKey(KeyEvent.KEYCODE_DPAD_UP) }
-                        IconKey(Icons.Default.KeyboardArrowRight, stringResource(R.string.terminal_key_right)) { onKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
+                        // Fixed bytes, so these arrows never mirror in right-to-left layouts.
+                        IconKey(R.drawable.sym_arrow_back, stringResource(R.string.terminal_key_left)) { onKey(KeyEvent.KEYCODE_DPAD_LEFT) }
+                        IconKey(R.drawable.sym_arrow_downward, stringResource(R.string.terminal_key_down)) { onKey(KeyEvent.KEYCODE_DPAD_DOWN) }
+                        IconKey(R.drawable.sym_arrow_upward, stringResource(R.string.terminal_key_up)) { onKey(KeyEvent.KEYCODE_DPAD_UP) }
+                        IconKey(R.drawable.sym_arrow_forward, stringResource(R.string.terminal_key_right)) { onKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
                         for (symbol in listOf("|", "~", "/", "-", "_", "\\", "`")) Key(symbol, null) { onText(symbol) }
                         Key("Home", stringResource(R.string.terminal_key_home)) { onKey(KeyEvent.KEYCODE_MOVE_HOME) }
                         Key("End", stringResource(R.string.terminal_key_end)) { onKey(KeyEvent.KEYCODE_MOVE_END) }
@@ -928,17 +917,19 @@ class TerminalActivity : AppCompatActivity() {
                             stringResource(R.string.terminal_key_function_row),
                             state = if (functionRow) Sticky.LOCKED else Sticky.OFF,
                         ) { functionRow = !functionRow }
-                        IconKey(painterResource(R.drawable.ic_baseline_content_paste_24), stringResource(R.string.terminal_paste), onClick = onPaste)
+                        IconKey(R.drawable.sym_content_paste, stringResource(R.string.terminal_paste), onPaste)
                     }
                     // Always in reach, never scrolled away: dictation and the keyboard.
-                    Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(28.dp).background(Color.White.copy(alpha = 0.12f)))
-                    if (onMic != null) IconKey(painterResource(R.drawable.ic_mic_black), stringResource(R.string.terminal_dictate), accent = true, onClick = onMic)
+                    if (onMic != null) {
+                        IconKey(R.drawable.sym_mic, stringResource(R.string.terminal_dictate), onMic)
+                        Spacer(Modifier.width(6.dp))
+                    }
                     IconKey(
-                        painterResource(if (imeVisible) R.drawable.ic_keyboard_hide_36dp else R.drawable.ic_action_keyboard_24dp),
+                        if (imeVisible) R.drawable.sym_keyboard_hide else R.drawable.sym_keyboard,
                         stringResource(if (imeVisible) R.string.terminal_hide_keyboard else R.string.terminal_show_keyboard),
-                        onClick = onKeyboard,
+                        onKeyboard,
                     )
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(8.dp))
                 }
             }
         }
@@ -952,8 +943,8 @@ class TerminalActivity : AppCompatActivity() {
     }
 
     /**
-     * A key chip. A sticky modifier shows its state: armed (next key only) fills with the accent;
-     * locked keeps the fill and adds a bar beneath the label.
+     * A key chip. A latched modifier is the only key that changes color: armed (next key only) or
+     * locked, which also underlines its label.
      */
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
@@ -964,56 +955,50 @@ class TerminalActivity : AppCompatActivity() {
         onLongClick: (() -> Unit)? = null,
         onClick: () -> Unit,
     ) {
-        val container = if (state == Sticky.OFF) KeyChip else MaterialTheme.colorScheme.primary
-        val content = if (state == Sticky.OFF) KeyLabel else MaterialTheme.colorScheme.onPrimary
+        val colors = MaterialTheme.colorScheme
+        val latched = state != Sticky.OFF
+        val view = LocalView.current
         Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = container,
-            contentColor = content,
+            shape = MaterialTheme.shapes.small,
+            color = if (latched) tokens.accent.copy(alpha = 0.18f) else tokens.surface2,
+            contentColor = if (latched) tokens.accent else colors.onSurface,
             modifier = Modifier
-                .padding(horizontal = 3.dp, vertical = 2.dp)
                 .widthIn(min = 44.dp)
                 .height(44.dp)
                 // Keys must never take focus: that would pull the keyboard away from the terminal.
                 .focusProperties { canFocus = false }
-                .clip(RoundedCornerShape(10.dp))
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .clip(MaterialTheme.shapes.small)
+                .combinedClickable(
+                    onClick = { view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); onClick() },
+                    onLongClick = onLongClick,
+                )
                 .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
-                Text(label, style = MaterialTheme.typography.labelLarge, fontSize = 15.sp, maxLines = 1)
-                if (state == Sticky.LOCKED) {
-                    Box(
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 5.dp)
-                            .width(16.dp)
-                            .height(2.dp)
-                            .background(content, CircleShape),
-                    )
-                }
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    textDecoration = if (state == Sticky.LOCKED) TextDecoration.Underline else null,
+                    maxLines = 1,
+                )
             }
         }
     }
 
     @Composable
-    private fun IconKey(icon: ImageVector, description: String, onClick: () -> Unit) =
-        IconKey(rememberVectorPainter(icon), description, onClick = onClick)
-
-    @Composable
-    private fun IconKey(icon: Painter, description: String, accent: Boolean = false, onClick: () -> Unit) {
+    private fun IconKey(@DrawableRes icon: Int, description: String, onClick: () -> Unit) {
+        val view = LocalView.current
         Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = if (accent) MaterialTheme.colorScheme.primaryContainer else KeyChip,
-            contentColor = if (accent) MaterialTheme.colorScheme.onPrimaryContainer else KeyLabel,
+            shape = MaterialTheme.shapes.small,
+            color = tokens.surface2,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
-                .padding(horizontal = 3.dp, vertical = 2.dp)
                 .size(44.dp)
                 .focusProperties { canFocus = false }
-                .clip(RoundedCornerShape(10.dp))
-                .clickable(onClick = onClick),
+                .clip(MaterialTheme.shapes.small)
+                .clickable { view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); onClick() },
         ) {
-            Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = description, modifier = Modifier.size(22.dp)) }
+            Box(contentAlignment = Alignment.Center) { Icon(painterResource(icon), contentDescription = description, modifier = Modifier.size(20.dp)) }
         }
     }
 
@@ -1035,42 +1020,33 @@ class TerminalActivity : AppCompatActivity() {
     }
 }
 
-/** The terminal surface and its key bar: black like the emulator's default background, keys lifted off it. */
-private val TerminalBlack = Color(0xFF000000)
-private val KeyBarBackground = Color(0xFF0D0F14)
-private val KeyChip = Color(0xFF1F232C)
-private val KeyLabel = Color(0xFFE6E8EE)
+/**
+ * The 16 ANSI colors, tuned for DeskLink's terminal black: the prompt green is the brand mint, the
+ * cursor coral. Applied to Termux's shared scheme, which every new emulator copies.
+ */
+internal object TerminalPalette {
+    private val colors = mapOf(
+        "foreground" to "#e6e6e6",
+        "cursor" to "#ff7a62",
+        "color0" to "#2a2e37", "color8" to "#5c6370",
+        "color1" to "#ff6b6b", "color9" to "#ff8787",
+        "color2" to "#34d1a0", "color10" to "#5fe0b8",
+        "color3" to "#ffc24d", "color11" to "#ffd47a",
+        "color4" to "#6e8cff", "color12" to "#93a9ff",
+        "color5" to "#c394e8", "color13" to "#d2acf0",
+        "color6" to "#5cc8d6", "color14" to "#86d9e3",
+        "color7" to "#c7cbd3", "color15" to "#f2f3f5",
+    )
 
-/** What a session runs, from its title: the desktop titles agent sessions by their launcher. */
-private enum class SessionKind { SHELL, CLAUDE, CODEX }
-
-private fun sessionKind(title: String) = when (title) {
-    TerminalProtocol.LAUNCHER_CLAUDE -> SessionKind.CLAUDE
-    TerminalProtocol.LAUNCHER_CODEX -> SessionKind.CODEX
-    else -> SessionKind.SHELL
-}
-
-/** A monogram tile: ">_" for a shell, the agent's initials otherwise. No third-party artwork. */
-@Composable
-private fun AgentBadge(kind: SessionKind, size: androidx.compose.ui.unit.Dp) {
-    val colors = MaterialTheme.colorScheme
-    val (text, container, content) = when (kind) {
-        SessionKind.SHELL -> Triple(">_", Color(0xFF14213D), Color(0xFF74D9C4))
-        SessionKind.CLAUDE -> Triple("CC", colors.tertiaryContainer, colors.onTertiaryContainer)
-        SessionKind.CODEX -> Triple("CX", colors.secondaryContainer, colors.onSecondaryContainer)
-    }
-    Surface(shape = RoundedCornerShape(size * 0.3f), color = container, contentColor = content, modifier = Modifier.size(size)) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = (size.value * 0.36f).sp,
-                maxLines = 1,
-            )
-        }
+    /** [dark]: the app's theme; the terminal black is a shade deeper there. */
+    fun apply(dark: Boolean) {
+        val background = if (dark) "#050506" else "#0b0c0e"
+        com.termux.terminal.TerminalColors.COLOR_SCHEME.updateWith(java.util.Properties().apply { putAll(colors + ("background" to background)) })
     }
 }
+
+/** How often the session list re-reads the preview tiles' screens. */
+private const val PREVIEW_REFRESH_MS = 1_500L
 
 /** How often the session list asks for sessions started elsewhere. */
 private const val LIST_REFRESH_MS = 5_000L

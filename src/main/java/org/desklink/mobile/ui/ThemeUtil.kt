@@ -64,7 +64,7 @@ object ThemeUtil {
             application,
             DynamicColorsOptions.Builder()
                 .setPrecondition { activity, _ ->
-                    PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(KEY_DYNAMIC_COLORS, true)
+                    PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(KEY_DYNAMIC_COLORS, false)
                 }
                 .build(),
         )

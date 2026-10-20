@@ -37,11 +37,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.desklink.mobile.plugins.mousepad.MousePadPlugin
-import org.desklink.mobile.plugins.share.SharePlugin
-import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.ui.compose.screen.pairing.PairingScreen
-import org.desklink.mobile.ui.compose.screen.pairing.QuickAction
 import org.desklink.mobile.ui.compose.screen.pairing.PairingViewModel
 import org.desklink.mobile.R
 import org.desklink.mobile.databinding.DevicesListBinding
@@ -63,11 +59,6 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
 
         override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
             return when (menuItem.itemId) {
-                R.id.menu_scan_qr -> {
-                    scanQr()
-                    true
-                }
-
                 R.id.menu_settings -> {
                     (mActivity as? MainActivity)?.openSettings()
                     true
@@ -194,26 +185,11 @@ class PairingFragment : BaseFragment<DevicesListBinding>() {
                                 openAppDetailsSettings()
                             }
                         },
-                        onDuplicateNamesClick = {
-                            // TODO: Define action for duplicate names if needed
-                        },
                         onRefresh = { viewModel.onRefresh() },
                         onScanQr = ::scanQr,
-                        onQuickAction = ::quickAction,
                     )
                 }
             }
-        }
-    }
-
-    /** The same entry points as the device screen's tiles, one tap from the list. */
-    private fun quickAction(deviceId: String, action: QuickAction) {
-        val activity = mActivity ?: return
-        val device = viewModel.getDeviceById(deviceId) ?: return
-        when (action) {
-            QuickAction.TERMINAL -> startActivity(TerminalActivity.intent(activity, deviceId))
-            QuickAction.SCREEN -> device.getPlugin(MousePadPlugin::class.java)?.getUiButtons()?.firstOrNull()?.onClick?.invoke(activity)
-            QuickAction.FILES -> device.getPlugin(SharePlugin::class.java)?.getUiButtons()?.firstOrNull()?.onClick?.invoke(activity)
         }
     }
 

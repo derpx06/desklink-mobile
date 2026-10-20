@@ -32,7 +32,8 @@ data class DeviceUiModel(
     val connection: DeviceConnection = DeviceConnection.OFFLINE,
     val batteryPercent: Int? = null,
     val charging: Boolean = false,
-    val canOpenTerminal: Boolean = false,
-    val canControlScreen: Boolean = false,
-    val canSendFiles: Boolean = false,
+    /** The device asked to pair and is waiting for an answer here. */
+    val wantsToPair: Boolean = false,
+    /** Its terminal sessions, for the card's strip; empty unless the feature transport is up. */
+    val sessions: List<org.desklink.mobile.ui.compose.components.SessionPreview> = emptyList(),
 )

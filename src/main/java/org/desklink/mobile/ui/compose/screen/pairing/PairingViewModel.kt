@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.desklink.mobile.BackgroundService.Companion.ForceRefreshConnections
 import org.desklink.mobile.Device
+import org.desklink.mobile.ui.compose.components.SessionPreviews
 import org.desklink.mobile.ui.compose.extensions.device.toUiModel
 import org.desklink.mobile.ui.compose.model.device.DeviceUiModel
 
@@ -69,7 +70,9 @@ class PairingViewModel(application: Application) : AndroidViewModel(application)
             for (device in deviceList) {
                 if (device.isReachable || device.isPaired) {
                     if (!names.add(device.name)) hasDuplicateNames = true
-                    val uiModel = device.toUiModel()
+                    val uiModel = device.toUiModel().let {
+                        if (device.isPaired) it.copy(sessions = SessionPreviews.of(getApplication(), device.deviceId, lineCount = 0)) else it
+                    }
                     when {
                         device.isReachable && device.isPaired -> connected.add(uiModel)
                         device.isReachable && !device.isPaired -> available.add(uiModel)

@@ -7,16 +7,14 @@
 package org.desklink.mobile.ui.compose.extensions.device
 
 import org.desklink.mobile.Device
+import org.desklink.mobile.PairingHandler
 import org.desklink.mobile.plugins.battery.BatteryPlugin
-import org.desklink.mobile.plugins.mousepad.MousePadPlugin
-import org.desklink.mobile.plugins.share.SharePlugin
 import org.desklink.mobile.ui.compose.model.device.DeviceConnection
 import org.desklink.mobile.ui.compose.model.device.DeviceUiModel
 import org.desklink.mobile.R
 
 fun Device.toUiModel(): DeviceUiModel {
     val battery = getPlugin(BatteryPlugin::class.java)?.remoteBatteryInfo
-    val featuresReady = hasActiveWebRtcFeatureTransport
     return DeviceUiModel(
         id = deviceId,
         icon = iconDrawable,
@@ -24,12 +22,10 @@ fun Device.toUiModel(): DeviceUiModel {
         summaryRes = if (compareProtocolVersion() > 0) R.string.protocol_version_newer else 0,
         isReachable = isReachable,
         isPaired = isPaired,
-        connection = deviceConnection(isReachable, featuresReady, hasLanLink, relayLink != null),
+        connection = deviceConnection(isReachable, hasActiveWebRtcFeatureTransport, hasLanLink, relayLink != null),
         batteryPercent = battery?.currentCharge,
         charging = battery?.isCharging == true,
-        canOpenTerminal = isPaired && featuresReady,
-        canControlScreen = isPaired && isReachable && getPlugin(MousePadPlugin::class.java) != null,
-        canSendFiles = isPaired && isReachable && getPlugin(SharePlugin::class.java) != null,
+        wantsToPair = pairStatus == PairingHandler.PairState.RequestedByPeer,
     )
 }
 

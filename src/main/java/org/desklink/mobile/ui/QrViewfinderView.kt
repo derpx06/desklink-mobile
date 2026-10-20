@@ -14,8 +14,9 @@ import android.util.AttributeSet
 import com.journeyapps.barcodescanner.ViewfinderView
 
 /**
- * The QR scanner's overlay: a dimmed camera with a rounded window and corner brackets, instead of
- * the library's red laser line. Wired in through our override of `zxing_barcode_scanner.xml`.
+ * The QR scanner's overlay: a dimmed camera with a rounded window and plain white corner brackets
+ * drawn from the same rectangle, instead of the library's red laser line. Wired in through our
+ * override of `zxing_barcode_scanner.xml`.
  */
 class QrViewfinderView(context: Context, attrs: AttributeSet?) : ViewfinderView(context, attrs) {
     private val density = resources.displayMetrics.density
@@ -29,7 +30,7 @@ class QrViewfinderView(context: Context, attrs: AttributeSet?) : ViewfinderView(
         strokeCap = Paint.Cap.ROUND
         color = 0xFFFFFFFF.toInt()
     }
-    private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xB3000000.toInt() }
+    private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x99000000.toInt() } // 60% black
 
     override fun onDraw(canvas: Canvas) {
         refreshSizes()
@@ -56,5 +57,16 @@ class QrViewfinderView(context: Context, attrs: AttributeSet?) : ViewfinderView(
         canvas.drawArc(r - d, b - d, r, b, 0f, 90f, false, bracketPaint)
         canvas.drawLine(r - radius, b, r - bracket - radius / 2, b, bracketPaint)
         canvas.drawLine(r, b - radius, r, b - bracket - radius / 2, bracketPaint)
+    }
+}
+
+/** The scanner's close button: the library's capture screen has none, so this one finishes it. */
+class QrCloseButton(context: Context, attrs: AttributeSet?) : androidx.appcompat.widget.AppCompatImageButton(context, attrs) {
+    init {
+        setOnClickListener {
+            var c: Context? = context
+            while (c is android.content.ContextWrapper && c !is android.app.Activity) c = c.baseContext
+            (c as? android.app.Activity)?.finish()
+        }
     }
 }

@@ -65,3 +65,11 @@ DeskLink includes code and protocol-compatible behavior derived from KDE
 Connect. Required copyright, license, and contributor attribution remain in
 the source. See the workspace documentation for the complete attribution and
 compatibility record.
+
+Bundled assets:
+
+- JetBrains Mono (`src/main/res/font/jetbrains_mono_*.ttf`), copyright 2020 The
+  JetBrains Mono Project Authors, under the SIL Open Font License 1.1
+  (`LICENSES/OFL-1.1.txt`). Used for the terminal and technical text.
+- Material Symbols icons (`src/main/res/drawable/sym_*.xml`, `ic_device_*_32dp.xml`)
+  by Google, under the Apache License 2.0 (`LICENSES/Apache-2.0.txt`).

@@ -67,6 +67,10 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
     private var textSizePx = 0
     private var renderer: TerminalRenderer
     private val metricsPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    /** JetBrains Mono (bundled, OFL-1.1); the system monospace if it cannot be loaded. */
+    private val terminalTypeface: Typeface =
+        androidx.core.content.res.ResourcesCompat.getFont(context, org.desklink.mobile.R.font.jetbrains_mono_regular) ?: Typeface.MONOSPACE
     private var fontWidth = 1f
     private var lineSpacing = 1
     private var spacingAndAscent = 0
@@ -202,7 +206,7 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
         } else {
             TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, DEFAULT_FONT_SP, resources.displayMetrics).toInt()
         }
-        renderer = TerminalRenderer(textSizePx, Typeface.MONOSPACE)
+        renderer = TerminalRenderer(textSizePx, terminalTypeface)
         applyMetrics()
     }
 
@@ -270,8 +274,8 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
     // ---- metrics and layout ------------------------------------------------------------------------
 
     private fun applyMetrics() {
-        renderer = TerminalRenderer(textSizePx, Typeface.MONOSPACE)
-        metricsPaint.typeface = Typeface.MONOSPACE
+        renderer = TerminalRenderer(textSizePx, terminalTypeface)
+        metricsPaint.typeface = terminalTypeface
         metricsPaint.textSize = textSizePx.toFloat()
         // The renderer computes these the same way; its own copies are package-private.
         fontWidth = renderer.fontWidth

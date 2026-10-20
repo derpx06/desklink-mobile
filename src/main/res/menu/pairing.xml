@@ -9,12 +9,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:desklink="http://schemas.android.com/apk/res-auto">
 
-    <item
-        android:id="@+id/menu_scan_qr"
-        android:icon="@drawable/ic_qr_code_scanner_24dp"
-        android:orderInCategory="100"
-        android:title="@string/qr_scan_to_pair"
-        desklink:showAsAction="always" />
 
     <item
         android:id="@+id/menu_settings"
