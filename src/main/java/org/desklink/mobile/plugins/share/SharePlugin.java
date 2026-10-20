@@ -273,7 +273,7 @@ public class SharePlugin extends Plugin {
             return;
         }
 
-        Log.i("SharePlugin", "hasUrl: " + url);
+        Log.i("SharePlugin", "Opening a shared URL");
 
         Intent browserIntent = new Intent(Intent.ACTION_VIEW, uri);
         browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

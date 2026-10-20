@@ -17,6 +17,7 @@ import org.desklink.mobile.backends.BaseLinkProvider.ConnectionReceiver
 import org.desklink.mobile.backends.lan.LanLink
 import org.desklink.mobile.backends.relay.RelayLink
 import org.desklink.mobile.backends.relay.RelayLinkProvider
+import org.desklink.mobile.helpers.CrashReporter
 import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.LifecycleHelper
 import org.desklink.mobile.helpers.NotificationHelper
@@ -108,6 +109,7 @@ class DeskLinkApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         _instance = this
+        CrashReporter.install(this)
         setupSL4JLogging()
         Log.d("DeskLink/Application", "onCreate")
         ThemeUtil.setUserPreferredTheme(this)
@@ -116,6 +118,7 @@ class DeskLinkApplication : Application() {
         SslHelper.initialiseCertificate(this)
         PluginFactory.initPluginInfo(this)
         NotificationHelper.initializeChannels(this)
+        CrashReporter.offerPendingReport(this)
         LifecycleHelper.initializeObserver()
         loadRememberedDevicesFromSettings()
 

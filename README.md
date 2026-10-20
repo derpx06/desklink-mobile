@@ -1,27 +1,42 @@
 # DeskLink for Android
 
-DeskLink is a phone-to-Linux connectivity application. The Android app
-discovers DeskLink peers on the same local network and communicates directly
-over encrypted links.
+DeskLink connects your Android phone and your Linux computer: shared terminals
+(with one-tap Claude Code and Codex), control of the computer from the phone,
+the phone's screen on the computer, notifications with replies, clipboard, and
+files. It works on the same Wi-Fi and, through the DeskLink relay, away from
+home. There is no account.
+
+Install: GitHub Releases (signed APK), Google Play, or F-Droid. Release and
+signing notes are in `docs/RELEASE.md`; the privacy policy is `PRIVACY.md`.
 
 ## Current transport
 
 DeskLink Protocol v9 over the local network.
 
 Discovery, identity, pairing, and signed signaling use TLS with pinned
-certificates. Paired features move to authenticated WebRTC data channels once
-the handover completes, and use the pinned-TLS link until then, so features keep
-working on networks where ICE cannot establish. File bytes only ever travel on
-the bounded WebRTC file-data channel.
+certificates. Paired features travel only over authenticated WebRTC data
+channels; until the handover completes they are queued, never sent over the
+bootstrap link. File bytes only ever travel on the bounded WebRTC file-data
+channel.
+
+Away from home, the phone and computer meet at the DeskLink relay and run an
+end-to-end encrypted bootstrap link through it (the relay sees IP addresses,
+certificate fingerprints and timing, never content); media goes direct or
+through TURN when the "Use TURN" setting allows. Spec: `docs/RELAY.md` in the
+workspace, relay server in the desktop repository's `relay/`.
 
 The inactive compatibility module documents the legacy KDE Connect-compatible
 protocol v8; it is not advertised or transmitted by the active path.
 
 ## Current support
 
-- Same-LAN discovery and direct encrypted communication.
+- Same-LAN discovery, QR pairing, and the relay for other networks.
+- Shared terminals with one-tap Claude Code/Codex, dictation and full screen;
+  an optional per-computer session password.
+- Remote control of the computer (view and control its screen) and the phone's
+  screen on the computer.
 - Ping, find-my-phone, battery, clipboard, files and links, notification
-  mirroring with reply and action, SFTP browsing, and remote input.
+  mirroring with reply and action, and file browsing.
 
 The exact set exchanged with the desktop client is `WebRtcFeatureProfile`. It
 must stay byte-identical to `DESKTOP_INCOMING` ∪ `DESKTOP_OUTGOING` in the
@@ -30,7 +45,7 @@ filtered capability list for exact equality. Tests on both sides pin the list.
 
 ## Not yet implemented
 
-Internet relay, Wi-Fi Direct, remote shell, and a shared virtual library.
+Wi-Fi Direct and a shared virtual library.
 
 Media control, system volume, and run-command are implemented here in the
 phone-controls-desktop direction only. They stay outside the shared profile

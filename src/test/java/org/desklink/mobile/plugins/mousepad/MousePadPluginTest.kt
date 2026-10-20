@@ -21,7 +21,12 @@ class MousePadPluginTest {
         }
 
         plugin.setContext(context, device)
+        val frames = ArrayList<Runnable>()
+        plugin.frameScheduler = { frames += it }
+        plugin.sendMousePosition(10, 10)
         plugin.sendMousePosition(320, 180)
+        verify(exactly = 0) { device.sendPacket(any()) }
+        frames.forEach(Runnable::run)
 
         verify(exactly = 1) {
             device.sendPacket(match { packet ->

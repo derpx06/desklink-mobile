@@ -23,10 +23,10 @@ import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.TrustedDevices
 import org.desklink.mobile.helpers.security.RsaHelper
 import org.desklink.mobile.helpers.security.SslHelper
+import org.desklink.mobile.webrtc.IceServerSpec
 import org.desklink.mobile.webrtc.identitySignature
 import org.json.JSONArray
 import org.json.JSONObject
-import org.webrtc.PeerConnection
 import java.net.URI
 import java.security.cert.Certificate
 import java.util.concurrent.ArrayBlockingQueue
@@ -84,7 +84,7 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
         var online = false
         var lastStart = 0L
         var link: RelayLink? = null
-        val turnWaiters = mutableListOf<ArrayBlockingQueue<List<PeerConnection.IceServer>>>()
+        val turnWaiters = mutableListOf<ArrayBlockingQueue<List<IceServerSpec>>>()
     }
 
     private val lock = Any()
@@ -172,11 +172,11 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
      * ICE servers the relay grants for the WebRTC peer with [deviceId], or none
      * within [TURN_TIMEOUT_MS]. Blocking; never call it from this provider's threads.
      */
-    fun iceServersFor(deviceId: String): List<PeerConnection.IceServer> {
+    internal fun iceServersFor(deviceId: String): List<IceServerSpec> {
         val waiter = synchronized(lock) {
             val ws = socket?.takeIf { status == Status.ONLINE } ?: return emptyList()
             val (fp, peer) = peers.entries.firstOrNull { it.value.deviceId == deviceId } ?: return emptyList()
-            ArrayBlockingQueue<List<PeerConnection.IceServer>>(1).also { waiter ->
+            ArrayBlockingQueue<List<IceServerSpec>>(1).also { waiter ->
                 peer.turnWaiters += waiter
                 ws.send(JSONObject().put("t", "turn").put("peer", fp).toString())
             }
@@ -221,8 +221,7 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
             return
         }
         val url = RelaySettings.url(context)
-        // The signed host has no IPv6 brackets, as the desktop's `host_of`.
-        val host = runCatching { URI(url).host?.removePrefix("[")?.removeSuffix("]") }.getOrNull()
+        val host = relayHost(url)
         val schemeOk = url.startsWith("wss://") || (BuildConfig.DEBUG && url.startsWith("ws://"))
         if (host.isNullOrEmpty() || !schemeOk) {
             Log.w(TAG, "Invalid relay address")
@@ -537,16 +536,33 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
         }
 
         /** `turnCreds.iceServers`; `username`/`credential` are absent on STUN entries. */
-        private fun parseIceServers(array: JSONArray?): List<PeerConnection.IceServer> =
+        private fun parseIceServers(array: JSONArray?): List<IceServerSpec> =
             (0 until (array?.length() ?: 0)).mapNotNull { index ->
                 val entry = array?.optJSONObject(index) ?: return@mapNotNull null
                 val urls = entry.optJSONArray("urls") ?: return@mapNotNull null
                 val list = (0 until urls.length()).mapNotNull { urls.optString(it).takeIf(String::isNotEmpty) }
                 if (list.isEmpty()) return@mapNotNull null
-                PeerConnection.IceServer.builder(list).apply {
-                    entry.optString("username").takeIf(String::isNotEmpty)?.let(::setUsername)
-                    entry.optString("credential").takeIf(String::isNotEmpty)?.let(::setPassword)
-                }.createIceServer()
+                IceServerSpec(
+                    list,
+                    entry.optString("username").takeIf(String::isNotEmpty),
+                    entry.optString("credential").takeIf(String::isNotEmpty),
+                )
             }
     }
+}
+
+/**
+ * The bare host the relay auth signs, as the desktop's `host_of`: no IPv6
+ * brackets, port or userinfo. [URI.getHost] is null for a hostname with `_`,
+ * so that falls back to taking the authority apart by hand.
+ */
+internal fun relayHost(url: String): String? {
+    val parsed = runCatching { URI(url).host }.getOrNull()
+        ?: url.substringAfter("://", "").substringBefore('/').substringBefore('?').substringBefore('#')
+            .substringAfterLast('@')
+            .let { authority ->
+                if (authority.startsWith("[")) authority.substringBefore(']') + "]"
+                else authority.substringBefore(':')
+            }
+    return parsed.removePrefix("[").removeSuffix("]").takeIf(String::isNotEmpty)
 }

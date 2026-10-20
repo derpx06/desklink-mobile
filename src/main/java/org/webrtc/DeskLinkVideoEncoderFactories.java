@@ -34,6 +34,36 @@ public final class DeskLinkVideoEncoderFactories {
 
     private DeskLinkVideoEncoderFactories() {}
 
+    /** Told, on the encoder thread, the frame size at which a hardware encoder failed. */
+    public interface FailureListener {
+        void onHardwareEncoderFailure(int width, int height);
+    }
+
+    // ponytail: one listener process-wide (the one capturing transport); a
+    // per-encoder route if two captures ever run at once.
+    @Nullable private static volatile FailureListener failureListener;
+
+    public static void setFailureListener(@Nullable FailureListener listener) {
+        failureListener = listener;
+    }
+
+    public static synchronized void clearFailureListener(FailureListener listener) {
+        if (failureListener == listener) failureListener = null;
+    }
+
+    static boolean isFailure(VideoCodecStatus status) {
+        return status == VideoCodecStatus.ERROR
+            || status == VideoCodecStatus.FALLBACK_SOFTWARE
+            || status == VideoCodecStatus.ERR_SIZE
+            || status == VideoCodecStatus.MEMORY;
+    }
+
+    private static void reportFailure(VideoCodecStatus status, int width, int height) {
+        FailureListener listener = failureListener;
+        if (listener == null || !isFailure(status)) return;
+        listener.onHardwareEncoderFailure(width, height);
+    }
+
     /** Hardware first (low-latency), libwebrtc's software encoders as fallback. */
     public static VideoEncoderFactory create(EglBase.Context sharedContext, boolean enableH264HighProfile) {
         return new DefaultVideoEncoderFactory(new LowLatencyHardwareFactory(sharedContext, enableH264HighProfile));
@@ -73,8 +103,45 @@ public final class DeskLinkVideoEncoderFactories {
                     Logging.w(TAG, "Low-latency encoder configuration unavailable", e);
                 }
             }
-            return encoder;
+            return encoder == null ? null : new FailureReportingEncoder(encoder);
         }
+    }
+
+    /** Passes everything through; reports failed init/encode calls with their size. */
+    private static final class FailureReportingEncoder implements VideoEncoder {
+        private final VideoEncoder inner;
+
+        FailureReportingEncoder(VideoEncoder inner) {
+            this.inner = inner;
+        }
+
+        @Override
+        public VideoCodecStatus initEncode(Settings settings, Callback callback) {
+            VideoCodecStatus status = inner.initEncode(settings, callback);
+            reportFailure(status, settings.width, settings.height);
+            return status;
+        }
+
+        @Override
+        public VideoCodecStatus encode(VideoFrame frame, EncodeInfo info) {
+            VideoCodecStatus status = inner.encode(frame, info);
+            if (isFailure(status)) {
+                reportFailure(status, frame.getBuffer().getWidth(), frame.getBuffer().getHeight());
+            }
+            return status;
+        }
+
+        @Override public long createNative(long webrtcEnvRef) { return inner.createNative(webrtcEnvRef); }
+        @Override public boolean isHardwareEncoder() { return inner.isHardwareEncoder(); }
+        @Override public VideoCodecStatus release() { return inner.release(); }
+        @Override public VideoCodecStatus setRateAllocation(BitrateAllocation allocation, int framerate) {
+            return inner.setRateAllocation(allocation, framerate);
+        }
+        @Override public VideoCodecStatus setRates(RateControlParameters parameters) { return inner.setRates(parameters); }
+        @Override public ScalingSettings getScalingSettings() { return inner.getScalingSettings(); }
+        @Override public ResolutionBitrateLimits[] getResolutionBitrateLimits() { return inner.getResolutionBitrateLimits(); }
+        @Override public String getImplementationName() { return inner.getImplementationName(); }
+        @Override public EncoderInfo getEncoderInfo() { return inner.getEncoderInfo(); }
     }
 
     private static final class LowLatencyCodecFactory implements MediaCodecWrapperFactory {

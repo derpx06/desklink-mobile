@@ -568,7 +568,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
                 ticker = extraText
             }
         } catch (e: Exception) {
-            Log.e(TAG, "problem parsing notification extras for " + notification.tickerText, e)
+            Log.e(TAG, "problem parsing notification extras", e)
         }
 
         if (ticker.isEmpty()) {

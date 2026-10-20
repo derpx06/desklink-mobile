@@ -397,7 +397,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                 }
                 Log.i("BTLinkProvider/Client", "Device: " + device.address + " Before sb.toString()")
                 val message = sb.toString()
-                Log.i("BTLinkProvider/Client", "Device: " + device.address + " Before unserialize (message: '" + message + "')")
+                Log.i("BTLinkProvider/Client", "Device: " + device.address + " Before unserialize (" + message.length + " chars)")
                 val identityPacket = NetworkPacket.unserialize(message)
                 Log.i("BTLinkProvider/Client", "Device: " + device.address + " After unserialize")
 

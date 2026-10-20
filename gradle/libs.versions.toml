@@ -2,7 +2,6 @@
 activityCompose = "1.13.0"
 androidDesugarJdkLibs = "2.1.5"
 androidGradlePlugin = "9.1.1"
-androidSmsmms = "kdeconnect-1-21-0"
 appcompat = "1.7.1"
 bcpkixJdk15on = "1.70"
 classindexksp = "1.2"
@@ -23,7 +22,6 @@ kspPlugin = "2.3.9"
 kotlinxCoroutinesCore = "1.11.0"
 lifecycleExtensions = "2.2.0"
 lifecycleRuntimeKtx = "2.10.0"
-logger = "1.0.3"
 androidMaterial = "1.14.0"
 composeMaterialIcons = "1.7.8"
 composeMaterial3 = "1.4.0"
@@ -51,7 +49,6 @@ termux = "v0.118.1"
 
 [libraries]
 android-desugarJdkLibsNio = { module = "com.android.tools:desugar_jdk_libs_nio", version.ref = "androidDesugarJdkLibs" }
-android-smsmms = { module = "org.kde.invent.sredman:android-smsmms", version.ref = "androidSmsmms" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "composeMaterial3" }
@@ -84,7 +81,6 @@ kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", ve
 kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesCore" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesCore" }
-logger = { module = "com.klinkerapps:logger", version.ref = "logger" }
 google-android-material = { module = "com.google.android.material:material", version.ref = "androidMaterial" }
 apache-mina-core = { module = "org.apache.mina:mina-core", version.ref = "minaCore" }
 apache-sshd-core = { module = "org.apache.sshd:sshd-core", version.ref = "sshdCore" }

@@ -48,7 +48,6 @@ public class FindMyPhonePlugin extends Plugin {
     private AudioManager audioManager;
     private MediaPlayer mediaPlayer;
     private int previousVolume = -1;
-    private PowerManager powerManager;
     private FlashlightManager flashlightManager;
 
     @Override
@@ -74,7 +73,6 @@ public class FindMyPhonePlugin extends Plugin {
         notificationManager = ContextCompat.getSystemService(context, NotificationManager.class);
         notificationId = (int) System.currentTimeMillis();
         audioManager = ContextCompat.getSystemService(context, AudioManager.class);
-        powerManager = ContextCompat.getSystemService(context, PowerManager.class);
         flashlightManager = new FlashlightManager(context);
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
@@ -126,13 +124,11 @@ public class FindMyPhonePlugin extends Plugin {
             intent.putExtra(FindMyPhoneActivity.EXTRA_DEVICE_ID, getDevice().getDeviceId());
             context.startActivity(intent);
         } else {
-            if (powerManager.isInteractive()) {
-                startPlaying();
-                startFlashing();
-                showBroadcastNotification();
-            } else {
-                showActivityNotification();
-            }
+            // Ring from here, screen on or off: a full-screen intent would need
+            // USE_FULL_SCREEN_INTENT, which Play grants only to calling and alarm apps.
+            startPlaying();
+            startFlashing();
+            showBroadcastNotification();
         }
         return true;
     }
@@ -148,20 +144,12 @@ public class FindMyPhonePlugin extends Plugin {
         createNotification(pendingIntent);
     }
 
-    private void showActivityNotification() {
-        Intent intent = new Intent(context, FindMyPhoneActivity.class);
-        intent.putExtra(FindMyPhoneActivity.EXTRA_DEVICE_ID, getDevice().getDeviceId());
-
-        PendingIntent pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        createNotification(pi);
-    }
-
     private void createNotification(PendingIntent pendingIntent) {
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY);
         notification
                 .setSmallIcon(R.drawable.ic_notification)
                 .setOngoing(false)
-                .setFullScreenIntent(pendingIntent, true)
+                .setContentIntent(pendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setOngoing(true)

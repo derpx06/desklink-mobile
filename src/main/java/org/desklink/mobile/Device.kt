@@ -453,6 +453,14 @@ class Device : PacketReceiver {
     val hasBootstrapLink: Boolean
         get() = links.isNotEmpty()
 
+    /** The live peer's path (lan/direct/turn), RTT and outgoing bandwidth, for a
+     * connection chip; null with no peer. Answers on libwebrtc's thread. */
+    @AnyThread
+    fun requestConnectionStats(callback: org.desklink.mobile.webrtc.WebRtcConnectionStatsCallback) {
+        val transport = webRtcTransport ?: return callback.onStats(null)
+        transport.requestConnectionStats(!hasLanLink && relayLink != null, callback)
+    }
+
     /** The preferred link is pinned TLS over the LAN (not, e.g., Bluetooth). */
     val hasLanLink: Boolean
         get() = links.firstOrNull() is org.desklink.mobile.backends.lan.LanLink

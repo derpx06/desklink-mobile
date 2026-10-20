@@ -1,21 +1,34 @@
-DeskLink provides a set of features to integrate your workflow across devices:
+DeskLink connects your Android phone to your Linux computer. Pair once by scanning a QR code, and the two work together at home or away from it. No account, no ads, no tracking.
 
-- Transfer files between your devices.
-- Access files on your phone from your computer, without wires.
-- Shared clipboard: copy and paste between your devices.
-- Get notifications for incoming calls and messages on your computer.
-- Virtual touchpad: Use your phone screen as your computer's touchpad.
-- Notifications sync: Access your phone notifications from your computer and reply to messages.
-- Multimedia remote control: Use your phone as a remote for Linux media players.
-- WiFi connection: no USB wire or bluetooth needed.
-- End-to-end TLS encryption: your information is safe.
+<b>Shared terminals</b>
+- Open terminals that run on your computer and pick them up on your phone, or start one on the phone and keep typing at your desk.
+- One tap starts Claude Code or Codex in a terminal on your computer, so you can keep an eye on an agent from anywhere.
+- Dictate into the terminal with your phone's speech recognizer.
 
-Please note you will need to install DeskLink on your computer for this app to work, and keep the desktop version up-to-date with the Android version for the latest features to work.
+<b>Remote control and screens</b>
+- See your computer's screen on the phone and control it with touch, keyboard and mouse.
+- Show your phone's screen on the computer.
+- Use the phone as a touchpad and keyboard.
 
-Sensitive permissions information:
-* Accessibility permission: Required to receive input from another device to control your Android phone, if you use the Remote Input feature.
-* Background location permission: Required to know to which WiFi network you are connected to, if you use the Trusted Networks feature.
+<b>Everyday integration</b>
+- Notifications from your phone appear on the computer, and you can reply from there.
+- Shared clipboard: copy on one device, paste on the other.
+- Send files and links both ways, and browse the phone's storage from the computer.
+- Battery level, find my phone, and lock the computer from your phone.
 
-DeskLink sends data directly from one device to the other using the local network, never through the internet, and using end to end encryption.
+<b>Works anywhere, privately</b>
+- On the same Wi-Fi, the devices talk directly over an encrypted connection.
+- Away from home, they find each other through the DeskLink relay. The connection setup is end-to-end encrypted: the relay sees IP addresses and device fingerprints, never your content.
+- No account and no sign-up. Pairing keys stay on your devices.
 
-This app is part of an open source project and it exists thanks to all the people who contributed to it. Visit the website to grab the source code.
+DeskLink needs the DeskLink desktop app on your Linux computer.
+
+<b>Permissions</b>
+- Accessibility service (optional): lets the computer control your phone while you share the phone's screen, and type into apps. DeskLink does not collect or share data through it.
+- Notification access (optional): to show your phone's notifications on the computer.
+- All files access (optional): to browse the phone's storage from the computer.
+- Screen capture: asked each time you share the phone's screen.
+- Camera: to scan the pairing QR code.
+
+DeskLink is free software, based on KDE Connect. Source code: https://github.com/derpx06/desklink-mobile
+Privacy policy: https://github.com/derpx06/desklink-mobile/blob/master/PRIVACY.md

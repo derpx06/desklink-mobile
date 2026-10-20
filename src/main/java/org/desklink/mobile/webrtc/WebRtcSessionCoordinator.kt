@@ -1526,6 +1526,11 @@ class WebRtcSessionCoordinator(
             }
             else -> Unit
         }
+        remoteSession.snapshot().let { s ->
+            transport?.setScreenControlled(
+                s.state == WebRtcRemoteSessionState.CONTROLLING && s.direction == WebRtcScreenDirection.PHONE_TO_DESKTOP,
+            )
+        }
         updateRemoteHeartbeatLocked(binding, attemptId)
         publish(
             "RemoteSession",
@@ -2042,44 +2047,41 @@ class WebRtcSessionCoordinator(
     }
 
     /**
-     * The LAN needs no server. A peer bootstrapped through the relay adds the
-     * relay's TURN grant when "Use TURN" is on, and uses no TURN at all —
-     * user-configured servers included — when it is off (docs/RELAY.md §5).
+     * See [selectIceServers]. The relay grant is requested only for a peer
+     * bootstrapped through the relay with "Use TURN" on (docs/RELAY.md §5).
      * Blocks up to 2 s for the grant: never call it under [lock] or on the main thread.
      */
     private fun iceServersForPath(): List<PeerConnection.IceServer> {
-        if (device.hasLanLink) return configuredIceServers(includeTurn = true)
-        if (!RelaySettings.useTurn(context)) return configuredIceServers(includeTurn = false)
-        val granted = RelayLinkProvider.instance?.iceServersFor(device.deviceId).orEmpty()
-        return configuredIceServers(includeTurn = true) + granted
+        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+        val useTurn = RelaySettings.useTurn(context)
+        val lan = device.hasLanLink
+        return selectIceServers(
+            hasLanLink = lan,
+            useTurn = useTurn,
+            configuredStun = configuredIceServers(
+                preferences.getString(DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE, "").orEmpty(),
+                setOf("stun", "stuns"),
+            ),
+            configuredTurn = if (!useTurn) emptyList() else configuredIceServers(
+                preferences.getString(DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE, "").orEmpty(),
+                setOf("turn", "turns"),
+            ),
+            granted = if (lan || !useTurn) emptyList()
+                else RelayLinkProvider.instance?.iceServersFor(device.deviceId).orEmpty(),
+        ).map(IceServerSpec::toIceServer)
     }
 
-    private fun configuredIceServers(includeTurn: Boolean): List<PeerConnection.IceServer> {
-        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        val stun = parseServerList(
-            preferences.getString(DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE, "").orEmpty(),
-            setOf("stun", "stuns"),
-        )
-        val turn = if (!includeTurn) emptyList() else parseServerList(
-            preferences.getString(DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE, "").orEmpty(),
-            setOf("turn", "turns"),
-        )
-        return (stun + turn).map { raw ->
+    private fun configuredIceServers(value: String, schemes: Set<String>): List<IceServerSpec> =
+        parseServerList(value, schemes).map { raw ->
             val uri = URI(raw)
-            val host = requireNotNull(uri.host) { "ICE server URI has no host: $raw" }
             val endpoint = buildString {
-                append(uri.scheme).append(':').append(host)
+                append(uri.scheme).append(':').append(uri.host)
                 if (uri.port >= 0) append(':').append(uri.port)
                 if (!uri.query.isNullOrEmpty()) append('?').append(uri.query)
             }
-            PeerConnection.IceServer.builder(endpoint).apply {
-                uri.userInfo?.split(':', limit = 2)?.let { credentials ->
-                    setUsername(credentials.first())
-                    if (credentials.size == 2) setPassword(credentials[1])
-                }
-            }.createIceServer()
+            val credentials = uri.userInfo?.split(':', limit = 2)
+            IceServerSpec(listOf(endpoint), credentials?.first(), credentials?.getOrNull(1))
         }
-    }
 
     private fun parseServerList(value: String, schemes: Set<String>): List<String> = value
         .split(',', '\n')

@@ -17,6 +17,7 @@ import org.desklink.mobile.transport.TransportState
 import org.desklink.mobile.transport.TransportType
 import org.desklink.mobile.NetworkPacket
 import org.webrtc.DataChannel
+import org.webrtc.DeskLinkVideoEncoderFactories
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStreamTrack
@@ -32,7 +33,9 @@ import org.webrtc.VideoTrack
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 enum class WebRtcPeerHealth { CONNECTED, DISCONNECTED, FAILED, CLOSED }
 
@@ -78,6 +81,16 @@ internal fun h264Rank(codec: org.webrtc.RtpCapabilities.CodecCapability): Int {
         else -> 2
     }
 }
+
+/** Text stays sharp while the desktop only watches; motion matters once it drives the phone. */
+internal fun screenDegradationPreference(controlled: Boolean): RtpParameters.DegradationPreference =
+    if (controlled) RtpParameters.DegradationPreference.BALANCED
+    else RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+
+/** The capture long side to retry at after the encoder failed at [current]; null to give up. */
+internal fun nextCaptureLongSide(current: Int): Int? = CAPTURE_LONG_SIDES.firstOrNull { it < current }
+
+internal val CAPTURE_LONG_SIDES = listOf(1280, 960, 720)
 
 internal object WebRtcMediaNegotiationPolicy {
     const val includeScreenTrackInInitialOffer = true
@@ -170,6 +183,15 @@ class WebRtcTransport(
     private var nextScreenCaptureEpoch = 0L
     private var activeScreenCaptureEpoch: Long? = null
     private var suppressedStopEpoch: Long? = null
+    @Volatile private var screenControlled = false
+    private var captureWidth = 0
+    private var captureHeight = 0
+    private var captureFps = 0
+    /** Long side of the running capture, 0 when none; lowered on encoder failure. */
+    private val captureLongSide = AtomicInteger(0)
+    @Volatile private var encoderGaveUp = false
+    private val encoderFailureListener =
+        DeskLinkVideoEncoderFactories.FailureListener { width, height -> onEncoderFailure(width, height) }
 
     init {
         val configuration = PeerConnection.RTCConfiguration(iceServers).apply {
@@ -498,24 +520,94 @@ class WebRtcTransport(
         screenCapturer = capturer
         screenTextureHelper = helper
         activeScreenCaptureEpoch = captureEpoch
+        captureWidth = width
+        captureHeight = height
+        captureFps = fps.coerceIn(1, 30)
+        encoderGaveUp = false
         try {
             capturer.initialize(helper, context, videoSource.capturerObserver)
-            // Scale proportionally so the long side is at most 1280. Clamping
-            // each side separately squashed a tall phone (2400 → 1920 high,
-            // width untouched), and encoding the full panel cost twice the
-            // bandwidth and encoder time for no gain on a desktop window.
-            val scale = minOf(1.0, MAX_CAPTURE_LONG_SIDE.toDouble() / maxOf(width, height, 1))
-            capturer.startCapture(
-                align16((width * scale).toInt().coerceAtLeast(240)),
-                align16((height * scale).toInt().coerceAtLeast(240)),
-                fps.coerceIn(1, 30),
-            )
+            val longSide = minOf(CAPTURE_LONG_SIDES.first(), maxOf(width, height, 1))
+            captureLongSide.set(longSide)
+            DeskLinkVideoEncoderFactories.setFailureListener(encoderFailureListener)
+            val (w, h) = captureSize(longSide)
+            capturer.startCapture(w, h, captureFps)
         } catch (error: Throwable) {
             releaseScreenCaptureLocked(stopCapture = true)
             throw error
         }
-        configureScreenSender(fps.coerceIn(1, 30))
+        configureScreenSender(captureFps)
         if (org.desklink.mobile.BuildConfig.DEBUG) startScreenStatsLog()
+    }
+
+    /**
+     * Scale proportionally so the long side is at most [longSide]. Clamping
+     * each side separately squashed a tall phone (2400 → 1920 high, width
+     * untouched), and encoding the full panel cost twice the bandwidth and
+     * encoder time for no gain on a desktop window.
+     */
+    private fun captureSize(longSide: Int): Pair<Int, Int> {
+        val scale = minOf(1.0, longSide.toDouble() / maxOf(captureWidth, captureHeight, 1))
+        return align16((captureWidth * scale).toInt().coerceAtLeast(240)) to
+            align16((captureHeight * scale).toInt().coerceAtLeast(240))
+    }
+
+    /**
+     * Encoder thread. A hardware encoder that fails (often a size it will not
+     * take) gets the capture one step smaller (1280 → 960 → 720 long side)
+     * before we give up. Failures for frames larger than the current capture
+     * are stale ones from before the last step, so a burst steps only once.
+     */
+    private fun onEncoderFailure(width: Int, height: Int) {
+        val current = captureLongSide.get()
+        if (current == 0 || maxOf(width, height) > current) return
+        val next = nextCaptureLongSide(current)
+        if (next == null) {
+            if (!encoderGaveUp) {
+                encoderGaveUp = true
+                Log.e(TAG, "Screen encoder failed at ${width}x$height, the smallest capture size; giving up")
+            }
+            return
+        }
+        if (!captureLongSide.compareAndSet(current, next)) return
+        Log.w(TAG, "Screen encoder failed at ${width}x$height; retrying with the capture's long side at $next")
+        // Off the encoder thread, and without this monitor: changeCaptureFormat
+        // waits on the capture thread, which takes the monitor in onStop. A
+        // capturer disposed meanwhile throws, which is caught.
+        thread(name = "DeskLink-encoder-retry") {
+            val capturer = synchronized(this) { screenCapturer } ?: return@thread
+            if (captureLongSide.get() != next) return@thread
+            val (w, h) = captureSize(next)
+            runCatching { capturer.changeCaptureFormat(w, h, captureFps) }
+                .onFailure { Log.w(TAG, "Could not shrink the screen capture", it) }
+        }
+    }
+
+    /**
+     * Whether the desktop is controlling (not just viewing) the phone's
+     * screen. Switches the live sender's degradation preference.
+     */
+    @Synchronized
+    fun setScreenControlled(controlled: Boolean) {
+        if (screenControlled == controlled) return
+        screenControlled = controlled
+        if (activeScreenCaptureEpoch == null) return
+        updateScreenSender { it.degradationPreference = screenDegradationPreference(controlled) }
+        Log.i(TAG, "Screen degradation preference: ${screenDegradationPreference(controlled)}")
+    }
+
+    /**
+     * Selected candidate pair, RTT and outgoing bandwidth estimate, for a
+     * connection chip; cheap enough to poll every couple of seconds.
+     * [bootstrapViaRelay]: this device was reached through the relay link.
+     */
+    fun requestConnectionStats(bootstrapViaRelay: Boolean, callback: WebRtcConnectionStatsCallback) {
+        if (state == TransportState.CLOSING || state == TransportState.CLOSED) {
+            callback.onStats(null)
+            return
+        }
+        runCatching {
+            peer.getStats { report -> callback.onStats(connectionStatsFrom(report.statsMap, bootstrapViaRelay)) }
+        }.onFailure { callback.onStats(null) }
     }
 
     /**
@@ -609,20 +701,27 @@ class WebRtcTransport(
     /**
      * libwebrtc otherwise starts the screen at ~300 kbps with no ceiling and
      * takes seconds to look sharp. Its congestion control still adapts inside
-     * these bounds; screen content prefers keeping text readable (drop frames
-     * before resolution).
+     * these bounds. A viewing desktop keeps text readable (drop frames before
+     * resolution); a controlling one keeps motion ([setScreenControlled]).
      */
+    @Synchronized
     private fun configureScreenSender(fps: Int) {
         runCatching { peer.setBitrate(MIN_SCREEN_BITRATE, START_SCREEN_BITRATE, MAX_SCREEN_BITRATE) }
-        val sender = peer.senders.firstOrNull { it.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND } ?: return
-        runCatching {
-            val parameters = sender.parameters
-            parameters.degradationPreference = RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+        updateScreenSender { parameters ->
+            parameters.degradationPreference = screenDegradationPreference(screenControlled)
             parameters.encodings.forEach { encoding ->
                 encoding.minBitrateBps = MIN_SCREEN_BITRATE
                 encoding.maxBitrateBps = MAX_SCREEN_BITRATE
                 encoding.maxFramerate = fps
             }
+        }
+    }
+
+    private fun updateScreenSender(change: (RtpParameters) -> Unit) {
+        val sender = peer.senders.firstOrNull { it.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND } ?: return
+        runCatching {
+            val parameters = sender.parameters
+            change(parameters)
             sender.parameters = parameters
         }.onFailure { Log.w(TAG, "Could not set screen sender parameters", it) }
     }
@@ -669,6 +768,8 @@ class WebRtcTransport(
         screenCapturer = null
         screenTextureHelper = null
         activeScreenCaptureEpoch = null
+        captureLongSide.set(0)
+        DeskLinkVideoEncoderFactories.clearFailureListener(encoderFailureListener)
         if (stopCapture) runCatching { capturer?.stopCapture() }
         capturer?.dispose()
         helper?.dispose()
@@ -768,7 +869,6 @@ class WebRtcTransport(
 
     private companion object {
         const val TAG = "DeskLink/WebRTC"
-        const val MAX_CAPTURE_LONG_SIDE = 1280
         const val MIN_SCREEN_BITRATE = 300_000
         const val START_SCREEN_BITRATE = 2_500_000
         const val MAX_SCREEN_BITRATE = 8_000_000

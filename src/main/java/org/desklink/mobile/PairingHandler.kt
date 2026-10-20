@@ -504,23 +504,23 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         }
 
         /**
-         * Six digits both screens show: the first four digest bytes, big-endian,
-         * mod 10^6, zero-padded. Pinned on the desktop too (`pairing.rs`).
+         * Six digits both screens show: SHA-256 over the two keys (larger
+         * first), then the timestamp in decimal ASCII when there is one; the
+         * first four digest bytes, big-endian, mod 10^6, zero-padded. Pinned
+         * on the desktop too (`pairing.rs`, `verification_key`).
          */
-        private fun humanReadableHash(bytes: ByteArray): String {
-            val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
+        internal fun verificationCode(a: ByteArray, b: ByteArray, timestamp: Long?): String {
+            val input = sortedConcat(a, b) + (timestamp?.toString()?.toByteArray(Charsets.US_ASCII) ?: ByteArray(0))
+            val hash = MessageDigest.getInstance("SHA-256").digest(input)
             val value = ByteBuffer.wrap(hash, 0, 4).int.toLong() and 0xFFFFFFFFL
             return String.format(Locale.ROOT, "%06d", value % 1_000_000)
         }
-        fun getVerificationKey(certificateA: Certificate, certificateB: Certificate, timestamp: Long): String {
-            val certsConcat = sortedConcat(certificateA.publicKey.encoded, certificateB.publicKey.encoded)
-            return humanReadableHash(certsConcat + timestamp.toString().toByteArray())
-        }
 
-        fun getVerificationKeyV7(certificateA: Certificate, certificateB: Certificate): String {
-            val certsConcat = sortedConcat(certificateA.publicKey.encoded, certificateB.publicKey.encoded)
-            return humanReadableHash(certsConcat)
-        }
+        fun getVerificationKey(certificateA: Certificate, certificateB: Certificate, timestamp: Long): String =
+            verificationCode(certificateA.publicKey.encoded, certificateB.publicKey.encoded, timestamp)
+
+        fun getVerificationKeyV7(certificateA: Certificate, certificateB: Certificate): String =
+            verificationCode(certificateA.publicKey.encoded, certificateB.publicKey.encoded, null)
     }
 
 }

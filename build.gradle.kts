@@ -28,6 +28,10 @@ plugins {
 
 val licenseResDir = "$projectDir/build/dependency-license-res"
 
+fun releaseSigningValue(name: String): String? =
+    (providers.gradleProperty(name).orNull ?: providers.environmentVariable(name).orNull)
+        ?.takeIf { it.isNotBlank() }
+
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_11
@@ -40,13 +44,16 @@ android {
     defaultConfig {
         applicationId = "org.desklink.mobile"
         minSdk = 23
-        targetSdk = 35
-        versionCode = 13509
-        versionName = "1.35.9"
+        targetSdk = 36
+        versionCode = 20000
+        versionName = "2.0.0"
         resConfigs("en")
-        // The DeskLink relay (docs/RELAY.md). A placeholder: release builds set
-        // the deployed relay's wss://<host>/v1 here. Users may override it.
-        buildConfigField("String", "DEFAULT_RELAY_URL", "\"wss://relay.desklink.example/v1\"")
+        // The DeskLink relay (docs/RELAY.md): the deployed relay's wss://<host>/v1
+        // from the DESKLINK_RELAY_URL Gradle property or environment variable,
+        // else a placeholder that reaches nothing. Release builds must set it
+        // (docs/RELEASE.md). Users may override it in settings.
+        val relayUrl = releaseSigningValue("DESKLINK_RELAY_URL") ?: "wss://relay.desklink.example/v1"
+        buildConfigField("String", "DEFAULT_RELAY_URL", "\"$relayUrl\"")
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     buildFeatures {
@@ -88,6 +95,18 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // The upload key (docs/RELEASE.md). Never in the repository: read from a
+        // Gradle property (~/.gradle/gradle.properties or -P) or the environment.
+        // Without it the release build is unsigned, which is what F-Droid builds.
+        val uploadKeystore = releaseSigningValue("DESKLINK_UPLOAD_KEYSTORE")
+        if (uploadKeystore != null) {
+            create("release") {
+                storeFile = file(uploadKeystore)
+                storePassword = releaseSigningValue("DESKLINK_UPLOAD_KEYSTORE_PASSWORD")
+                keyAlias = releaseSigningValue("DESKLINK_UPLOAD_KEY_ALIAS")
+                keyPassword = releaseSigningValue("DESKLINK_UPLOAD_KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -100,6 +119,7 @@ android {
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     lint {
@@ -305,14 +325,6 @@ dependencies {
     implementation(libs.bcpkix.jdk15on) //For SSL certificate generation
 
     ksp(libs.classindexksp)
-
-    // The android-smsmms library is the only way I know to handle MMS in Android
-    // (Shouldn't a phone OS make phone things easy?)
-    // This library was originally authored as com.klinkerapps at https://github.com/klinker41/android-smsmms.
-    // However, that version is under-loved. I have therefore made "some fixes" and published it.
-    // Please see https://invent.kde.org/sredman/android-smsmms/-/tree/master
-    implementation(libs.android.smsmms)
-    implementation(libs.logger)
 
     implementation(libs.commons.io)
     implementation(libs.commons.collections4)
