@@ -82,6 +82,8 @@ data class TerminalSessionInfo(
     val rows: Int,
     val cols: Int,
     val exitStatus: Long? = null,
+    /** A terminal window at the desk shows this session and answers its terminal queries; the phone must not. */
+    val deskWindow: Boolean = false,
 )
 
 /**
@@ -134,6 +136,7 @@ data class TerminalControl(
                         append(",\"rows\":").append(info.rows)
                         append(",\"cols\":").append(info.cols)
                         info.exitStatus?.let { append(",\"exitStatus\":").append(it) }
+                        if (info.deskWindow) append(",\"deskWindow\":true")
                         append('}')
                     }
                 },
@@ -244,6 +247,7 @@ data class TerminalControl(
                             rows = narrow(item.requiredInteger("rows")),
                             cols = narrow(item.requiredInteger("cols")),
                             exitStatus = item.optionalInteger("exitStatus"),
+                            deskWindow = item.present("deskWindow")?.let { it as? Boolean ?: bad("deskWindow") } ?: false,
                         )
                     }
                 },

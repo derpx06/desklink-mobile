@@ -869,6 +869,21 @@ class TerminalClientTest {
         assertEquals("\u001b[1;1R", String(h.inputs().single().data))
     }
 
+    @Test
+    fun repliesAreDroppedWhileADeskWindowAnswersButKeystrokesAreNot() {
+        val h = Harness()
+        h.ready(); h.listed(bash.copy(deskWindow = true)); h.open()
+        h.sinks["t1"]!!.reply("\u001b[1;1R".toByteArray())
+        assertTrue(h.inputs().isEmpty())
+        h.client.sendInput("t1", "y".toByteArray())
+        assertEquals("y", String(h.inputs().single().data))
+
+        h.sent.clear()
+        h.listed(bash) // the desk window closed: the phone answers again
+        h.sinks["t1"]!!.reply("\u001b[1;1R".toByteArray())
+        assertEquals("\u001b[1;1R", String(h.inputs().single().data))
+    }
+
     // ---- resize --------------------------------------------------------------------------------------
 
     @Test

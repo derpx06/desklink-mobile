@@ -216,7 +216,7 @@ class TerminalClient(
     /** The screen for [id], created on first use. Safe from any thread. */
     fun sink(id: String, rows: Int, cols: Int): TerminalSink = sinks.computeIfAbsent(id) {
         sinkFactory.create(id, rows.coerceIn(MIN_ROWS, TerminalProtocol.MAX_DIMENSION), cols.coerceIn(MIN_COLS, TerminalProtocol.MAX_DIMENSION)) { bytes ->
-            sendInput(id, bytes)
+            sendReply(id, bytes)
         }
     }
 
@@ -325,6 +325,15 @@ class TerminalClient(
                 executor.execute { guarded { flushInput() } }
             }
         }
+    }
+
+    /**
+     * The emulator's answer to a terminal query in the output. Dropped while a window at the desk
+     * shows the session: that window answers too, and the program would read the second answer as
+     * typed keys. Keystrokes use [sendInput] and are never gated.
+     */
+    private fun sendReply(id: String, bytes: ByteArray) = post {
+        if (sessions[id]?.info?.deskWindow != true) sendInput(id, bytes)
     }
 
     /** Stops the client's thread. Called when its device is unpaired or the coordinator closes. */

@@ -267,6 +267,22 @@ class TerminalProtocolTest {
     }
 
     @Test
+    fun deskWindowIsReadWhenPresentAndFalseWhenAbsent() {
+        fun parse(extra: String) = TerminalControl.fromJson(
+            host(",\"sessions\":[{\"terminalId\":\"t1\",\"title\":\"x\",\"rows\":24,\"cols\":80$extra}]").toByteArray(),
+        ).also { it.validateFromHost(wire) }.sessions!!.single()
+        assertFalse(parse("").deskWindow)
+        assertTrue(parse(",\"deskWindow\":true").deskWindow)
+        assertFalse(parse(",\"deskWindow\":false").deskWindow)
+        rejected { parse(",\"deskWindow\":\"true\"") }
+        // Round trip, and omitted when false like serde's skip_serializing_if.
+        val listed = listOf(TerminalSessionInfo("t1", "x", 24, 80), TerminalSessionInfo("t2", "y", 24, 80, deskWindow = true))
+        val json = String(TerminalControl.create(TerminalAction.SESSIONS, wire).copy(sessions = listed).toJson())
+        assertEquals(1, Regex("deskWindow").findAll(json).count())
+        assertEquals(listed, TerminalControl.fromJson(json.toByteArray()).sessions)
+    }
+
+    @Test
     fun aTitleIsClippedNotTrusted() {
         val control = TerminalControl.fromJson(
             host(",\"sessions\":[{\"terminalId\":\"t1\",\"title\":\"${"x".repeat(5000)}\",\"rows\":24,\"cols\":80}]").toByteArray(),
