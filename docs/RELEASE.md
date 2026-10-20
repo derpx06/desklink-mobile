@@ -119,12 +119,11 @@ Text lives in `fastlane/metadata/android/en-US/` (`title.txt` ≤ 30 characters,
 `short_description.txt` ≤ 80, `full_description.txt` ≤ 4000). F-Droid reads it from
 the tag; for Play run `fastlane supply` as described in `fastlane/README`.
 
-Images are not in the repository yet. Add them under
-`fastlane/metadata/android/en-US/images/`:
+Images live under `fastlane/metadata/android/en-US/images/`. `icon.png` is in place
+(512 × 512, rendered from `icon.svg`, which matches the launcher icon). Still to add:
 
 | File | Size |
 |---|---|
-| `icon.png` | 512 × 512 PNG, from `icon.svg` |
 | `featureGraphic.png` | 1024 × 500 PNG/JPEG, no KDE artwork (`docs/BRANDING.md`) |
 | `phoneScreenshots/1.png` … | 2–8 screenshots, 16:9 or 9:16, 320–3840 px per side |
 
