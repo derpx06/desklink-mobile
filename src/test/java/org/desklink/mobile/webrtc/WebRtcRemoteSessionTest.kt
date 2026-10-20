@@ -322,6 +322,37 @@ class WebRtcRemoteSessionTest {
         assertNull(control(WebRtcRemoteSessionControlKind.HEARTBEAT, "11111111-1111-4111-8111-111111111111").editable)
     }
 
+    @Test
+    fun `the session password is sent only when one is known`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        val id = controller.beginView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        val without = controller.makeMessage(WebRtcRemoteSessionControlKind.REQUEST_VIEW, attemptId, wire, id).toJson()
+        assertFalse(without.has("password"))
+        val empty = controller.makeMessage(WebRtcRemoteSessionControlKind.REQUEST_VIEW, attemptId, wire, id, password = "").toJson()
+        assertFalse(empty.has("password"))
+        val with = controller.makeMessage(WebRtcRemoteSessionControlKind.REQUEST_VIEW, attemptId, wire, id, password = "s3cret").toJson()
+        assertEquals("s3cret", with.getString("password"))
+        assertEquals("s3cret", WebRtcRemoteSessionControlMessage.fromJson(with).password)
+    }
+
+    @Test
+    fun `password denials are recognised and nothing else is`() {
+        assertEquals(SessionPasswordDenial.Required, SessionPassword.denial("password-required"))
+        assertEquals(SessionPasswordDenial.Wrong, SessionPassword.denial("password-wrong"))
+        assertEquals(SessionPasswordDenial.Locked(120), SessionPassword.denial("password-locked:120"))
+        assertNull(SessionPassword.denial("password-locked"))
+        assertNull(SessionPassword.denial("password-locked:soon"))
+        assertNull(SessionPassword.denial("password-locked:-1"))
+        assertNull(SessionPassword.denial("The approved desktop-control session is not active"))
+        assertNull(SessionPassword.denial(null))
+    }
+
+    @Test
+    fun `a password is bounded in UTF-8 bytes like the desktop`() {
+        assertTrue(SessionPassword.fits("é".repeat(128)))
+        assertFalse(SessionPassword.fits("é".repeat(128) + "x"))
+    }
+
     private fun control(kind: WebRtcRemoteSessionControlKind, remoteSessionId: String) =
         grant(remoteSessionId, owner = "phone", leaseId = "unused").copy(
             kind = kind,

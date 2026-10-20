@@ -139,6 +139,8 @@ class WebRtcTransport(
     private val wireBinding: WebRtcWireBinding,
     iceServers: List<PeerConnection.IceServer> = emptyList(),
     private val createLocalChannels: Boolean = false,
+    /** Debug "Force TURN": gather relay candidates only. */
+    relayOnly: Boolean = false,
     private val observer: Observer,
 ) : SessionTransport {
     interface Observer {
@@ -179,6 +181,7 @@ class WebRtcTransport(
             // handshakes instead of one — slower to connect and one more thing
             // that can fail on a hostile network.
             bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
+            if (relayOnly) iceTransportsType = PeerConnection.IceTransportsType.RELAY
         }
         peer = factory.createPeerConnection(configuration, PeerObserver())
             ?: error("Unable to create DeskLink WebRTC peer connection")

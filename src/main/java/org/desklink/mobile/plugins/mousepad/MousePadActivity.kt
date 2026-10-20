@@ -85,6 +85,7 @@ import org.desklink.mobile.plugins.screen.ScreenPoint
 import org.desklink.mobile.ui.PluginSettingsActivity
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
+import org.desklink.mobile.ui.compose.SessionPasswordDialog
 
 class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
     private var deviceId: String? = null
@@ -159,13 +160,15 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         val plugin = screenControlPlugin()
         val controlEnabled = plugin?.remoteControlEnabled == true
         val live = plugin?.remoteLive == true
+        val prompt = plugin?.passwordPrompt
         // Control follows the picture: once the desktop is visible, ask for
         // control and keep asking until it is granted — no extra button. The
         // desktop grants at once when its portal approved input, which it does
-        // in the same dialog as the screen.
-        LaunchedEffect(live, controlEnabled) {
+        // in the same dialog as the screen. Not while the password is being
+        // asked for, nor once the person declined to give it.
+        LaunchedEffect(live, controlEnabled, prompt, controlPasswordDeclined) {
             var first = true
-            while (live && !controlEnabled) {
+            while (live && !controlEnabled && prompt == null && !controlPasswordDeclined) {
                 // Retries keep quiet: a refusal's reason (e.g. "allow remote
                 // interaction on the computer") must stay shown.
                 if (DeskLinkApplication.getInstance().requestRemoteControl(deviceId) && first) {
@@ -184,7 +187,28 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             if (controlEnabled && autoKeyboard) setKeyboardShown(textFocused)
         }
         ImmersiveDesktop(controlEnabled, screenStatus)
+        if (plugin != null && prompt != null) {
+            SessionPasswordDialog(
+                wrong = prompt.wrong,
+                onSubmit = { password ->
+                    DeskLinkApplication.getInstance().setSessionPassword(deviceId, password)
+                    plugin.passwordPrompt = null
+                    // Control is asked for again by the loop above as the prompt clears;
+                    // asking here as well would spend two guesses on one password.
+                    if (!prompt.control) requestDesktopScreen()
+                },
+                onDismiss = {
+                    plugin.passwordPrompt = null
+                    // Without the password there is no view to stay on; a refused control
+                    // still leaves the picture.
+                    if (prompt.control) controlPasswordDeclined = true else finish()
+                },
+            )
+        }
     }
+
+    /** The person cancelled the password prompt for control: stop asking for it. */
+    private var controlPasswordDeclined by mutableStateOf(false)
 
     private val stickyModifiers = StickyModifiers()
     private var zoomTransform by mutableStateOf(DesktopViewTransform())
@@ -640,6 +664,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     }
 
     private fun requestDesktopScreen() {
+        controlPasswordDeclined = false
         if (screenControlPlugin() == null) {
             statusText = getString(R.string.remote_screen_plugin_missing)
             return

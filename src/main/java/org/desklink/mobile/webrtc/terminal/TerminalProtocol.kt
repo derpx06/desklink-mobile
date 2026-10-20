@@ -3,6 +3,7 @@
  */
 package org.desklink.mobile.webrtc.terminal
 
+import org.desklink.mobile.webrtc.SessionPassword
 import org.desklink.mobile.webrtc.WebRtcWireBinding
 import org.json.JSONArray
 import org.json.JSONObject
@@ -34,8 +35,21 @@ object TerminalProtocol {
     const val MAX_SESSIONS = 256
     const val MAX_TITLE_CHARS = 256
 
+    /** Agent CLIs the desktop may list in `launchers`; anything else it lists is ignored. */
+    const val LAUNCHER_CLAUDE = "claude"
+    const val LAUNCHER_CODEX = "codex"
+    val KNOWN_LAUNCHERS = listOf(LAUNCHER_CLAUDE, LAUNCHER_CODEX)
+    const val MAX_LAUNCHERS = 8
+    const val MAX_LAUNCHER_CHARS = 32
+
     /** Sent as `error` when the desktop user has not enabled terminal access for this phone. */
     const val ERROR_NOT_ALLOWED = "terminal-not-allowed"
+
+    /**
+     * Sent as the `error` of a `closed` for each attached session, then of an `error`, when the
+     * person at the desk ends this phone's sessions. They keep running there; access is not revoked.
+     */
+    const val ERROR_TERMINAL_ENDED = "terminal-ended"
 
     /** Sent as `error` (with the terminal id) when an attach names a session that does not exist. */
     const val ERROR_NO_SUCH_TERMINAL = "No such DeskLink terminal"
@@ -89,6 +103,10 @@ data class TerminalControl(
     val offset: Long? = null,
     val command: List<String>? = null,
     val sessions: List<TerminalSessionInfo>? = null,
+    /** With [TerminalAction.SESSIONS]: the known agent CLIs installed on the desktop. */
+    val launchers: List<String>? = null,
+    /** The desktop's session password ([SessionPassword]), on every phone control but `detach`. */
+    val password: String? = null,
     val exitStatus: Long? = null,
     val error: String? = null,
 ) {
@@ -121,6 +139,13 @@ data class TerminalControl(
                 },
             )
             out.append(']')
+        }
+        launchers?.let { names ->
+            out.append(",\"launchers\":[").append(names.joinToString(",") { quote(it) }).append(']')
+        }
+        password?.let {
+            require(it.isNotEmpty() && SessionPassword.fits(it)) { "DeskLink terminal password is empty or too long" }
+            out.append(",\"password\":").append(quote(it))
         }
         exitStatus?.let { out.append(",\"exitStatus\":").append(it) }
         error?.let { out.append(",\"error\":").append(quote(it)) }
@@ -222,6 +247,22 @@ data class TerminalControl(
                         )
                     }
                 },
+                launchers = json.optionalArray("launchers")?.let { array ->
+                    require(array.length() <= TerminalProtocol.MAX_LAUNCHERS) {
+                        "DeskLink terminal launcher list is too long"
+                    }
+                    val listed = (0 until array.length()).map { index ->
+                        val name = array.opt(index) as? String
+                            ?: throw IllegalArgumentException("Malformed DeskLink terminal launcher")
+                        require(name.length <= TerminalProtocol.MAX_LAUNCHER_CHARS) {
+                            "DeskLink terminal launcher name is too long"
+                        }
+                        name
+                    }
+                    // Known names only, in a fixed order: a newer desktop may list agents this app cannot name.
+                    TerminalProtocol.KNOWN_LAUNCHERS.filter { it in listed }
+                },
+                password = json.optionalString("password"),
                 exitStatus = json.optionalInteger("exitStatus"),
                 error = json.optionalString("error"),
             )

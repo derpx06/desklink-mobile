@@ -5,21 +5,23 @@ package org.desklink.mobile.transport
 
 import org.desklink.mobile.Device
 import org.desklink.mobile.NetworkPacket
-import org.desklink.mobile.backends.lan.LanLink
+import org.desklink.mobile.backends.BaseLink
+import org.desklink.mobile.backends.relay.RelayLink
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.json.JSONException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Adapter around the existing authenticated Java LAN link.
+ * Adapter around an authenticated bootstrap link: the pinned LAN TLS link, or
+ * an end-to-end verified relay link (docs/RELAY.md).
  *
  * This adapter is bootstrap-only. Paired feature packets and file bytes must
  * use the authenticated WebRTC transport and are rejected here as defense in
  * depth even if a caller bypasses Device.sendPacket().
  */
 class LegacyLanTransport(
-    private val link: LanLink,
+    val link: BaseLink,
 ) : SessionTransport {
     override val transportId: String =
         "legacy-lan:${link.deviceId}:${System.identityHashCode(link)}"
@@ -102,7 +104,9 @@ class LegacyLanTransport(
     override fun close(reason: DisconnectReason) {
         val previous = stateRef.getAndSet(TransportState.CLOSING)
         if (previous == TransportState.CLOSED || previous == TransportState.CLOSING) return
-        runCatching { link.disconnect() }
+        // A relay link outlives a session that moved to the LAN: it is the
+        // failover path for when the LAN drops (docs/RELAY.md §4).
+        if (link !is RelayLink) runCatching { link.disconnect() }
         stateRef.set(TransportState.CLOSED)
     }
 }

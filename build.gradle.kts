@@ -44,6 +44,9 @@ android {
         versionCode = 13509
         versionName = "1.35.9"
         resConfigs("en")
+        // The DeskLink relay (docs/RELAY.md). A placeholder: release builds set
+        // the deployed relay's wss://<host>/v1 here. Users may override it.
+        buildConfigField("String", "DEFAULT_RELAY_URL", "\"wss://relay.desklink.example/v1\"")
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     buildFeatures {

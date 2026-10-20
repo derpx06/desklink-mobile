@@ -4,13 +4,7 @@
 package org.desklink.mobile.webrtc
 
 import android.util.Base64
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
 import org.json.JSONObject
-import java.util.LinkedHashSet
 import java.nio.charset.StandardCharsets
 import java.security.PrivateKey
 import java.security.PublicKey
@@ -123,9 +117,7 @@ data class WebRtcSignalingMessage(
         SignalingMessageType.CLOSE -> ""
     }
 
-    private fun signatureFor(keyAlgorithm: String): Signature = Signature.getInstance(
-        if (keyAlgorithm.equals("RSA", ignoreCase = true)) "SHA256withRSA" else "SHA256withECDSA",
-    )
+    private fun signatureFor(keyAlgorithm: String): Signature = identitySignature(keyAlgorithm)
 
     companion object {
         fun fromJson(json: String): WebRtcSignalingMessage {
@@ -162,50 +154,7 @@ data class WebRtcSignalingMessage(
     }
 }
 
-/** Optional cloud signaling client. Empty endpoint means disabled. */
-class CloudWebSocketSignaling(
-    private val endpoint: String,
-    private val client: OkHttpClient = OkHttpClient(),
-    private val listener: Listener,
-    private val localDeviceId: String? = null,
-) {
-    interface Listener {
-        fun onOpen()
-        fun onMessage(message: WebRtcSignalingMessage)
-        fun onFailure(error: Throwable)
-        fun onClosed()
-    }
-
-    private var socket: WebSocket? = null
-    private val seenRequestIds = LinkedHashSet<String>()
-
-    fun connect() {
-        require(endpoint.startsWith("wss://")) { "WebRTC signaling endpoint must use wss://" }
-        socket = client.newWebSocket(Request.Builder().url(endpoint).build(), object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) = listener.onOpen()
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                runCatching { WebRtcSignalingMessage.fromJson(text) }
-                    .onSuccess { message ->
-                        localDeviceId?.let { message.validateFor(it, System.currentTimeMillis()) }
-                        synchronized(seenRequestIds) {
-                            require(seenRequestIds.add(message.requestId)) { "Replayed WebRTC signaling request" }
-                            while (seenRequestIds.size > 4096) {
-                                seenRequestIds.iterator().run { next(); remove() }
-                            }
-                        }
-                        listener.onMessage(message)
-                    }
-                    .onFailure(listener::onFailure)
-            }
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = listener.onFailure(t)
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = listener.onClosed()
-        })
-    }
-
-    fun send(message: WebRtcSignalingMessage): Boolean = socket?.send(message.toJson().toString()) == true
-
-    fun close() {
-        socket?.close(1000, "DeskLink session closed")
-        socket = null
-    }
-}
+/** SHA-256 with a device identity key: ECDSA (DER) for EC keys, PKCS#1 v1.5 for RSA. */
+internal fun identitySignature(keyAlgorithm: String): Signature = Signature.getInstance(
+    if (keyAlgorithm.equals("RSA", ignoreCase = true)) "SHA256withRSA" else "SHA256withECDSA",
+)

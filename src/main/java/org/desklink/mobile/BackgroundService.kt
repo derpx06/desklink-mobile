@@ -28,12 +28,17 @@ import androidx.annotation.MainThread
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.MutableLiveData
 import org.desklink.mobile.backends.BaseLinkProvider
 import org.desklink.mobile.backends.BaseLinkProvider.ConnectionReceiver
 import org.desklink.mobile.backends.bluetooth.BluetoothLinkProvider
 import org.desklink.mobile.backends.lan.LanLinkProvider
+import org.desklink.mobile.backends.relay.RelayLinkProvider
+import org.desklink.mobile.backends.relay.RelaySettings
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.plugins.clipboard.ClipboardFloatingActivity
 import org.desklink.mobile.plugins.clipboard.ClipboardPlugin
@@ -57,6 +62,7 @@ import java.util.concurrent.Executors
 class BackgroundService : Service() {
     private lateinit var applicationInstance: DeskLinkApplication
     private var networkCallback: NetworkCallback? = null
+    private var defaultNetworkCallback: NetworkCallback? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private var connectionWakeLock: PowerManager.WakeLock? = null
     private val availableNetworks = Collections.newSetFromMap(ConcurrentHashMap<Network, Boolean>())
@@ -87,9 +93,48 @@ class BackgroundService : Service() {
     }
 
     private fun registerLinkProviders() {
-        linkProviders.add(LanLinkProvider(this))
-        //linkProviders.add(LoopbackLinkProvider(this))
-        linkProviders.add(BluetoothLinkProvider(this))
+        // Debug "Force relay": no LAN or Bluetooth links at all, so every
+        // paired device is reached through the relay. Read at service start.
+        if (!RelaySettings.forceRelay(this)) {
+            linkProviders.add(LanLinkProvider(this))
+            //linkProviders.add(LoopbackLinkProvider(this))
+            linkProviders.add(BluetoothLinkProvider(this))
+        }
+        linkProviders.add(RelayLinkProvider(this))
+    }
+
+    private fun relayProvider(): RelayLinkProvider? = linkProviders.filterIsInstance<RelayLinkProvider>().firstOrNull()
+
+    /** The relay settings changed: reconnect with them, the ladder starting over. */
+    fun onRelaySettingsChanged() {
+        if (!initialized) return
+        runCatching { networkChangeExecutor.execute { relayProvider()?.reset(reconnect = true) } }
+    }
+
+    /**
+     * The default network (the one the relay socket and media use) became a
+     * different network. Reconnect the relay at once, ladder reset, and let the
+     * existing recovery rebuild WebRTC once for peers that have no LAN link.
+     * Debounced like [onLocalNetworkMoved]: a switch reports lost and available
+     * moments apart.
+     */
+    private fun onDefaultNetworkChanged() {
+        networkMovedDebounce.removeCallbacks(defaultNetworkTask)
+        networkMovedDebounce.postDelayed(defaultNetworkTask, 1_000L)
+    }
+
+    private val defaultNetworkTask = Runnable {
+        if (!initialized) return@Runnable
+        runCatching { networkChangeExecutor.execute { relayProvider()?.reset(reconnect = true) } }
+        applicationInstance.onDefaultNetworkMoved()
+    }
+
+    /** The app came to the foreground: a relay that gave up gets a fresh ladder. */
+    private val foregroundObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) {
+            if (!initialized) return
+            runCatching { networkChangeExecutor.execute { relayProvider()?.reset(reconnect = false) } }
+        }
     }
 
     fun onNetworkChange(network: Network?) {
@@ -246,6 +291,29 @@ class BackgroundService : Service() {
         }
         networkCallback = callback
         connectivityManager?.registerNetworkCallback(networkRequestBuilder.build(), callback)
+
+        val defaultCallback = object : NetworkCallback() {
+            // Registration reports the current default first: that is the baseline, not a change.
+            private var current: Network? = null
+
+            override fun onAvailable(network: Network) {
+                val previous = current
+                current = network
+                if (previous != null && previous != network) onDefaultNetworkChanged()
+            }
+
+            override fun onLost(network: Network) {
+                if (network == current) {
+                    current = null
+                    onDefaultNetworkChanged()
+                }
+            }
+        }
+        defaultNetworkCallback = defaultCallback
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            connectivityManager?.registerDefaultNetworkCallback(defaultCallback)
+        }
+        ProcessLifecycleOwner.get().lifecycle.addObserver(foregroundObserver)
 
         registerLinkProviders()
         addConnectionListener(applicationInstance.connectionListener) // Link Providers need to be already registered
@@ -450,6 +518,12 @@ class BackgroundService : Service() {
             getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(callback)
         }
         networkCallback = null
+        defaultNetworkCallback?.let { callback ->
+            runCatching { getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(callback) }
+        }
+        defaultNetworkCallback = null
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(foregroundObserver)
+        networkMovedDebounce.removeCallbacks(defaultNetworkTask)
         availableNetworks.clear()
         // Provider shutdown closes sockets and TLS streams. Keep it off the
         // service main thread as well; stopping a foreground service can race

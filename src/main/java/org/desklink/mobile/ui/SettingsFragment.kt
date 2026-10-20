@@ -35,6 +35,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.apache.commons.io.IOUtils
 import org.desklink.mobile.BackgroundService
+import org.desklink.mobile.backends.relay.RelayLinkProvider
+import org.desklink.mobile.backends.relay.RelaySettings
 import org.desklink.mobile.helpers.CreateFileParams
 import org.desklink.mobile.helpers.CreateFileResultContract
 import org.desklink.mobile.helpers.DeviceHelper
@@ -67,11 +69,18 @@ class SettingsFragment : PreferenceFragmentCompat() {
             trustedNetworkPref(context),
             devicesByIpPref(context),
             bluetoothSupportPref(context),
+            relayEnabledPref(context),
+            relayUrlPref(context),
+            relayUseTurnPref(context),
             webRtcStunServersPref(context),
             webRtcTurnServersPref(context),
             exportLogsPref(context),
             moreSettingsPref(context),
         ).forEach(screen::addPreference)
+        if (BuildConfig.DEBUG) {
+            screen.addPreference(relayDebugPref(context, RelaySettings.KEY_FORCE_RELAY, R.string.setting_relay_force_relay, R.string.setting_relay_force_relay_description))
+            screen.addPreference(relayDebugPref(context, RelaySettings.KEY_FORCE_TURN, R.string.setting_relay_force_turn, R.string.setting_relay_force_turn_description))
+        }
 
         preferenceScreen = screen
     }
@@ -79,6 +88,60 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         listView.setupBottomPadding()
+        RelayLinkProvider.statusLive.observe(viewLifecycleOwner) { status ->
+            relayEnabledPref?.summary = getString(R.string.setting_relay_disclosure) + "\n" + getString(
+                when (status) {
+                    RelayLinkProvider.Status.CONNECTING -> R.string.relay_status_connecting
+                    RelayLinkProvider.Status.ONLINE -> R.string.relay_status_online
+                    RelayLinkProvider.Status.UNAVAILABLE -> R.string.relay_status_unavailable
+                    RelayLinkProvider.Status.UPDATE_REQUIRED -> R.string.relay_status_update_required
+                    else -> R.string.relay_status_off
+                },
+            )
+        }
+    }
+
+    private var relayEnabledPref: Preference? = null
+
+    /** Applies a relay setting once the preference has been saved (change listeners run before). */
+    private val relaySettingChanged = Preference.OnPreferenceChangeListener { _, _ ->
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            BackgroundService.instance?.onRelaySettingsChanged()
+        }
+        true
+    }
+
+    private fun relayEnabledPref(context: Context) = SwitchPreference(context).apply {
+        relayEnabledPref = this
+        key = RelaySettings.KEY_ENABLED
+        setDefaultValue(true)
+        setTitle(R.string.setting_relay_enabled)
+        setSummary(R.string.setting_relay_disclosure)
+        onPreferenceChangeListener = relaySettingChanged
+    }
+
+    private fun relayUrlPref(context: Context) = EditTextPreference(context).apply {
+        key = RelaySettings.KEY_URL
+        setTitle(R.string.setting_relay_url)
+        summaryProvider = Preference.SummaryProvider<EditTextPreference> { pref ->
+            pref.text?.trim()?.takeIf(String::isNotEmpty)
+                ?: getString(R.string.setting_relay_url_default, BuildConfig.DEFAULT_RELAY_URL)
+        }
+        setOnBindEditTextListener(EditText::setSingleLine)
+        onPreferenceChangeListener = relaySettingChanged
+    }
+
+    private fun relayUseTurnPref(context: Context) = SwitchPreference(context).apply {
+        key = RelaySettings.KEY_USE_TURN
+        setDefaultValue(true)
+        setTitle(R.string.setting_relay_use_turn)
+    }
+
+    private fun relayDebugPref(context: Context, prefKey: String, title: Int, summary: Int) = SwitchPreference(context).apply {
+        key = prefKey
+        setDefaultValue(false)
+        setTitle(title)
+        setSummary(summary)
     }
 
     private fun deviceNamePref(context: Context) = EditTextPreference(context).apply {

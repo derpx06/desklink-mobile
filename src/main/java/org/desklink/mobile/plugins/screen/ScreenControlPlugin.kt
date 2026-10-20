@@ -13,6 +13,8 @@ import org.desklink.mobile.R
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.ui.compose.sessionPasswordLockedMessage
+import org.desklink.mobile.webrtc.SessionPasswordDenial
 import org.webrtc.VideoFrame
 import org.webrtc.VideoSink
 import org.webrtc.VideoTrack
@@ -41,6 +43,13 @@ class ScreenControlPlugin : Plugin() {
         private set
     var remoteScreenHeight by mutableStateOf(0)
         private set
+
+    /** The desktop refused a request for want of its session password: the screen asks for it,
+     * clears this, and repeats the request. */
+    var passwordPrompt by mutableStateOf<PasswordPrompt?>(null)
+
+    /** [control]: the refused request was for control, not the view. */
+    data class PasswordPrompt(val wrong: Boolean, val control: Boolean)
     private val frameSeen = AtomicBoolean(false)
     @Volatile
     private var phoneCaptureRequested = false
@@ -163,6 +172,20 @@ class ScreenControlPlugin : Plugin() {
         latestStatus = reason?.takeIf(String::isNotBlank)?.let {
             context.getString(R.string.remote_control_denied_reason, it)
         } ?: context.getString(R.string.remote_control_denied)
+    }
+
+    /** A view or control request was refused for the session password. A lockout is only shown:
+     * no prompt until it has passed. */
+    fun onPasswordDenied(denial: SessionPasswordDenial, control: Boolean) {
+        remoteControlEnabled = false
+        if (!control) resetView()
+        if (denial is SessionPasswordDenial.Locked) {
+            passwordPrompt = null
+            latestStatus = sessionPasswordLockedMessage(context, denial.seconds)
+        } else {
+            passwordPrompt = PasswordPrompt(wrong = denial == SessionPasswordDenial.Wrong, control = control)
+            latestStatus = context.getString(R.string.session_password_needed)
+        }
     }
 
     /** Control ended but the view is still there. */

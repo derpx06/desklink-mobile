@@ -6,6 +6,8 @@ package org.desklink.mobile.webrtc.terminal
 import org.desklink.mobile.transport.TransportCallback
 import org.desklink.mobile.transport.TransportError
 import org.desklink.mobile.transport.TransportErrorCode
+import org.desklink.mobile.webrtc.SessionPassword
+import org.desklink.mobile.webrtc.SessionPasswordDenial
 import org.desklink.mobile.webrtc.WebRtcWireBinding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +19,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /** Outbound half of the data channel. Implemented by the WebRTC coordinator. */
 fun interface TerminalSender {
@@ -77,6 +80,13 @@ data class TerminalClientState(
     val error: String? = null,
     /** A session the phone just created; the UI opens it and calls [TerminalClient.consumeCreated]. */
     val createdId: String? = null,
+    /** Agent CLIs the desktop can start, from [TerminalProtocol.KNOWN_LAUNCHERS]. */
+    val launchers: List<String> = emptyList(),
+    /** The desktop wants its session password before anything else; see [TerminalClient.unlock]. */
+    val passwordNeeded: SessionPasswordDenial? = null,
+    /** The person at the desk ended this phone's sessions; the UI says so, returns to the list and
+     * calls [TerminalClient.consumeEnded]. */
+    val endedByComputer: Boolean = false,
 )
 
 /**
@@ -97,6 +107,9 @@ class TerminalClient(
     private val sinkFactory: TerminalSinkFactory,
     private val executor: Executor = newExecutor("DeskLink-Terminal"),
     private val discard: (String, Throwable?) -> Unit = { _, _ -> },
+    /** The device's session password, shared with its screen. Kept across reconnects: the desktop
+     * asks once per connection, and the next one is offered it again. */
+    private val password: AtomicReference<String?> = AtomicReference(),
 ) {
     private class Session(val id: String) {
         var info: TerminalSessionInfo? = null
@@ -126,6 +139,19 @@ class TerminalClient(
     private var notAllowed = false
     private var error: String? = null
     private var createdId: String? = null
+    private var launchers: List<String> = emptyList()
+    private var passwordNeeded: SessionPasswordDenial? = null
+    private var endedByComputer = false
+
+    /**
+     * A password from [unlock] that the desktop has not yet accepted. It goes out on one list only:
+     * every request that carries a wrong password counts as a guess, so nothing else carries it
+     * until the list comes back and proves it.
+     */
+    private var unproven: String? = null
+
+    /** A create the desktop has not answered yet, re-sent once the password is given. */
+    private var pendingCreate: TerminalControl? = null
     private val sessions = LinkedHashMap<String, Session>()
     private val pendingInput = LinkedHashMap<String, ByteArrayOutputStream>()
     private var pendingInputBytes = 0
@@ -199,13 +225,34 @@ class TerminalClient(
     /** Asks for a new session running the login shell, or [command] as an argument vector. */
     fun create(rows: Int, cols: Int, command: List<String>? = null) = post {
         if (!linkUp) return@post
-        sendControl(
-            control(TerminalAction.CREATE).copy(
-                rows = rows.coerceIn(MIN_ROWS, TerminalProtocol.MAX_DIMENSION),
-                cols = cols.coerceIn(MIN_COLS, TerminalProtocol.MAX_DIMENSION),
-                command = command,
-            ),
+        val create = control(TerminalAction.CREATE).copy(
+            rows = rows.coerceIn(MIN_ROWS, TerminalProtocol.MAX_DIMENSION),
+            cols = cols.coerceIn(MIN_COLS, TerminalProtocol.MAX_DIMENSION),
+            command = command,
         )
+        pendingCreate = create
+        sendControl(create)
+    }
+
+    /**
+     * The person gave the desktop's session password. It is tried on the list alone; once the list
+     * comes back the open sessions are attached again and a refused create is repeated.
+     */
+    fun unlock(password: String) = post {
+        // A second tap while one is being tried would be a second guess.
+        if (!linkUp || unproven != null || password.isEmpty() || !SessionPassword.fits(password)) return@post
+        unproven = password
+        passwordNeeded = null
+        sendControl(control(TerminalAction.LIST).copy(password = password))
+        publish()
+    }
+
+    /**
+     * The user declined to enter the password: forget the session they were creating, so a later
+     * unlock (to browse the list) does not start it behind their back.
+     */
+    fun cancelUnlock() = post {
+        pendingCreate = null
     }
 
     /**
@@ -289,14 +336,22 @@ class TerminalClient(
 
     fun clearError() = post { if (error != null) { error = null; publish() } }
 
+    fun consumeEnded() = post { if (endedByComputer) { endedByComputer = false; publish() } }
+
     // ---- state machine (executor only) ----------------------------------------------------------
 
     private fun handleControl(control: TerminalControl) {
         when (control.action) {
             TerminalAction.SESSIONS -> {
-                val wasRefused = notAllowed
+                val unlocked = unproven != null
+                unproven?.let(password::set)
+                unproven = null
+                val wasRefused = notAllowed || unlocked
                 notAllowed = false
+                passwordNeeded = null
                 listLoaded = true
+                // Absent from an older desktop: it can start a shell only.
+                launchers = control.launchers.orEmpty()
                 val listed = control.sessions.orEmpty()
                 val ids = listed.map { it.terminalId }.toSet()
                 sessions.values.filter { it.id !in ids }.forEach { markGone(it) }
@@ -319,14 +374,18 @@ class TerminalClient(
                 listed.forEach { info ->
                     if (sessions[info.terminalId]?.attached == true) sinks[info.terminalId]?.resize(info.rows, info.cols)
                 }
-                // Access was refused and is allowed again (the person retried): pick the open sessions
-                // back up from where they left off. One attempt per retry, never a loop.
+                // Access was refused and is allowed again (the person retried or gave the password):
+                // pick the open sessions back up from where they left off. One attempt per retry,
+                // never a loop.
                 if (wasRefused && linkUp) {
                     sessions.values.filter { it.wanted && !it.attached && !it.awaitingAttach && !it.gone }.forEach(::sendAttach)
                 }
+                if (unlocked && linkUp) pendingCreate?.let { sendControl(it.copy(password = password.get())) }
             }
             TerminalAction.CREATED -> {
                 notAllowed = false
+                passwordNeeded = null
+                pendingCreate = null
                 val id = control.terminalId!!
                 session(id).apply {
                     info = info ?: TerminalSessionInfo(id, "", control.rows ?: MIN_ROWS, control.cols ?: MIN_COLS)
@@ -336,6 +395,7 @@ class TerminalClient(
             }
             TerminalAction.ATTACHED -> {
                 notAllowed = false
+                passwordNeeded = null
                 val session = sessions[control.terminalId!!] ?: return
                 session.attached = true
                 session.awaitingAttach = false
@@ -366,6 +426,18 @@ class TerminalClient(
                     publish()
                     return
                 }
+                if (control.error == TerminalProtocol.ERROR_TERMINAL_ENDED) {
+                    // Ended from the desk: the session still runs there and access stands. It is only
+                    // detached, and is not picked up again until the person opens it.
+                    endedByComputer = true
+                    session.wanted = false
+                    session.attached = false
+                    session.awaitingAttach = false
+                    sinks[session.id]?.setReplaying(false)
+                    purge()
+                    publish()
+                    return
+                }
                 session.wanted = false
                 session.attached = false
                 session.awaitingAttach = false
@@ -388,6 +460,7 @@ class TerminalClient(
         val message = control.error ?: "Unknown terminal error"
         if (message == TerminalProtocol.ERROR_NOT_ALLOWED) {
             notAllowed = true
+            pendingCreate = null
             // Nothing will attach until the user enables it on the desktop.
             sessions.values.forEach {
                 it.attached = false
@@ -396,7 +469,36 @@ class TerminalClient(
             }
             return
         }
+        SessionPassword.denial(message)?.let { denial ->
+            // The open session stays wanted and is attached again once the password is given.
+            control.terminalId?.let { sessions[it] }?.takeIf { it.awaitingAttach }?.let { session ->
+                session.awaitingAttach = false
+                sinks[session.id]?.setReplaying(false)
+            }
+            // Not a refusal of terminal access: the desktop wants its session password first. A
+            // request sent without it, answered while a password is being tried or after one was
+            // refused, must not hide that answer.
+            if (denial == SessionPasswordDenial.Required &&
+                (unproven != null || passwordNeeded == SessionPasswordDenial.Wrong)
+            ) {
+                return
+            }
+            // A refused password is never offered again: each one counts as a guess.
+            if (denial != SessionPasswordDenial.Required) {
+                password.set(null)
+                unproven = null
+            }
+            notAllowed = false
+            passwordNeeded = denial
+            return
+        }
+        if (message == TerminalProtocol.ERROR_TERMINAL_ENDED) {
+            // Follows the `closed` for each session it detached: see what is still running.
+            if (linkUp) sendControl(TerminalAction.LIST)
+            return
+        }
         error = message
+        if (control.terminalId == null) pendingCreate = null
         // A failed attach must not leave the session waiting for output that will never come.
         control.terminalId?.let { id ->
             sessions[id]?.takeIf { it.awaitingAttach }?.let { session ->
@@ -527,6 +629,8 @@ class TerminalClient(
 
     private fun markLinkDown() {
         linkUp = false
+        unproven = null
+        pendingCreate = null
         sessions.values.forEach { it.attached = false; it.awaitingAttach = false }
         pendingInput.clear()
         pendingInputBytes = 0
@@ -539,8 +643,10 @@ class TerminalClient(
         return sessions.getOrPut(id) { Session(id) }
     }
 
+    /** Leaving needs no password; everything else carries it while it is known. */
     private fun control(action: TerminalAction): TerminalControl =
         TerminalControl.create(action, requireNotNull(wire) { "No terminal link" })
+            .copy(password = if (action == TerminalAction.DETACH) null else password.get())
 
     private fun sendControl(action: TerminalAction) = sendControl(control(action))
 
@@ -587,6 +693,9 @@ class TerminalClient(
             notAllowed = notAllowed,
             error = error,
             createdId = createdId,
+            launchers = launchers,
+            passwordNeeded = passwordNeeded,
+            endedByComputer = endedByComputer,
         )
     }
 

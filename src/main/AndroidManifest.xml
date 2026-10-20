@@ -13,6 +13,14 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
          source audit); the app supports 23. The PTY JNI part is excluded, see build.gradle.kts. -->
     <uses-sdk tools:overrideLibrary="com.termux.terminal,com.termux.view" />
 
+    <!-- SpeechRecognizer.isRecognitionAvailable sees no recognizer on Android 11+ without this:
+         the terminal's dictation key would never show. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />

@@ -88,6 +88,9 @@ data class WebRtcRemoteSessionControlMessage(
     val editable: Boolean? = null,
     /** `screen-ready`: how many screens the desktop shares. */
     val screenCount: Int? = null,
+    /** `request-view` / `request-control`: the desktop's session password, when one is known
+     * (see [SessionPassword]). Omitted, never empty. */
+    val password: String? = null,
 ) {
     fun validate(wire: WebRtcWireBinding, attemptId: String, now: Long) {
         require(remoteSessionVersion == VERSION) { "Unsupported DeskLink remote-session version" }
@@ -141,6 +144,7 @@ data class WebRtcRemoteSessionControlMessage(
             screenRotation?.let { value.put("screenRotation", it) }
             editable?.let { value.put("editable", it) }
             screenCount?.let { value.put("screenCount", it) }
+            password?.takeIf(String::isNotEmpty)?.let { value.put("password", it) }
         }
 
     companion object {
@@ -170,6 +174,7 @@ data class WebRtcRemoteSessionControlMessage(
                 screenRotation = value.takeIf { it.has("screenRotation") }?.getInt("screenRotation"),
                 editable = value.takeIf { it.has("editable") }?.getBoolean("editable"),
                 screenCount = value.takeIf { it.has("screenCount") }?.getInt("screenCount")?.coerceIn(0, 16),
+                password = value.optString("password").takeIf(String::isNotEmpty),
             )
     }
 }
@@ -288,6 +293,7 @@ class WebRtcRemoteSessionController(
         screenWidth: Int? = null,
         screenHeight: Int? = null,
         screenRotation: Int? = null,
+        password: String? = null,
     ): WebRtcRemoteSessionControlMessage = WebRtcRemoteSessionControlMessage(
         remoteSessionVersion = WebRtcRemoteSessionControlMessage.VERSION,
         kind = kind,
@@ -306,6 +312,7 @@ class WebRtcRemoteSessionController(
         screenWidth = screenWidth,
         screenHeight = screenHeight,
         screenRotation = screenRotation,
+        password = password,
     )
 
     /** Applies a validated peer control message and returns the automatic

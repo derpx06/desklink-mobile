@@ -6,6 +6,8 @@ package org.desklink.mobile.webrtc.terminal
 import org.desklink.mobile.transport.TransportCallback
 import org.desklink.mobile.transport.TransportError
 import org.desklink.mobile.transport.TransportErrorCode
+import org.desklink.mobile.webrtc.SessionPassword
+import org.desklink.mobile.webrtc.SessionPasswordDenial
 import org.desklink.mobile.webrtc.WebRtcWireBinding
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -14,6 +16,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicReference
 
 class TerminalClientTest {
     private val wire = WebRtcWireBinding("phone-1", "desktop-1", 7, 1)
@@ -47,6 +50,7 @@ class TerminalClientTest {
         val sinks = mutableMapOf<String, FakeSink>()
         val discarded = mutableListOf<String>()
         var nextFailure: TransportError? = null
+        val password = AtomicReference<String?>()
         val client = TerminalClient(
             sender = { type, payload, callback ->
                 sent += Sent(type, payload)
@@ -55,6 +59,7 @@ class TerminalClientTest {
             sinkFactory = { id, _, _, reply -> FakeSink(reply).also { sinks[id] = it } },
             executor = executor,
             discard = { message, _ -> discarded += message },
+            password = password,
         )
 
         fun controls(action: TerminalAction? = null): List<TerminalControl> = sent
@@ -150,6 +155,18 @@ class TerminalClientTest {
         h.ready()
         h.client.create(24, 80, listOf("tmux", "attach", "-t", "a b; rm -rf ~"))
         assertEquals(listOf("tmux", "attach", "-t", "a b; rm -rf ~"), h.controls(TerminalAction.CREATE).single().command)
+    }
+
+    @Test
+    fun everySessionListUpdatesTheLaunchers() {
+        val h = Harness()
+        h.ready()
+        assertEquals(emptyList<String>(), h.state().launchers)
+        h.fromHost(h.hostControl(TerminalAction.SESSIONS).copy(sessions = listOf(bash), launchers = listOf("claude")))
+        assertEquals(listOf("claude"), h.state().launchers)
+        // An agent uninstalled at the desk, or an older desktop that does not say.
+        h.listed(bash)
+        assertEquals(emptyList<String>(), h.state().launchers)
     }
 
     @Test
@@ -513,6 +530,138 @@ class TerminalClientTest {
         assertTrue("nothing is retried until asked", h.controls(TerminalAction.ATTACH).isEmpty())
         h.listed(bash)
         assertFalse(h.state().notAllowed)
+        assertEquals(3L, h.controls(TerminalAction.ATTACH).single().offset)
+    }
+
+    // ---- session password -------------------------------------------------------------------------
+
+    @Test
+    fun aKnownPasswordGoesOnEveryControlButDetach() {
+        val h = Harness()
+        h.password.set("secret")
+        h.ready(); h.listed(bash); h.open()
+        h.client.attachOrResize("t1", 30, 90)
+        h.client.create(24, 80)
+        h.client.close("t1")
+        h.client.detach("t1")
+        val byAction = h.controls().groupBy { it.action }
+        listOf(TerminalAction.LIST, TerminalAction.ATTACH, TerminalAction.RESIZE, TerminalAction.CREATE, TerminalAction.CLOSE)
+            .forEach { action -> assertTrue(action.wire, byAction.getValue(action).all { it.password == "secret" }) }
+        assertNull(byAction.getValue(TerminalAction.DETACH).single().password)
+    }
+
+    @Test
+    fun thePasswordIsKeptAcrossALinkDropAndOfferedToTheNextConnection() {
+        val h = Harness()
+        h.password.set("secret")
+        h.ready(); h.listed(bash)
+        h.client.onLinkLost(wire)
+        assertEquals("secret", h.password.get())
+        h.sent.clear()
+        h.ready(WebRtcWireBinding("phone-1", "desktop-1", 7, 2))
+        assertEquals("a Wi-Fi switch does not ask again", "secret", h.controls(TerminalAction.LIST).single().password)
+    }
+
+    @Test
+    fun passwordRequiredAsksForThePasswordAndIsNotARefusalOfAccess() {
+        val h = Harness()
+        h.ready()
+        h.error(SessionPassword.REQUIRED)
+        assertEquals(SessionPasswordDenial.Required, h.state().passwordNeeded)
+        assertFalse(h.state().notAllowed)
+        assertNull("a password prompt, not a snackbar", h.state().error)
+    }
+
+    @Test
+    fun aGivenPasswordIsTriedOnTheListAloneThenResumesWhatWasRefused() {
+        val h = Harness()
+        h.ready(); h.listed(bash)
+        h.client.sink("t1", 24, 80)
+        h.client.attachOrResize("t1", 24, 80)
+        h.error(SessionPassword.REQUIRED, id = "t1")
+        h.client.create(24, 80)
+        h.error(SessionPassword.REQUIRED)
+        assertEquals(SessionPasswordDenial.Required, h.state().passwordNeeded)
+        assertTrue(h.session().wanted)
+
+        h.sent.clear()
+        h.client.unlock("secret")
+        h.client.unlock("secret") // a double tap is not a second guess
+        h.client.refresh() // the list screen's poll does not carry an unproven password
+        assertNull(h.state().passwordNeeded)
+        assertEquals(listOf("secret", null), h.controls().map { it.password })
+        assertNull("not shared until the desktop accepts it", h.password.get())
+
+        h.sent.clear()
+        h.listed(bash)
+        assertEquals("secret", h.password.get())
+        assertEquals("secret", h.controls(TerminalAction.ATTACH).single().password)
+        assertEquals("secret", h.controls(TerminalAction.CREATE).single().password)
+    }
+
+    @Test
+    fun aSessionWhosePasswordPromptWasCancelledIsNotStartedByALaterUnlock() {
+        val h = Harness()
+        h.ready(); h.listed(bash)
+        h.client.create(24, 80, listOf("claude"))
+        h.error(SessionPassword.REQUIRED)
+        h.client.cancelUnlock()
+
+        h.client.unlock("secret")
+        h.sent.clear()
+        h.listed(bash)
+        assertTrue("unlocking to browse must not start the cancelled session", h.controls(TerminalAction.CREATE).isEmpty())
+    }
+
+    @Test
+    fun aWrongPasswordIsForgottenAndNotHiddenByLaterAnswers() {
+        val h = Harness()
+        h.ready()
+        h.error(SessionPassword.REQUIRED)
+        h.client.unlock("guess")
+        h.error(SessionPassword.REQUIRED) // a poll sent without it
+        assertNull(h.state().passwordNeeded)
+        h.error(SessionPassword.WRONG)
+        assertEquals(SessionPasswordDenial.Wrong, h.state().passwordNeeded)
+        h.error(SessionPassword.REQUIRED)
+        assertEquals(SessionPasswordDenial.Wrong, h.state().passwordNeeded)
+        h.sent.clear()
+        h.client.refresh()
+        assertNull(h.controls().single().password)
+
+        h.error("${SessionPassword.LOCKED}:60")
+        assertEquals(SessionPasswordDenial.Locked(60), h.state().passwordNeeded)
+        assertFalse(h.state().notAllowed)
+    }
+
+    // ---- ended from the desk -------------------------------------------------------------------------
+
+    @Test
+    fun sessionsEndedFromTheDeskAreDetachedNotRefused() {
+        val h = Harness()
+        h.ready(); h.listed(bash); h.open()
+        h.output("t1", 0, "abc")
+
+        h.sent.clear()
+        h.fromHost(h.hostControl(TerminalAction.CLOSED).copy(terminalId = "t1", error = TerminalProtocol.ERROR_TERMINAL_ENDED))
+        h.error(TerminalProtocol.ERROR_TERMINAL_ENDED)
+        assertTrue(h.state().endedByComputer)
+        assertFalse(h.state().notAllowed)
+        assertNull(h.state().error)
+        assertFalse(h.session().attached)
+        assertFalse(h.session().wanted)
+        assertFalse("it still runs at the desk", h.session().gone)
+        assertFalse(h.sinks["t1"]!!.events.any { it.startsWith("ended") })
+        assertEquals(listOf(TerminalAction.LIST), h.controls().map { it.action })
+
+        // Not picked up again by a list or a reconnect, only when the person opens it.
+        h.listed(bash)
+        h.client.onLinkLost(wire)
+        h.ready()
+        assertTrue(h.controls(TerminalAction.ATTACH).isEmpty())
+        h.client.consumeEnded()
+        assertFalse(h.state().endedByComputer)
+        h.client.attachOrResize("t1", 24, 80)
         assertEquals(3L, h.controls(TerminalAction.ATTACH).single().offset)
     }
 

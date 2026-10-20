@@ -20,7 +20,8 @@ import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.R
 import java.security.MessageDigest
 import java.security.cert.Certificate
-import java.util.Formatter
+import java.nio.ByteBuffer
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
@@ -502,13 +503,14 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
             }
         }
 
+        /**
+         * Six digits both screens show: the first four digest bytes, big-endian,
+         * mod 10^6, zero-padded. Pinned on the desktop too (`pairing.rs`).
+         */
         private fun humanReadableHash(bytes: ByteArray): String {
             val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
-            val formatter = Formatter()
-            for (value in hash) {
-                formatter.format("%02x", value)
-            }
-            return formatter.toString().substring(0, 8).uppercase()
+            val value = ByteBuffer.wrap(hash, 0, 4).int.toLong() and 0xFFFFFFFFL
+            return String.format(Locale.ROOT, "%06d", value % 1_000_000)
         }
         fun getVerificationKey(certificateA: Certificate, certificateB: Certificate, timestamp: Long): String {
             val certsConcat = sortedConcat(certificateA.publicKey.encoded, certificateB.publicKey.encoded)

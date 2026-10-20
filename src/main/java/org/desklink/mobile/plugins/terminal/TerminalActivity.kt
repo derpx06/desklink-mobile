@@ -3,14 +3,18 @@
  */
 package org.desklink.mobile.plugins.terminal
 
+import android.content.ActivityNotFoundException
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.core.view.ViewCompat
@@ -55,6 +59,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,9 +103,13 @@ import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
+import org.desklink.mobile.ui.compose.SessionPasswordDialog
+import org.desklink.mobile.ui.compose.sessionPasswordLockedMessage
+import org.desklink.mobile.webrtc.SessionPasswordDenial
 import org.desklink.mobile.webrtc.terminal.TerminalClient
 import org.desklink.mobile.webrtc.terminal.TerminalClientState
 import org.desklink.mobile.webrtc.terminal.TerminalLinkState
+import org.desklink.mobile.webrtc.terminal.TerminalProtocol
 import org.desklink.mobile.webrtc.terminal.TerminalSessionState
 
 /**
@@ -115,6 +125,14 @@ class TerminalActivity : AppCompatActivity() {
     /** The session screen without the app bar or the phone's status and navigation bars. */
     private var fullscreen by mutableStateOf(true)
     private val labels = mutableStateMapOf<String, String>()
+
+    /** Recognised speech waiting to be typed into the open terminal. */
+    private var dictated by mutableStateOf<String?>(null)
+    private val dictation = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            dictated = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.ifEmpty { null }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -185,6 +203,18 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
+    /** The recognizer activity owns the microphone, so this app needs no audio permission. */
+    private fun dictate() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.terminal_dictate_prompt))
+        try {
+            dictation.launch(intent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.terminal_dictate_unavailable, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun loadLabels() {
         val prefs = getSharedPreferences(LABEL_PREFS, MODE_PRIVATE)
         prefs.all.forEach { (key, value) ->
@@ -222,12 +252,37 @@ class TerminalActivity : AppCompatActivity() {
                 client.clearError()
             }
         }
+        // Ended from the desk: back to the list, which the client is already refreshing. The
+        // session is not attached again until the person opens it.
+        LaunchedEffect(state.endedByComputer) {
+            if (state.endedByComputer) {
+                openId?.let { leaveTerminal(client, it) }
+                client.consumeEnded()
+                snackbar.showSnackbar(getString(R.string.terminal_ended_by_computer))
+            }
+        }
+
+        // Cancelled: the list shows "Locked" until the person asks for the dialog again.
+        var passwordDismissed by remember(state.passwordNeeded == null) { mutableStateOf(false) }
 
         if (current == null) {
-            SessionListScreen(client, state, snackbar)
+            SessionListScreen(client, state, snackbar) { passwordDismissed = false }
         } else {
             BackHandler { leaveTerminal(client, current) }
             TerminalScreenUi(client, state, current, snackbar)
+        }
+
+        val needed = state.passwordNeeded
+        if (needed != null && needed !is SessionPasswordDenial.Locked && !passwordDismissed) {
+            SessionPasswordDialog(
+                wrong = needed == SessionPasswordDenial.Wrong,
+                onSubmit = client::unlock,
+                onDismiss = {
+                    passwordDismissed = true
+                    client.cancelUnlock()
+                    openId?.let { leaveTerminal(client, it) }
+                },
+            )
         }
     }
 
@@ -239,15 +294,21 @@ class TerminalActivity : AppCompatActivity() {
     // ---- session list ---------------------------------------------------------------------------------
 
     @Composable
-    private fun SessionListScreen(client: TerminalClient, state: TerminalClientState, snackbar: SnackbarHostState) {
+    private fun SessionListScreen(
+        client: TerminalClient,
+        state: TerminalClientState,
+        snackbar: SnackbarHostState,
+        onEnterPassword: () -> Unit,
+    ) {
         var renaming by remember { mutableStateOf<TerminalSessionState?>(null) }
         var closing by remember { mutableStateOf<TerminalSessionState?>(null) }
         val connected = state.link == TerminalLinkState.CONNECTED
+        val locked = state.passwordNeeded != null
         // Sessions can also start at the desk (any tmux session there is
         // listed), which the desktop does not announce: look again while the
-        // list is on screen.
-        androidx.compose.runtime.LaunchedEffect(connected) {
-            while (connected) {
+        // list is on screen. Not while it is locked: only the person retries that.
+        androidx.compose.runtime.LaunchedEffect(connected, locked) {
+            while (connected && !locked) {
                 client.refresh()
                 kotlinx.coroutines.delay(LIST_REFRESH_MS)
             }
@@ -270,12 +331,14 @@ class TerminalActivity : AppCompatActivity() {
             },
             snackbarHost = { SnackbarHost(snackbar) },
             floatingActionButton = {
-                if (!state.notAllowed) {
-                    ExtendedFloatingActionButton(
-                        onClick = { if (connected) client.create(DEFAULT_ROWS, DEFAULT_COLS) },
-                        icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                        text = { Text(stringResource(R.string.terminal_new_session)) },
-                    )
+                if (!state.notAllowed && !locked) {
+                    NewSession(client, state.launchers) { open ->
+                        ExtendedFloatingActionButton(
+                            onClick = { if (connected) open() },
+                            icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                            text = { Text(stringResource(R.string.terminal_new_session)) },
+                        )
+                    }
                 }
             },
         ) { padding ->
@@ -283,8 +346,13 @@ class TerminalActivity : AppCompatActivity() {
                 if (!connected) ReconnectingBanner()
                 when {
                     state.notAllowed -> NotAllowed(onRetry = { client.refresh() })
+                    state.passwordNeeded != null -> Locked(state.passwordNeeded, onEnterPassword, onRetry = { client.refresh() })
                     connected && !state.listLoaded -> CenteredProgress()
-                    state.sessions.isEmpty() -> EmptyState(connected) { client.create(DEFAULT_ROWS, DEFAULT_COLS) }
+                    state.sessions.isEmpty() -> EmptyState {
+                        NewSession(client, state.launchers) { open ->
+                            Button(onClick = open, enabled = connected) { Text(stringResource(R.string.terminal_new_session)) }
+                        }
+                    }
                     else -> LazyColumn(
                         Modifier.fillMaxSize(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp, 8.dp, 16.dp, 88.dp),
@@ -329,6 +397,41 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * [button] starts a shell, or opens a menu of the agent CLIs the desktop says it has installed.
+     * Those sessions are titled by their command, which [agentName] turns back into a name.
+     */
+    @Composable
+    private fun NewSession(client: TerminalClient, launchers: List<String>, button: @Composable (open: () -> Unit) -> Unit) {
+        var menu by remember { mutableStateOf(false) }
+        val create = { command: List<String>? ->
+            menu = false
+            client.create(DEFAULT_ROWS, DEFAULT_COLS, command)
+        }
+        Box {
+            button { if (launchers.isEmpty()) create(null) else menu = true }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.terminal_launch_shell)) },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_terminal_24dp), contentDescription = null) },
+                    onClick = { create(null) },
+                )
+                launchers.forEach { launcher ->
+                    agentName(launcher)?.let { name ->
+                        DropdownMenuItem(text = { Text(name) }, onClick = { create(listOf(launcher)) })
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun agentName(title: String): String? = when (title) {
+        TerminalProtocol.LAUNCHER_CLAUDE -> stringResource(R.string.terminal_launcher_claude)
+        TerminalProtocol.LAUNCHER_CODEX -> stringResource(R.string.terminal_launcher_codex)
+        else -> null
+    }
+
     @Composable
     private fun SessionCard(
         session: TerminalSessionState,
@@ -338,7 +441,7 @@ class TerminalActivity : AppCompatActivity() {
         onRename: () -> Unit,
         onClose: () -> Unit,
     ) {
-        val name = label ?: session.title.ifBlank { session.id.take(8) }
+        val name = label ?: agentName(session.title) ?: session.title.ifBlank { session.id.take(8) }
         Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
             Row(Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -392,8 +495,37 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
+    /** The desktop wants its session password. During a lockout only a retry is offered. */
     @Composable
-    private fun EmptyState(connected: Boolean, onCreate: () -> Unit) {
+    private fun Locked(denial: SessionPasswordDenial, onEnterPassword: () -> Unit, onRetry: () -> Unit) {
+        Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(16.dp))
+            Text(stringResource(R.string.terminal_locked_title), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (denial is SessionPasswordDenial.Locked) {
+                    sessionPasswordLockedMessage(this@TerminalActivity, denial.seconds)
+                } else {
+                    stringResource(R.string.session_password_message)
+                },
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(24.dp))
+            if (denial is SessionPasswordDenial.Locked) {
+                Button(onClick = onRetry) { Text(stringResource(R.string.terminal_retry)) }
+            } else {
+                Button(onClick = onEnterPassword) { Text(stringResource(R.string.terminal_enter_password)) }
+            }
+        }
+    }
+
+    @Composable
+    private fun EmptyState(newSession: @Composable () -> Unit) {
         Column(
             Modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -403,7 +535,7 @@ class TerminalActivity : AppCompatActivity() {
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.terminal_empty_message), textAlign = TextAlign.Center)
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onCreate, enabled = connected) { Text(stringResource(R.string.terminal_new_session)) }
+            newSession()
         }
     }
 
@@ -457,6 +589,7 @@ class TerminalActivity : AppCompatActivity() {
         var alt by remember { mutableStateOf(Sticky.OFF) }
         var viewRef by remember { mutableStateOf<TerminalView?>(null) }
         val imeVisible = WindowInsets.isImeVisible
+        val canDictate = remember { SpeechRecognizer.isRecognitionAvailable(context) }
 
         val host = remember(id) {
             object : TerminalView.Host {
@@ -479,12 +612,25 @@ class TerminalActivity : AppCompatActivity() {
             }
         }
 
-        val name = labels[id] ?: session?.title?.ifBlank { null } ?: id.take(8)
+        val name = labels[id] ?: session?.title?.let { agentName(it) ?: it.ifBlank { null } } ?: id.take(8)
         val subtitle = when {
             !connected -> stringResource(R.string.terminal_status_reconnecting)
             session == null || session.gone -> stringResource(R.string.terminal_chip_ended)
             session.exitStatus != null -> stringResource(R.string.terminal_chip_exited, session.exitStatus)
             else -> stringResource(R.string.terminal_chip_running)
+        }
+
+        // Typed like the key bar's symbols, armed modifiers included, and never followed by Enter:
+        // the person reads what was recognised before running it.
+        val type = { text: String ->
+            val m = host.takeModifiers()
+            host.send(TerminalKeys.text(text, m.ctrl, m.alt))
+        }
+        LaunchedEffect(dictated) {
+            dictated?.let {
+                dictated = null
+                type(it)
+            }
         }
 
         DisposableEffect(fullscreen) {
@@ -547,10 +693,8 @@ class TerminalActivity : AppCompatActivity() {
                         val m = host.takeModifiers()
                         TerminalKeys.key(keyCode, ctrl = m.ctrl, alt = m.alt, cursorApp = cursorApp)?.let(host::send)
                     },
-                    onText = { text ->
-                        val m = host.takeModifiers()
-                        host.send(TerminalKeys.text(text, m.ctrl, m.alt))
-                    },
+                    onText = type,
+                    onMic = if (canDictate) ::dictate else null,
                     onPaste = { paste(context, screen) },
                     onKeyboard = {
                         viewRef?.let { view ->
@@ -594,6 +738,7 @@ class TerminalActivity : AppCompatActivity() {
         onAltLong: () -> Unit,
         onKey: (Int) -> Unit,
         onText: (String) -> Unit,
+        onMic: (() -> Unit)?,
         onPaste: () -> Unit,
         onKeyboard: () -> Unit,
     ) {
@@ -640,6 +785,7 @@ class TerminalActivity : AppCompatActivity() {
                         stringResource(R.string.terminal_key_function_row),
                         state = if (functionRow) Sticky.LOCKED else Sticky.OFF,
                     ) { functionRow = !functionRow }
+                    if (onMic != null) IconKey(painterResource(R.drawable.ic_mic_black), stringResource(R.string.terminal_dictate), onMic)
                     IconKey(painterResource(R.drawable.ic_baseline_content_paste_24), stringResource(R.string.terminal_paste), onPaste)
                     IconKey(
                         painterResource(if (imeVisible) R.drawable.ic_keyboard_hide_36dp else R.drawable.ic_action_keyboard_24dp),

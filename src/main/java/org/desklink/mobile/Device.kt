@@ -457,6 +457,10 @@ class Device : PacketReceiver {
     val hasLanLink: Boolean
         get() = links.firstOrNull() is org.desklink.mobile.backends.lan.LanLink
 
+    /** The verified relay link, if the device is reachable through the relay. */
+    val relayLink: org.desklink.mobile.backends.relay.RelayLink?
+        get() = links.firstNotNullOfOrNull { it as? org.desklink.mobile.backends.relay.RelayLink }
+
 
     // A pending recovery with no bootstrap link is waiting for a peer that may
     // be switched off; holding a partial wake lock for that indefinitely

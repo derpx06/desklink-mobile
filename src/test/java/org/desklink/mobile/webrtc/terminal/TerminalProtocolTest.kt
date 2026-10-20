@@ -274,6 +274,63 @@ class TerminalProtocolTest {
         assertEquals(TerminalProtocol.MAX_TITLE_CHARS, control.sessions!![0].title.length)
     }
 
+    // ---- launchers -------------------------------------------------------------------------
+
+    private fun launchers(body: String) = TerminalControl.fromJson(host(",\"sessions\":[]$body").toByteArray())
+        .also { it.validateFromHost(wire) }.launchers
+
+    @Test
+    fun launchersAreOptional() {
+        assertNull(launchers(""))
+        assertEquals(listOf("claude", "codex"), launchers(",\"launchers\":[\"claude\",\"codex\"]"))
+        assertEquals(emptyList<String>(), launchers(",\"launchers\":[]"))
+    }
+
+    @Test
+    fun unknownLaunchersAreDroppedAndKnownOnesKeepAFixedOrder() {
+        assertEquals(
+            listOf("claude", "codex"),
+            launchers(",\"launchers\":[\"codex\",\"aider\",\"claude\",\"Claude\",\"codex\"]"),
+        )
+    }
+
+    @Test
+    fun hostileLauncherListsAreRefused() {
+        val nine = (1..TerminalProtocol.MAX_LAUNCHERS + 1).joinToString(",", "[", "]") { "\"claude\"" }
+        rejected { launchers(",\"launchers\":$nine") }
+        rejected { launchers(",\"launchers\":[\"${"x".repeat(TerminalProtocol.MAX_LAUNCHER_CHARS + 1)}\"]") }
+        rejected { launchers(",\"launchers\":[5]") }
+        rejected { launchers(",\"launchers\":\"claude\"") }
+    }
+
+    @Test
+    fun launchersRoundTrip() {
+        val control = TerminalControl.create(TerminalAction.SESSIONS, WebRtcWireBinding("desktop-1", "phone-1", 7, 1))
+            .copy(sessions = emptyList(), launchers = listOf("claude", "codex"))
+        val json = String(control.toJson())
+        assertTrue(json, json.endsWith(",\"sessions\":[],\"launchers\":[\"claude\",\"codex\"]}"))
+        assertEquals(control, TerminalControl.fromJson(json.toByteArray()))
+    }
+
+    @Test
+    fun aPasswordRoundTripsInTheDesktopFieldOrder() {
+        val control = TerminalControl.create(TerminalAction.ATTACH, wire)
+            .copy(terminalId = "t1", offset = 0, password = "pässwörd \"1\"")
+        val json = String(control.toJson())
+        assertTrue(json, json.endsWith(",\"terminalId\":\"t1\",\"offset\":0,\"password\":\"pässwörd \\\"1\\\"\"}"))
+        assertEquals(control, TerminalControl.fromJson(json.toByteArray()))
+        assertFalse(String(TerminalControl.create(TerminalAction.LIST, wire).toJson()).contains("password"))
+    }
+
+    @Test
+    fun aPasswordIsBoundedInUtf8BytesAndNeverEmpty() {
+        val list = TerminalControl.create(TerminalAction.LIST, wire)
+        // 128 two-byte characters: 256 bytes, the desktop's limit.
+        list.copy(password = "é".repeat(128)).toJson()
+        rejected { list.copy(password = "é".repeat(128) + "x").toJson() }
+        rejected { list.copy(password = "").toJson() }
+    }
+
     @Test
     fun malformedJsonIsRefused() {
         rejected { TerminalControl.fromJson("not json".toByteArray()) }
