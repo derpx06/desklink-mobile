@@ -48,7 +48,10 @@ import java.util.UUID
  */
 @LoadablePlugin
 class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
-    private val tracker = CallTracker(System::currentTimeMillis) { UUID.randomUUID().toString() }
+    private val tracker by lazy {
+        CallTracker(System::currentTimeMillis, CallTracker.decode(settings.getString(KEY_LIVE_CALL, null))) { UUID.randomUUID().toString() }
+    }
+    private val settings get() = TrustedDevices.getDeviceSettings(context, device.deviceId)
     private val flags = CallFlags()
     private var unregister: (() -> Unit)? = null
 
@@ -131,6 +134,9 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
         }
         if (line == LineState.IDLE) flags.muted = false
         caller()?.let { (name, number) -> tracker.annotate(name, number) }
+        // Kept while off the hook, so an app restart mid-call keeps its id and timer.
+        val live = CallTracker.toSave(tracker.calls).takeIf { line == LineState.OFFHOOK }
+        settings.edit { if (live != null) putString(KEY_LIVE_CALL, CallTracker.encode(live)) else remove(KEY_LIVE_CALL) }
         sendSnapshot()
         missed?.let { device.sendPacket(CallTracker.missedPacket(it, System.currentTimeMillis(), showCaller(context, device.deviceId))) }
     }
@@ -228,7 +234,8 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
     /** (name, number) from the dialer notification's title, looked up in contacts when it is a number. */
     private fun caller(): Pair<String?, String?>? {
         if (!showCaller(context, device.deviceId)) return null
-        val title = dialerNotification?.notification?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
+        val title = dialerNotification?.notification?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+            ?.let(CallTracker::plain)?.trim()
             ?.takeIf(String::isNotEmpty) ?: return null
         val number = CallTracker.dialable(title)
         return if (number != null) contactName(number) to number else title to null
@@ -261,6 +268,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
     companion object {
         private const val TAG = "DeskLink/Telephony"
         private const val KEY_SHOW_CALLER = "telephony_show_caller"
+        private const val KEY_LIVE_CALL = "telephony_live_call"
 
         /** Words of the dialer's Decline / Hang up buttons (AOSP and the common OEM dialers). */
         private val DECLINE_WORDS = listOf("decline", "hang up", "end", "reject", "dismiss")

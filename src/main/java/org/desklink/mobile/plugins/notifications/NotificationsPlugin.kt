@@ -231,7 +231,24 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             if ("low_battery" == statusBarNotification.tag) return false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && "MediaOngoingActivity" == notification.channelId) return false
         }
-        return "org.desklink.mobile" != packageName && "org.desklink.mobile.debug" != packageName
+        if ("org.desklink.mobile" == packageName || "org.desklink.mobile.debug" == packageName) return false
+        // T3: who is calling reaches the desk only with "Show caller on <desk>"; the dialer's
+        // call and missed-call notifications would otherwise tell it anyway.
+        if (isCallNotification(statusBarNotification) &&
+            !org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(context, device.deviceId)
+        ) {
+            return false
+        }
+        return true
+    }
+
+    private fun isCallNotification(statusBarNotification: StatusBarNotification): Boolean {
+        val category = statusBarNotification.notification.category
+        if (category == Notification.CATEGORY_CALL || category == "missed_call") return true
+        val dialer = runCatching {
+            context.getSystemService(android.telecom.TelecomManager::class.java)?.defaultDialerPackage
+        }.getOrNull()
+        return dialer != null && dialer == statusBarNotification.packageName
     }
 
     // isPreexisting is true for notifications that we are sending in response to a request command
@@ -241,38 +258,9 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         isPreexisting: Boolean
     ) {
         val notification = statusBarNotification.notification
-
-        if ((notification.flags and Notification.FLAG_FOREGROUND_SERVICE) != 0
-            || (notification.flags and Notification.FLAG_ONGOING_EVENT) != 0
-            || (notification.flags and Notification.FLAG_LOCAL_ONLY) != 0
-            || (notification.flags and NotificationCompat.FLAG_GROUP_SUMMARY) != 0 // The notification that groups other notifications
-        ) {
-            // This is not a notification we want
-            return
-        }
-
+        // One filter for what is mirrored and what the snapshot lists.
+        if (!isMirrored(statusBarNotification)) return
         val packageName = statusBarNotification.packageName
-        if (!appDatabase.isEnabled(packageName)) {
-            // Notification excluded by the user
-            return
-        }
-        if ("com.android.systemui" == packageName) {
-            if ("low_battery" == statusBarNotification.tag) {
-                // HACK: Android low battery notification are posted again every few seconds. Ignore them, as we already have a battery indicator.
-                return
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if ("MediaOngoingActivity" == notification.channelId) {
-                    // HACK: Samsung OneUI sends this notification when media playback is started. Ignore it, as this is handled by Mpris plugin
-                    return
-                }
-            }
-        }
-
-        if ("org.desklink.mobile" == packageName || "org.desklink.mobile.debug" == packageName) {
-            // Don't send our own notifications
-            return
-        }
 
         val key = getNotificationKeyCompat(statusBarNotification)
         val np = NetworkPacket(PACKET_TYPE_NOTIFICATION)

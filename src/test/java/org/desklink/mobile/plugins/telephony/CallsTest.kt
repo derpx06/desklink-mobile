@@ -77,6 +77,33 @@ class CallsTest {
     }
 
     @Test
+    fun dialerDirectionMarksDoNotHideANumber() {
+        assertEquals("+1 555 123 4567", CallTracker.dialable("\u2066+1 555 123 4567\u2069"))
+        assertEquals("+1 555", CallTracker.dialable("\u202A\u200E+1 555\u200F\u202C"))
+        assertEquals("Ada", CallTracker.plain("\u2068Ada\u2069"))
+    }
+
+    @Test
+    fun aCallUpAcrossAnAppRestartKeepsItsIdAndTimer() {
+        val first = tracker()
+        first.onLine(LineState.RINGING)
+        clock = 5_000
+        first.onLine(LineState.OFFHOOK)
+        val saved = CallTracker.decode(CallTracker.encode(CallTracker.toSave(first.calls)!!))
+        assertEquals(first.calls.single(), saved)
+        clock = 60_000
+        val restarted = CallTracker({ clock }, saved) { "c${++ids}" }
+        restarted.onLine(LineState.OFFHOOK)
+        assertEquals(first.calls.single(), restarted.calls.single())
+        // Once the line has been seen, a later call is a new one.
+        val idleFirst = CallTracker({ clock }, saved) { "new" }
+        idleFirst.onLine(LineState.IDLE)
+        idleFirst.onLine(LineState.OFFHOOK)
+        assertEquals("new", idleFirst.calls.single().callId)
+        assertEquals(60_000L, idleFirst.calls.single().startedAt)
+    }
+
+    @Test
     fun onlyDialableNumbersAreDialled() {
         assertEquals("+1 (555) 123-4567", CallTracker.dialable(" +1 (555) 123-4567 "))
         assertNull(CallTracker.dialable("Ada Lovelace"))

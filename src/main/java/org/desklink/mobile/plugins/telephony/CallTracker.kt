@@ -29,7 +29,12 @@ enum class LineState { IDLE, RINGING, OFFHOOK }
  * IDLE with nothing else is missed (unless the phone declined it on request); OFFHOOK → IDLE ends
  * everything. Pure and clock-injected, for tests.
  */
-class CallTracker(private val now: () -> Long, private val newId: () -> String) {
+class CallTracker(
+    private val now: () -> Long,
+    /** The call that was up when the app last stopped: kept if the line is still off the hook. */
+    private var restored: TrackedCall? = null,
+    private val newId: () -> String,
+) {
     var calls: List<TrackedCall> = emptyList()
         private set
     private var line = LineState.IDLE
@@ -40,6 +45,9 @@ class CallTracker(private val now: () -> Long, private val newId: () -> String) 
     fun onLine(next: LineState): TrackedCall? {
         val previous = line
         line = next
+        // Only the first report after start-up may resume the saved call.
+        val saved = restored
+        restored = null
         if (previous == next) return null
         var missed: TrackedCall? = null
         calls = when (next) {
@@ -52,7 +60,8 @@ class CallTracker(private val now: () -> Long, private val newId: () -> String) 
                         else -> call
                     }
                 }
-                else -> listOf(TrackedCall(newId(), STATE_TALKING, incoming = false, startedAt = now()))
+                // Off the hook at start-up with a call saved: the same call, its timer intact.
+                else -> listOf(saved ?: TrackedCall(newId(), STATE_TALKING, incoming = false, startedAt = now()))
             }
             LineState.IDLE -> {
                 if (previous == LineState.RINGING) {
@@ -128,8 +137,25 @@ class CallTracker(private val now: () -> Long, private val newId: () -> String) 
             this["action"] = action
         }
 
+        /**
+         * Without the invisible direction and isolate marks dialers wrap numbers in
+         * (U+200E/F, U+202A–E, U+2066–9), which made "\u2066+1 555…\u2069" not a number.
+         */
+        fun plain(text: String): String = text.filterNot { it == '\u200E' || it == '\u200F' || it in '\u202A'..'\u202E' || it in '\u2066'..'\u2069' }
+
+        /** The call worth keeping across an app restart: the one talking while off the hook. */
+        fun toSave(calls: List<TrackedCall>): TrackedCall? = calls.firstOrNull { it.state == STATE_TALKING }
+
+        fun encode(call: TrackedCall): String = JSONObject().put("callId", call.callId).put("incoming", call.incoming)
+            .apply { call.startedAt?.let { put("startedAt", it) } }.toString()
+
+        fun decode(saved: String?): TrackedCall? = runCatching {
+            val json = JSONObject(requireNotNull(saved))
+            TrackedCall(json.getString("callId"), STATE_TALKING, json.getBoolean("incoming"), json.optLong("startedAt").takeIf { json.has("startedAt") })
+        }.getOrNull()
+
         /** A number the desk may dial: digits and the usual dialling characters, at most 32. */
         fun dialable(number: String?): String? =
-            number?.trim()?.takeIf { it.length in 1..32 && it.all { c -> c.isDigit() || c in "+*#() -." } && it.any(Char::isDigit) }
+            number?.let(::plain)?.trim()?.takeIf { it.length in 1..32 && it.all { c -> c.isDigit() || c in "+*#() -." } && it.any(Char::isDigit) }
     }
 }

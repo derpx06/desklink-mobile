@@ -218,9 +218,9 @@ internal fun MediaCard(media: HomeMedia, actions: HomeActions, artBounds: Mutabl
             .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
     ) {
         Row(
+            // No clip here: it cut the artwork's shadow. The card's own rounded clip bounds the ripple.
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
                 .pointerInput(media.canNext, media.canPrevious) {
                     detectHorizontalDragGestures(
                         onDragEnd = {
@@ -265,8 +265,9 @@ internal fun MediaCard(media: HomeMedia, actions: HomeActions, artBounds: Mutabl
                 Titles(media, reduced, titleSize = 16, subtitleSize = 13, alignCenter = false)
             }
         }
-        // The seek bar and its times line up with the title, not the artwork.
-        Column(Modifier.fillMaxWidth().padding(start = CARD_ART + CARD_GAP, top = 4.dp)) {
+        // The seek bar's track and its times line up with the title, not the artwork. The
+        // slider insets its track by half its 24 dp thumb, hence the 12 dp.
+        Column(Modifier.fillMaxWidth().padding(start = CARD_ART + CARD_GAP - THUMB_INSET, top = 4.dp)) {
             SeekBar(media, palette, actions.onSeek, compact = true)
         }
         Controls(media, actions, palette, playSize = 52.dp, reduced)
@@ -275,6 +276,7 @@ internal fun MediaCard(media: HomeMedia, actions: HomeActions, artBounds: Mutabl
 
 private val CARD_ART = 64.dp
 private val CARD_GAP = 14.dp
+private val THUMB_INSET = 12.dp
 
 /** Fades the end (and, while it scrolls, the start) of a one-line text instead of a hard cut. */
 private fun Modifier.fadeEdges(start: Boolean, width: Dp = 20.dp) = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -453,7 +455,7 @@ private fun SeekBar(media: HomeMedia, palette: MediaPalette, onSeek: (Long) -> U
                 stateDescription = value
             },
         )
-        Row(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = THUMB_INSET)) {
             Text(MediaControl.clock(shown), fontFamily = MonoFamily, fontSize = 11.sp, color = t.textDim)
             Spacer(Modifier.weight(1f))
             Text(if (length > 0) MediaControl.clock(length) else "–:––", fontFamily = MonoFamily, fontSize = 11.sp, color = t.textDim)
