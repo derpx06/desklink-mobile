@@ -157,6 +157,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
+import org.desklink.mobile.ui.SessionGate
 import org.desklink.mobile.plugins.screen.SessionLiveNotification
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
@@ -195,6 +196,18 @@ class TerminalActivity : AppCompatActivity() {
     private var deviceId: String = ""
     private var client: TerminalClient? = null
     private var openId by mutableStateOf<String?>(null)
+    private var openTitle by mutableStateOf<String?>(null)
+    private var openSince = 0L
+    private var runKey by mutableStateOf<String?>(null)
+    private var runAfterSerial = Int.MAX_VALUE
+
+    private fun takeRunExtras(intent: Intent) {
+        openTitle = intent.getStringExtra(EXTRA_OPEN_TITLE)
+        openSince = intent.getLongExtra(EXTRA_OPEN_SINCE, 0)
+        runKey = intent.getStringExtra(EXTRA_RUN_KEY)
+        runAfterSerial = client?.state?.value?.listSerial ?: 0
+        if (runKey != null) client?.refresh()
+    }
     private var resumed by mutableStateOf(false)
 
     /** The session screen without the app bar or the phone's status and navigation bars. */
@@ -223,13 +236,16 @@ class TerminalActivity : AppCompatActivity() {
             (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES,
         )
         openId = savedInstanceState?.getString(STATE_OPEN_ID) ?: intent.getStringExtra(EXTRA_TERMINAL_ID)
+        if (savedInstanceState == null) takeRunExtras(intent)
         loadLabels()
         fullscreen = getSharedPreferences(LABEL_PREFS, MODE_PRIVATE).getBoolean(KEY_FULLSCREEN, true)
-        setContent {
-            DeskLinkTheme(this) {
-                TerminalRoot(terminalClient)
+        SessionGate.check(this, deviceId, onOpen = {
+            setContent {
+                DeskLinkTheme(this) {
+                    TerminalRoot(terminalClient)
+                }
             }
-        }
+        }, onDenied = ::finish)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -239,6 +255,11 @@ class TerminalActivity : AppCompatActivity() {
             recreate() // a notification for another device
         } else {
             intent.getStringExtra(EXTRA_TERMINAL_ID)?.let { openId = it }
+            if (intent.hasExtra(EXTRA_OPEN_TITLE)) {
+                openId?.let { current -> client?.leave(current) }
+                openId = null
+                takeRunExtras(intent)
+            }
         }
     }
 
@@ -332,8 +353,30 @@ class TerminalActivity : AppCompatActivity() {
         }
         LaunchedEffect(state.error) {
             state.error?.let {
-                snackbar.showSnackbar(it)
+                snackbar.showSnackbar(if (it == TerminalProtocol.ERROR_BAD_CWD) getString(R.string.terminal_bad_cwd, deskName()) else it)
                 client.clearError()
+            }
+        }
+        // Run command refused "locked": once a list after this screen opened was accepted (the
+        // session password is proven for this connection), run it once more.
+        LaunchedEffect(state.listSerial, state.passwordNeeded, state.notAllowed) {
+            // A list accepted: the desk now also lists its commands to this phone if it held them back.
+            if (state.listLoaded && state.passwordNeeded == null && !state.notAllowed) {
+                DeskLinkApplication.getInstance().getDevicePlugin(deviceId, org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)?.onSessionPasswordProven()
+            }
+            val key = runKey ?: return@LaunchedEffect
+            if (state.listSerial > runAfterSerial && state.passwordNeeded == null && !state.notAllowed) {
+                runKey = null
+                DeskLinkApplication.getInstance().getDevicePlugin(deviceId, org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)?.retryRun(key)
+            }
+        }
+        // Run command: open the shared terminal the desk starts for it, once it is listed.
+        LaunchedEffect(state.sessions, openTitle) {
+            val title = openTitle ?: return@LaunchedEffect
+            if (openId != null) return@LaunchedEffect
+            pickStartedSession(state.sessions, title, openSince)?.let {
+                openTitle = null
+                openId = it
             }
         }
         // Ended from the desk: back to the list, which the client is already refreshing. The
@@ -359,10 +402,15 @@ class TerminalActivity : AppCompatActivity() {
         }
 
         val needed = state.passwordNeeded
+        // A remembered password that the desk refuses is never offered again.
+        LaunchedEffect(needed) { if (needed == SessionPasswordDenial.Wrong) SessionGate.forget(this@TerminalActivity, deviceId) }
         if (needed != null && needed !is SessionPasswordDenial.Locked && !passwordDismissed) {
             SessionPasswordDialog(
                 wrong = needed == SessionPasswordDenial.Wrong,
-                onSubmit = client::unlock,
+                onSubmit = { password ->
+                    client.unlock(password)
+                    SessionGate.offerToRemember(this@TerminalActivity, deviceId, password)
+                },
                 onDismiss = {
                     passwordDismissed = true
                     client.cancelUnlock()
@@ -499,7 +547,7 @@ class TerminalActivity : AppCompatActivity() {
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
         }
 
-        if (newSheet) NewTerminalSheet(state.launchers, onDismiss = { newSheet = false }) { command -> newSheet = false; client.create(DEFAULT_ROWS, DEFAULT_COLS, command) }
+        if (newSheet) NewTerminalSheet(state.launchers, state.folders, onDismiss = { newSheet = false }) { command, cwd -> newSheet = false; client.create(DEFAULT_ROWS, DEFAULT_COLS, command, cwd) }
         renaming?.let { session ->
             RenameDialog(
                 initial = labels[session.id].orEmpty(),
@@ -554,11 +602,13 @@ class TerminalActivity : AppCompatActivity() {
      */
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    private fun NewTerminalSheet(launchers: List<String>, onDismiss: () -> Unit, onStart: (List<String>?) -> Unit) {
+    private fun NewTerminalSheet(launchers: List<String>, folders: List<String>, onDismiss: () -> Unit, onStart: (List<String>?, String?) -> Unit) {
         val t = tokens
         val options = listOf<Pair<String, List<String>?>>(stringResource(R.string.terminal_launch_shell) to null) +
             launchers.mapNotNull { launcher -> agentName(launcher)?.let { it to listOf(launcher) } }
         var choice by rememberSaveable { mutableIntStateOf(0) }
+        // "Start in": the desk's folders ("~" first), the first one picked. An older desk sends none.
+        var folder by rememberSaveable { mutableIntStateOf(0) }
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -593,9 +643,37 @@ class TerminalActivity : AppCompatActivity() {
                         }
                     }
                 }
+                if (folders.isNotEmpty()) {
+                    Text(stringResource(R.string.terminal_new_start_in), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.textDim)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
+                        folders.forEachIndexed { index, path ->
+                            val selected = index == folder
+                            Box(
+                                Modifier
+                                    .heightIn(min = 48.dp)
+                                    .selectable(selected = selected, role = Role.RadioButton) { folder = index },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    path,
+                                    fontFamily = MonoFamily,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.MiddleEllipsis,
+                                    color = if (selected) t.onAccentContainer else t.text,
+                                    modifier = Modifier
+                                        .widthIn(max = 220.dp)
+                                        .background(if (selected) t.accentContainer else Color.Transparent, RoundedCornerShape(18.dp))
+                                        .border(1.dp, if (selected) Color.Transparent else t.hairlineStrong, RoundedCornerShape(18.dp))
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                )
+                            }
+                        }
+                    }
+                }
                 PillButton(
                     stringResource(R.string.terminal_new_start_button),
-                    { onStart(options.getOrNull(choice)?.second) },
+                    { onStart(options.getOrNull(choice)?.second, folders.getOrNull(folder)) },
                     Modifier.fillMaxWidth().padding(top = 6.dp),
                     icon = R.drawable.sym_terminal,
                 )
@@ -635,9 +713,13 @@ class TerminalActivity : AppCompatActivity() {
                     .padding(start = 18.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                // Its folder names a plain shell best; a name given here or an agent's name wins.
+                val cardTitle = labels[session.id] ?: agentName(session.title) ?: session.cwd ?: preview.name
+                val meta = listOfNotNull(session.shell, session.startedAt?.let { startedLabel(it) }).joinToString(" · ")
+                    .ifEmpty { "${preview.badge} · ${preview.size}" }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(preview.name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text("${preview.badge} · ${preview.size}", fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim)
+                    Text(cardTitle, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f))
+                    Text(meta, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1)
                     Box {
                         IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
                             Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.terminal_session_options, preview.name), tint = TermIcon)
@@ -672,6 +754,10 @@ class TerminalActivity : AppCompatActivity() {
                             PresenceDot(color = TermCoral)
                             Text(stringResource(R.string.terminal_you_are_here), fontSize = 12.sp, color = TermCoralText)
                         }
+                        session.attachedElsewhere -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            PresenceDot(color = TermCoral)
+                            Text(stringResource(R.string.terminal_open_elsewhere), fontSize = 12.sp, color = TermCoralText)
+                        }
                         else -> Text(stringResource(R.string.terminal_running_on, deskName()), fontSize = 12.sp, color = TermDim)
                     }
                     Spacer(Modifier.weight(1f))
@@ -684,6 +770,14 @@ class TerminalActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /** "10:42" today, "Mon 10:42" otherwise. */
+    private fun startedLabel(unixSecs: Long): String {
+        val millis = unixSecs * 1000
+        val time = android.text.format.DateFormat.getTimeFormat(this).format(java.util.Date(millis))
+        return if (android.text.format.DateUtils.isToday(millis)) time else
+            android.text.format.DateUtils.formatDateTime(this, millis, android.text.format.DateUtils.FORMAT_SHOW_WEEKDAY or android.text.format.DateUtils.FORMAT_ABBREV_WEEKDAY) + " " + time
     }
 
     /** The desktop wants its session password. During a lockout only a retry is offered. */
@@ -937,7 +1031,7 @@ class TerminalActivity : AppCompatActivity() {
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp))
         }
-        if (newSheet) NewTerminalSheet(state.launchers, onDismiss = { newSheet = false }) { command -> newSheet = false; client.create(DEFAULT_ROWS, DEFAULT_COLS, command) }
+        if (newSheet) NewTerminalSheet(state.launchers, state.folders, onDismiss = { newSheet = false }) { command, cwd -> newSheet = false; client.create(DEFAULT_ROWS, DEFAULT_COLS, command, cwd) }
         renamingOpen?.let { renameId ->
             RenameDialog(
                 initial = labels[renameId].orEmpty(),
@@ -1292,6 +1386,23 @@ class TerminalActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_DEVICE_ID = "deviceId"
         const val EXTRA_TERMINAL_ID = "terminalId"
+
+        /** Open the session with this title once the desk lists it (a command just run). */
+        const val EXTRA_OPEN_TITLE = "openTitle"
+
+        /** A command the desk refused "locked": run once more after the session password is proven. */
+        const val EXTRA_RUN_KEY = "runKey"
+
+        /** Unix seconds the run was asked for: older sessions with the same title are not it. */
+        const val EXTRA_OPEN_SINCE = "openSince"
+
+        /** The newest running session titled [title] that started at or after [since] (a few seconds of clock skew allowed). */
+        fun pickStartedSession(sessions: List<TerminalSessionState>, title: String, since: Long): String? =
+            sessions.lastOrNull { s ->
+                s.title == title && !s.gone && s.exitStatus == null && (s.startedAt == null || since == 0L || s.startedAt >= since - CLOCK_SKEW_SECS)
+            }?.id
+
+        private const val CLOCK_SKEW_SECS = 30L
 
         private const val STATE_OPEN_ID = "openTerminalId"
         private const val LABEL_PREFS = "desklink_terminal_labels"

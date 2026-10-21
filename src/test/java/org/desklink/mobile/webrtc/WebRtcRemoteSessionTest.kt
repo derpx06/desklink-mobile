@@ -108,6 +108,26 @@ class WebRtcRemoteSessionTest {
         assertNull(decoded.reason)
     }
 
+    /** Contract §9: the phone offers its own screen; the desk's request-view for that id needs no second consent. */
+    @Test
+    fun `offer-view carries a new phone-chosen id phone to desktop`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        val offered = controller.beginOffer()
+        val message = controller.makeMessage(WebRtcRemoteSessionControlKind.OFFER_VIEW, attemptId, wire, remoteSessionId = offered)
+        val json = message.toJson()
+        assertEquals("offer-view", json.getString("kind"))
+        assertEquals("phone-to-desktop", json.getString("direction"))
+        assertEquals(offered, json.getString("remoteSessionId"))
+        assertTrue(json.getLong("sequence") > 0)
+
+        // The desk's request-view for another id, or the other direction, is not the answer.
+        assertFalse(controller.answersOffer("another-id", WebRtcScreenDirection.PHONE_TO_DESKTOP))
+        assertFalse(controller.answersOffer(offered, WebRtcScreenDirection.DESKTOP_TO_PHONE))
+        assertTrue(controller.answersOffer(offered, WebRtcScreenDirection.PHONE_TO_DESKTOP))
+        // Used once.
+        assertFalse(controller.answersOffer(offered, WebRtcScreenDirection.PHONE_TO_DESKTOP))
+    }
+
     /** An expired lease must leave the session viewing, so the phone can ask
      * for control again instead of refusing every gesture forever. */
     @Test

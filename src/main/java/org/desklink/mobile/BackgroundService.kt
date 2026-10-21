@@ -229,7 +229,7 @@ class BackgroundService : Service() {
         )
 
         // Register screen on listener
-        val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
+        val filter = IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) }
         // See: https://developer.android.com/reference/android/net/ConnectivityManager.html#CONNECTIVITY_ACTION
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
             filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION)
@@ -330,53 +330,53 @@ class BackgroundService : Service() {
     }
 
     /**
-     * A foreground service keeps the process eligible to run, but it does not
-     * by itself keep the CPU awake while Android turns the display off. Hold a
-     * scoped partial wake lock only while there is a paired bootstrap session,
-     * authenticated WebRTC peer, or bounded WebRTC recovery attempt; release
-     * it immediately once the final session goes away.
+     * A partial wake lock only while something is really being done: a terminal attached, the desk
+     * screen viewed or controlled, this phone's screen shared, or a file moving. Never merely for
+     * being connected: an always-held lock is what ColorOS's GuardElf killed the app for
+     * ("guardelf_wakelock"), and OEM freezers release it anyway. Each hold has a timeout and is
+     * renewed while the work lasts, so a missed release cannot keep the CPU up.
      *
-     * This intentionally does not try to defeat force-stop, battery-saver, or
-     * OEM task-killer decisions. Those are explicit system/user choices and
-     * must remain visible recovery states rather than being bypassed.
+     * The check runs on a main-thread Handler, which does not wake a sleeping phone: while asleep
+     * nothing is checked, and nothing needs to be.
      */
     private fun updateConnectionPowerLease() {
         if (!::applicationInstance.isInitialized) return
-        val needsLease = applicationInstance.devices.values.any { device ->
-            device.isPaired && device.requiresConnectionPowerLease
-        }
-        if (needsLease) {
-            acquireConnectionWakeLock()
-            // The lease can lapse with no event to notice it (a recovery that
-            // outlives RECOVERY_POWER_LEASE_MS), so look again just after.
-            leaseRecheck.removeCallbacks(leaseRecheckTask)
-            leaseRecheck.postDelayed(leaseRecheckTask, RECOVERY_POWER_LEASE_MS + 1_000L)
-        } else {
-            leaseRecheck.removeCallbacks(leaseRecheckTask)
-            releaseConnectionWakeLock()
-        }
+        val working = applicationInstance.devices.values.any { device -> device.isPaired && hasActiveWork(device) }
+        if (working) acquireWorkWakeLock() else releaseConnectionWakeLock()
+        leaseRecheck.removeCallbacks(leaseRecheckTask)
+        leaseRecheck.postDelayed(leaseRecheckTask, WORK_LEASE_CHECK_MS)
+    }
+
+    private fun hasActiveWork(device: org.desklink.mobile.Device): Boolean {
+        val id = device.deviceId
+        val screen = device.getPlugin(org.desklink.mobile.plugins.screen.ScreenControlPlugin::class.java)
+        return isActiveWork(
+            terminalAttached = applicationInstance.terminalClient(id)?.state?.value?.sessions?.any { it.attached && !it.gone } == true,
+            deskScreen = screen?.remoteLive == true,
+            phoneScreenShared = org.desklink.mobile.plugins.screen.PhoneScreenCaptureService.sharingDeviceId == id,
+            transferring = org.desklink.mobile.plugins.share.TransferProgress.visibleFor(id)?.finished == false,
+        )
     }
 
     private val leaseRecheck = android.os.Handler(android.os.Looper.getMainLooper())
     private val leaseRecheckTask = Runnable { updateConnectionPowerLease() }
 
-    private fun acquireConnectionWakeLock() {
+    private fun acquireWorkWakeLock() {
         val powerManager = getSystemService<PowerManager>() ?: return
         val lock = connectionWakeLock ?: powerManager
-            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DeskLink:active-connection")
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "DeskLink:active-work")
             .apply { setReferenceCounted(false) }
             .also { connectionWakeLock = it }
-        if (!lock.isHeld) {
-            runCatching { lock.acquire() }
-                .onFailure { error -> Log.w(LOG_TAG, "Could not acquire DeskLink connection wake lock", error) }
-        }
+        // Re-arms the timeout on every check while the work lasts.
+        runCatching { lock.acquire(WORK_LEASE_MS) }
+            .onFailure { error -> Log.w(LOG_TAG, "Could not acquire DeskLink work wake lock", error) }
     }
 
     private fun releaseConnectionWakeLock() {
         connectionWakeLock?.let { lock ->
             if (lock.isHeld) {
                 runCatching { lock.release() }
-                    .onFailure { error -> Log.w(LOG_TAG, "Could not release DeskLink connection wake lock", error) }
+                    .onFailure { error -> Log.w(LOG_TAG, "Could not release DeskLink work wake lock", error) }
             }
         }
     }
@@ -546,6 +546,7 @@ class BackgroundService : Service() {
             if (lock.isHeld) lock.release()
         }
         wifiLock = null
+        leaseRecheck.removeCallbacks(leaseRecheckTask)
         releaseConnectionWakeLock()
         connectionWakeLock = null
         DeskLinkApplication.getInstance().removeDeviceListChangedCallback("BackgroundService")
@@ -583,6 +584,14 @@ class BackgroundService : Service() {
 
         const val UPDATE_IMMUTABLE_FLAGS = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         private const val FOREGROUND_NOTIFICATION_ID = 1
+
+        /** One hold lasts at most this long; renewed every [WORK_LEASE_CHECK_MS] while working. */
+        const val WORK_LEASE_MS = 60_000L
+        const val WORK_LEASE_CHECK_MS = 20_000L
+
+        /** Work that needs the CPU with the screen off; being connected is not work. */
+        fun isActiveWork(terminalAttached: Boolean, deskScreen: Boolean, phoneScreenShared: Boolean, transferring: Boolean): Boolean =
+            terminalAttached || deskScreen || phoneScreenShared || transferring
 
         @JvmStatic
         var instance: BackgroundService? = null

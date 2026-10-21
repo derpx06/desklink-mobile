@@ -11,7 +11,6 @@
   <string name="pref_plugin_battery_desc">Periode raporti staton de la baterio</string>
   <string name="pref_plugin_connectivity_report">Raporto pri konektebleco</string>
   <string name="pref_plugin_connectivity_report_desc">Raporti retan signalforton kaj staton</string>
-  <string name="pref_plugin_sftp_desc">Permesas foliumi la dosiersistemon de ĉi tiu aparato malproksime</string>
   <string name="pref_plugin_clipboard">Sinkronigo de tondujo</string>
   <string name="pref_plugin_clipboard_desc">Kunhavigi la enhavon de la tondujo</string>
   <string name="pref_plugin_clipboard_sent">Clipboard Sendita</string>
@@ -214,19 +213,6 @@
   <string name="show_notification_if_screen_off">Sendi sciigojn nur se la ekrano estas malŝaltita</string>
   <string name="add_device_dialog_title">Aldoni aparaton</string>
   <string name="add_device_hint">Gastnomo aŭ IP-adreso</string>
-  <string name="sftp_preference_configured_storage_locations">Agorditaj konservejoj</string>
-  <string name="sftp_preference_add_storage_location_title">Aldoni konservejon</string>
-  <string name="sftp_preference_edit_storage_location">Redakti konservan lokon</string>
-  <string name="sftp_storage_preference_storage_location">Loko de konservado</string>
-  <string name="sftp_storage_preference_storage_location_already_configured">Ĉi tiu loko jam estis agordita</string>
-  <string name="sftp_storage_preference_click_to_select">klaku por elekti</string>
-  <string name="sftp_storage_preference_display_name">Montra nomo</string>
-  <string name="sftp_storage_preference_display_name_already_used">Ĉi tiu montra nomo jam estas uzata</string>
-  <string name="sftp_storage_preference_display_name_cannot_be_empty">Montrnomo ne povas esti malplena</string>
-  <string name="sftp_action_mode_menu_delete">Forigi</string>
-  <string name="sftp_no_storage_locations_configured">Neniuj konservejoj agordis</string>
-  <string name="sftp_saf_permission_explanation">Por aliri dosierojn malproksime vi devas agordi konservadlokojn</string>
-  <string name="sftp_manage_storage_permission_explanation">Por permesi foran aliron al dosieroj sur ĉi tiu aparato, vi devas permesi al DeskLink administri la konservejon.</string>
   <string name="no_players_connected">Neniuj ludantoj trovitaj</string>
   <string name="send_files">Sendi dosierojn</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

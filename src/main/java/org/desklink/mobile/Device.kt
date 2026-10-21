@@ -462,6 +462,9 @@ class Device : PacketReceiver {
     }
 
     /** The preferred link is pinned TLS over the LAN (not, e.g., Bluetooth). */
+    /** Whether [packetType] is in the feature set shared with this computer (both profiles agree). */
+    fun featureActive(packetType: String): Boolean = WebRtcFeatureProfile.peerAccepts(deviceId, packetType)
+
     val hasLanLink: Boolean
         get() = links.firstOrNull() is org.desklink.mobile.backends.lan.LanLink
 
@@ -470,14 +473,33 @@ class Device : PacketReceiver {
         get() = links.firstNotNullOfOrNull { it as? org.desklink.mobile.backends.relay.RelayLink }
 
 
-    // A pending recovery with no bootstrap link is waiting for a peer that may
-    // be switched off; holding a partial wake lock for that indefinitely
-    // drained the battery while the PC was off. Discovery wakes us again.
-    val requiresConnectionPowerLease: Boolean
-        get() = hasBootstrapLink || hasActiveWebRtcFeatureTransport || (
-            webRtcRecoveryPending &&
-                android.os.SystemClock.elapsedRealtime() - webRtcRecoveryPendingSince < RECOVERY_POWER_LEASE_MS
+    private fun isInteractive(): Boolean =
+        context.getSystemService(android.os.PowerManager::class.java)?.isInteractive ?: true
+
+    /**
+     * The screen went on or off: tell the desk at once (`dozing`) on every live path, as a
+     * report (`reply: true`) so nothing answers it. Best effort.
+     */
+    fun sendDozeState() {
+        if (!isPaired) return
+        val interactive = isInteractive()
+        webRtcTransport?.takeIf { it.isReadyForPackets() }?.sendPacket(
+            heartbeatPacket(reply = true, interactive = interactive),
+            object : TransportCallback {
+                override fun onSuccess() = Unit
+                override fun onFailure(error: TransportError) = Unit
+            },
+        )
+        if (hasBootstrapLink) {
+            sendBootstrapPacket(
+                heartbeatPacket(reply = true, interactive = interactive),
+                object : SendPacketStatusCallback() {
+                    override fun onSuccess() = Unit
+                    override fun onFailure(e: Throwable) = Unit
+                },
             )
+        }
+    }
 
     fun setSessionTransport(transport: SessionTransport?) {
         sessionTransport = transport
@@ -806,8 +828,7 @@ class Device : PacketReceiver {
                 // would ping-pong forever. Arriving at all already refreshed the
                 // coordinator's own silence clock.
                 if (!np.getBoolean("reply", false)) {
-                    val reply = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT)
-                    reply["reply"] = true
+                    val reply = heartbeatPacket(reply = true, interactive = isInteractive())
                     webRtcTransport?.sendPacket(reply, object : TransportCallback {
                         override fun onSuccess() = Unit
                         override fun onFailure(error: TransportError) {
@@ -815,9 +836,9 @@ class Device : PacketReceiver {
                         }
                     })
                 }
-            } else {
+            } else if (!np.getBoolean("reply", false)) {
                 sendBootstrapPacket(
-                    NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT),
+                    heartbeatPacket(reply = true, interactive = isInteractive()),
                     // Best effort. A failure here means the link is already
                     // gone, which the desktop's own silence budget will reach
                     // the same conclusion about a few seconds later.
@@ -854,7 +875,8 @@ class Device : PacketReceiver {
         // `desklink.sms.request`, `desklink.telephony.request`,
         // `desklink.screen.request` and the rest — and handed them straight to
         // their plugins.
-        if (!bootstrapPacket && !WebRtcFeatureProfile.allows(np.type)) {
+        // Within the profile and, once the handover is done, within what the peer said it sends.
+        if (!bootstrapPacket && !WebRtcFeatureProfile.peerSends(deviceId, np.type)) {
             Log.w("DeskLink/Device", "Rejected feature outside the active profile: ${np.type}")
             np.payload?.close()
             return
@@ -1043,9 +1065,10 @@ class Device : PacketReceiver {
         val readyTransport = transport?.takeIf { it.isReadyForPackets() }
         val filePayload = np.type == DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST &&
             np.getString("filename").isNotEmpty() && np.payload != null
-        if (isPaired && !bootstrapPacket && !WebRtcFeatureProfile.allows(np.type)) {
+        // The intersection: in this profile, and in what the peer said it receives.
+        if (isPaired && !bootstrapPacket && !WebRtcFeatureProfile.peerAccepts(deviceId, np.type)) {
             val error = IllegalStateException(
-                "${np.type} is not enabled in the current DeskLink WebRTC feature profile",
+                "${np.type} is not enabled with ${deviceInfo.name} (outside the shared feature profile)",
             )
             callback.onFailure(error)
             np.payload?.close()
@@ -1366,8 +1389,16 @@ class Device : PacketReceiver {
  * travel exclusively over the authenticated WebRTC transport, before and after
  * the handover alike, so both sides always agree about where a feature lives.
  */
-/** Longest a pending WebRTC recovery alone may keep the wake lock. */
-internal const val RECOVERY_POWER_LEASE_MS = 5 * 60_000L
+/**
+ * `desklink.heartbeat`, carrying `dozing` (contract §11): with the phone's screen off the desk
+ * stretches its dead time and stops probing the data channel, since a frozen phone cannot answer.
+ * [reply] marks a report that must not be answered (answers and state pushes alike).
+ */
+internal fun heartbeatPacket(reply: Boolean, interactive: Boolean): NetworkPacket =
+    NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT).apply {
+        if (reply) this["reply"] = true
+        this["dozing"] = !interactive
+    }
 
 /** Queued features older than this are failed, not sent. Matches the desktop. */
 internal const val PENDING_FEATURE_MAX_AGE_MS = 30_000L

@@ -279,4 +279,74 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="one">%1$d file in the last 30 days</item>
         <item quantity="other">%1$d files in the last 30 days</item>
     </plurals>
+
+    <!-- Stage D: desk features from the phone -->
+    <string name="pref_plugin_desk_settings">Desk settings</string>
+    <string name="pref_plugin_desk_settings_desc">Change the computer\'s DeskLink switches from this phone</string>
+    <string name="pref_plugin_desk_unlock">Unlock with this phone</string>
+    <string name="pref_plugin_desk_unlock_desc">Confirm with your fingerprint to unlock the computer when it asks</string>
+    <string name="pref_plugin_handoff">Hand off</string>
+    <string name="pref_plugin_handoff_desc">Continue a terminal on this phone when you lock the computer</string>
+
+    <string name="unlock_title">Unlock %1$s?</string>
+    <string name="unlock_body_button">Someone at your desk asked to unlock it with this phone.</string>
+    <string name="unlock_body_phone">Confirm it\'s you to unlock it.</string>
+    <string name="unlock_prompt_subtitle">Your fingerprint or screen lock</string>
+    <string name="unlock_touch">Touch to unlock</string>
+    <string name="unlock_decline">Not me · keep locked</string>
+    <string name="unlock_expired">That request expired. Ask again from the computer.</string>
+    <string name="unlock_no_screen_lock">Set up a screen lock on this phone to unlock the computer with it.</string>
+    <string name="unlock_refused_pref_off">%1$s doesn\'t allow unlocking with this phone. Turn it on in DeskLink there.</string>
+    <string name="unlock_refused_not_lan">%1$s unlocks only when this phone is on the same network.</string>
+    <string name="unlock_refused_not_locked">%1$s isn\'t locked.</string>
+    <string name="unlock_refused_not_ready">%1$s isn\'t ready yet. Try again in a moment.</string>
+    <string name="unlock_refused_expired">The unlock request expired. Try again.</string>
+    <string name="unlock_refused_wrong_device">That unlock request was for another phone.</string>
+    <string name="unlock_refused_other">%1$s stayed locked.</string>
+    <string name="home_unlock_desk">Unlock %1$s</string>
+    <string name="home_unlock_asking">Asking %1$s…</string>
+
+    <string name="handoff_title">You locked %1$s</string>
+    <string name="handoff_text">Continue %1$s on your phone?</string>
+    <string name="handoff_not_now">Not now</string>
+    <string name="handoff_continue">Continue</string>
+
+    <string name="home_run_command">Run command</string>
+    <string name="runcommand_terminal_off">Terminal access is off on %1$s. Turn it on there to run commands.</string>
+    <string name="runcommand_locked">%1$s wants its session password first. Open Terminals to enter it.</string>
+    <string name="runcommand_add_on_desk">Add commands in DeskLink\'s preferences on %1$s.</string>
+
+    <string name="home_share_offered">Sharing with %1$s. Confirm on this phone when asked.</string>
+    <string name="screen_offer_busy">%1$s is already in a screen session.</string>
+
+    <string name="terminal_bad_cwd">That folder is no longer on %1$s.</string>
+    <string name="terminal_new_start_in">Start in</string>
+    <string name="terminal_open_elsewhere">Open on another phone</string>
+    <string name="terminal_job_default">A command</string>
+    <string name="terminal_job_finished_after">%1$s finished after %2$s</string>
+    <string name="terminal_job_finished">%1$s finished</string>
+
+    <string name="settings_keep_awake">Keep %1$s awake</string>
+    <string name="settings_keep_awake_summary">While this phone is connected</string>
+    <string name="settings_command_alerts">Tell me when commands finish</string>
+    <string name="settings_command_alerts_summary">Long-running commands in shared terminals</string>
+    <string name="settings_unlock_nearby">Unlock with this phone</string>
+    <string name="settings_unlock_nearby_on">On. Turn it off on %1$s.</string>
+    <string name="settings_unlock_nearby_off">Off. Turn it on in DeskLink on %1$s.</string>
+    <string name="settings_phone_media">Show this phone\'s media on %1$s</string>
+    <string name="settings_phone_media_summary">Needs notification access</string>
+    <string name="settings_session_gate">Fingerprint before terminals</string>
+    <string name="settings_session_gate_summary">Also before the desk screen, once per connection</string>
+    <string name="settings_session_gate_no_lock">Set up a screen lock to use this</string>
+
+    <string name="gate_title">Open %1$s</string>
+    <string name="gate_stored_subtitle">Your fingerprint unlocks the saved session password</string>
+    <string name="gate_type_password">Type password</string>
+    <string name="gate_remember_title">Remember the password for %1$s?</string>
+    <string name="gate_remember_subtitle">Your fingerprint will unlock it next time</string>
+    <string name="gate_not_now">Not now</string>
+
+    <string name="settings_open">Open</string>
+    <string name="settings_perm_oem">Keep DeskLink running</string>
+    <string name="settings_perm_oem_summary">This phone stops apps in the background. Allow background activity and auto-launch so %1$s stays connected.</string>
 </resources>

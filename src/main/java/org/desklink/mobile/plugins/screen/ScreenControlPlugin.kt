@@ -183,6 +183,7 @@ class ScreenControlPlugin : Plugin() {
             passwordPrompt = null
             latestStatus = sessionPasswordLockedMessage(context, denial.seconds)
         } else {
+            if (denial == SessionPasswordDenial.Wrong) org.desklink.mobile.ui.SessionGate.forget(context, device.deviceId)
             passwordPrompt = PasswordPrompt(wrong = denial == SessionPasswordDenial.Wrong, control = control)
             latestStatus = context.getString(R.string.session_password_needed)
         }
@@ -221,6 +222,15 @@ class ScreenControlPlugin : Plugin() {
     }
 
     fun onRemoteViewFailed(reason: String?) {
+        // The desk answers this phone's own Share screen with "busy" while another session runs.
+        if (reason == REASON_BUSY) {
+            val message = context.getString(R.string.screen_offer_busy, device.name)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+            }
+            onRemoteSessionEnded(message)
+            return
+        }
         onRemoteSessionEnded(
             reason?.takeIf(String::isNotBlank) ?: context.getString(R.string.remote_screen_error),
         )
@@ -249,7 +259,7 @@ class ScreenControlPlugin : Plugin() {
                 if (np.getString("role", "") == ROLE_PHONE_SCREEN && shouldPromptForCapture()) {
                     promptedAt = android.os.SystemClock.elapsedRealtime()
                     screenSessionActive = true
-                    promptForCapture()
+                    promptForCapture(offered = np.getBoolean(OFFERED_FIELD, false))
                 }
             }
             PACKET_TYPE_SCREEN_READY -> {
@@ -323,7 +333,7 @@ class ScreenControlPlugin : Plugin() {
     /** Android blocks activity starts from the background without telling
      * us, so the consent prompt is also offered as a notification: tapping it
      * is a user action, which Android always lets open the prompt. */
-    private fun promptForCapture() {
+    private fun promptForCapture(offered: Boolean) {
         val intent = Intent(context, ScreenProjectionActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra(ScreenProjectionActivity.EXTRA_DEVICE_ID, device.deviceId)
@@ -332,6 +342,8 @@ class ScreenControlPlugin : Plugin() {
         } catch (exception: RuntimeException) {
             Log.w(TAG, "Could not open the screen-sharing prompt directly", exception)
         }
+        // Offered from this phone's own Share screen: the person is in the app, no notification.
+        if (offered) return
         val pending = android.app.PendingIntent.getActivity(
             context,
             device.deviceId.hashCode(),
@@ -386,6 +398,10 @@ class ScreenControlPlugin : Plugin() {
         const val PACKET_TYPE_SCREEN_ERROR = DeskLinkProtocol.PACKET_TYPE_SCREEN_ERROR
 
         const val ROLE_PHONE_SCREEN = "phone-screen"
+
+        /** Local-only flag on the synthesised request: the share was offered from this phone. */
+        const val OFFERED_FIELD = "offeredHere"
+        const val REASON_BUSY = "busy"
         const val PROMPT_NOTIFICATION_ID = 1702
         private const val PROMPT_PENDING_MS = 30_000L
         const val ROLE_DESKTOP_SCREEN = "desktop-screen"

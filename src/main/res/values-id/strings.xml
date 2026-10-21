@@ -7,8 +7,6 @@
   <string name="pref_plugin_telephony_desc">Kirim notifikasi untuk panggilan yang masuk</string>
   <string name="pref_plugin_battery">Laporan baterai</string>
   <string name="pref_plugin_battery_desc">Status baterai laporkan secara berkala</string>
-  <string name="pref_plugin_sftp">Menyingkap sistem file</string>
-  <string name="pref_plugin_sftp_desc">Membolehkan menelusuri sistem file perangkat ini secara jarak jauh</string>
   <string name="pref_plugin_clipboard">Sinkron clipboard</string>
   <string name="pref_plugin_clipboard_desc">Berbagi konten papan-klip</string>
   <string name="pref_plugin_mousepad">Input jarak jauh</string>
@@ -145,10 +143,6 @@
   <string name="share_received_file">Bagikan \"%s\"</string>
   <string name="title_activity_notification_filter">Filter notifikasi</string>
   <string name="filter_apps_info">Notifikasi akan disinkronkan terhadap apl terpilih.</string>
-  <string name="sftp_sdcard_num">Kartu SD %d</string>
-  <string name="sftp_sdcard">Kartu SD</string>
-  <string name="sftp_readonly">(hanya baca)</string>
-  <string name="sftp_camera">Gambar kamera</string>
   <string name="no_players_connected">Tidak ada pemutar yang ditemukan</string>
   <string name="send_files">Kirim file</string>
   <string name="pairing_title">Perangkat DeskLink</string>

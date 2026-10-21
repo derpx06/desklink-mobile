@@ -11,7 +11,6 @@
   <string name="pref_plugin_battery_desc">Batareya vəziyyətini vaxtaşırı bildirmək</string>
   <string name="pref_plugin_connectivity_report">Bağlantı hesabatı</string>
   <string name="pref_plugin_connectivity_report_desc">Şəbəkə siqnalının gücünü və vəziyyətini bildirin</string>
-  <string name="pref_plugin_sftp_desc">Bu cihazın fayl sisteminə baxmağa icazə vermək</string>
   <string name="pref_plugin_clipboard">Mübadilə Buferini eyniləşdirmək</string>
   <string name="pref_plugin_clipboard_desc">Mübadilə buferi tərkiblərini paylaşmaq</string>
   <string name="pref_plugin_clipboard_sent">Mübadilə buferini göndərmək</string>
@@ -203,19 +202,6 @@
   <string name="show_notification_if_screen_off">Yalnız ekran söndükdə bildiriş göndərmək</string>
   <string name="add_device_dialog_title">Cihaz əlavə etmək</string>
   <string name="add_device_hint">Host_adı və ya İP ünvanı</string>
-  <string name="sftp_preference_configured_storage_locations">Saxlama yerini tənzimləmək</string>
-  <string name="sftp_preference_add_storage_location_title">Saxlama yeri əlavə etmək</string>
-  <string name="sftp_preference_edit_storage_location">Saxlama yerinə düzəliş</string>
-  <string name="sftp_storage_preference_storage_location">Saxlama yeri</string>
-  <string name="sftp_storage_preference_storage_location_already_configured">Bu yer artıq tənzimlənib</string>
-  <string name="sftp_storage_preference_click_to_select">klikləyərək seçin</string>
-  <string name="sftp_storage_preference_display_name">Görünən adı</string>
-  <string name="sftp_storage_preference_display_name_already_used">Bu ad artıq istifadə olunub</string>
-  <string name="sftp_storage_preference_display_name_cannot_be_empty">Görünən ad boş ola bilməz</string>
-  <string name="sftp_action_mode_menu_delete">Silmək</string>
-  <string name="sftp_no_storage_locations_configured">Saxlama yeri tənzimlənməyib</string>
-  <string name="sftp_saf_permission_explanation">Fayllara uzaqdan daxil olmaq üçün saxlama yerlərini konfiqurasiya etməlisiniz</string>
-  <string name="sftp_manage_storage_permission_explanation">Bu cihazdakı fayllara giriş əldə etmək üçün DeskLink-ə yaddaşı idarə etməyə icazə vermək lazımdır.</string>
   <string name="no_players_connected">Pleyer tapılmadı</string>
   <string name="send_files">Faylları göndərmək</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

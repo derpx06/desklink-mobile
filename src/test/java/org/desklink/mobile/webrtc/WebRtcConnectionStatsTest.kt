@@ -61,6 +61,20 @@ class WebRtcConnectionStatsTest {
     }
 
     @Test
+    fun anUnresolvedCandidateTypeMeansNoStatsNotTheInternet() {
+        fun report(localType: String?, remoteType: String?) = mapOf(
+            stats("T1", "transport", "selectedCandidatePairId" to "CP"),
+            stats("CP", "candidate-pair", "localCandidateId" to "L", "remoteCandidateId" to "R", "currentRoundTripTime" to 0.004),
+            if (localType == null) stats("L", "local-candidate") else stats("L", "local-candidate", "candidateType" to localType),
+            if (remoteType == null) stats("R", "remote-candidate") else stats("R", "remote-candidate", "candidateType" to remoteType),
+        )
+        assertNull(connectionStatsFrom(report(null, "host"), bootstrapViaRelay = false))
+        assertNull(connectionStatsFrom(report("host", null), bootstrapViaRelay = false))
+        assertNull(connectionStatsFrom(report("", "host"), bootstrapViaRelay = false))
+        assertEquals(WebRtcConnectionPath.LAN, connectionStatsFrom(report("host", "host"), bootstrapViaRelay = false)?.path)
+    }
+
+    @Test
     fun controlKeepsMotionAndViewingKeepsResolution() {
         assertEquals(RtpParameters.DegradationPreference.BALANCED, screenDegradationPreference(true))
         assertEquals(RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION, screenDegradationPreference(false))

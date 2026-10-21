@@ -12,8 +12,6 @@
   <string name="pref_plugin_connectivity_report">Reporto de connectivitate</string>
   <string name="pref_plugin_digitizer">Tabletta de Designar</string>
   <string name="pref_plugin_digitizer_desc">Usa tu dispositivo como un tabletta de designar sensibile al pression</string>
-  <string name="pref_plugin_sftp">Accesso de systema de file</string>
-  <string name="pref_plugin_sftp_desc">Permitte navigar in le systema de file de iste dispositivo remotemente</string>
   <string name="pref_plugin_clipboard">Sync de area de transferentia</string>
   <string name="pref_plugin_clipboard_desc">Comparti le contento de area de transferentia</string>
   <string name="pref_plugin_clipboard_sent">Area de transferentia inviate</string>
@@ -110,9 +108,6 @@
   <string name="show_notification_if_screen_off">Invia notificationes si le schermo es extinguite</string>
   <string name="add_device_dialog_title">Adde dispositivo</string>
   <string name="add_device_hint">Nomine de hospite o adresse IP</string>
-  <string name="sftp_storage_preference_click_to_select">pulsa pro seliger</string>
-  <string name="sftp_storage_preference_display_name">Nomine de monstrar</string>
-  <string name="sftp_action_mode_menu_delete">Dele</string>
   <string name="no_players_connected">Necun Jocatores trovate</string>
   <string name="send_files">Invia files</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

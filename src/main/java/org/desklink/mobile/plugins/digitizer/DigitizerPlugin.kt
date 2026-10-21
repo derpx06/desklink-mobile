@@ -9,7 +9,6 @@ package org.desklink.mobile.plugins.digitizer
 import android.app.Activity
 import android.content.Intent
 import android.util.Log
-import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory
@@ -25,8 +24,9 @@ class DigitizerPlugin : Plugin() {
     override val description: String
         get() = context.resources.getString(R.string.pref_plugin_digitizer_desc)
 
+    // The desk draws with it now (strokes become pointer drags under the control lease).
     override val isEnabledByDefault: Boolean
-        get() = DeviceHelper.isTablet
+        get() = true
 
     override fun getUiButtons(): List<PluginUiButton> = listOf(
         PluginUiButton(

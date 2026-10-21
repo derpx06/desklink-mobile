@@ -11,7 +11,6 @@
   <string name="pref_plugin_battery_desc">Informar periodicamente do estado da batería.</string>
   <string name="pref_plugin_connectivity_report">Informe de conectividade</string>
   <string name="pref_plugin_connectivity_report_desc">Informar da forza do sinal e do estado da rede</string>
-  <string name="pref_plugin_sftp_desc">Permite examinar o sistema de ficheiros do dispositivo remotamente.</string>
   <string name="pref_plugin_clipboard">Sincronización do portapapeis</string>
   <string name="pref_plugin_clipboard_desc">Comparta o contido do portapapeis.</string>
   <string name="pref_plugin_clipboard_sent">Enviouse o portapapeis</string>
@@ -217,19 +216,6 @@
   <string name="show_notification_if_screen_off">Enviar notificacións só se a pantalla está apagada</string>
   <string name="add_device_dialog_title">Engadir o dispositivo</string>
   <string name="add_device_hint">Nome de máquina ou enderezo IP</string>
-  <string name="sftp_preference_configured_storage_locations">Lugares de almacenamento configurados</string>
-  <string name="sftp_preference_add_storage_location_title">Engadir un lugar de almacenamento</string>
-  <string name="sftp_preference_edit_storage_location">Editar un lugar de almacenamento</string>
-  <string name="sftp_storage_preference_storage_location">Lugar de almacenamento</string>
-  <string name="sftp_storage_preference_storage_location_already_configured">Este lugar xa está configurado</string>
-  <string name="sftp_storage_preference_click_to_select">premer para seleccionar</string>
-  <string name="sftp_storage_preference_display_name">Nome visual</string>
-  <string name="sftp_storage_preference_display_name_already_used">Este nome visual xa está a usarse.</string>
-  <string name="sftp_storage_preference_display_name_cannot_be_empty">O nome visual non pode estar baleiro.</string>
-  <string name="sftp_action_mode_menu_delete">Eliminar</string>
-  <string name="sftp_no_storage_locations_configured">Non se configuraron localizacións de almacenamento</string>
-  <string name="sftp_saf_permission_explanation">Para acceder a ficheiro remotamente ten que configurar lugares de almacenamento</string>
-  <string name="sftp_manage_storage_permission_explanation">Para permitir o acceso remoto a ficheiros neste dispositivo ten que permitir a DeskLink xestionar o seu almacenamento.</string>
   <string name="no_players_connected">Non se atoparon reprodutores.</string>
   <string name="send_files">Enviar ficheiros</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

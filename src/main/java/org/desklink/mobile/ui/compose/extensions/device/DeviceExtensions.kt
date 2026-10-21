@@ -29,11 +29,15 @@ fun Device.toUiModel(): DeviceUiModel {
     )
 }
 
-/** A LAN link wins over the relay: when both exist the handover prefers the LAN. */
+/**
+ * A LAN link wins over the relay: when both exist the handover prefers the LAN. A live WebRTC
+ * feature transport is connected even while the bootstrap link is being re-established (features
+ * work; only signalling waits).
+ */
 fun deviceConnection(reachable: Boolean, featuresReady: Boolean, lan: Boolean, relay: Boolean): DeviceConnection = when {
+    featuresReady && lan -> DeviceConnection.LOCAL
+    featuresReady && relay -> DeviceConnection.AWAY
+    featuresReady -> DeviceConnection.CONNECTED
     !reachable -> DeviceConnection.OFFLINE
-    !featuresReady -> DeviceConnection.CONNECTING
-    lan -> DeviceConnection.LOCAL
-    relay -> DeviceConnection.AWAY
-    else -> DeviceConnection.CONNECTED
+    else -> DeviceConnection.CONNECTING
 }

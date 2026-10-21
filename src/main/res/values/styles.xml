@@ -51,6 +51,14 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <style name="DeskLinkTheme.NoActionBar" parent="DeskLinkThemeBase.NoActionBar" />
 
+    <!-- A full-window, see-through activity that draws its own bottom sheet and scrim. -->
+    <style name="DeskLinkTheme.Sheet" parent="DeskLinkTheme">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Translucent</item>
+    </style>
+
     <style name="DeskLinkTheme.Toolbar" parent="Widget.AppCompat.Toolbar">
     </style>
 

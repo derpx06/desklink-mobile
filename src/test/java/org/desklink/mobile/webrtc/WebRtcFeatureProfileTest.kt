@@ -9,11 +9,10 @@ import org.junit.Test
 class WebRtcFeatureProfileTest {
 
     /**
-     * Pins the wire contract. The desktop client filters its own capabilities
-     * with an identical set and the handover compares the two lists for exact
-     * equality, so this list and `DESKTOP_INCOMING`/`DESKTOP_OUTGOING` in the
-     * desktop's `features/registry.rs` must be edited together. A one-sided
-     * change fails here rather than breaking every paired feature at runtime.
+     * Pins the wire contract: byte-identical to the desktop's `WEBRTC_PROFILE`
+     * (`profile_matches_the_android_webrtc_feature_profile`). The handover now
+     * uses the intersection of the two apps' lists, so a one-sided edit no
+     * longer breaks every feature, but the lists are still kept in step.
      */
     @Test
     fun profileMatchesTheDesktopFeatureRegistry() {
@@ -22,21 +21,66 @@ class WebRtcFeatureProfileTest {
                 "desklink.battery",
                 "desklink.clipboard",
                 "desklink.clipboard.connect",
+                "desklink.digitizer",
+                "desklink.digitizer.session",
                 "desklink.findmyphone.request",
+                "desklink.handoff",
                 "desklink.lock",
                 "desklink.lock.request",
                 "desklink.mousepad.request",
+                "desklink.mpris",
+                "desklink.mpris.request",
                 "desklink.notification",
                 "desklink.notification.action",
                 "desklink.notification.reply",
                 "desklink.notification.request",
                 "desklink.ping",
-                "desklink.sftp",
-                "desklink.sftp.request",
+                "desklink.runcommand",
+                "desklink.runcommand.request",
+                "desklink.settings",
+                "desklink.settings.request",
                 "desklink.share.request",
+                "desklink.unlock.request",
             ),
             WebRtcFeatureProfile.capabilities(ALL_PACKET_TYPES),
         )
+    }
+
+    @Test
+    fun aPeerMayClaimLessThanItsIdentityButNeverMore() {
+        val identity = listOf(DeskLinkProtocol.PACKET_TYPE_PING, DeskLinkProtocol.PACKET_TYPE_BATTERY, DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST)
+        assertTrue(WebRtcFeatureProfile.handoverListIsConsistent(listOf(DeskLinkProtocol.PACKET_TYPE_PING), identity))
+        assertTrue(WebRtcFeatureProfile.handoverListIsConsistent(emptyList(), identity))
+        // Types outside this profile are filtered from both sides first.
+        assertTrue(WebRtcFeatureProfile.handoverListIsConsistent(listOf(DeskLinkProtocol.PACKET_TYPE_PING, "desklink.future"), identity))
+        assertFalse(WebRtcFeatureProfile.handoverListIsConsistent(listOf(DeskLinkProtocol.PACKET_TYPE_SETTINGS), identity))
+        assertFalse(WebRtcFeatureProfile.handoverListIsConsistent(listOf(DeskLinkProtocol.PACKET_TYPE_PING), null))
+    }
+
+    @Test
+    fun onlyTheIntersectionIsSentAndAccepted() {
+        val id = "older-desk"
+        // An older desk: no settings, no unlock; it receives ping and sends battery.
+        WebRtcFeatureProfile.recordPeer(
+            id,
+            incoming = listOf(DeskLinkProtocol.PACKET_TYPE_PING, DeskLinkProtocol.PACKET_TYPE_BATTERY, "desklink.unknown"),
+            outgoing = listOf(DeskLinkProtocol.PACKET_TYPE_BATTERY, DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST),
+        )
+        try {
+            assertTrue(WebRtcFeatureProfile.peerAccepts(id, DeskLinkProtocol.PACKET_TYPE_PING))
+            assertFalse(WebRtcFeatureProfile.peerAccepts(id, DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST))
+            assertFalse(WebRtcFeatureProfile.peerAccepts(id, DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST))
+            assertFalse(WebRtcFeatureProfile.peerAccepts(id, "desklink.unknown"))
+            assertTrue(WebRtcFeatureProfile.peerSends(id, DeskLinkProtocol.PACKET_TYPE_BATTERY))
+            assertFalse(WebRtcFeatureProfile.peerSends(id, DeskLinkProtocol.PACKET_TYPE_SETTINGS))
+            // Outside this profile, even when the peer claims it.
+            assertFalse(WebRtcFeatureProfile.peerSends(id, DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST))
+        } finally {
+            WebRtcFeatureProfile.forgetPeer(id)
+        }
+        // Before a handover only this profile applies.
+        assertTrue(WebRtcFeatureProfile.peerAccepts(id, DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST))
+        assertFalse(WebRtcFeatureProfile.peerAccepts(id, DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST))
     }
 
     @Test
@@ -69,18 +113,10 @@ class WebRtcFeatureProfileTest {
         assertTrue(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_BATTERY))
     }
 
-    /**
-     * MPRIS, system volume and run-command are implemented on this application
-     * in the phone-controls-desktop direction only, and the desktop has no
-     * backend to answer them. Signaling is bootstrap transport metadata and is
-     * never a feature capability.
-     */
+    /** Signaling is bootstrap transport metadata and is never a feature capability. */
     @Test
-    fun featuresWithoutADesktopCounterpartStayDisabled() {
-        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_MPRIS_REQUEST))
-        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_MPRIS))
+    fun featuresWithoutACounterpartStayDisabled() {
         assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME_REQUEST))
-        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND_REQUEST))
         assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST))
         assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST))
         assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1))
@@ -110,8 +146,12 @@ class WebRtcFeatureProfileTest {
             DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND,
             DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST,
-            DeskLinkProtocol.PACKET_TYPE_SFTP,
-            DeskLinkProtocol.PACKET_TYPE_SFTP_REQUEST,
+            DeskLinkProtocol.PACKET_TYPE_DIGITIZER,
+            DeskLinkProtocol.PACKET_TYPE_DIGITIZER_SESSION,
+            DeskLinkProtocol.PACKET_TYPE_HANDOFF,
+            DeskLinkProtocol.PACKET_TYPE_SETTINGS,
+            DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
+            DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST_UPDATE,
             DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST,

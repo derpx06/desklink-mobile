@@ -53,6 +53,8 @@ internal fun connectionStatsFrom(
     val pair = report[pairId]?.members ?: return null
     val localType = report[pair["localCandidateId"] as? String]?.members?.get("candidateType") as? String
     val remoteType = report[pair["remoteCandidateId"] as? String]?.members?.get("candidateType") as? String
+    // Unresolved candidates mean the path is unknown, not "over the internet".
+    if (localType.isNullOrEmpty() || remoteType.isNullOrEmpty()) return null
     return WebRtcConnectionStats(
         path = connectionPath(localType, remoteType, bootstrapViaRelay),
         roundTripTimeMs = (pair["currentRoundTripTime"] as? Number)?.let { Math.round(it.toDouble() * 1000) },

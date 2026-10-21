@@ -235,6 +235,14 @@ public class LanLinkProvider extends BaseLinkProvider {
         return false;
     }
 
+    private static boolean isOwnAddress(InetAddress address) {
+        try {
+            return address.isAnyLocalAddress() || java.net.NetworkInterface.getByInetAddress(address) != null;
+        } catch (java.net.SocketException e) {
+            return false;
+        }
+    }
+
     private static void closeQuietly(Socket socket) {
         try { socket.close(); } catch (IOException ignored) { }
     }
@@ -266,6 +274,11 @@ public class LanLinkProvider extends BaseLinkProvider {
     private void udpPacketReceived(DatagramPacket packet) {
 
         final InetAddress address = packet.getAddress();
+
+        // Our own announce, heard back on one of our interfaces (rmnet, hotspot): not a peer.
+        if (isOwnAddress(address)) {
+            return;
+        }
 
         if (!isPrivateAddress(address)) {
             Log.i("LanLinkProvider", "Discarding UDP packet from a non-local IP");
@@ -480,6 +493,7 @@ public class LanLinkProvider extends BaseLinkProvider {
             visibleDevices.put(deviceInfo.id, link);
             onConnectionReceived(link);
         }
+        LastLanAddress.INSTANCE.remember(context, deviceInfo.id, socket.getInetAddress());
     }
 
     public LanLinkProvider(Context context) {
@@ -602,6 +616,10 @@ public class LanLinkProvider extends BaseLinkProvider {
             }
 
             ArrayList<InetAddress> ipList = new ArrayList<>();
+            // Paired desks with no link yet: also announce to where each was last reached.
+            for (InetAddress last : LastLanAddress.INSTANCE.targets(context, new java.util.HashSet<>(visibleDevices.keySet()))) {
+                if (!ipList.contains(last)) ipList.add(last);
+            }
             for (DeviceHost host : hostList) {
                 try {
                     ipList.add(InetAddress.getByName(host.toString()));

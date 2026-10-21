@@ -11,7 +11,6 @@
   <string name="pref_plugin_battery_desc">Periodiškai pranešti apie akumuliatoriaus būseną</string>
   <string name="pref_plugin_connectivity_report">Jungiamumo ataskaita</string>
   <string name="pref_plugin_connectivity_report_desc">Pranešti apie tinklo signalo stiprumą ir būseną</string>
-  <string name="pref_plugin_sftp_desc">Leidžia nuotoliniu būdu naršyti šio įrenginio failų sistemą</string>
   <string name="pref_plugin_clipboard">Iškarpinės sinchronizavimas</string>
   <string name="pref_plugin_clipboard_desc">Bendrinti iškarpinės turinį</string>
   <string name="pref_plugin_clipboard_sent">Iškarpinė išsiųsta</string>
@@ -212,18 +211,6 @@
   <string name="show_notification_if_screen_off">Siųsti pranešimus tik tuo atveju, jei ekranas yra išjungtas</string>
   <string name="add_device_dialog_title">Pridėti įrenginį</string>
   <string name="add_device_hint">Mazgo pavadinimas arba IP adresas</string>
-  <string name="sftp_preference_configured_storage_locations">Sukonfigūruotos saugyklų vietos</string>
-  <string name="sftp_preference_add_storage_location_title">Pridėti saugyklos vietą</string>
-  <string name="sftp_preference_edit_storage_location">Taisyti saugyklos vietą</string>
-  <string name="sftp_storage_preference_storage_location">Saugyklos vieta</string>
-  <string name="sftp_storage_preference_storage_location_already_configured">Ši vieta jau yra sukonfigūruota</string>
-  <string name="sftp_storage_preference_click_to_select">spustelėkite norėdami pasirinkti</string>
-  <string name="sftp_storage_preference_display_name">Rodomas pavadinimas</string>
-  <string name="sftp_storage_preference_display_name_already_used">Šis rodomas pavadinimas jau yra naudojamas</string>
-  <string name="sftp_storage_preference_display_name_cannot_be_empty">Rodomas pavadinimas negali būti tuščias</string>
-  <string name="sftp_action_mode_menu_delete">Ištrinti</string>
-  <string name="sftp_no_storage_locations_configured">Nėra sukonfigūruota jokių saugyklos vietų</string>
-  <string name="sftp_saf_permission_explanation">Norėdami gauti nuotolinę prieigą prie failų, turite sukonfigūruoti saugyklos vietas</string>
   <string name="no_players_connected">Nerasta jokių leistuvių</string>
   <string name="send_files">Siųsti failus</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

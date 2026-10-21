@@ -11,7 +11,6 @@
   <string name="pref_plugin_battery_desc">Периодично съобщаване за състоянието на батерията</string>
   <string name="pref_plugin_connectivity_report">Доклад за свързаност</string>
   <string name="pref_plugin_connectivity_report_desc">Доклад за силата на сигнала на мрежата и състоянието</string>
-  <string name="pref_plugin_sftp_desc">Разрешаване на отдалечен преглед на файловта система на устройството</string>
   <string name="pref_plugin_clipboard">Синхронизиране на буфера</string>
   <string name="pref_plugin_clipboard_desc">Споделяне съдържанието на буфера</string>
   <string name="pref_plugin_clipboard_sent">Изпратено съдържание на клипборда</string>
@@ -220,19 +219,6 @@
   <string name="show_notification_if_screen_off">Изпращане на известия само ако екранът е изключен</string>
   <string name="add_device_dialog_title">Добавяне на устройство</string>
   <string name="add_device_hint">Име на хост или IP адрес</string>
-  <string name="sftp_preference_configured_storage_locations">Конфигурирани места за съхранение</string>
-  <string name="sftp_preference_add_storage_location_title">Добавяне на място за съхранение</string>
-  <string name="sftp_preference_edit_storage_location">Редактиране на място за съхранение</string>
-  <string name="sftp_storage_preference_storage_location">Място за съхранение</string>
-  <string name="sftp_storage_preference_storage_location_already_configured">Това местоположение вече е конфигурирано</string>
-  <string name="sftp_storage_preference_click_to_select">кликнете за избор</string>
-  <string name="sftp_storage_preference_display_name">Показвано име</string>
-  <string name="sftp_storage_preference_display_name_already_used">Това име на дисплея вече се използва</string>
-  <string name="sftp_storage_preference_display_name_cannot_be_empty">Името на дисплея не може да бъде празно</string>
-  <string name="sftp_action_mode_menu_delete">Изтриване</string>
-  <string name="sftp_no_storage_locations_configured">Няма конфигурирани места за съхранение</string>
-  <string name="sftp_saf_permission_explanation">За да получите достъп до файлове от разстояние, трябва да конфигурирате местата за съхранение</string>
-  <string name="sftp_manage_storage_permission_explanation">За да разрешите отдалечен достъп до файловете на това устройство, трябва да разрешите DeskLink да управлява хранилището.</string>
   <string name="no_players_connected">Няма възпроизвеждане на медия</string>
   <string name="send_files">Изпращане на файлове</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

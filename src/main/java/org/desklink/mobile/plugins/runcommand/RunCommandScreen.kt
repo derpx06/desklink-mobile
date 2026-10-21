@@ -153,7 +153,15 @@ fun RunCommandScreen(
                                     .combinedClickable(
                                         indication = ripple(color = Color.White),
                                         interactionSource = remember { MutableInteractionSource() },
-                                        onClick = { plugin.runCommand(command.key) },
+                                        onClick = {
+                                            plugin.runCommand(command.key)
+                                            // The desk runs it in a shared terminal named after it: open that.
+                                            context.startActivity(
+                                                org.desklink.mobile.plugins.terminal.TerminalActivity.intent(context, device.deviceId)
+                                                    .putExtra(org.desklink.mobile.plugins.terminal.TerminalActivity.EXTRA_OPEN_TITLE, command.name)
+                                                    .putExtra(org.desklink.mobile.plugins.terminal.TerminalActivity.EXTRA_OPEN_SINCE, System.currentTimeMillis() / 1000),
+                                            )
+                                        },
                                         onLongClick = {
                                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                             menuExpanded = true
@@ -206,11 +214,13 @@ fun RunCommandScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    var text = stringResource(R.string.addcommand_explanation)
-                    if (!(plugin.canAddCommand())) {
-                        text += "\n" + stringResource(R.string.addcommand_explanation2)
+                    // The desk lists its commands only to phones it lets use terminals.
+                    val text = if (plugin.terminalOff) {
+                        stringResource(R.string.runcommand_terminal_off, device.name)
+                    } else {
+                        stringResource(R.string.addcommand_explanation) + "\n" + stringResource(R.string.runcommand_add_on_desk, device.name)
                     }
-                    Text(text)
+                    Text(text, modifier = Modifier.padding(horizontal = 24.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
         }

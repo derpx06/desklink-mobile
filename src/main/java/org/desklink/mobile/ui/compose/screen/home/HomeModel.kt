@@ -17,6 +17,7 @@ import org.desklink.mobile.plugins.screen.PhoneScreenCaptureService
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.share.TransferProgress
 import org.desklink.mobile.ui.compose.components.SessionPreviews
+import org.desklink.mobile.ui.compose.model.device.DeviceConnection
 import org.desklink.mobile.ui.compose.extensions.device.toUiModel
 
 /** Reads Home's state from the live device objects; called on every refresh tick. */
@@ -60,6 +61,12 @@ object HomeModel {
             },
             clipboardOn = device.isPluginEnabled(clipboardKey),
             historyCount = org.desklink.mobile.plugins.share.TransferHistory.store(context).forDevice(id).size,
+            canUnlock = connection == DeviceConnection.LOCAL &&
+                device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby == true &&
+                device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java) != null &&
+                device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST),
+            hasCommands = device.getPlugin(org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)?.commandItems?.isNotEmpty() == true &&
+                device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND_REQUEST),
             relayAvailable = org.desklink.mobile.backends.relay.RelaySettings.enabled(context) &&
                 org.desklink.mobile.backends.relay.RelayLinkProvider.statusLive.value == org.desklink.mobile.backends.relay.RelayLinkProvider.Status.ONLINE,
         )

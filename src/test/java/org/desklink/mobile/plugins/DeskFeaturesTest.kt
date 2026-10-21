@@ -1,0 +1,192 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+package org.desklink.mobile.plugins
+
+import org.desklink.mobile.NetworkPacket
+import org.desklink.mobile.R
+import org.desklink.mobile.plugins.battery.BatteryPlugin
+import org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin
+import org.desklink.mobile.plugins.desksettings.DeskSettingsState
+import org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin
+import org.desklink.mobile.plugins.deskunlock.UnlockOffer
+import org.desklink.mobile.plugins.handoff.Handoff
+import org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin
+import org.desklink.mobile.plugins.runcommand.RunCommandPlugin
+import org.desklink.mobile.plugins.terminal.TerminalActivity
+import org.desklink.mobile.plugins.terminal.TerminalAttentionNotifier
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.ui.compose.screen.settings.deskSwitch
+import org.desklink.mobile.webrtc.terminal.TerminalSessionState
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** The phone's side of the Stage D contract: each packet as the desk sends or reads it. */
+class DeskFeaturesTest {
+    private fun settings(vararg skip: String) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SETTINGS).apply {
+        mapOf(
+            "keepAwake" to true, "clipboard" to false, "notifications" to true, "relayConfigured" to false,
+            "relay" to false, "commandAlerts" to true, "unlockNearby" to true,
+        ).filterKeys { it !in skip }.forEach { (k, v) -> this[k] = v }
+    }
+
+    // ---- §4 settings --------------------------------------------------------------------------
+
+    @Test
+    fun theDesksSettingsReportIsReadWhole() {
+        assertEquals(
+            DeskSettingsState(keepAwake = true, clipboard = false, notifications = true, relayConfigured = false, relay = false, commandAlerts = true, unlockNearby = true),
+            DeskSettingsPlugin.parse(settings()),
+        )
+        // The desk always sends every key; a partial report is not trusted.
+        assertNull(DeskSettingsPlugin.parse(settings("unlockNearby")))
+    }
+
+    @Test
+    fun aSwitchSendsOneKeyUnderSet() {
+        val packet = DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.KEEP_AWAKE, true, relayConfigured = false)!!
+        assertEquals(DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST, packet.type)
+        val set = packet.getJSONObject("set")!!
+        assertEquals(1, set.length())
+        assertTrue(set.getBoolean("keepAwake"))
+        assertNotNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.COMMAND_ALERTS, false, relayConfigured = false))
+        // The desk's own: never asked for from here.
+        assertNull(DeskSettingsPlugin.requestPacket("unlockNearby", true, relayConfigured = true))
+        // No relay at the desk: nothing to turn on.
+        assertNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.RELAY, true, relayConfigured = false))
+        assertNotNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.RELAY, true, relayConfigured = true))
+    }
+
+    @Test
+    fun aSharedSwitchIsOnOnlyWhenBothEndsAre() {
+        assertTrue(deskSwitch(phone = true, desk = true))
+        assertFalse(deskSwitch(phone = true, desk = false))
+        assertFalse(deskSwitch(phone = false, desk = true))
+        // An older desk reports nothing: the phone's own switch decides.
+        assertTrue(deskSwitch(phone = true, desk = null))
+    }
+
+    // ---- §5 unlock ----------------------------------------------------------------------------
+
+    private fun unlockRequest(nonce: String?, reason: String? = "button") = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST).apply {
+        nonce?.let { this["nonce"] = it }
+        reason?.let { this["reason"] = it }
+    }
+
+    private val nonce = "0123456789abcdef0123456789abcdef"
+
+    @Test
+    fun onlyAWellFormedNonceIsAnOffer() {
+        assertEquals(UnlockOffer(nonce, "button", 5), UnlockOffer.parse(unlockRequest(nonce), now = 5))
+        assertEquals("phone", UnlockOffer.parse(unlockRequest(nonce, "phone"), now = 5)?.reason)
+        assertEquals("button", UnlockOffer.parse(unlockRequest(nonce, "whatever"), now = 5)?.reason)
+        assertNull(UnlockOffer.parse(unlockRequest(null), now = 5))
+        assertNull(UnlockOffer.parse(unlockRequest(nonce.uppercase()), now = 5))
+        assertNull(UnlockOffer.parse(unlockRequest(nonce.dropLast(1)), now = 5))
+        assertNull(UnlockOffer.parse(unlockRequest("$nonce\""), now = 5))
+    }
+
+    @Test
+    fun anOfferIsUsableForLessThanTheDesksMinute() {
+        val offer = UnlockOffer(nonce, "button", receivedAt = 1_000)
+        assertTrue(offer.isFresh(1_000 + 54_999))
+        assertFalse(offer.isFresh(1_000 + UnlockOffer.FRESH_MS))
+    }
+
+    @Test
+    fun theApprovalSpendsTheNonceAsALockRequest() {
+        val packet = DeskUnlockPlugin.approvalPacket(nonce)
+        assertEquals(DeskLinkProtocol.PACKET_TYPE_LOCK_REQUEST, packet.type)
+        assertFalse(packet.getBoolean("setLocked", true))
+        assertEquals(nonce, packet.getString("nonce"))
+    }
+
+    @Test
+    fun everyRefusalCodeHasItsOwnWords() {
+        assertEquals(R.string.unlock_refused_pref_off, DeskUnlockPlugin.refusalText("pref-off"))
+        assertEquals(R.string.unlock_refused_not_lan, DeskUnlockPlugin.refusalText("not-lan"))
+        assertEquals(R.string.unlock_refused_not_locked, DeskUnlockPlugin.refusalText("not-locked"))
+        assertEquals(R.string.unlock_refused_not_ready, DeskUnlockPlugin.refusalText("not-ready"))
+        assertEquals(R.string.unlock_refused_wrong_device, DeskUnlockPlugin.refusalText("wrong-device"))
+        for (code in listOf("expired", "no-nonce", "replayed")) assertEquals(R.string.unlock_refused_expired, DeskUnlockPlugin.refusalText(code))
+        assertEquals(R.string.unlock_refused_other, DeskUnlockPlugin.refusalText("from-the-future"))
+    }
+
+    // ---- §6 hand-off --------------------------------------------------------------------------
+
+    @Test
+    fun aHandOffNamesATerminalId() {
+        val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HANDOFF).apply {
+            this["sessionId"] = "t-1_a"
+            this["title"] = "zsh"
+            this["path"] = "~/api"
+        }
+        assertEquals(Handoff("t-1_a", "zsh", "~/api"), Handoff.parse(packet))
+        packet["sessionId"] = "../x"
+        assertNull(Handoff.parse(packet))
+        assertNull(Handoff.parse(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HANDOFF)))
+    }
+
+    // ---- §2 run command -----------------------------------------------------------------------
+
+    @Test
+    fun aLockedRunIsRetriedOnceAfterThePassword() {
+        assertEquals(RunCommandPlugin.RefusalAction.PROVE_PASSWORD_AND_RETRY, RunCommandPlugin.refusalAction("locked", false))
+        assertEquals(RunCommandPlugin.RefusalAction.TELL_LOCKED, RunCommandPlugin.refusalAction("locked", true))
+        assertEquals(RunCommandPlugin.RefusalAction.TELL_TERMINAL_OFF, RunCommandPlugin.refusalAction("terminal-off", false))
+    }
+
+    private fun session(id: String, title: String, startedAt: Long?, exit: Long? = null, gone: Boolean = false) =
+        TerminalSessionState(id, title, 24, 80, exitStatus = exit, attached = false, wanted = false, gone = gone, startedAt = startedAt)
+
+    @Test
+    fun theRunsTerminalIsTheNewestWithItsName() {
+        val sessions = listOf(
+            session("old", "deploy", startedAt = 100),
+            session("other", "build", startedAt = 2_000),
+            session("ended", "deploy", startedAt = 2_000, exit = 0),
+            session("new", "deploy", startedAt = 1_990),
+        )
+        assertEquals("new", TerminalActivity.pickStartedSession(sessions, "deploy", since = 2_000))
+        assertNull(TerminalActivity.pickStartedSession(sessions.take(1), "deploy", since = 2_000))
+        // An older desk without startedAt: the newest with the name.
+        assertEquals("b", TerminalActivity.pickStartedSession(listOf(session("a", "x", null), session("b", "x", null)), "x", since = 2_000))
+    }
+
+    // ---- §7 finished --------------------------------------------------------------------------
+
+    @Test
+    fun aFinishedJobAlertsUnlessItsTerminalIsOnScreenOrAlertsAreOff() {
+        assertTrue(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = null, terminalId = "t1", commandAlerts = true))
+        assertTrue(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = "t2", terminalId = "t1", commandAlerts = null))
+        assertFalse(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = "t1", terminalId = "t1", commandAlerts = true))
+        assertFalse(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = null, terminalId = "t1", commandAlerts = false))
+    }
+
+    @Test
+    fun durationsReadNaturally() {
+        assertEquals("45 s", TerminalAttentionNotifier.formatDuration(45))
+        assertEquals("2 min 4 s", TerminalAttentionNotifier.formatDuration(124))
+        assertEquals("1 h 3 min", TerminalAttentionNotifier.formatDuration(3_780))
+    }
+
+    // ---- §1 media, §8 battery -----------------------------------------------------------------
+
+    @Test
+    fun seekIsMicrosecondsAndNeverBeforeTheStart() {
+        assertEquals(15_000L, MprisReceiverPlugin.seekTarget(5_000, 10_000_000))
+        assertEquals(0L, MprisReceiverPlugin.seekTarget(5_000, -10_000_000))
+    }
+
+    @Test
+    fun chargeTimeIsWholeMinutesOrMinusOne() {
+        assertEquals(-1L, BatteryPlugin.chargeTimeRemaining(isCharging = false, rawMillis = 600_000))
+        assertEquals(-1L, BatteryPlugin.chargeTimeRemaining(isCharging = true, rawMillis = -1))
+        assertEquals(-1L, BatteryPlugin.chargeTimeRemaining(isCharging = true, rawMillis = 0))
+        assertEquals(1_800_000L, BatteryPlugin.chargeTimeRemaining(isCharging = true, rawMillis = 1_859_999))
+    }
+}

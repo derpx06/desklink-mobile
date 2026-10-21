@@ -11,7 +11,6 @@
   <string name="pref_plugin_battery_desc">Status baterai laporkan secara berkala</string>
   <string name="pref_plugin_connectivity_report">Laporan koneksi</string>
   <string name="pref_plugin_connectivity_report_desc">Laporkan kekuatan sinyal jaringan dan status</string>
-  <string name="pref_plugin_sftp_desc">Memungkinkan untuk menelusuri sistem file peranti ini secara jarak jauh</string>
   <string name="pref_plugin_clipboard">Sinkron papan klip</string>
   <string name="pref_plugin_clipboard_desc">Berbagi konten papan klip</string>
   <string name="pref_plugin_clipboard_sent">Papan Klip Terkirim</string>
@@ -194,18 +193,6 @@
   <string name="show_notification_if_screen_off">Hanya kirimkan notifikasi saja ketika layarnya mati</string>
   <string name="add_device_dialog_title">Tambahkan peranti</string>
   <string name="add_device_hint">Alamat IP atau hostname</string>
-  <string name="sftp_preference_configured_storage_locations">Lokasi penyimpanan terkonfigurasi</string>
-  <string name="sftp_preference_add_storage_location_title">Tambahkan lokasi penyimpanan</string>
-  <string name="sftp_preference_edit_storage_location">Edit lokasi penyimpanan</string>
-  <string name="sftp_storage_preference_storage_location">Lokasi penyimpanan</string>
-  <string name="sftp_storage_preference_storage_location_already_configured">Lokasi ini sudah dikonfigurasi</string>
-  <string name="sftp_storage_preference_click_to_select">klik untuk pilih</string>
-  <string name="sftp_storage_preference_display_name">Tampilan nama</string>
-  <string name="sftp_storage_preference_display_name_already_used">Tampilan nama ini sudah digunakan</string>
-  <string name="sftp_storage_preference_display_name_cannot_be_empty">Tampilan nama tidak boleh kosong</string>
-  <string name="sftp_action_mode_menu_delete">Hapus</string>
-  <string name="sftp_no_storage_locations_configured">Tidak ada lokasi penyimpanan yang dikonfigurasi</string>
-  <string name="sftp_saf_permission_explanation">Untuk mengakses file secara jarak jauh, Anda harus mengkonfigurasi lokasi penyimpanan</string>
   <string name="no_players_connected">Tidak ada pemutar yang ditemukan</string>
   <string name="send_files">Kirim file</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

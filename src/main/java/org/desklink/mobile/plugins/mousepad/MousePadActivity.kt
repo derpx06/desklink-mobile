@@ -19,6 +19,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -151,7 +152,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         // renderer keep their session; an explicit refresh remains available
         // for a real retry after permission denial or stream loss.
         if (savedInstanceState == null) {
-            requestDesktopScreen()
+            // The phone-side gate first (fingerprint for a remembered password, or the optional
+            // phone-only check); the request then carries the password when it is known.
+            org.desklink.mobile.ui.SessionGate.check(this, deviceId.orEmpty(), onOpen = ::requestDesktopScreen, onDenied = ::finish)
         }
         // A desktop is landscape: the view is always full screen, like a video.
         requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -229,6 +232,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 wrong = prompt.wrong,
                 onSubmit = { password ->
                     DeskLinkApplication.getInstance().setSessionPassword(deviceId, password)
+                    org.desklink.mobile.ui.SessionGate.offerToRemember(this@MousePadActivity, deviceId.orEmpty(), password)
                     plugin.passwordPrompt = null
                     // Control is asked for again by the loop above as the prompt clears;
                     // asking here as well would spend two guesses on one password.
@@ -483,8 +487,24 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
     private fun deviceName(): String = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
 
+    /**
+     * Only while the activity is started: a stopped one (screen off, another app) releases its
+     * EglRenderer, which otherwise kept running and logging 0-frame statistics, and stops feeding
+     * frames to it. Back in front, a fresh renderer attaches.
+     */
     @Composable
     private fun RemoteDesktopView(modifier: Modifier) {
+        val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+        val state by lifecycle.currentStateAsState()
+        if (state.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+            StartedRemoteDesktopView(modifier)
+        } else {
+            Box(modifier)
+        }
+    }
+
+    @Composable
+    private fun StartedRemoteDesktopView(modifier: Modifier) {
         var renderer by remember { mutableStateOf<RemoteTextureRenderer?>(null) }
         val plugin = screenControlPlugin()
         DisposableEffect(renderer, plugin) {

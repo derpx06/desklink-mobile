@@ -69,14 +69,16 @@ class BatteryPlugin : Plugin() {
 
             val currentCharge = level * 100 / scale
             val isCharging = 0 != plugged
+            val chargeTime = chargeTimeRemaining(isCharging, rawChargeTimeRemaining(context))
 
             if (isCharging != batteryInfo.getBoolean("isCharging") || currentCharge != batteryInfo.getInt("currentCharge") || thresholdEvent != batteryInfo.getInt(
                     "thresholdEvent"
-                )
+                ) || chargeTime != batteryInfo.getLong("chargeTimeRemaining", -1)
             ) {
                 batteryInfo["currentCharge"] = currentCharge
                 batteryInfo["isCharging"] = isCharging
                 batteryInfo["thresholdEvent"] = thresholdEvent
+                batteryInfo["chargeTimeRemaining"] = chargeTime
                 device.sendPacket(batteryInfo)
 
                 // We just send a possible threshold event so reset it so we not create notifications on each change
@@ -120,6 +122,21 @@ class BatteryPlugin : Plugin() {
         // keep these fields in sync with kdeconnect-kded:BatteryPlugin.h:ThresholdBatteryEvent
         private const val THRESHOLD_EVENT_NONE = 0
         private const val THRESHOLD_EVENT_BATTERY_LOW = 1
+
+        /**
+         * `chargeTimeRemaining`: ms until full, to the minute (the platform's estimate moves every
+         * second and would resend the packet each time), or -1 when unknown or not charging.
+         */
+        fun chargeTimeRemaining(isCharging: Boolean, rawMillis: Long): Long =
+            if (!isCharging || rawMillis <= 0) -1 else rawMillis / 60_000 * 60_000
+
+        /** The platform's estimate (Android 9+), or -1. */
+        private fun rawChargeTimeRemaining(context: Context): Long =
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                runCatching { context.getSystemService(BatteryManager::class.java)?.computeChargeTimeRemaining() }.getOrNull() ?: -1
+            } else {
+                -1
+            }
 
         fun isLowBattery(info: DeviceBatteryInfo): Boolean {
             return info.thresholdEvent == THRESHOLD_EVENT_BATTERY_LOW

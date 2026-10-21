@@ -11,7 +11,6 @@
   <string name="pref_plugin_battery_desc">Akkumulátorállapot időszakos jelentése</string>
   <string name="pref_plugin_connectivity_report">Kapcsolódási jelentés</string>
   <string name="pref_plugin_connectivity_report_desc">Hálózati jelerősség és állapot jelentése</string>
-  <string name="pref_plugin_sftp_desc">Lehetővé teszi az eszköz fájlrendszerének távolról történő tallózását</string>
   <string name="pref_plugin_clipboard">Vágólap szinkronizáció</string>
   <string name="pref_plugin_clipboard_desc">A vágólap tartalmának megosztása</string>
   <string name="pref_plugin_clipboard_sent">Vágólap elküldve</string>
@@ -195,18 +194,6 @@
   <string name="show_notification_if_screen_off">Értesítések küldése, csak ha a képernyő ki van kapcsolva</string>
   <string name="add_device_dialog_title">Eszköz hozzáadása</string>
   <string name="add_device_hint">Gépnév vagy IP-cím</string>
-  <string name="sftp_preference_configured_storage_locations">Beállított tárolóhelyek</string>
-  <string name="sftp_preference_add_storage_location_title">Tárolóhely hozzáadása</string>
-  <string name="sftp_preference_edit_storage_location">Tárolóhely szerkesztése</string>
-  <string name="sftp_storage_preference_storage_location">Tárolóhely</string>
-  <string name="sftp_storage_preference_storage_location_already_configured">Ez a hely már be van állítva-</string>
-  <string name="sftp_storage_preference_click_to_select">kattintson a kiválasztáshoz</string>
-  <string name="sftp_storage_preference_display_name">Megjelenített név</string>
-  <string name="sftp_storage_preference_display_name_already_used">Ez a név már használatban van</string>
-  <string name="sftp_storage_preference_display_name_cannot_be_empty">A megjelenített név nem lehet üres</string>
-  <string name="sftp_action_mode_menu_delete">Törlés</string>
-  <string name="sftp_no_storage_locations_configured">Nincs beállítva tárolóhely</string>
-  <string name="sftp_saf_permission_explanation">A fájlok távoli eléréséhez be kell állítania a tárolóhelyeket</string>
   <string name="no_players_connected">Nem találhatók lejátszók</string>
   <string name="send_files">Fájlok küldése</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

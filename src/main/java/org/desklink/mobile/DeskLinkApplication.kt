@@ -216,6 +216,17 @@ class DeskLinkApplication : Application() {
         }.getOrDefault(false)
     }
 
+    /** Home → Share screen: offer this phone's screen to the desk (`offer-view`). */
+    fun offerPhoneScreen(deviceId: String?): Boolean {
+        val device = getDevice(deviceId) ?: return false
+        return runCatching {
+            webRtcCoordinatorFor(device).offerPhoneScreen()
+            true
+        }.onFailure { error ->
+            Log.w("DeskLink/RemoteSession", "Could not offer the phone screen", error)
+        }.getOrDefault(false)
+    }
+
     fun requestRemoteControl(deviceId: String?): Boolean {
         val device = getDevice(deviceId) ?: return false
         return runCatching {
@@ -230,6 +241,12 @@ class DeskLinkApplication : Application() {
     fun setSessionPassword(deviceId: String?, password: String) {
         getDevice(deviceId)?.let { webRtcCoordinatorFor(it).sessionPassword.set(password) }
     }
+
+    /** The live WebRTC connection's identity for [deviceId], or null (see [org.desklink.mobile.ui.SessionGate]). */
+    fun connectionKey(deviceId: String?): Long? = getDevice(deviceId)?.let { webRtcCoordinatorFor(it).connectionKey() }
+
+    /** The session password known for [deviceId] this run, if any. */
+    fun sessionPassword(deviceId: String?): String? = getDevice(deviceId)?.let { webRtcCoordinatorFor(it).sessionPassword.get() }
 
     /** The terminal client of a paired device; it outlives any activity, so rotation keeps sessions. */
     fun terminalClient(deviceId: String?): TerminalClient? =
@@ -247,6 +264,8 @@ class DeskLinkApplication : Application() {
     @WorkerThread
     fun beginDeviceUnpair(device: Device) {
         webRtcCoordinators.remove(device.deviceId)?.closeForUnpair()
+        org.desklink.mobile.webrtc.WebRtcFeatureProfile.forgetPeer(device.deviceId)
+        org.desklink.mobile.ui.SessionGate.forget(this, device.deviceId)
         sessionPasswords.remove(device.deviceId)?.set(null)
         screenResumes.remove(device.deviceId)?.set(false)
         device.clearWebRtcBindingsForUnpair()

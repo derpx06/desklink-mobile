@@ -44,8 +44,6 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_FINDMYPHONE_REQUEST = "desklink.findmyphone.request"
     const val PACKET_TYPE_MPRIS = "desklink.mpris"
     const val PACKET_TYPE_MPRIS_REQUEST = "desklink.mpris.request"
-    const val PACKET_TYPE_SFTP = "desklink.sftp"
-    const val PACKET_TYPE_SFTP_REQUEST = "desklink.sftp.request"
     const val PACKET_TYPE_BATTERY = "desklink.battery"
     const val PACKET_TYPE_NOTIFICATION = "desklink.notification"
     const val PACKET_TYPE_NOTIFICATION_REQUEST = "desklink.notification.request"
@@ -71,6 +69,18 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST = "desklink.shareinputdevices.request"
     const val PACKET_TYPE_DIGITIZER_SESSION = "desklink.digitizer.session"
     const val PACKET_TYPE_DIGITIZER = "desklink.digitizer"
+
+    /** Desk → phone: the desk's own settings, on feature-ready and on every change. */
+    const val PACKET_TYPE_SETTINGS = "desklink.settings"
+
+    /** Phone → desk: `{set: {key: bool}}` for the allow-listed desk settings. */
+    const val PACKET_TYPE_SETTINGS_REQUEST = "desklink.settings.request"
+
+    /** Both ways: the desk's unlock nonce (`{nonce, reason}`), or the phone asking for one (`{ask: true}`). */
+    const val PACKET_TYPE_UNLOCK_REQUEST = "desklink.unlock.request"
+
+    /** Desk → phone: continue this terminal (`{sessionId, title, path}`) after Lock & Hand Off. */
+    const val PACKET_TYPE_HANDOFF = "desklink.handoff"
     const val PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS =
         "desklink.contacts.request_all_uids_timestamps"
     const val PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS =

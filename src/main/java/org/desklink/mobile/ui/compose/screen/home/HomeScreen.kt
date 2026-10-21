@@ -131,6 +131,10 @@ data class HomeState(
     val relayAvailable: Boolean = false,
     /** Files sent or received with this computer in the last 30 days. */
     val historyCount: Int = 0,
+    /** The desk lets this phone unlock it and the link is the local network: "Unlock desk" shows. */
+    val canUnlock: Boolean = false,
+    /** The desk listed commands to run: a Run command tile shows. */
+    val hasCommands: Boolean = false,
 ) {
     val ready get() = connection == DeviceConnection.LOCAL || connection == DeviceConnection.AWAY || connection == DeviceConnection.CONNECTED
 }
@@ -155,6 +159,8 @@ class HomeActions(
     val onTransfers: () -> Unit,
     val onSendClipboard: () -> Unit,
     val onClipboard: (Boolean) -> Unit,
+    val onUnlockDesk: () -> Unit,
+    val onRunCommand: () -> Unit,
     /** An action was tapped while the computer cannot take it; the message says why. */
     val onUnavailable: (String) -> Unit,
 )
@@ -312,7 +318,9 @@ private fun StatusCard(state: HomeState, actions: HomeActions) {
                     color = t.textDim,
                 )
             }
-            else -> Unit
+            else -> if (state.canUnlock) {
+                PillButton(stringResource(R.string.home_unlock_desk, state.name), actions.onUnlockDesk, Modifier.fillMaxWidth(), style = PillStyle.Outlined, height = 44.dp, icon = R.drawable.sym_lock_open)
+            }
         }
         if (state.live.any) LiveRow(state.live, actions.onEndLive)
     }
@@ -483,7 +491,7 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
         Triple(R.drawable.sym_waving_hand, R.string.home_ping_desk, actions.onPing),
         Triple(R.drawable.sym_vibration, R.string.home_ring_desk, actions.onRing),
         Triple(R.drawable.sym_swap_vert, R.string.transfers_title, actions.onTransfers),
-    )
+    ) + if (state.hasCommands) listOf(Triple(R.drawable.sym_terminal, R.string.home_run_command, actions.onRunCommand)) else emptyList()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tiles.chunked(2).forEach { pair ->
             Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -128,12 +128,19 @@ data class DeskSettings(
     val key: String,
     /** Plugins this computer uses that wait for a permission, as (name, open its dialog). */
     val pluginPermissions: List<Pair<String, () -> Unit>> = emptyList(),
+    /** What the desk itself reports (`desklink.settings`); null from an older desk or before it arrives. */
+    val remote: org.desklink.mobile.plugins.desksettings.DeskSettingsState? = null,
+    /** This phone's media is shown and controlled on the desk. */
+    val phoneMediaOn: Boolean = false,
 )
 
 class SettingsActions(
     val onBack: () -> Unit,
     val onDeskClipboard: (Boolean) -> Unit,
     val onDeskNotifications: (Boolean) -> Unit,
+    /** A desk-side switch (`desklink.settings.request {set: {key: value}}`). */
+    val onDeskSetting: (String, Boolean) -> Unit,
+    val onPhoneMedia: (Boolean) -> Unit,
     val onQuickCommands: () -> Unit,
     val onMore: () -> Unit,
     val onUnpair: () -> Unit,
@@ -218,27 +225,75 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                 checked = prefs.getBoolean(KEY_CONNECT_ON_STARTUP, true),
                 onClick = { prefs.edit { putBoolean(KEY_CONNECT_ON_STARTUP, !prefs.getBoolean(KEY_CONNECT_ON_STARTUP, true)) }; revision++ },
             )
+            // Phone-only: a fingerprint or screen-lock check before Terminals and the desk screen.
+            val canCheck = org.desklink.mobile.ui.Biometrics.available(context, org.desklink.mobile.ui.Biometrics.STRONG_OR_CREDENTIAL)
+            GroupRow(
+                stringResource(R.string.settings_session_gate),
+                icon = R.drawable.sym_fingerprint,
+                subtitle = stringResource(if (canCheck) R.string.settings_session_gate_summary else R.string.settings_session_gate_no_lock),
+                checked = canCheck && prefs.getBoolean(org.desklink.mobile.ui.SessionGate.KEY_PHONE_GATE, false),
+                enabled = canCheck,
+                onClick = {
+                    prefs.edit { putBoolean(org.desklink.mobile.ui.SessionGate.KEY_PHONE_GATE, !prefs.getBoolean(org.desklink.mobile.ui.SessionGate.KEY_PHONE_GATE, false)) }
+                    revision++
+                },
+            )
         }
 
         PermissionsSection(desk)
 
         if (desk != null) {
+            val remote = desk.remote
             SectionLabel(desk.name)
             RowGroup {
+                // On only when both ends are on; a switch here turns both.
+                val clipboard = deskSwitch(desk.clipboardOn, remote?.clipboard)
                 GroupRow(
                     stringResource(R.string.home_clipboard_sync),
                     icon = R.drawable.sym_content_paste,
                     subtitle = stringResource(clipboardSummary()),
-                    checked = desk.clipboardOn,
-                    onClick = { actions.onDeskClipboard(!desk.clipboardOn) },
+                    checked = clipboard,
+                    onClick = { actions.onDeskClipboard(!clipboard) },
                 )
+                val notifications = deskSwitch(desk.notificationsOn, remote?.notifications)
                 GroupRow(
                     stringResource(R.string.settings_desk_notifications),
                     icon = R.drawable.sym_notifications,
                     subtitle = stringResource(R.string.settings_desk_notifications_summary),
-                    checked = desk.notificationsOn,
-                    onClick = { actions.onDeskNotifications(!desk.notificationsOn) },
+                    checked = notifications,
+                    onClick = { actions.onDeskNotifications(!notifications) },
                 )
+                GroupRow(
+                    stringResource(R.string.settings_phone_media, desk.name),
+                    icon = R.drawable.sym_music_note,
+                    subtitle = stringResource(R.string.settings_phone_media_summary),
+                    checked = desk.phoneMediaOn,
+                    onClick = { actions.onPhoneMedia(!desk.phoneMediaOn) },
+                )
+            }
+            if (remote != null) {
+                RowGroup {
+                    GroupRow(
+                        stringResource(R.string.settings_keep_awake, desk.name),
+                        icon = R.drawable.sym_coffee,
+                        subtitle = stringResource(R.string.settings_keep_awake_summary),
+                        checked = remote.keepAwake,
+                        onClick = { actions.onDeskSetting(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.KEEP_AWAKE, !remote.keepAwake) },
+                    )
+                    GroupRow(
+                        stringResource(R.string.settings_command_alerts),
+                        icon = R.drawable.sym_notifications_active,
+                        subtitle = stringResource(R.string.settings_command_alerts_summary),
+                        checked = remote.commandAlerts,
+                        onClick = { actions.onDeskSetting(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.COMMAND_ALERTS, !remote.commandAlerts) },
+                    )
+                    // Turned on at the desk only: it lets this phone unlock it.
+                    GroupRow(
+                        stringResource(R.string.settings_unlock_nearby),
+                        icon = R.drawable.sym_lock_open,
+                        subtitle = stringResource(if (remote.unlockNearby) R.string.settings_unlock_nearby_on else R.string.settings_unlock_nearby_off, desk.name),
+                    )
+                }
             }
             RowGroup {
                 // Without a relay address the switch has nothing to turn on: say so, and wait for one.
@@ -257,6 +312,8 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                     onClick = {
                         prefs.edit { putBoolean(RelaySettings.KEY_ENABLED, !relayOn) }
                         relaySettingChanged()
+                        // The desk follows when it has a relay set up too.
+                        if (remote?.relayConfigured == true) actions.onDeskSetting(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.RELAY, !relayOn)
                         revision++
                     },
                 )
@@ -348,6 +405,9 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
     }
 }
 
+/** A switch both ends hold: on only when both are (an older desk reports nothing: the phone decides). */
+fun deskSwitch(phone: Boolean, desk: Boolean?): Boolean = phone && desk != false
+
 /** Android 10+ keeps background apps off the clipboard: the phone's side needs a tap. */
 fun clipboardSummary(): Int =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) R.string.home_clipboard_on_q else R.string.home_clipboard_on
@@ -357,7 +417,19 @@ private fun Chevron() = Icon(painterResource(R.drawable.sym_chevron_right), cont
 
 // ---- permissions ------------------------------------------------------------------------------------------------
 
-private class PermissionRow(@DrawableRes val icon: Int, val title: String, val summary: String, val granted: Boolean, val allow: () -> Unit)
+private class PermissionRow(
+    @DrawableRes val icon: Int,
+    val title: String,
+    val summary: String,
+    val granted: Boolean,
+    /** Android cannot tell whether it is done (OEM settings): an "Open" button, never counted as waiting. */
+    val unknown: Boolean = false,
+    val allow: () -> Unit,
+)
+
+/** OEMs whose battery managers freeze or kill a foreground service with the screen off. */
+fun needsOemBackgroundSetting(manufacturer: String): Boolean =
+    manufacturer.lowercase() in setOf("oppo", "realme", "oneplus", "xiaomi", "redmi", "poco", "vivo", "iqoo", "huawei", "honor", "meizu", "asus", "tecno", "infinix")
 
 @Composable
 private fun PermissionsSection(desk: DeskSettings?) {
@@ -382,8 +454,8 @@ private fun PermissionsSection(desk: DeskSettings?) {
     val deskName = desk?.name ?: stringResource(R.string.settings_your_computer)
     val tapToGrant = stringResource(R.string.device_tap_permission)
     val rows = remember(tick, asked, desk) { permissionRows(context, deskName, request::launch) } +
-        desk?.pluginPermissions.orEmpty().map { (name, open) -> PermissionRow(R.drawable.sym_info, name, tapToGrant, false, open) }
-    val waiting = rows.count { !it.granted }
+        desk?.pluginPermissions.orEmpty().map { (name, open) -> PermissionRow(R.drawable.sym_info, name, tapToGrant, false, allow = open) }
+    val waiting = rows.count { !it.granted && !it.unknown }
     SectionLabel(stringResource(R.string.settings_permissions)) {
         if (waiting > 0) Text(pluralsString(R.plurals.settings_permissions_waiting, waiting), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = t.amber)
     }
@@ -396,7 +468,7 @@ private fun PermissionsSection(desk: DeskSettings?) {
                         Text(stringResource(R.string.settings_allowed), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = t.mintText)
                     }
                 } else {
-                    PillButton(stringResource(R.string.settings_allow), row.allow, style = PillStyle.Tonal, height = 34.dp, modifier = Modifier.padding(start = 4.dp))
+                    PillButton(stringResource(if (row.unknown) R.string.settings_open else R.string.settings_allow), row.allow, style = PillStyle.Tonal, height = 34.dp, modifier = Modifier.padding(start = 4.dp))
                 }
             }
         }
@@ -425,7 +497,7 @@ private fun permissionRows(context: Context, desk: String, request: (Array<Strin
         add(PermissionRow(
             R.drawable.sym_notifications, context.getString(R.string.settings_perm_notification_access), context.getString(R.string.settings_perm_notification_access_summary, desk),
             NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName),
-            open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
+            allow = open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
         ))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && prefs.getBoolean(KEY_BLUETOOTH_ENABLED, false)) {
             val nearby = arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
@@ -440,12 +512,27 @@ private fun permissionRows(context: Context, desk: String, request: (Array<Strin
         add(PermissionRow(
             R.drawable.sym_battery_full, context.getString(R.string.settings_perm_battery), context.getString(R.string.settings_perm_battery_summary),
             power?.isIgnoringBatteryOptimizations(context.packageName) == true,
-            open(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${context.packageName}".toUri())),
+            allow = open(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${context.packageName}".toUri())),
         ))
+        if (needsOemBackgroundSetting(Build.MANUFACTURER)) {
+            add(PermissionRow(
+                R.drawable.sym_restart_alt, context.getString(R.string.settings_perm_oem), context.getString(R.string.settings_perm_oem_summary, desk),
+                granted = false,
+                unknown = true,
+                allow = {
+                    // App info (Battery usage → Allow background activity) underneath, and on
+                    // ColorOS its auto-launch list on top; back from that lands on app info.
+                    runCatching { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))) }
+                    runCatching {
+                        context.startActivity(Intent().setClassName("com.oplus.battery", "com.oplus.startupapp.view.StartupAppListActivity"))
+                    }
+                },
+            ))
+        }
         add(PermissionRow(
             R.drawable.sym_accessibility_new, context.getString(R.string.settings_perm_accessibility), context.getString(R.string.settings_perm_accessibility_summary, desk),
             MouseReceiverService.instance != null,
-            open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
+            allow = open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
         ))
     }
 }

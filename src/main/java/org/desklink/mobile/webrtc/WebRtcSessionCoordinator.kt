@@ -88,8 +88,7 @@ class WebRtcSessionCoordinator(
     private var remoteHeartbeat: ScheduledFuture<*>? = null
     // Data-channel liveness (mirrors the desktop's PEER_PROBE_AFTER /
     // PEER_DEAD_AFTER). Only armed while feature-ready; see startLivenessLocked.
-    @Volatile private var lastInboundAt = 0L
-    private var lastProbeAt = 0L
+    private val peerLiveness = PeerLiveness(PEER_PROBE_AFTER_MS, PEER_DEAD_AFTER_MS)
     // When the current initiator attempt began; a heartbeat may only replace
     // an attempt that has visibly stalled (see onBootstrapReconnected).
     private var attemptStartedAt = 0L
@@ -115,12 +114,6 @@ class WebRtcSessionCoordinator(
         Log.w(TAG, "Remote session action failed", error)
         publish("RemoteSessionFailed", error.message)
     }
-    /** Runs the blocking send of a file the peer asked to download. It must not
-     * share `fileExecutor`: that thread also processes the peer's ACCEPT and
-     * ACK, which the send waits for. */
-    private val fileSendExecutor = Executors.newCachedThreadPool { runnable ->
-        Thread(runnable, "DeskLink-WebRTC-FileSend-${device.deviceId}").apply { isDaemon = true }
-    }
     private val fileExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "DeskLink-WebRTC-File-${device.deviceId}").apply { isDaemon = true }
     }
@@ -138,13 +131,13 @@ class WebRtcSessionCoordinator(
         executor = TerminalClient.newExecutor("DeskLink-Terminal-${device.deviceId}"),
         discard = { message, error -> Log.w(TAG, message, error) },
         password = sessionPassword,
+        onJobFinished = { finished -> org.desklink.mobile.plugins.terminal.TerminalAttentionNotifier.jobFinished(context, device.deviceId, finished) },
     )
 
     /** Link up/down events for [terminal], queued here so they are never delivered under [lock]. */
     private val terminalLink = DeferredTaskExecutor(
         "DeskLink-WebRTC-TerminalLink-${device.deviceId}",
     ) { error -> Log.w(TAG, "Terminal link event failed", error) }
-    private val fileBrowser = WebRtcPhoneFileBrowser(context, device)
     /** Sole authority for WebRTC remote-view and remote-input lease state. */
     private val remoteSession = WebRtcRemoteSessionController {
         DeviceHelper.getDeviceId(context)
@@ -237,10 +230,9 @@ class WebRtcSessionCoordinator(
     fun onBootstrapReconnected() {
         val binding = sessions.currentBinding(device.deviceId) ?: return
         val localDeviceId = DeviceHelper.getDeviceId(context)
-        if (hasActiveFeatureTransport()) {
-            publish("BootstrapReconnected", "Retaining the active WebRTC feature transport")
-            return
-        }
+        // The usual case: a LAN heartbeat while the peer is fine. Publishing it fired a device-list
+        // change (notification, lease, UI) on every heartbeat and every thaw of a frozen process.
+        if (hasActiveFeatureTransport()) return
         if (!device.isPaired) return
         // A heartbeat arrives every ~10 s. Restarting on each one tore down a
         // negotiation still in progress and reset the backoff, so on any
@@ -431,6 +423,44 @@ class WebRtcSessionCoordinator(
         }
         publish("ScreenFailed", reason)
     }
+
+    /**
+     * Share screen from the phone: offers this phone's screen to the desk (`offer-view`). The desk
+     * answers with a `request-view` for the same id, which runs the usual consent and capture.
+     */
+    fun offerPhoneScreen() {
+        remoteActionExecutor.execute {
+            try {
+                synchronized(lock) {
+                    val binding = requireNotNull(activeBinding) { "DeskLink WebRTC session is not active" }
+                    val attemptId = requireNotNull(activeAttemptId) { "DeskLink WebRTC session is not active" }
+                    val wire = requireNotNull(activeWireBinding) { "DeskLink WebRTC session is not active" }
+                    require(currentTransport(binding, attemptId).isReadyForPackets()) {
+                        "DeskLink WebRTC feature transport is not ready"
+                    }
+                    remoteSession.snapshot().remoteSessionId?.let { previous -> sendReleaseLocked(previous) }
+                    val remoteSessionId = remoteSession.beginOffer()
+                    sendRemoteSessionControlLocked(
+                        binding,
+                        attemptId,
+                        remoteSession.makeMessage(
+                            WebRtcRemoteSessionControlKind.OFFER_VIEW,
+                            attemptId,
+                            wire,
+                            remoteSessionId = remoteSessionId,
+                        ),
+                    )
+                    publish("OfferingPhoneScreen", remoteSessionId)
+                    scheduleRemoteRequestTimeout(control = false, remoteSessionId)
+                }
+            } catch (error: Exception) {
+                surfaceRemoteFailure(control = false, error)
+            }
+        }
+    }
+
+    /** Identifies the live WebRTC connection (its session id), or null without one. */
+    fun connectionKey(): Long? = synchronized(lock) { activeWireBinding?.sessionId }
 
     /** Called only from a user gesture in the remote-control UI. */
     fun requestRemoteView(direction: WebRtcScreenDirection) {
@@ -773,7 +803,6 @@ class WebRtcSessionCoordinator(
         }
         recoveryExecutor.shutdownNow()
         fileExecutor.shutdownNow()
-        fileSendExecutor.shutdownNow()
         transportCleanup.close()
         remoteActionExecutor.close()
         peerEvents.close()
@@ -798,7 +827,6 @@ class WebRtcSessionCoordinator(
         }
         recoveryExecutor.shutdownNow()
         fileExecutor.shutdownNow()
-        fileSendExecutor.shutdownNow()
         transportCleanup.close()
         remoteActionExecutor.close()
         peerEvents.close()
@@ -887,7 +915,7 @@ class WebRtcSessionCoordinator(
             override fun onEnvelope(envelope: WebRtcEnvelope) {
                 runCatching {
                     require(sessions.isCurrent(binding)) { "Stale DeskLink session" }
-                    lastInboundAt = SystemClock.elapsedRealtime()
+                    peerLiveness.onInbound(SystemClock.elapsedRealtime())
                     // Bind the envelope to the current wire before recording its
                     // ID, so a message that was never entitled to this session
                     // cannot burn an identifier. This deliberately does NOT
@@ -964,54 +992,6 @@ class WebRtcSessionCoordinator(
                                 }
                             }.onFailure { error ->
                                 Log.w(TAG, "Rejected WebRTC file message", error)
-                                publish("Failed", error.message)
-                            }
-                        }
-                        return@runCatching
-                    }
-                    if (envelope.messageType == WebRtcPhoneFileBrowser.MESSAGE_TYPE) {
-                        require(envelope.channel == WebRtcChannel.FILE_CONTROL.label) {
-                            "Phone-file request arrived on the wrong channel"
-                        }
-                        val wire = requireNotNull(activeWireBinding) {
-                            "No active DeskLink WebRTC wire binding"
-                        }
-                        val payload = envelope.validate(
-                            wire.peerDeviceId,
-                            wire.sessionId,
-                            wire.generation,
-                        )
-                        fileExecutor.execute {
-                            runCatching {
-                                val request = JSONObject(String(payload, Charsets.UTF_8))
-                                val response = fileBrowser.handle(payload)
-                                sendBrowserMessage(response)
-                                if (request.optString("action") == "download" &&
-                                    JSONObject(String(response, Charsets.UTF_8)).optBoolean("ok")
-                                ) {
-                                    val packet = fileBrowser.downloadPacket(payload)
-                                    // Blocks until the peer has the whole file,
-                                    // so it cannot run on this thread: the
-                                    // peer's ACCEPT and ACK are processed here.
-                                    fileSendExecutor.execute {
-                                        runCatching {
-                                            fileTransfers.sendPayload(
-                                                wire,
-                                                packet,
-                                                object : Device.SendPacketStatusCallback() {
-                                                    override fun onSuccess() {
-                                                        publish("PhoneFileDownloadComplete", packet.getString("filename"))
-                                                    }
-
-                                                    override fun onFailure(error: Throwable) {
-                                                        publish("PhoneFileDownloadFailed", error.message)
-                                                    }
-                                                },
-                                            )
-                                        }.onFailure { publish("PhoneFileDownloadFailed", it.message) }
-                                    }
-                                }
-                            }.onFailure { error ->
                                 publish("Failed", error.message)
                             }
                         }
@@ -1426,6 +1406,7 @@ class WebRtcSessionCoordinator(
         }
         when (message.kind) {
             WebRtcRemoteSessionControlKind.REQUEST_VIEW -> {
+                val offeredHere = remoteSession.answersOffer(message.remoteSessionId, message.direction)
                 if (message.direction == WebRtcScreenDirection.DESKTOP_TO_PHONE) {
                     remoteSession.markScreenReady(WebRtcScreenDirection.DESKTOP_TO_PHONE)
                 }
@@ -1440,9 +1421,11 @@ class WebRtcSessionCoordinator(
                     ),
                 )
                 if (message.direction == WebRtcScreenDirection.PHONE_TO_DESKTOP) {
-                    // The plugin starts Android's explicit MediaProjection flow.
+                    // The plugin starts Android's explicit MediaProjection flow. An answer to this
+                    // phone's own offer was asked for here: no "the desk wants your screen" prompt.
                     val request = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST).apply {
                         this["role"] = ScreenControlPlugin.ROLE_PHONE_SCREEN
+                        if (offeredHere) this[ScreenControlPlugin.OFFERED_FIELD] = true
                     }
                     device.getPlugin(ScreenControlPlugin::class.java)?.onPacketReceived(request)
                 }
@@ -1604,8 +1587,7 @@ class WebRtcSessionCoordinator(
      */
     private fun startLivenessLocked(binding: SessionBinding, attemptId: String) {
         cancelLivenessLocked()
-        lastInboundAt = SystemClock.elapsedRealtime()
-        lastProbeAt = lastInboundAt
+        peerLiveness.start(SystemClock.elapsedRealtime())
         liveness = recoveryExecutor.scheduleWithFixedDelay({
             val dead = synchronized(lock) {
                 val active = transport
@@ -1614,13 +1596,13 @@ class WebRtcSessionCoordinator(
                 ) {
                     return@synchronized false
                 }
-                val now = SystemClock.elapsedRealtime()
-                val silence = now - lastInboundAt
-                if (silence >= PEER_DEAD_AFTER_MS) return@synchronized true
-                if (silence >= PEER_PROBE_AFTER_MS && now - lastProbeAt >= PEER_PROBE_AFTER_MS) {
-                    lastProbeAt = now
-                    active.sendPacket(
-                        NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT),
+                when (peerLiveness.tick(SystemClock.elapsedRealtime())) {
+                    PeerLiveness.Verdict.DEAD -> return@synchronized true
+                    PeerLiveness.Verdict.PROBE -> active.sendPacket(
+                        org.desklink.mobile.heartbeatPacket(
+                            reply = false,
+                            interactive = context.getSystemService(android.os.PowerManager::class.java)?.isInteractive ?: true,
+                        ),
                         object : TransportCallback {
                             override fun onSuccess() = Unit
                             override fun onFailure(error: TransportError) {
@@ -1628,6 +1610,7 @@ class WebRtcSessionCoordinator(
                             }
                         },
                     )
+                    PeerLiveness.Verdict.OK -> Unit
                 }
                 false
             }
@@ -1745,27 +1728,6 @@ class WebRtcSessionCoordinator(
         completion.get(10, TimeUnit.SECONDS)
     }
 
-    private fun sendBrowserMessage(payload: ByteArray) {
-        val activeTransport = synchronized(lock) {
-            requireNotNull(transport) { "No active WebRTC peer connection" }
-                .also { require(it.isReadyForPackets()) { "WebRTC phone-file transport is not ready" } }
-        }
-        val completion = CompletableFuture<Unit>()
-        activeTransport.sendEnvelope(
-            WebRtcChannel.FILE_CONTROL,
-            WebRtcPhoneFileBrowser.MESSAGE_TYPE,
-            payload,
-            System.currentTimeMillis(),
-            object : org.desklink.mobile.transport.TransportCallback {
-                override fun onSuccess() = completion.complete(Unit).let { Unit }
-                override fun onFailure(error: org.desklink.mobile.transport.TransportError) {
-                    completion.completeExceptionally(error)
-                }
-            },
-        )
-        completion.get(10, TimeUnit.SECONDS)
-    }
-
     private fun controlMessage(
         kind: WebRtcHandoverControlKind,
         attemptId: String,
@@ -1821,15 +1783,19 @@ class WebRtcSessionCoordinator(
         )
     }
 
+    /**
+     * The peer's handover lists may claim less than its authenticated identity (an older or newer
+     * build), never more. What it confirms is then the intersection used for every feature send
+     * and receive with it ([WebRtcFeatureProfile.peerAccepts] / [WebRtcFeatureProfile.peerSends]).
+     */
     private fun verifyRemoteCapabilities(message: WebRtcHandoverControlMessage) {
-        val expectedIncoming = WebRtcFeatureProfile.capabilities(device.deviceInfo.incomingCapabilities)
-        val expectedOutgoing = WebRtcFeatureProfile.capabilities(device.deviceInfo.outgoingCapabilities)
-        require(message.incomingCapabilities == expectedIncoming) {
-            "WebRTC incoming capabilities do not match the authenticated device identity"
+        require(WebRtcFeatureProfile.handoverListIsConsistent(message.incomingCapabilities, device.deviceInfo.incomingCapabilities)) {
+            "WebRTC incoming capabilities claim more than the authenticated device identity"
         }
-        require(message.outgoingCapabilities == expectedOutgoing) {
-            "WebRTC outgoing capabilities do not match the authenticated device identity"
+        require(WebRtcFeatureProfile.handoverListIsConsistent(message.outgoingCapabilities, device.deviceInfo.outgoingCapabilities)) {
+            "WebRTC outgoing capabilities claim more than the authenticated device identity"
         }
+        WebRtcFeatureProfile.recordPeer(device.deviceId, message.incomingCapabilities, message.outgoingCapabilities)
     }
 
     private fun sha256Hex(value: String): String = MessageDigest.getInstance("SHA-256")

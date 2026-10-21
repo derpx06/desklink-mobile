@@ -53,6 +53,15 @@ object TerminalProtocol {
 
     /** Sent as `error` (with the terminal id) when an attach names a session that does not exist. */
     const val ERROR_NO_SUCH_TERMINAL = "No such DeskLink terminal"
+
+    /** Sent as `error` (no terminal id) when a `create` names a folder that is not a readable directory. */
+    const val ERROR_BAD_CWD = "bad-cwd"
+
+    /** Bounds for the folder fields: the desk refuses longer, and a list of folders is short. */
+    const val MAX_CWD_CHARS = 4096
+    const val MAX_FOLDERS = 16
+    const val MAX_SHELL_CHARS = 64
+    const val MAX_JOB_CHARS = 256
 }
 
 enum class TerminalAction(val wire: String, val hostAuthored: Boolean) {
@@ -67,6 +76,8 @@ enum class TerminalAction(val wire: String, val hostAuthored: Boolean) {
     CLOSED("closed", true),
     RESIZE("resize", false),
     ERROR("error", true),
+    /** Host → client: a long foreground job in a session ended (`job`, `secs`). */
+    FINISHED("finished", true),
     ;
 
     companion object {
@@ -84,6 +95,14 @@ data class TerminalSessionInfo(
     val exitStatus: Long? = null,
     /** A terminal window at the desk shows this session and answers its terminal queries; the phone must not. */
     val deskWindow: Boolean = false,
+    /** Another phone (not this one) is attached to it. Omitted when false. */
+    val attached: Boolean = false,
+    /** The foreground process's directory, `$HOME` shown as `~`. */
+    val cwd: String? = null,
+    /** Unix seconds. */
+    val startedAt: Long? = null,
+    /** The shell's basename ("zsh"); omitted when unknown. */
+    val shell: String? = null,
 )
 
 /**
@@ -111,6 +130,14 @@ data class TerminalControl(
     val password: String? = null,
     val exitStatus: Long? = null,
     val error: String? = null,
+    /** With [TerminalAction.CREATE]: the folder to start in (absolute or `~/…`). */
+    val cwd: String? = null,
+    /** With [TerminalAction.SESSIONS]: folders to offer for a new session. */
+    val folders: List<String>? = null,
+    /** With [TerminalAction.FINISHED]: the job's name ("cargo"). */
+    val job: String? = null,
+    /** With [TerminalAction.FINISHED]: how long it ran, in seconds. */
+    val secs: Long? = null,
 ) {
     fun toJson(): ByteArray {
         val out = StringBuilder(160)
@@ -137,6 +164,10 @@ data class TerminalControl(
                         append(",\"cols\":").append(info.cols)
                         info.exitStatus?.let { append(",\"exitStatus\":").append(it) }
                         if (info.deskWindow) append(",\"deskWindow\":true")
+                        if (info.attached) append(",\"attached\":true")
+                        info.cwd?.let { append(",\"cwd\":").append(quote(it)) }
+                        info.startedAt?.let { append(",\"startedAt\":").append(it) }
+                        info.shell?.let { append(",\"shell\":").append(quote(it)) }
                         append('}')
                     }
                 },
@@ -152,6 +183,13 @@ data class TerminalControl(
         }
         exitStatus?.let { out.append(",\"exitStatus\":").append(it) }
         error?.let { out.append(",\"error\":").append(quote(it)) }
+        cwd?.let {
+            require(validCwd(it)) { "Invalid DeskLink terminal folder" }
+            out.append(",\"cwd\":").append(quote(it))
+        }
+        folders?.let { list -> out.append(",\"folders\":[").append(list.joinToString(",") { quote(it) }).append(']') }
+        job?.let { out.append(",\"job\":").append(quote(it)) }
+        secs?.let { out.append(",\"secs\":").append(it) }
         out.append('}')
         return out.toString().toByteArray(Charsets.UTF_8)
     }
@@ -197,6 +235,7 @@ data class TerminalControl(
             TerminalAction.ATTACHED -> require(terminalId != null && offset != null) {
                 "DeskLink terminal attach reply needs a terminal id and offset"
             }
+            TerminalAction.FINISHED -> require(terminalId != null) { "DeskLink terminal finished event needs a terminal id" }
             else -> Unit
         }
     }
@@ -248,6 +287,10 @@ data class TerminalControl(
                             cols = narrow(item.requiredInteger("cols")),
                             exitStatus = item.optionalInteger("exitStatus"),
                             deskWindow = item.present("deskWindow")?.let { it as? Boolean ?: bad("deskWindow") } ?: false,
+                            attached = item.present("attached")?.let { it as? Boolean ?: bad("attached") } ?: false,
+                            cwd = item.optionalString("cwd")?.takeIf(::validCwd),
+                            startedAt = item.optionalInteger("startedAt"),
+                            shell = item.optionalString("shell")?.take(TerminalProtocol.MAX_SHELL_CHARS),
                         )
                     }
                 },
@@ -269,8 +312,20 @@ data class TerminalControl(
                 password = json.optionalString("password"),
                 exitStatus = json.optionalInteger("exitStatus"),
                 error = json.optionalString("error"),
+                cwd = json.optionalString("cwd"),
+                // Folders the phone cannot use are dropped, not fatal: a newer desk may send more.
+                folders = json.optionalArray("folders")?.let { array ->
+                    (0 until array.length()).mapNotNull { index -> (array.opt(index) as? String)?.takeIf(::validCwd) }
+                        .distinct().take(TerminalProtocol.MAX_FOLDERS)
+                },
+                job = json.optionalString("job")?.take(TerminalProtocol.MAX_JOB_CHARS),
+                secs = json.optionalInteger("secs"),
             )
         }
+
+        /** What the desk accepts as `cwd`: non-empty, bounded, no NUL. */
+        fun validCwd(value: String): Boolean =
+            value.isNotEmpty() && value.length <= TerminalProtocol.MAX_CWD_CHARS && '\u0000' !in value
 
         private fun narrow(value: Long): Int {
             require(value in 0..Int.MAX_VALUE) { "DeskLink terminal number is out of range" }

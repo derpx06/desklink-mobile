@@ -8,7 +8,6 @@
   <string name="pref_plugin_telephony_desc">Sisenevate kõnede märguannete saatmine</string>
   <string name="pref_plugin_battery">Aku aruanne</string>
   <string name="pref_plugin_battery_desc">Perioodiline aku olekust teavitamine</string>
-  <string name="pref_plugin_sftp_desc">Seadme failisüsteemi eemalt sirvimise võimaldamine</string>
   <string name="pref_plugin_clipboard">Lõikepuhvri sünkroonimine</string>
   <string name="pref_plugin_clipboard_desc">Lõikepuhvri sisu jagamine</string>
   <string name="pref_plugin_clipboard_sent">Lõikepuhvrist saadud</string>
@@ -162,18 +161,6 @@
   <string name="filter_apps_info">Valitud rakenduste märguanded sünkroonitakse</string>
   <string name="add_device_dialog_title">Seadme lisamine</string>
   <string name="add_device_hint">Masinanimi või IP-aadress</string>
-  <string name="sftp_preference_configured_storage_locations">Seadistatud salvestuskohad</string>
-  <string name="sftp_preference_add_storage_location_title">Salvestuskoha lisamine</string>
-  <string name="sftp_preference_edit_storage_location">Salvestuskoha muutmine</string>
-  <string name="sftp_storage_preference_storage_location">Salvestuskoht</string>
-  <string name="sftp_storage_preference_storage_location_already_configured">See asukoht on juba seadistatud</string>
-  <string name="sftp_storage_preference_click_to_select">"klõpsa valimiseks "</string>
-  <string name="sftp_storage_preference_display_name">Näidatav nimi</string>
-  <string name="sftp_storage_preference_display_name_already_used">See nimi on juba kasutusel</string>
-  <string name="sftp_storage_preference_display_name_cannot_be_empty">Näidatav nimi ei tohi olla andmata</string>
-  <string name="sftp_action_mode_menu_delete">Kustuta</string>
-  <string name="sftp_no_storage_locations_configured">Ühtegi salvestuskohta pole seadistatud</string>
-  <string name="sftp_saf_permission_explanation">Ligipääsuks failidele eemalt tuleb seadistada salvestuskohad</string>
   <string name="no_players_connected">Ühtegi mängijat ei leitud</string>
   <string name="send_files">Saada faile</string>
   <string-array name="digitizer_preference_entries_draw_button_side">

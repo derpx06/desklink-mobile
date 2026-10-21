@@ -53,7 +53,7 @@ class TerminalAttentionNotifier(
         post(attention, lastLine(tail), yesNo = attention == TerminalAttention.WAITING && offersYesNo(tail))
     }
 
-    private fun post(attention: TerminalAttention, detail: String, yesNo: Boolean) {
+    internal fun post(attention: TerminalAttention, detail: String, yesNo: Boolean) {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -125,6 +125,31 @@ class TerminalAttentionNotifier(
         }
 
         fun tag(deviceId: String, terminalId: String) = "terminal:$deviceId:$terminalId"
+
+        /**
+         * Whether a `finished` event alerts: not while that terminal is on screen here, and not when
+         * the desk reports its command alerts off (it should not send then; an older desk might).
+         */
+        fun shouldAlertFinished(visibleTerminalId: String?, terminalId: String, commandAlerts: Boolean?): Boolean =
+            visibleTerminalId != terminalId && commandAlerts != false
+
+        /** The desk's `finished` event: "cargo finished after 2 min 4 s". */
+        fun jobFinished(context: Context, deviceId: String, finished: org.desklink.mobile.webrtc.terminal.TerminalJobFinished) {
+            val commandAlerts = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)
+                ?.settings?.commandAlerts
+            if (!shouldAlertFinished(TerminalForeground.terminalId, finished.terminalId, commandAlerts)) return
+            val job = finished.job?.takeIf(String::isNotBlank) ?: finished.title.ifBlank { context.getString(R.string.terminal_job_default) }
+            val detail = finished.secs?.let { context.getString(R.string.terminal_job_finished_after, job, formatDuration(it)) }
+                ?: context.getString(R.string.terminal_job_finished, job)
+            TerminalAttentionNotifier(context.applicationContext, deviceId, finished.terminalId).post(TerminalAttention.FINISHED, detail, yesNo = false)
+        }
+
+        /** "45 s", "2 min 4 s", "1 h 3 min". */
+        fun formatDuration(secs: Long): String = when {
+            secs < 60 -> "$secs s"
+            secs < 3600 -> if (secs % 60 == 0L) "${secs / 60} min" else "${secs / 60} min ${secs % 60} s"
+            else -> if (secs % 3600 / 60 == 0L) "${secs / 3600} h" else "${secs / 3600} h ${secs % 3600 / 60} min"
+        }
     }
 }
 

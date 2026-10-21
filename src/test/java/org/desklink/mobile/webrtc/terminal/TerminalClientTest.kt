@@ -51,7 +51,9 @@ class TerminalClientTest {
         val discarded = mutableListOf<String>()
         var nextFailure: TransportError? = null
         val password = AtomicReference<String?>()
+        val finished = mutableListOf<TerminalJobFinished>()
         val client = TerminalClient(
+            onJobFinished = { finished += it },
             sender = { type, payload, callback ->
                 sent += Sent(type, payload)
                 nextFailure?.let { callback.onFailure(it) } ?: callback.onSuccess()
@@ -167,6 +169,35 @@ class TerminalClientTest {
         // An agent uninstalled at the desk, or an older desktop that does not say.
         h.listed(bash)
         assertEquals(emptyList<String>(), h.state().launchers)
+    }
+
+    @Test
+    fun createAsksForTheChosenFolderAndListsCarryTheFolders() {
+        val h = Harness()
+        h.ready()
+        h.fromHost(h.hostControl(TerminalAction.SESSIONS).copy(sessions = listOf(bash.copy(cwd = "~/api", shell = "zsh", startedAt = 1_760_000_000)), folders = listOf("~", "~/api")))
+        assertEquals(listOf("~", "~/api"), h.state().folders)
+        assertEquals("~/api", h.session().cwd)
+        assertEquals("zsh", h.session().shell)
+        assertEquals(1_760_000_000L, h.session().startedAt)
+        val serial = h.state().listSerial
+        h.client.create(24, 80, cwd = "~/api")
+        assertEquals("~/api", h.controls(TerminalAction.CREATE).single().cwd)
+        // An invalid folder is never sent: the desk would start in its default.
+        h.client.create(24, 80, cwd = "")
+        assertNull(h.controls(TerminalAction.CREATE).last().cwd)
+        h.listed(bash)
+        assertEquals(emptyList<String>(), h.state().folders)
+        assertEquals(serial + 1, h.state().listSerial)
+    }
+
+    @Test
+    fun aFinishedJobIsReportedWithItsSessionTitle() {
+        val h = Harness()
+        h.ready()
+        h.listed(bash)
+        h.fromHost(h.hostControl(TerminalAction.FINISHED).copy(terminalId = "t1", job = "cargo", secs = 124))
+        assertEquals(listOf(TerminalJobFinished("t1", "bash", "cargo", 124)), h.finished)
     }
 
     @Test

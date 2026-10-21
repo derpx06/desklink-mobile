@@ -56,6 +56,36 @@ public class MprisReceiverPlugin extends Plugin {
         return device.getDeviceId();
     }
 
+    /** A relative `Seek` (microseconds, KDE Connect's unit) from [positionMs], never before the start. */
+    public static long seekTarget(long positionMs, long seekMicros) {
+        return Math.max(0, positionMs + seekMicros / 1000);
+    }
+
+    /** Off until the person turns it on (Settings → this computer): it needs notification access. */
+    @Override
+    public boolean isEnabledByDefault() {
+        return false;
+    }
+
+    /** At most two state packets a second per player; the last change always goes out. */
+    private static final long MIN_INTERVAL_MS = 500;
+    /** While playing, the position is re-sent this often so the desk's progress bar stays true. */
+    private static final long POSITION_INTERVAL_MS = 5_000;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final HashMap<String, Long> lastSent = new HashMap<>();
+    private final HashMap<String, Runnable> deferred = new HashMap<>();
+    private final Runnable positionTick = new Runnable() {
+        @Override
+        public void run() {
+            if (players != null) {
+                for (MprisReceiverPlayer player : new ArrayList<>(players.values())) {
+                    if (player.isPlaying()) sendMetadata(player);
+                }
+            }
+            handler.postDelayed(this, POSITION_INTERVAL_MS);
+        }
+    };
+
     @Override
     public boolean onCreate() {
         if (!NotificationReceiver.hasReadNotificationsPermission(context)) {
@@ -74,6 +104,7 @@ public class MprisReceiverPlugin extends Plugin {
 
             createPlayers(manager.getActiveSessions(new ComponentName(context, NotificationReceiver.class)));
             sendPlayerList();
+            handler.postDelayed(positionTick, POSITION_INTERVAL_MS);
         } catch (Exception e) {
             Log.e(TAG, "Exception", e);
         }
@@ -84,6 +115,7 @@ public class MprisReceiverPlugin extends Plugin {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        handler.removeCallbacksAndMessages(null);
         MediaSessionManager manager = ContextCompat.getSystemService(context, MediaSessionManager.class);
         if (manager != null && mediaSessionChangeListener != null) {
             manager.removeOnActiveSessionsChangedListener(mediaSessionChangeListener);
@@ -151,6 +183,11 @@ public class MprisReceiverPlugin extends Plugin {
         if (np.has("SetPosition")) {
             long position = np.getLong("SetPosition", 0);
             player.setPosition(position);
+        }
+
+        // A relative seek, in microseconds (the desk's skip buttons).
+        if (np.has("Seek")) {
+            player.setPosition(seekTarget(player.getPosition(), np.getLong("Seek", 0)));
         }
 
         if (np.has("setVolume")) {
@@ -234,7 +271,8 @@ public class MprisReceiverPlugin extends Plugin {
     private void sendPlayerList() {
         NetworkPacket np = new NetworkPacket(PACKET_TYPE_MPRIS);
         np.set("playerList", players.keySet());
-        np.set("supportAlbumArtPayload", true);
+        // Artwork bytes are not transferred in DeskLink v4.
+        np.set("supportAlbumArtPayload", false);
         getDevice().sendPacket(np);
     }
 
@@ -270,6 +308,21 @@ public class MprisReceiverPlugin extends Plugin {
     }
 
     void sendMetadata(MprisReceiverPlayer player) {
+        String key = String.valueOf(player.getName());
+        long now = android.os.SystemClock.elapsedRealtime();
+        Long last = lastSent.get(key);
+        if (last != null && now - last < MIN_INTERVAL_MS) {
+            if (!deferred.containsKey(key)) {
+                Runnable later = () -> {
+                    deferred.remove(key);
+                    sendMetadata(player);
+                };
+                deferred.put(key, later);
+                handler.postDelayed(later, MIN_INTERVAL_MS - (now - last));
+            }
+            return;
+        }
+        lastSent.put(key, now);
         NetworkPacket np = new NetworkPacket(MprisReceiverPlugin.PACKET_TYPE_MPRIS);
         np.set("player", player.getName());
         np.set("title", player.getTitle());

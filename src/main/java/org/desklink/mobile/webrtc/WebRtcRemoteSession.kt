@@ -54,6 +54,12 @@ enum class WebRtcRemoteSessionControlKind(val wireName: String) {
     INPUT_FOCUS("input-focus"),
     /** Phone → desktop: show the next shared screen. */
     SWITCH_SCREEN("switch-screen"),
+    /**
+     * Phone → desktop: this phone offers its own screen without being asked. The desk adopts the
+     * phone-chosen `remoteSessionId` and answers with an ordinary `request-view` for it (or
+     * `view-denied` "busy"); the phone treats that request as already consented.
+     */
+    OFFER_VIEW("offer-view"),
     ;
 
     companion object {
@@ -253,6 +259,17 @@ class WebRtcRemoteSessionController(
         return id
     }
 
+    /** The phone's own offer of its screen ([WebRtcRemoteSessionControlKind.OFFER_VIEW]): a new id, phone to desktop. */
+    @Synchronized
+    fun beginOffer(): String = beginView(WebRtcScreenDirection.PHONE_TO_DESKTOP).also { offered = it }
+
+    /** Whether a desk `request-view` answers this phone's own offer (and so needs no second consent). Consumed once. */
+    @Synchronized
+    fun answersOffer(remoteSessionId: String, direction: WebRtcScreenDirection?): Boolean =
+        (direction == WebRtcScreenDirection.PHONE_TO_DESKTOP && offered == remoteSessionId).also { if (it) offered = null }
+
+    private var offered: String? = null
+
     @Synchronized
     fun requestControl(): String {
         require(state == WebRtcRemoteSessionState.VIEWING || state == WebRtcRemoteSessionState.REQUESTING_CONTROL) {
@@ -398,6 +415,8 @@ class WebRtcRemoteSessionController(
             // Sent by this phone, never received.
             WebRtcRemoteSessionControlKind.SWITCH_SCREEN ->
                 throw IllegalArgumentException("switch-screen is a request to the desktop")
+            WebRtcRemoteSessionControlKind.OFFER_VIEW ->
+                throw IllegalArgumentException("offer-view is made by the phone")
             WebRtcRemoteSessionControlKind.RELEASE,
             WebRtcRemoteSessionControlKind.SCREEN_STOPPED -> {
                 if (!isCurrent(message)) return false

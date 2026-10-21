@@ -17,6 +17,8 @@ class DeviceConnectionTest {
         assertEquals(DeviceConnection.LOCAL, deviceConnection(reachable = true, featuresReady = true, lan = true, relay = true))
         assertEquals(DeviceConnection.AWAY, deviceConnection(reachable = true, featuresReady = true, lan = false, relay = true))
         assertEquals(DeviceConnection.CONNECTED, deviceConnection(reachable = true, featuresReady = true, lan = false, relay = false))
+        // The bootstrap link is being re-established while WebRTC still carries every feature.
+        assertEquals(DeviceConnection.CONNECTED, deviceConnection(reachable = false, featuresReady = true, lan = false, relay = false))
     }
 }
 

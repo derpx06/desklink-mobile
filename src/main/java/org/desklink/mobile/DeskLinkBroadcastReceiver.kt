@@ -44,13 +44,27 @@ class DeskLinkBroadcastReceiver : BroadcastReceiver() {
                 BackgroundService.ForceRefreshConnections(context)
             }
 
-            Intent.ACTION_SCREEN_ON -> try {
-                BackgroundService.ForceRefreshConnections(context)
-            } catch (e: IllegalStateException) { // To catch ForegroundServiceStartNotAllowedException
-                Log.w("BroadcastReceiver", "Couldn't start the foreground service.", e)
+            Intent.ACTION_SCREEN_ON -> {
+                // First: the desk stops treating this phone as dozing (contract §11).
+                sendDozeState()
+                try {
+                    BackgroundService.ForceRefreshConnections(context)
+                } catch (e: IllegalStateException) { // To catch ForegroundServiceStartNotAllowedException
+                    Log.w("BroadcastReceiver", "Couldn't start the foreground service.", e)
+                }
             }
 
+            Intent.ACTION_SCREEN_OFF -> sendDozeState()
+
             else -> Log.i("BroadcastReceiver", "Ignoring broadcast event: ${intent.action}")
+        }
+    }
+
+    private fun sendDozeState() {
+        // Off the main thread: the LAN write may block.
+        org.desklink.mobile.helpers.ThreadHelper.execute {
+            runCatching { DeskLinkApplication.getInstance().devices.values.forEach { it.sendDozeState() } }
+                .onFailure { Log.d("BroadcastReceiver", "Could not report the screen state", it) }
         }
     }
 }

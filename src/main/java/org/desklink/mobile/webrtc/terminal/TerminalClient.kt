@@ -69,6 +69,14 @@ data class TerminalSessionState(
     val wanted: Boolean,
     /** No longer exists on the desktop. */
     val gone: Boolean,
+    /** Another phone has it open. */
+    val attachedElsewhere: Boolean = false,
+    /** The foreground process's folder, `~/…`. */
+    val cwd: String? = null,
+    /** Unix seconds. */
+    val startedAt: Long? = null,
+    /** "zsh". */
+    val shell: String? = null,
 )
 
 data class TerminalClientState(
@@ -87,7 +95,14 @@ data class TerminalClientState(
     /** The person at the desk ended this phone's sessions; the UI says so, returns to the list and
      * calls [TerminalClient.consumeEnded]. */
     val endedByComputer: Boolean = false,
+    /** Folders the desk offers for a new session ("~" first); empty from an older desk. */
+    val folders: List<String> = emptyList(),
+    /** Counts the desk's accepted lists: a list after a given one proves the password was taken. */
+    val listSerial: Int = 0,
 )
+
+/** A long job in a session ended: what the desk's `finished` event says. */
+data class TerminalJobFinished(val terminalId: String, val title: String, val job: String?, val secs: Long?)
 
 /**
  * Per-device terminal state machine.
@@ -110,6 +125,8 @@ class TerminalClient(
     /** The device's session password, shared with its screen. Kept across reconnects: the desktop
      * asks once per connection, and the next one is offered it again. */
     private val password: AtomicReference<String?> = AtomicReference(),
+    /** Called on the client thread for each `finished` event; the notifier decides whether to alert. */
+    private val onJobFinished: (TerminalJobFinished) -> Unit = {},
 ) {
     private class Session(val id: String) {
         var info: TerminalSessionInfo? = null
@@ -142,6 +159,8 @@ class TerminalClient(
     private var launchers: List<String> = emptyList()
     private var passwordNeeded: SessionPasswordDenial? = null
     private var endedByComputer = false
+    private var folders: List<String> = emptyList()
+    private var listSerial = 0
 
     /**
      * A password from [unlock] that the desktop has not yet accepted. It goes out on one list only:
@@ -225,13 +244,17 @@ class TerminalClient(
 
     fun refresh() = post { if (linkUp) sendControl(TerminalAction.LIST) }
 
-    /** Asks for a new session running the login shell, or [command] as an argument vector. */
-    fun create(rows: Int, cols: Int, command: List<String>? = null) = post {
+    /**
+     * Asks for a new session running the login shell, or [command] as an argument vector, in [cwd]
+     * (absolute or `~/…`; the desk refuses a folder that is not there with `bad-cwd`).
+     */
+    fun create(rows: Int, cols: Int, command: List<String>? = null, cwd: String? = null) = post {
         if (!linkUp) return@post
         val create = control(TerminalAction.CREATE).copy(
             rows = rows.coerceIn(MIN_ROWS, TerminalProtocol.MAX_DIMENSION),
             cols = cols.coerceIn(MIN_COLS, TerminalProtocol.MAX_DIMENSION),
             command = command,
+            cwd = cwd?.takeIf { TerminalControl.validCwd(it) },
         )
         pendingCreate = create
         sendControl(create)
@@ -362,8 +385,10 @@ class TerminalClient(
                 notAllowed = false
                 passwordNeeded = null
                 listLoaded = true
+                listSerial++
                 // Absent from an older desktop: it can start a shell only.
                 launchers = control.launchers.orEmpty()
+                folders = control.folders.orEmpty()
                 val listed = control.sessions.orEmpty()
                 val ids = listed.map { it.terminalId }.toSet()
                 sessions.values.filter { it.id !in ids }.forEach { markGone(it) }
@@ -462,6 +487,11 @@ class TerminalClient(
                 }
             }
             TerminalAction.ERROR -> handleError(control)
+            TerminalAction.FINISHED -> {
+                val id = control.terminalId!!
+                onJobFinished(TerminalJobFinished(id, sessions[id]?.info?.title.orEmpty(), control.job, control.secs))
+                return
+            }
             else -> Unit // unreachable: validateFromHost refused client-authored actions
         }
         purge()
@@ -699,6 +729,10 @@ class TerminalClient(
                     attached = session.attached,
                     wanted = session.wanted,
                     gone = session.gone,
+                    attachedElsewhere = info.attached,
+                    cwd = info.cwd,
+                    startedAt = info.startedAt,
+                    shell = info.shell,
                 )
             },
             listLoaded = listLoaded,
@@ -708,6 +742,8 @@ class TerminalClient(
             launchers = launchers,
             passwordNeeded = passwordNeeded,
             endedByComputer = endedByComputer,
+            folders = folders,
+            listSerial = listSerial,
         )
     }
 

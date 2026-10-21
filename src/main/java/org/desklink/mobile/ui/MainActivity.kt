@@ -67,6 +67,8 @@ import kotlinx.coroutines.launch
 import org.apache.commons.lang3.ArrayUtils
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.DeskLinkApplication
+import org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin
+import org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin
 import org.desklink.mobile.Device
 import org.desklink.mobile.PairingHandler.PairState
 import org.desklink.mobile.QrPairing
@@ -380,10 +382,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             },
             onLock = { run(menu(R.string.lock_remote_device), R.string.home_locked) },
             onShareScreen = {
-                if (PhoneScreenCaptureService.sharingDeviceId == id) {
-                    SessionLiveNotification.endAll(this, id)
-                } else {
-                    onShareInfo()
+                when {
+                    PhoneScreenCaptureService.sharingDeviceId == id -> SessionLiveNotification.endAll(this, id)
+                    // Offered from here; the desk opens its Phone Screen window and asks back.
+                    DeskLinkApplication.getInstance().offerPhoneScreen(id) -> showMessage(getString(R.string.home_share_offered, device.name))
+                    else -> onShareInfo()
                 }
             },
             onPresenter = {
@@ -404,6 +407,16 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 }
             },
             onClipboard = { on -> setPluginEnabled(device, HomeModel.clipboardKey, on) },
+            onUnlockDesk = {
+                val unlock = device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java)
+                if (unlock == null) showMessage(getString(R.string.home_feature_off)) else {
+                    unlock.ask()
+                    showMessage(getString(R.string.home_unlock_asking, device.name))
+                }
+            },
+            onRunCommand = {
+                startActivity(Intent(this, org.desklink.mobile.plugins.runcommand.RunCommandActivity::class.java).putExtra("deviceId", id))
+            },
             onUnavailable = ::showMessage,
         )
     }
@@ -630,14 +643,31 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 key = SslHelper.getCertificateHash(it.certificate).filter(Char::isLetterOrDigit).uppercase().take(8).chunked(2).joinToString(":"),
                 pluginPermissions = it.pluginsWithoutPermissions.values.filter { p -> it.isPluginEnabled(p.pluginKey) }.map { p -> p.displayName to { showPluginPermission(p, optional = false) } } +
                     it.pluginsWithoutOptionalPermissions.values.filter { p -> it.isPluginEnabled(p.pluginKey) }.map { p -> p.displayName to { showPluginPermission(p, optional = true) } },
+                remote = it.getPlugin(DeskSettingsPlugin::class.java)?.settings,
+                phoneMediaOn = it.isPluginEnabled(Plugin.getPluginKey(MprisReceiverPlugin::class.java)),
             )
         }
+        fun deskSet(key: String, on: Boolean) = device?.getPlugin(DeskSettingsPlugin::class.java)?.set(key, on)
         SettingsScreen(
             desk,
             SettingsActions(
                 onBack = ::pop,
-                onDeskClipboard = { on -> device?.let { setPluginEnabled(it, HomeModel.clipboardKey, on) } },
-                onDeskNotifications = { on -> device?.let { setPluginEnabled(it, Plugin.getPluginKey(NotificationsPlugin::class.java), on) } },
+                onDeskClipboard = { on ->
+                    device?.let { setPluginEnabled(it, HomeModel.clipboardKey, on) }
+                    deskSet(DeskSettingsPlugin.CLIPBOARD, on)
+                },
+                onDeskNotifications = { on ->
+                    device?.let { setPluginEnabled(it, Plugin.getPluginKey(NotificationsPlugin::class.java), on) }
+                    deskSet(DeskSettingsPlugin.NOTIFICATIONS, on)
+                },
+                onDeskSetting = { key, on -> deskSet(key, on) },
+                onPhoneMedia = { on ->
+                    device?.let { setPluginEnabled(it, Plugin.getPluginKey(MprisReceiverPlugin::class.java), on) }
+                    // Notification access is asked for only now, when the person turns this on.
+                    if (on && !org.desklink.mobile.plugins.notifications.NotificationReceiver.hasReadNotificationsPermission(this)) {
+                        runCatching { startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                    }
+                },
                 onQuickCommands = { push(QUICK) },
                 onMore = { push(MORE) },
                 onUnpair = {

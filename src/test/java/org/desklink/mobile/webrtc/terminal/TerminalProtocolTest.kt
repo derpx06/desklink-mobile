@@ -463,6 +463,71 @@ class TerminalProtocolTest {
         assertArrayEquals(good, TerminalChunk.decode(good).encode())
     }
 
+    // ---- Stage D additions (contract §7) ----------------------------------------------------
+
+    @Test
+    fun createCarriesTheFolderAtTopLevelAfterTheOtherFields() {
+        assertEquals(
+            "{\"protocolVersion\":1,\"action\":\"create\",\"deviceId\":\"phone-1\",\"sessionId\":7," +
+                "\"connectionGeneration\":1,\"rows\":24,\"cols\":80,\"cwd\":\"~/api\"}",
+            String(TerminalControl.create(TerminalAction.CREATE, wire).copy(rows = 24, cols = 80, cwd = "~/api").toJson()),
+        )
+        rejected { TerminalControl.create(TerminalAction.CREATE, wire).copy(cwd = "").toJson() }
+        rejected { TerminalControl.create(TerminalAction.CREATE, wire).copy(cwd = "a\u0000b").toJson() }
+        rejected { TerminalControl.create(TerminalAction.CREATE, wire).copy(cwd = "x".repeat(TerminalProtocol.MAX_CWD_CHARS + 1)).toJson() }
+    }
+
+    @Test
+    fun sessionsCarryTheirFolderShellStartAndFolders() {
+        val sessions = TerminalControl.fromJson(
+            host(
+                ",\"sessions\":[{\"terminalId\":\"t1\",\"title\":\"zsh\",\"rows\":24,\"cols\":80,\"attached\":true," +
+                    "\"cwd\":\"~/api\",\"startedAt\":1760000000,\"shell\":\"zsh\"}],\"folders\":[\"~\",\"~/api\",\"~/api\",\"\"]",
+            ).toByteArray(),
+        )
+        sessions.validateFromHost(wire)
+        val info = sessions.sessions.orEmpty().single()
+        assertTrue(info.attached)
+        assertEquals("~/api", info.cwd)
+        assertEquals(1_760_000_000L, info.startedAt)
+        assertEquals("zsh", info.shell)
+        // Duplicates and invalid entries are dropped, the order kept.
+        assertEquals(listOf("~", "~/api"), sessions.folders)
+    }
+
+    @Test
+    fun anOlderDeskWithoutTheNewFieldsStillParses() {
+        val sessions = TerminalControl.fromJson(GOLDEN_SESSIONS.toByteArray())
+        sessions.validateFromHost(wire)
+        val info = sessions.sessions.orEmpty()[0]
+        assertFalse(info.attached)
+        assertNull(info.cwd)
+        assertNull(info.startedAt)
+        assertNull(info.shell)
+        assertNull(sessions.folders)
+        // And the new fields stay out of what an older desk receives.
+        val json = String(TerminalControl.create(TerminalAction.CREATE, wire).copy(rows = 24, cols = 80).toJson())
+        for (absent in listOf("cwd", "folders", "job", "secs")) assertFalse(json.contains(absent))
+    }
+
+    @Test
+    fun aFinishedJobNamesItsTerminal() {
+        val finished = TerminalControl.fromJson(host(",\"terminalId\":\"t1\",\"job\":\"cargo\",\"secs\":124", action = "finished").toByteArray())
+        finished.validateFromHost(wire)
+        assertEquals(TerminalAction.FINISHED, finished.action)
+        assertEquals("cargo", finished.job)
+        assertEquals(124L, finished.secs)
+        rejected { fromHost(host(",\"job\":\"cargo\"", action = "finished")) }
+    }
+
+    @Test
+    fun aBadFolderIsAnErrorWithoutATerminal() {
+        val error = TerminalControl.fromJson(host(",\"error\":\"bad-cwd\"", action = "error").toByteArray())
+        error.validateFromHost(wire)
+        assertEquals(TerminalProtocol.ERROR_BAD_CWD, error.error)
+        assertNull(error.terminalId)
+    }
+
     private companion object {
         val GOLDEN_SNAPSHOT_DATA = byteArrayOf(0x1b, 0x63, 0x1b, 0x5b, 0x3f, 0x31, 0x30, 0x34, 0x39, 0x68) // ESC c ESC [ ? 1049 h
 

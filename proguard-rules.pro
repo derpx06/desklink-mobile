@@ -20,10 +20,6 @@
 -keepattributes SourceFile,LineNumberTable,Signature,*Annotation*
 -keep class org.desklink.mobile.** {*;}
 
-# SSHd requires mina, and mina uses reflection so some classes would get deleted
--keep class org.apache.sshd.** {*;}
--dontwarn org.apache.sshd.**
-
 # The webrtc-sdk AAR ships no consumer rules, and its native code finds Java
 # classes, fields and methods by name over JNI.
 -keep class org.webrtc.** { *; }
