@@ -26,4 +26,21 @@ class QrPairingTest {
             proof.joinToString("") { "%02x".format(it) },
         )
     }
+
+    @Test
+    fun `qr v2 addresses are private ipv4 literals only`() {
+        assertEquals(
+            listOf("192.168.1.20", "10.0.0.5"),
+            QrPairing.parseAddresses("192.168.1.20, 10.0.0.5,8.8.8.8,evil.example,127.0.0.1,192.168.1.20,").map { it.hostAddress },
+        )
+        assertEquals(emptyList<java.net.InetAddress>(), QrPairing.parseAddresses(null))
+    }
+
+    @Test
+    fun `qr v2 port is in DeskLink's range`() {
+        assertEquals(1716, QrPairing.parsePort("1716"))
+        assertEquals(null, QrPairing.parsePort("80"))
+        assertEquals(null, QrPairing.parsePort("x"))
+        assertEquals(null, QrPairing.parsePort(null))
+    }
 }

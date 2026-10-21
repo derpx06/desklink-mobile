@@ -51,6 +51,10 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -473,6 +477,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             },
             onClose = ::pop,
         )
+        QrProgress()
         qrConflict?.let { (code, name) ->
             AlertDialog(
                 onDismissRequest = { qrConflict = null; pop() },
@@ -490,12 +495,74 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     /** A scanned code that would replace an existing pairing, waiting for the person's answer. */
     private var qrConflict by mutableStateOf<Pair<QrPairing.Code, String>?>(null)
 
+    /** A scanned code being paired: which desk, and how far (null stage: scanning). */
+    private var qrProgress by mutableStateOf<Pair<String, QrPairing.Stage>?>(null)
+
     private fun startQrPairing(code: QrPairing.Code, replaceExisting: Boolean) {
-        showMessage(getString(R.string.qr_pairing_started))
-        pop()
-        QrPairing.pair(DeskLinkApplication.getInstance(), code, replaceExisting) { error ->
-            if (error != null) runOnUiThread { showMessage(error) }
+        qrProgress = code.desktopId to QrPairing.Stage.CONNECTING
+        QrPairing.pair(
+            DeskLinkApplication.getInstance(),
+            code,
+            replaceExisting,
+            onProgress = { stage -> runOnUiThread { qrProgress = code.desktopId to stage } },
+        ) { error ->
+            if (error != null) runOnUiThread {
+                qrProgress = null
+                showMessage(error)
+                scanAttempt++
+            }
         }
+    }
+
+    /** Connecting → verifying → paired, over the scan screen; paired goes to the desk's Home. */
+    @Composable
+    private fun QrProgress() {
+        val (id, stage) = qrProgress ?: return
+        @Suppress("UNUSED_VARIABLE") val refresh = tick
+        val device = DeskLinkApplication.getInstance().getDevice(id)
+        val paired = device?.isPaired == true
+        LaunchedEffect(paired) {
+            if (paired) {
+                kotlinx.coroutines.delay(700)
+                qrProgress = null
+                select(id)
+                resetTo(HOME)
+            }
+        }
+        // The desk never answered the proof: say so instead of spinning.
+        LaunchedEffect(stage) {
+            if (stage == QrPairing.Stage.VERIFYING) {
+                kotlinx.coroutines.delay(20_000)
+                if (qrProgress?.first == id && DeskLinkApplication.getInstance().getDevice(id)?.isPaired != true) {
+                    qrProgress = null
+                    showMessage(getString(R.string.qr_progress_timeout))
+                    scanAttempt++
+                }
+            }
+        }
+        val label = when {
+            paired -> getString(R.string.qr_progress_paired, device?.name.orEmpty())
+            stage == QrPairing.Stage.CONNECTING -> getString(R.string.qr_progress_connecting)
+            else -> getString(R.string.qr_progress_verifying, device?.name.orEmpty())
+        }
+        AlertDialog(
+            onDismissRequest = {},
+            text = {
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                ) {
+                    if (paired) {
+                        androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = tokens.mint)
+                    } else {
+                        androidx.compose.material3.CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.5.dp)
+                    }
+                    Text(label)
+                }
+            },
+            confirmButton = {},
+        )
     }
 
     /** QR pairing: one scan, nothing to compare (see QrPairing / pairing_qr.rs). */

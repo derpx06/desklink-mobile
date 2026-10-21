@@ -18,6 +18,8 @@ class PeerLiveness(private val probeAfterMs: Long, private val deadAfterMs: Long
     private var lastInboundAt = 0L
     private var lastProbeAt = 0L
     private var lastTickAt = 0L
+    /** Only real inbound data; the freeze reset never moves it. */
+    private var lastHeardAt = 0L
 
     @Synchronized
     fun start(now: Long) {
@@ -29,7 +31,12 @@ class PeerLiveness(private val probeAfterMs: Long, private val deadAfterMs: Long
     @Synchronized
     fun onInbound(now: Long) {
         lastInboundAt = now
+        lastHeardAt = now
     }
+
+    /** Whether anything really arrived at or after [since] (the screen-on probe's answer). */
+    @Synchronized
+    fun heardSince(since: Long): Boolean = lastHeardAt >= since
 
     @Synchronized
     fun tick(now: Long): Verdict {

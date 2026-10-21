@@ -30,6 +30,7 @@ class WebRtcRecoveryPolicy {
     fun attempts(): Int = nextAttempt
 
     companion object {
-        private val DELAYS_MILLIS = longArrayOf(1_000, 2_000, 4_000, 8_000, 16_000, 30_000)
+        /** Six rungs, in lockstep with the desk (contract B3). The phone never gives up on attempts. */
+        internal val DELAYS_MILLIS = longArrayOf(250, 1_000, 2_000, 4_000, 8_000, 16_000)
     }
 }

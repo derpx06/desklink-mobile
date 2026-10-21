@@ -36,10 +36,23 @@ internal fun connectionPath(
     remoteType: String?,
     bootstrapViaRelay: Boolean,
 ): WebRtcConnectionPath {
-    if (localType == "relay" || remoteType == "relay") return WebRtcConnectionPath.TURN
-    val local = localType == "host" || localType == "prflx"
-    val remote = remoteType == "host" || remoteType == "prflx"
+    val l = canonicalCandidateType(localType)
+    val r = canonicalCandidateType(remoteType)
+    if (l == "relay" || r == "relay") return WebRtcConnectionPath.TURN
+    val local = l == "host" || l == "prflx"
+    val remote = r == "host" || r == "prflx"
     return if (local && remote && !bootstrapViaRelay) WebRtcConnectionPath.LAN else WebRtcConnectionPath.DIRECT
+}
+
+/**
+ * Stats spell candidate types two ways: the short SDP names (libwebrtc) and the long ones
+ * (webrtcbin: "server-reflexive", "peer-reflexive", "relayed"). Both map to the short form (B5).
+ */
+internal fun canonicalCandidateType(type: String?): String? = when (type) {
+    "srflx", "server-reflexive" -> "srflx"
+    "prflx", "peer-reflexive" -> "prflx"
+    "relay", "relayed" -> "relay"
+    else -> type
 }
 
 /** transport → selectedCandidatePairId → candidate-pair → local/remote candidate. */

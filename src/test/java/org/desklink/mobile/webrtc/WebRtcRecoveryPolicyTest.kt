@@ -9,12 +9,13 @@ class WebRtcRecoveryPolicyTest {
     @Test
     fun `backoff is bounded and duplicate workers are coalesced`() {
         val policy = WebRtcRecoveryPolicy()
-        assertEquals(1_000L, policy.claimDelayMillis())
+        // The ladder is in lockstep with the desk (contract B3): six rungs, then the last repeats.
+        assertEquals(250L, policy.claimDelayMillis())
         assertNull(policy.claimDelayMillis())
         policy.release()
-        assertEquals(2_000L, policy.claimDelayMillis())
+        assertEquals(1_000L, policy.claimDelayMillis())
         policy.release()
-        for (delay in listOf(4_000L, 8_000L, 16_000L, 30_000L, 30_000L)) {
+        for (delay in listOf(2_000L, 4_000L, 8_000L, 16_000L, 16_000L)) {
             assertEquals(delay, policy.claimDelayMillis())
             policy.release()
         }
@@ -28,6 +29,6 @@ class WebRtcRecoveryPolicyTest {
         policy.claimDelayMillis()
         policy.reset()
         assertEquals(0, policy.attempts())
-        assertEquals(1_000L, policy.claimDelayMillis())
+        assertEquals(250L, policy.claimDelayMillis())
     }
 }

@@ -22,6 +22,7 @@ object WebRtcRuntime {
             PeerConnectionFactory.initialize(
                 PeerConnectionFactory.InitializationOptions.builder(context.applicationContext)
                     .setEnableInternalTracer(false)
+                    .setFieldTrials(FIELD_TRIALS)
                     .createInitializationOptions(),
             )
         }
@@ -74,6 +75,12 @@ object WebRtcRuntime {
         disableNetworkMonitor = true
         networkIgnoreMask = PeerConnectionFactory.Options.ADAPTER_TYPE_LOOPBACK
     }
+
+    /**
+     * V3: no playout delay. A screen is not a call: frames are shown the moment they decode,
+     * never smoothed into a jitter buffer target (local, no wire).
+     */
+    internal const val FIELD_TRIALS = "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/"
 
     @Synchronized
     fun eglContext(context: Context): EglBase.Context {

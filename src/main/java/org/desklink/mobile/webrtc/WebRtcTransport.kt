@@ -154,6 +154,11 @@ class WebRtcTransport(
     private val createLocalChannels: Boolean = false,
     /** Debug "Force TURN": gather relay candidates only. */
     relayOnly: Boolean = false,
+    /**
+     * A LAN link to the desk exists: skip cellular adapters (libwebrtc's LOW_COST policy), so ICE
+     * does not spend checks on mobile data. Decided per peer, so each rebuild looks again.
+     */
+    lowCostOnly: Boolean = false,
     private val observer: Observer,
 ) : SessionTransport {
     interface Observer {
@@ -204,6 +209,7 @@ class WebRtcTransport(
             // that can fail on a hostile network.
             bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
             if (relayOnly) iceTransportsType = PeerConnection.IceTransportsType.RELAY
+            if (lowCostOnly && !relayOnly) candidateNetworkPolicy = PeerConnection.CandidateNetworkPolicy.LOW_COST
         }
         peer = factory.createPeerConnection(configuration, PeerObserver())
             ?: error("Unable to create DeskLink WebRTC peer connection")
@@ -632,6 +638,7 @@ class WebRtcTransport(
      * gives no hint whether nothing arrives or nothing decodes. */
     private fun startInboundStatsLog() {
         var lastPackets = -1L
+        var previous: Map<String, Any?> = emptyMap()
         inboundStatsTimer = java.util.Timer("DeskLink-inbound-stats", true).apply {
             schedule(object : java.util.TimerTask() {
                 override fun run() {
@@ -645,14 +652,8 @@ class WebRtcTransport(
                             if (packets == lastPackets) return@getStats
                             lastPackets = packets
                             val codec = (m["codecId"] as? String)?.let { report.statsMap[it]?.members?.get("mimeType") }
-                            Log.i(
-                                TAG,
-                                "inbound-stats codec=$codec decoder=${m["decoderImplementation"]} " +
-                                    "packets=$packets lost=${m["packetsLost"]} framesReceived=${m["framesReceived"]} " +
-                                    "framesDecoded=${m["framesDecoded"]} keyFramesDecoded=${m["keyFramesDecoded"]} " +
-                                    "framesDropped=${m["framesDropped"]} nack=${m["nackCount"]} pli=${m["pliCount"]} " +
-                                    "size=${m["frameWidth"]}x${m["frameHeight"]} framesAtTrack=${debugFramesAtTrack.get()}",
-                            )
+                            Log.i(TAG, "inbound-stats codec=$codec " + inboundStatsLine(previous, m) + " framesAtTrack=${debugFramesAtTrack.get()}")
+                            previous = HashMap(m)
                         }
                     }
                 }
@@ -873,4 +874,26 @@ class WebRtcTransport(
         const val START_SCREEN_BITRATE = 2_500_000
         const val MAX_SCREEN_BITRATE = 8_000_000
     }
+}
+
+/**
+ * One debug line of the desk→phone video: rates over the last interval where the stats are
+ * running totals (decode time per frame, jitter-buffer delay per frame), counters as they stand.
+ * Pure, so the arithmetic is tested.
+ */
+internal fun inboundStatsLine(previous: Map<String, Any?>, current: Map<String, Any?>): String {
+    fun num(map: Map<String, Any?>, key: String) = (map[key] as? Number)?.toDouble()
+    fun delta(key: String) = num(current, key)?.let { it - (num(previous, key) ?: 0.0) }
+    fun perFrame(total: String, count: String): String {
+        val t = delta(total) ?: return "-"
+        val c = delta(count)?.takeIf { it > 0 } ?: return "-"
+        return "%.1f".format(t / c * 1000)
+    }
+    return "decoder=${current["decoderImplementation"]} fps=${num(current, "framesPerSecond")?.let { "%.0f".format(it) } ?: "-"} " +
+        "decodeMs=${perFrame("totalDecodeTime", "framesDecoded")} " +
+        "jitterBufferMs=${perFrame("jitterBufferDelay", "jitterBufferEmittedCount")} " +
+        "jitterMs=${num(current, "jitter")?.let { "%.1f".format(it * 1000) } ?: "-"} " +
+        "freezes=${current["freezeCount"]} dropped=${current["framesDropped"]} " +
+        "lost=${current["packetsLost"]} decoded=${current["framesDecoded"]} keyFrames=${current["keyFramesDecoded"]} " +
+        "nack=${current["nackCount"]} pli=${current["pliCount"]} size=${current["frameWidth"]}x${current["frameHeight"]}"
 }

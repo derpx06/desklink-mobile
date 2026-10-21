@@ -59,6 +59,17 @@ class PeerLivenessTest {
     }
 
     @Test
+    fun theScreenOnProbeOnlyCountsRealAnswers() {
+        val liveness = PeerLiveness(5_000, 15_000).apply { start(0) }
+        liveness.run(1_000, 2_000)
+        // Thawed at 60 s and probed: the freeze reset of the silence clock is not an answer.
+        liveness.tick(60_000)
+        assertFalse(liveness.heardSince(60_000))
+        liveness.onInbound(60_400)
+        assertTrue(liveness.heardSince(60_000))
+    }
+
+    @Test
     fun heartbeatsSayWhetherThePhoneIsDozing() {
         val probe = heartbeatPacket(reply = false, interactive = false)
         assertEquals(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT, probe.type)

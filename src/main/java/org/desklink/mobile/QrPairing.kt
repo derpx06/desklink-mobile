@@ -31,7 +31,13 @@ object QrPairing {
         val fingerprint: ByteArray,
         val secret: ByteArray,
         val host: InetAddress?,
+        /** QR v2 (`a`, `p`): every LAN address of the desk and its TCP port, dialled directly. */
+        val addresses: List<InetAddress> = emptyList(),
+        val port: Int? = null,
     )
+
+    /** Where a scan has got to, for the scan screen (scanning → connecting → verifying → paired). */
+    enum class Stage { CONNECTING, VERIFYING }
 
     /** The desktop a scan is pairing with; lets its link past the trusted-network gate. */
     @Volatile
@@ -54,8 +60,25 @@ object QrPairing {
             ?.takeIf { it.isNotEmpty() && it.all { c -> c.isDigit() || c == '.' } }
             ?.let { runCatching { InetAddress.getByName(it) }.getOrNull() }
             ?.takeIf { org.desklink.mobile.helpers.isPrivateAddress(it) }
-        Code(id, fp, secret, host)
+        Code(id, fp, secret, host, parseAddresses(uri.getQueryParameter("a")), parsePort(uri.getQueryParameter("p")))
     }.getOrNull()
+
+    /** `a`: comma-separated private IPv4 literals, at most 8; anything else is dropped (no DNS). */
+    @JvmStatic
+    fun parseAddresses(value: String?): List<InetAddress> =
+        value.orEmpty().split(',').asSequence()
+            .map(String::trim)
+            .filter { it.matches(Regex("""\d{1,3}(\.\d{1,3}){3}""")) }
+            .mapNotNull { runCatching { InetAddress.getByName(it) }.getOrNull() }
+            .filter { org.desklink.mobile.helpers.isPrivateAddress(it) && !it.isLoopbackAddress }
+            .distinct()
+            .take(8)
+            .toList()
+
+    /** `p`: DeskLink's TCP port range only. */
+    @JvmStatic
+    fun parsePort(value: String?): Int? =
+        value?.toIntOrNull()?.takeIf { it in org.desklink.mobile.backends.lan.LanLinkProvider.MIN_PORT..org.desklink.mobile.backends.lan.LanLinkProvider.MAX_PORT }
 
     /** Must equal `pairing_qr::proof` on the desktop, byte for byte. */
     @JvmStatic
@@ -93,14 +116,15 @@ object QrPairing {
         application: DeskLinkApplication,
         code: Code,
         replaceExisting: Boolean,
+        onProgress: (Stage) -> Unit = {},
         onResult: (String?) -> Unit,
     ) {
         org.desklink.mobile.helpers.ThreadHelper.execute {
-            onResult(runCatching { pairBlocking(application, code, replaceExisting) }.exceptionOrNull()?.message)
+            onResult(runCatching { pairBlocking(application, code, replaceExisting, onProgress) }.exceptionOrNull()?.message)
         }
     }
 
-    private fun pairBlocking(application: DeskLinkApplication, code: Code, replaceExisting: Boolean) {
+    private fun pairBlocking(application: DeskLinkApplication, code: Code, replaceExisting: Boolean, onProgress: (Stage) -> Unit) {
         pendingDesktopId = code.desktopId
         try {
             // Never unpaired on a scan's say-so alone: a code shown elsewhere
@@ -110,6 +134,13 @@ object QrPairing {
             conflictingPairing(application, code)?.let { existing ->
                 if (!replaceExisting) throw ReplacesPairing(existing.name)
                 existing.unpair()
+            }
+            onProgress(Stage.CONNECTING)
+            // QR v2: dial the desk's addresses ourselves (pinned to the code's fingerprint below),
+            // no UDP hop. The announce-then-dial-back of v1 runs too, as the fallback.
+            val port = code.port
+            if (port != null && code.addresses.isNotEmpty()) {
+                org.desklink.mobile.backends.lan.LanLinkProvider.instance?.dialDirect(code.desktopId, code.addresses, port)
             }
             code.host?.let { BackgroundService.instance?.sendIdentityTo(it) }
                 ?: BackgroundService.instance?.refreshDiscovery()
@@ -126,6 +157,7 @@ object QrPairing {
                 code.fingerprint,
                 fingerprint(SslHelper.certificate),
             )
+            onProgress(Stage.VERIFYING)
             Log.i(TAG, "Sending QR pairing proof to ${code.desktopId}")
             device.pairingHandler.requestPairingWithProof(mac, device.certificate)
         } finally {

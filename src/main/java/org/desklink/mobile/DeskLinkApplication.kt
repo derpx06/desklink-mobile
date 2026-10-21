@@ -245,6 +245,9 @@ class DeskLinkApplication : Application() {
         getDevice(deviceId)?.let { webRtcCoordinatorFor(it).sessionPassword.set(password) }
     }
 
+    /** SCREEN_ON: every live peer is probed at once and rebuilt if silent (contract B2). */
+    fun onScreenOn() = webRtcCoordinators.values.forEach { runCatching { it.onScreenOn() } }
+
     /** The live WebRTC connection's identity for [deviceId], or null (see [org.desklink.mobile.ui.SessionGate]). */
     fun connectionKey(deviceId: String?): Long? = getDevice(deviceId)?.let { webRtcCoordinatorFor(it).connectionKey() }
 

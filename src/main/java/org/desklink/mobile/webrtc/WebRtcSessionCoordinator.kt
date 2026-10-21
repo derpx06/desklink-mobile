@@ -449,6 +449,36 @@ class WebRtcSessionCoordinator(
         }
     }
 
+    /**
+     * The screen came on (contract B2): probe the data channel now, and rebuild if nothing at all
+     * arrives within [SCREEN_ON_PROBE_MS]. A thawed phone otherwise waited out the 15 s silence
+     * budget on a peer the desk had already given up on.
+     */
+    fun onScreenOn() {
+        val (binding, attemptId, active) = synchronized(lock) {
+            val b = activeBinding ?: return
+            val a = activeAttemptId ?: return
+            val t = transport?.takeIf { it.isReadyForPackets() } ?: return
+            Triple(b, a, t)
+        }
+        val sentAt = SystemClock.elapsedRealtime()
+        active.sendPacket(
+            org.desklink.mobile.heartbeatPacket(reply = false, interactive = true),
+            object : TransportCallback {
+                override fun onSuccess() = Unit
+                override fun onFailure(error: TransportError) = Unit
+            },
+        )
+        runCatching {
+            recoveryExecutor.schedule({
+                val silent = synchronized(lock) {
+                    !closed && activeAttemptId == attemptId && sessions.isCurrent(binding) && !peerLiveness.heardSince(sentAt)
+                }
+                if (silent) scheduleRecovery(binding, attemptId, "No answer ${SCREEN_ON_PROBE_MS} ms after the screen came on", notifyPeer = false)
+            }, SCREEN_ON_PROBE_MS, TimeUnit.MILLISECONDS)
+        }
+    }
+
     /** Identifies the live WebRTC connection (its session id), or null without one. */
     fun connectionKey(): Long? = synchronized(lock) { activeWireBinding?.sessionId }
 
@@ -869,6 +899,7 @@ class WebRtcSessionCoordinator(
         iceServers = iceServers,
         createLocalChannels = createLocalChannels,
         relayOnly = RelaySettings.forceTurn(context),
+        lowCostOnly = device.hasLanLink,
         observer = OffThreadObserver(events = peerEvents, target = object : WebRtcTransport.Observer {
             override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) {
                 when (type) {
@@ -2229,6 +2260,7 @@ class WebRtcSessionCoordinator(
         private const val OFFER_CREATION_TIMEOUT_MILLIS = 10_000L
         private const val REMOTE_HEARTBEAT_SECONDS = 10L
         const val PEER_PROBE_AFTER_MS = 5_000L
+        const val SCREEN_ON_PROBE_MS = 3_000L
         const val PEER_DEAD_AFTER_MS = 15_000L
         const val ATTEMPT_STALL_MS = 20_000L
         // The measured LAN offer→answer is ~0.3 s; 5 s leaves room for the

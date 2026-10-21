@@ -61,8 +61,12 @@ import kotlin.text.Charsets;
 public class LanLinkProvider extends BaseLinkProvider {
 
     final static int UDP_PORT = 1716;
-    final static int MIN_PORT = 1716;
-    final static int MAX_PORT = 1764;
+    public final static int MIN_PORT = 1716;
+    public final static int MAX_PORT = 1764;
+
+    /** The running provider, for QR pairing's direct dial. */
+    @Nullable
+    public static volatile LanLinkProvider instance;
     final static int PAYLOAD_TRANSFER_MIN_PORT = 1739;
 
     final static int MAX_IDENTITY_PACKET_SIZE = 1024 * 512;
@@ -233,6 +237,63 @@ public class LanLinkProvider extends BaseLinkProvider {
             times.entrySet().removeIf(e -> e.getValue() + MILLIS_DELAY_BETWEEN_CONNECTIONS_TO_SAME_DEVICE < now);
         }
         return false;
+    }
+
+    /** Stagger between parallel dials (happy eyeballs, contract B4). */
+    static final long DIAL_STAGGER_MS = 250;
+
+    /**
+     * QR v2: dials [addresses] in parallel, one every {@link #DIAL_STAGGER_MS}; the first TCP
+     * connection wins and the rest are closed. From there it is the same as answering the desk's
+     * announcement: our identity, then TLS. The desk's certificate is pinned by QR pairing, which
+     * sends its proof only to a link whose certificate matches the code.
+     */
+    public void dialDirect(String desktopId, List<InetAddress> addresses, int port) {
+        final java.util.concurrent.atomic.AtomicBoolean won = new java.util.concurrent.atomic.AtomicBoolean(false);
+        for (int i = 0; i < addresses.size(); i++) {
+            final InetAddress address = addresses.get(i);
+            final long delay = i * DIAL_STAGGER_MS;
+            ThreadHelper.execute(() -> {
+                try {
+                    if (delay > 0) Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (won.get() || visibleDevices.containsKey(desktopId)) return;
+                Socket socket = null;
+                try {
+                    socket = SocketFactory.getDefault().createSocket();
+                    socket.connect(new java.net.InetSocketAddress(address, port), 3000);
+                    if (won.getAndSet(true)) {
+                        closeQuietly(socket);
+                        return;
+                    }
+                    Log.i("DeskLink/LanLinkProvider", "QR dial reached " + address.getHostAddress());
+                    configureSocket(socket);
+                    NetworkPacket myIdentity = DeviceHelper.getDeviceInfo(context).toIdentityPacket();
+                    myIdentity.set("targetDeviceId", desktopId);
+                    myIdentity.set("targetProtocolVersion", String.valueOf(DeviceHelper.PROTOCOL_VERSION));
+                    OutputStream out = socket.getOutputStream();
+                    out.write(myIdentity.serialize().getBytes());
+                    out.flush();
+                    identityPacketReceived(qrIdentity(desktopId, port), socket, LanLink.ConnectionStarted.Remotely,
+                            TrustedDevices.isTrustedDevice(context, desktopId));
+                } catch (IOException | CertificateException | JSONException e) {
+                    Log.i("DeskLink/LanLinkProvider", "QR dial to " + address.getHostAddress() + " failed: " + e.getMessage());
+                    if (socket != null) closeQuietly(socket);
+                }
+            });
+        }
+    }
+
+    /** What the QR code says about the desk, standing in for its unencrypted announcement. */
+    private static NetworkPacket qrIdentity(String desktopId, int port) {
+        NetworkPacket identity = new NetworkPacket(NetworkPacket.PACKET_TYPE_IDENTITY);
+        identity.set("deviceId", desktopId);
+        identity.set("protocolVersion", DeviceHelper.PROTOCOL_VERSION);
+        identity.set("tcpPort", port);
+        return identity;
     }
 
     private static boolean isOwnAddress(InetAddress address) {
@@ -497,6 +558,7 @@ public class LanLinkProvider extends BaseLinkProvider {
     }
 
     public LanLinkProvider(Context context) {
+        instance = this;
         this.context = context;
         this.mdnsDiscovery = new MdnsDiscovery(context, this);
     }

@@ -22,6 +22,17 @@ class WebRtcConnectionStatsTest {
     }
 
     @Test
+    fun webrtcbinsLongCandidateTypeNamesMapLikeTheShortOnes() {
+        assertEquals(WebRtcConnectionPath.LAN, connectionPath("host", "peer-reflexive", bootstrapViaRelay = false))
+        assertEquals(WebRtcConnectionPath.DIRECT, connectionPath("server-reflexive", "host", bootstrapViaRelay = false))
+        assertEquals(WebRtcConnectionPath.TURN, connectionPath("host", "relayed", bootstrapViaRelay = false))
+        assertEquals("srflx", canonicalCandidateType("server-reflexive"))
+        assertEquals("prflx", canonicalCandidateType("peer-reflexive"))
+        assertEquals("relay", canonicalCandidateType("relayed"))
+        assertEquals("host", canonicalCandidateType("host"))
+    }
+
+    @Test
     fun unknownCandidateTypesAreDirect() {
         assertEquals(WebRtcConnectionPath.DIRECT, connectionPath(null, null, bootstrapViaRelay = false))
         assertEquals(WebRtcConnectionPath.DIRECT, connectionPath("host", null, bootstrapViaRelay = false))

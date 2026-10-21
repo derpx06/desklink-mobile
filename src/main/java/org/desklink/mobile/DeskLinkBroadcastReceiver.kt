@@ -45,8 +45,10 @@ class DeskLinkBroadcastReceiver : BroadcastReceiver() {
             }
 
             Intent.ACTION_SCREEN_ON -> {
-                // First: the desk stops treating this phone as dozing (contract §11).
+                // First: the desk stops treating this phone as dozing (contract §11), and every
+                // live peer is probed, rebuilt if it does not answer in 3 s (B2).
                 sendDozeState()
+                org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { DeskLinkApplication.getInstance().onScreenOn() } }
                 try {
                     BackgroundService.ForceRefreshConnections(context)
                 } catch (e: IllegalStateException) { // To catch ForegroundServiceStartNotAllowedException

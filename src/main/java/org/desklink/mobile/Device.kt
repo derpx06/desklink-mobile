@@ -526,6 +526,8 @@ class Device : PacketReceiver {
      */
     fun onFeatureReady() {
         lifecycle.enqueue("feature-ready snapshots") {
+            // B1: the doze state first; the desk keeps its own until the phone says otherwise.
+            runCatching { sendDozeState() }
             loadedPlugins.values.forEach { plugin ->
                 runCatching { plugin.onFeatureReady() }
                     .onFailure { Log.w("DeskLink/Device", "${plugin.pluginKey} failed its feature-ready snapshot", it) }
@@ -879,6 +881,15 @@ class Device : PacketReceiver {
                     })
                 }
             } else if (!np.getBoolean("reply", false)) {
+                // B1: also on the data channel, so the desk's data-channel clock hears the phone
+                // even while it is dozing and frozen between LAN heartbeats.
+                webRtcTransport?.takeIf { it.isReadyForPackets() }?.sendPacket(
+                    heartbeatPacket(reply = true, interactive = isInteractive()),
+                    object : TransportCallback {
+                        override fun onSuccess() = Unit
+                        override fun onFailure(error: TransportError) = Unit
+                    },
+                )
                 sendBootstrapPacket(
                     heartbeatPacket(reply = true, interactive = isInteractive()),
                     // Best effort. A failure here means the link is already

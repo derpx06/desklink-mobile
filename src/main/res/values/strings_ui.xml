@@ -377,4 +377,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     </plurals>
     <string name="transfer_resuming">%1$s is paused. It continues when %2$s is back.</string>
     <string name="home_transfer_resuming">Resumes when back</string>
+    <string name="qr_progress_connecting">Connecting to the computer…</string>
+    <string name="qr_progress_verifying">Verifying %1$s…</string>
+    <string name="qr_progress_paired">Paired with %1$s</string>
+    <string name="qr_progress_timeout">The computer did not confirm the pairing. Scan the code again.</string>
 </resources>
