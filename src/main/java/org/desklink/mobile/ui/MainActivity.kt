@@ -787,6 +787,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             add(MoreExtra(R.drawable.sym_keyboard, getString(R.string.more_desk_types), getString(R.string.more_desk_types_summary)) {
                 startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS))
             })
+            // Android 13+ can add a tile without the person digging in the shade's editor.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(MoreExtra(R.drawable.sym_tune, getString(R.string.surfaces_add_tiles), getString(R.string.surfaces_add_tiles_summary)) { offerTiles() })
+            }
             if (device != null) {
                 add(MoreExtra(R.drawable.sym_bolt, getString(R.string.feature_run_command), getString(R.string.feature_desc_run_command),
                     button(R.drawable.run_command_plugin_icon_24dp)?.let { b -> { b.onClick(this@MainActivity) } }
@@ -805,6 +809,31 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onBack = ::pop,
             onMessage = ::showMessage,
         )
+    }
+
+    /** Picks one of DeskLink's Quick Settings tiles and asks the system to add it (API 33+). */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private fun offerTiles() {
+        val tiles = listOf(
+            Triple(org.desklink.mobile.ui.surfaces.LockDeskTileService::class.java, R.string.tile_lock_desk, R.drawable.sym_lock),
+            Triple(org.desklink.mobile.ui.surfaces.KeepAwakeTileService::class.java, R.string.tile_keep_awake, R.drawable.sym_coffee),
+            Triple(org.desklink.mobile.ui.surfaces.RingDeskTileService::class.java, R.string.tile_ring_desk, R.drawable.sym_vibration),
+            Triple(org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java, R.string.send_clipboard, R.drawable.sym_content_paste),
+        )
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.surfaces_add_tiles)
+            .setItems(tiles.map { getString(it.second) }.toTypedArray()) { _, which ->
+                val (cls, label, icon) = tiles[which]
+                getSystemService(android.app.StatusBarManager::class.java)?.requestAddTileService(
+                    android.content.ComponentName(this, cls),
+                    getString(label),
+                    android.graphics.drawable.Icon.createWithResource(this, icon),
+                    mainExecutor,
+                ) { result ->
+                    if (result == android.app.StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED) showMessage(getString(R.string.surfaces_tile_added))
+                }
+            }
+            .show()
     }
 
     @Composable

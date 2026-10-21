@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DeskLink's desk widget: 2×2, resizable to 4×3. Redrawn on change only (no period). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_desk_description"
+    android:initialLayout="@layout/widget_desk_small"
+    android:maxResizeHeight="300dp"
+    android:maxResizeWidth="400dp"
+    android:minHeight="110dp"
+    android:minResizeHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minWidth="110dp"
+    android:previewImage="@drawable/widget_desk_preview"
+    android:previewLayout="@layout/widget_desk_small"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    />

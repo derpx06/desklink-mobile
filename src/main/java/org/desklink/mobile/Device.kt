@@ -1408,7 +1408,10 @@ class Device : PacketReceiver {
         onPluginsChanged()
     }
 
-    fun onPluginsChanged() = pluginsChangedListeners.forEach { it.onPluginsChanged(this) }
+    fun onPluginsChanged() {
+        pluginsChangedListeners.forEach { it.onPluginsChanged(this) }
+        org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
+    }
 
     fun addPluginsChangedListener(listener: PluginsChangedListener) = pluginsChangedListeners.add(listener)
 

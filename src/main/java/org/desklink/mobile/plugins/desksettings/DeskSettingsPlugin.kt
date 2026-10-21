@@ -66,6 +66,7 @@ class DeskSettingsPlugin : Plugin() {
         parse(np)?.let {
             settings = it
             pending = emptyMap()
+            org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
         }
         return true
     }
@@ -74,6 +75,7 @@ class DeskSettingsPlugin : Plugin() {
     fun set(key: String, value: Boolean) {
         val packet = requestPacket(key, value, settings?.relayConfigured == true) ?: return
         pending = pending + (key to value)
+        org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
         device.sendPacket(packet, object : org.desklink.mobile.UserActionCallback() {
             override fun onSuccess() = Unit
             override fun onFailure(e: Throwable) {

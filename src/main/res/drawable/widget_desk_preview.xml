@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget picker's picture before Android 12 (12+ renders widget_desk_large instead). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="220dp" android:height="160dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/widget_bg" />
+            <corners android:radius="24dp" />
+        </shape>
+    </item>
+    <item android:width="8dp" android:height="8dp" android:left="16dp" android:top="22dp">
+        <shape android:shape="oval"><solid android:color="@color/widget_mint" /></shape>
+    </item>
+    <item android:width="110dp" android:height="12dp" android:left="32dp" android:top="20dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_text" /><corners android:radius="6dp" /></shape>
+    </item>
+    <item android:width="140dp" android:height="8dp" android:left="16dp" android:top="42dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_faint" /><corners android:radius="4dp" /></shape>
+    </item>
+    <item android:width="188dp" android:height="34dp" android:left="16dp" android:top="62dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_button_bg" /><corners android:radius="12dp" /></shape>
+    </item>
+    <item android:width="41dp" android:height="40dp" android:left="16dp" android:top="106dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_button_bg" /><corners android:radius="12dp" /></shape>
+    </item>
+    <item android:width="41dp" android:height="40dp" android:left="65dp" android:top="106dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_button_bg" /><corners android:radius="12dp" /></shape>
+    </item>
+    <item android:width="41dp" android:height="40dp" android:left="114dp" android:top="106dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_button_bg" /><corners android:radius="12dp" /></shape>
+    </item>
+    <item android:width="41dp" android:height="40dp" android:left="163dp" android:top="106dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_button_bg" /><corners android:radius="12dp" /></shape>
+    </item>
+</layer-list>

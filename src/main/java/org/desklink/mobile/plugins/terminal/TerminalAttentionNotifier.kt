@@ -141,6 +141,7 @@ class TerminalAttentionNotifier(
             val detail = finished.secs?.let { context.getString(R.string.terminal_job_finished_after, job, formatDuration(it)) }
                 ?: context.getString(R.string.terminal_job_finished, job)
             TerminalAttentionNotifier(context.applicationContext, deviceId, finished.terminalId).post(TerminalAttention.FINISHED, detail, yesNo = false)
+            org.desklink.mobile.ui.surfaces.DeskSurfaces.noteFinished(context, deviceId)
         }
 
         /** "45 s", "2 min 4 s", "1 h 3 min". */

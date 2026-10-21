@@ -271,6 +271,8 @@ class TerminalActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         resumed = true
+        // Seen: the widget's "finished" badge goes.
+        org.desklink.mobile.ui.surfaces.DeskSurfaces.clearFinished(this, deviceId)
     }
 
     override fun onPause() {

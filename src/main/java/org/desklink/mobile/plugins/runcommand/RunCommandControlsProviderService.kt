@@ -56,12 +56,14 @@ class RunCommandControlsProviderService : ControlsProviderService() {
 
         for (controlId in controlIds) {
             val commandEntry = getCommandByControlId(controlId)
-            if (commandEntry != null && commandEntry.device.isReachable) {
+            // Live only while the desk is ready (Phase 1): a tap otherwise queues behind a control
+            // that looks like it ran.
+            if (commandEntry != null && commandEntry.device.hasActiveWebRtcFeatureTransport) {
                 updatePublisher.onNext(createStatefulBuilder(commandEntry, controlId)
                         .setStatus(Control.STATUS_OK)
                         .setStatusText(getString(R.string.tap_to_execute))
                         .build())
-            } else if (commandEntry != null && commandEntry.device.isPaired && !commandEntry.device.isReachable) {
+            } else if (commandEntry != null && commandEntry.device.isPaired) {
                 updatePublisher.onNext(createStatefulBuilder(commandEntry, controlId)
                         .setStatus(Control.STATUS_DISABLED)
                         .build())

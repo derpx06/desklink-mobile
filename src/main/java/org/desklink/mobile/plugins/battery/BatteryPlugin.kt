@@ -79,6 +79,8 @@ class BatteryPlugin : Plugin() {
                 batteryInfo["isCharging"] = isCharging
                 batteryInfo["thresholdEvent"] = thresholdEvent
                 batteryInfo["chargeTimeRemaining"] = chargeTime
+                // The widget shows this phone's battery too.
+                org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
                 device.sendPacket(batteryInfo)
 
                 // We just send a possible threshold event so reset it so we not create notifications on each change

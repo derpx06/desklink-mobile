@@ -17,6 +17,12 @@ import org.desklink.mobile.DeskLinkApplication
 
 @RequiresApi(Build.VERSION_CODES.N)
 class ClipboardTileService : TileService() {
+    /** Like the other desk tiles: the desk's name, or "Not connected" and unavailable. */
+    override fun onStartListening() {
+        super.onStartListening()
+        org.desklink.mobile.ui.surfaces.DeskTileService.render(this, org.desklink.mobile.ui.surfaces.TileKind.CLIPBOARD)
+    }
+
     override fun onClick() {
         super.onClick()
 

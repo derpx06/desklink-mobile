@@ -497,14 +497,69 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
         <service
             android:name="org.desklink.mobile.plugins.clipboard.ClipboardTileService"
-            android:icon="@drawable/ic_baseline_content_paste_24"
+            android:icon="@drawable/sym_content_paste"
             android:exported="true"
-            android:label="@string/send_clipboard"
+            android:label="@string/tile_send_clipboard"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <service
+            android:name="org.desklink.mobile.ui.surfaces.LockDeskTileService"
+            tools:targetApi="n"
+            android:exported="true"
+            android:icon="@drawable/sym_lock"
+            android:label="@string/tile_lock_desk"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="false" />
+        </service>
+
+        <service
+            android:name="org.desklink.mobile.ui.surfaces.KeepAwakeTileService"
+            tools:targetApi="n"
+            android:exported="true"
+            android:icon="@drawable/sym_coffee"
+            android:label="@string/tile_keep_awake"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.TOGGLEABLE_TILE" android:value="true" />
+        </service>
+
+        <service
+            android:name="org.desklink.mobile.ui.surfaces.RingDeskTileService"
+            tools:targetApi="n"
+            android:exported="true"
+            android:icon="@drawable/sym_vibration"
+            android:label="@string/tile_ring_desk"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- The desk widget. Its buttons go to the receiver below, which is not exported. -->
+        <receiver
+            android:name="org.desklink.mobile.ui.surfaces.DeskWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_desk_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/desk_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="org.desklink.mobile.ui.surfaces.DeskWidgetActionReceiver"
+            android:exported="false" />
 
         <service android:name="org.desklink.mobile.plugins.runcommand.RunCommandControlsProviderService"
             android:label="@string/app_name"

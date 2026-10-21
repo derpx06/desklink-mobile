@@ -381,4 +381,40 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="qr_progress_verifying">Verifying %1$s…</string>
     <string name="qr_progress_paired">Paired with %1$s</string>
     <string name="qr_progress_timeout">The computer did not confirm the pairing. Scan the code again.</string>
+
+    <!-- Phase 2: tiles and the desk widget -->
+    <string name="tile_lock_desk">Lock desk</string>
+    <string name="tile_keep_awake">Keep awake</string>
+    <string name="tile_send_clipboard">Clipboard</string>
+    <string name="tile_ring_desk">Ring desk</string>
+    <string name="surfaces_not_connected">Not connected</string>
+    <string name="surfaces_not_paired">No computer paired</string>
+    <string name="surfaces_add_tiles">Quick Settings tiles</string>
+    <string name="surfaces_add_tiles_summary">Lock, keep awake, ring and send clipboard from the shade</string>
+    <string name="surfaces_tile_added">Tile added</string>
+    <string name="widget_desk_label">DeskLink</string>
+    <string name="widget_desk_description">Your computer at a glance: its link, terminals and music, with Lock, Send clipboard and Ring.</string>
+    <string name="widget_desk_preview_name">arch-desk</string>
+    <string name="widget_desk_preview_status">Connected · Phone 82%</string>
+    <string name="widget_desk_preview_battery">82%</string>
+    <string name="widget_desk_preview_terminals">2 terminals</string>
+    <string name="widget_desk_preview_media">Night Drive</string>
+    <string name="widget_battery">Phone %1$d%%</string>
+    <string name="widget_battery_charging">Phone %1$d%% ⚡</string>
+    <string name="widget_last_seen">Offline · last seen %1$s</string>
+    <string name="widget_no_terminals">No terminals</string>
+    <string name="widget_terminal_attached">one is open on this phone</string>
+    <string name="widget_open_terminals">Open terminals</string>
+    <string name="widget_lock">Lock</string>
+    <string name="widget_clipboard">Clipboard</string>
+    <string name="widget_ring">Ring</string>
+    <string name="widget_terminals">Terminals</string>
+    <plurals name="widget_terminals">
+        <item quantity="one">%1$d terminal</item>
+        <item quantity="other">%1$d terminals</item>
+    </plurals>
+    <plurals name="widget_finished">
+        <item quantity="one">%1$d command finished</item>
+        <item quantity="other">%1$d commands finished</item>
+    </plurals>
 </resources>

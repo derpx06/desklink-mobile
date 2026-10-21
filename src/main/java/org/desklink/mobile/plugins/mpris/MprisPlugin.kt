@@ -239,6 +239,7 @@ class MprisPlugin : Plugin() {
         pendingPlaying = !MediaControl.shownPlaying(reported, pendingPlaying, pendingSince, now)
         pendingSince = now
         revision++
+        org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
         request { this["action"] = "PlayPause" }
     }
 
@@ -514,6 +515,7 @@ class MprisPlugin : Plugin() {
 
     fun notifyPlayerStatusUpdated() {
         revision++
+        org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
         for ((key, callback) in playerStatusUpdated) {
             try {
                 callback()

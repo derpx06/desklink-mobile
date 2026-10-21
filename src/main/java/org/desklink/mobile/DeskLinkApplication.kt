@@ -177,6 +177,7 @@ class DeskLinkApplication : Application() {
     private fun onDeviceListChanged() {
         Log.i("MainActivity", "Device list changed, notifying ${deviceListChangedCallbacks.size} observers.")
         deviceListChangedCallbacks.values.forEach(DeviceListChangedCallback::onDeviceListChanged)
+        org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(this)
     }
 
     fun getDevice(id: String?): Device? {
@@ -281,8 +282,9 @@ class DeskLinkApplication : Application() {
             // The live-session notification follows the attached sessions, whoever changed them.
             // The job lives exactly as long as the client (shutDownTerminalClient).
             terminalWatchers[id] = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob()).launch {
-                client.state.map { state -> state.sessions.count { it.attached && !it.gone } }.distinctUntilChanged().collect {
+                client.state.map { state -> state.sessions.count { !it.gone } to state.sessions.count { it.attached && !it.gone } }.distinctUntilChanged().collect {
                     org.desklink.mobile.plugins.screen.SessionLiveNotification.refresh(this@DeskLinkApplication, id)
+                    org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(this@DeskLinkApplication)
                 }
             }
         }
