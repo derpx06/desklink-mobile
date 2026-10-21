@@ -89,10 +89,16 @@ class WebRtcConnectionStatsTest {
     fun controlKeepsMotionAndViewingKeepsResolution() {
         assertEquals(RtpParameters.DegradationPreference.BALANCED, screenDegradationPreference(true))
         assertEquals(RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION, screenDegradationPreference(false))
+        // On the LAN there is bandwidth for both: resolution wins even under control (V2).
+        assertEquals(RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION, screenDegradationPreference(true, lan = true))
+        assertEquals(16_000_000, maxScreenBitrate(lan = true))
+        assertEquals(8_000_000, maxScreenBitrate(lan = false))
     }
 
     @Test
     fun encoderFailureStepsTheCaptureDownThenGivesUp() {
+        assertEquals(1920, CAPTURE_LONG_SIDES.first())
+        assertEquals(1280, nextCaptureLongSide(1920))
         assertEquals(960, nextCaptureLongSide(1280))
         assertEquals(720, nextCaptureLongSide(960))
         assertEquals(720, nextCaptureLongSide(800))

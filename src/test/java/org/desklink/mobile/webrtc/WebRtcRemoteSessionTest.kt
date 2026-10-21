@@ -128,6 +128,22 @@ class WebRtcRemoteSessionTest {
         assertFalse(controller.answersOffer(offered, WebRtcScreenDirection.PHONE_TO_DESKTOP))
     }
 
+    @Test
+    fun `a view request carries this phone's size and rate and old messages parse without`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        val id = controller.beginView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        val message = controller.makeMessage(WebRtcRemoteSessionControlKind.REQUEST_VIEW, attemptId, wire, remoteSessionId = id, maxDimension = 2400, fps = 60)
+        val json = message.toJson()
+        assertEquals(2400, json.getInt("maxDimension"))
+        assertEquals(60, json.getInt("fps"))
+        val decoded = WebRtcRemoteSessionControlMessage.fromJson(json)
+        assertEquals(2400, decoded.maxDimension)
+        assertEquals(60, decoded.fps)
+        val plain = controller.makeMessage(WebRtcRemoteSessionControlKind.REQUEST_VIEW, attemptId, wire, remoteSessionId = id).toJson()
+        assertFalse(plain.has("maxDimension"))
+        assertNull(WebRtcRemoteSessionControlMessage.fromJson(plain).fps)
+    }
+
     /** An expired lease must leave the session viewing, so the phone can ask
      * for control again instead of refusing every gesture forever. */
     @Test

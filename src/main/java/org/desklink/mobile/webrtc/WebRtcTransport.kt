@@ -82,15 +82,21 @@ internal fun h264Rank(codec: org.webrtc.RtpCapabilities.CodecCapability): Int {
     }
 }
 
-/** Text stays sharp while the desktop only watches; motion matters once it drives the phone. */
-internal fun screenDegradationPreference(controlled: Boolean): RtpParameters.DegradationPreference =
-    if (controlled) RtpParameters.DegradationPreference.BALANCED
+/**
+ * Text stays sharp while the desktop only watches; motion matters once it drives the phone, except
+ * on the LAN, where there is bandwidth for both and resolution wins (V2).
+ */
+internal fun screenDegradationPreference(controlled: Boolean, lan: Boolean = false): RtpParameters.DegradationPreference =
+    if (controlled && !lan) RtpParameters.DegradationPreference.BALANCED
     else RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+
+/** The screen's bitrate ceiling: ~16 Mbps on the LAN, 8 elsewhere; congestion control backs off below it. */
+internal fun maxScreenBitrate(lan: Boolean): Int = if (lan) 16_000_000 else 8_000_000
 
 /** The capture long side to retry at after the encoder failed at [current]; null to give up. */
 internal fun nextCaptureLongSide(current: Int): Int? = CAPTURE_LONG_SIDES.firstOrNull { it < current }
 
-internal val CAPTURE_LONG_SIDES = listOf(1280, 960, 720)
+internal val CAPTURE_LONG_SIDES = listOf(1920, 1280, 960, 720)
 
 internal object WebRtcMediaNegotiationPolicy {
     const val includeScreenTrackInInitialOffer = true
@@ -194,6 +200,8 @@ class WebRtcTransport(
     private var captureFps = 0
     /** Long side of the running capture, 0 when none; lowered on encoder failure. */
     private val captureLongSide = AtomicInteger(0)
+    /** Re-delivers the last captured frame once motion stops (V2). */
+    private var refinement: StaticRefinement? = null
     @Volatile private var encoderGaveUp = false
     private val encoderFailureListener =
         DeskLinkVideoEncoderFactories.FailureListener { width, height -> onEncoderFailure(width, height) }
@@ -528,10 +536,17 @@ class WebRtcTransport(
         activeScreenCaptureEpoch = captureEpoch
         captureWidth = width
         captureHeight = height
-        captureFps = fps.coerceIn(1, 30)
+        captureFps = fps.coerceIn(1, 60)
         encoderGaveUp = false
         try {
-            capturer.initialize(helper, context, videoSource.capturerObserver)
+            val handler = helper.handler
+            refinement = StaticRefinement(
+                REFINE_AFTER_MS,
+                schedule = { task, delay -> handler.postDelayed(task, delay) },
+                cancel = { task -> handler.removeCallbacks(task) },
+                force = { runCatching { helper.forceFrame() } },
+            )
+            capturer.initialize(helper, context, RefiningCapturerObserver(videoSource.capturerObserver, requireNotNull(refinement)))
             val longSide = minOf(CAPTURE_LONG_SIDES.first(), maxOf(width, height, 1))
             captureLongSide.set(longSide)
             DeskLinkVideoEncoderFactories.setFailureListener(encoderFailureListener)
@@ -597,8 +612,8 @@ class WebRtcTransport(
         if (screenControlled == controlled) return
         screenControlled = controlled
         if (activeScreenCaptureEpoch == null) return
-        updateScreenSender { it.degradationPreference = screenDegradationPreference(controlled) }
-        Log.i(TAG, "Screen degradation preference: ${screenDegradationPreference(controlled)}")
+        updateScreenSender { it.degradationPreference = screenDegradationPreference(controlled, onLan) }
+        Log.i(TAG, "Screen degradation preference: ${screenDegradationPreference(controlled, onLan)}")
     }
 
     /**
@@ -612,7 +627,11 @@ class WebRtcTransport(
             return
         }
         runCatching {
-            peer.getStats { report -> callback.onStats(connectionStatsFrom(report.statsMap, bootstrapViaRelay)) }
+            peer.getStats { report ->
+                val stats = connectionStatsFrom(report.statsMap, bootstrapViaRelay)
+                stats?.let { onPath(it.path == WebRtcConnectionPath.LAN) }
+                callback.onStats(stats)
+            }
         }.onFailure { callback.onStats(null) }
     }
 
@@ -707,15 +726,27 @@ class WebRtcTransport(
      */
     @Synchronized
     private fun configureScreenSender(fps: Int) {
-        runCatching { peer.setBitrate(MIN_SCREEN_BITRATE, START_SCREEN_BITRATE, MAX_SCREEN_BITRATE) }
+        val max = maxScreenBitrate(onLan)
+        runCatching { peer.setBitrate(MIN_SCREEN_BITRATE, START_SCREEN_BITRATE, max) }
         updateScreenSender { parameters ->
-            parameters.degradationPreference = screenDegradationPreference(screenControlled)
+            parameters.degradationPreference = screenDegradationPreference(screenControlled, onLan)
             parameters.encodings.forEach { encoding ->
                 encoding.minBitrateBps = MIN_SCREEN_BITRATE
-                encoding.maxBitrateBps = MAX_SCREEN_BITRATE
+                encoding.maxBitrateBps = max
                 encoding.maxFramerate = fps
             }
         }
+    }
+
+    /** Whether the selected ICE pair is on the LAN, as the last stats read said. */
+    @Volatile private var onLan = false
+
+    /** The path moved on or off the LAN: a live capture takes the matching ceiling and preference. */
+    @Synchronized
+    private fun onPath(lan: Boolean) {
+        if (lan == onLan) return
+        onLan = lan
+        if (activeScreenCaptureEpoch != null) configureScreenSender(captureFps)
     }
 
     private fun updateScreenSender(change: (RtpParameters) -> Unit) {
@@ -762,6 +793,8 @@ class WebRtcTransport(
 
     /** Caller holds this instance monitor. */
     private fun releaseScreenCaptureLocked(stopCapture: Boolean) {
+        refinement?.stop()
+        refinement = null
         screenStatsTimer?.cancel()
         screenStatsTimer = null
         val capturer = screenCapturer
@@ -871,8 +904,9 @@ class WebRtcTransport(
     private companion object {
         const val TAG = "DeskLink/WebRTC"
         const val MIN_SCREEN_BITRATE = 300_000
+        /** How long after the last frame the capture re-delivers it, once, for refinement. */
+        const val REFINE_AFTER_MS = 100L
         const val START_SCREEN_BITRATE = 2_500_000
-        const val MAX_SCREEN_BITRATE = 8_000_000
     }
 }
 

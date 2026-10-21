@@ -479,6 +479,17 @@ class WebRtcSessionCoordinator(
         }
     }
 
+    /** The real panel's long side and refresh rate, and whether the peer is on the LAN (V1). */
+    private fun viewRequestForThisDisplay(): Pair<Int, Int> {
+        val metrics = context.resources.displayMetrics
+        val display = context.getSystemService(android.hardware.display.DisplayManager::class.java)
+            ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+        val longSide = display?.let { d ->
+            android.graphics.Point().also { @Suppress("DEPRECATION") d.getRealSize(it) }.let { maxOf(it.x, it.y) }
+        } ?: maxOf(metrics.widthPixels, metrics.heightPixels)
+        return desktopViewRequest(longSide, display?.refreshRate ?: 60f, device.connectionPath == WebRtcConnectionPath.LAN)
+    }
+
     /** Identifies the live WebRTC connection (its session id), or null without one. */
     fun connectionKey(): Long? = synchronized(lock) { activeWireBinding?.sessionId }
 
@@ -502,6 +513,7 @@ class WebRtcSessionCoordinator(
                         sendReleaseLocked(previous)
                     }
                     val remoteSessionId = remoteSession.beginView(direction)
+                    val ask = if (direction == WebRtcScreenDirection.DESKTOP_TO_PHONE) viewRequestForThisDisplay() else null
                     sendRemoteSessionControlLocked(
                         binding,
                         attemptId,
@@ -511,6 +523,8 @@ class WebRtcSessionCoordinator(
                             wire,
                             remoteSessionId = remoteSessionId,
                             password = sessionPassword.get(),
+                            maxDimension = ask?.first,
+                            fps = ask?.second,
                         ),
                     )
                     publish("RequestingRemoteView", direction.wireName)

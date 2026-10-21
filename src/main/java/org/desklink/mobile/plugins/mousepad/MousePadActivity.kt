@@ -66,6 +66,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
@@ -132,6 +133,15 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     private var haptics = true
     private var accelerationProfile = PointerAccelerationProfileFactory.getProfileWithName("default")
     private val mouseDelta = PointerAccelerationProfile.MouseDelta()
+
+    /**
+     * Touches straight to the gesture code, not batched to the next frame: a pointer move leaves
+     * one vsync earlier (it is still sent at most once per frame by [PointerMotionCoalescer]).
+     */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) window.decorView.requestUnbufferedDispatch(ev)
+        return super.dispatchTouchEvent(ev)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -281,11 +291,14 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             }
         }
         val density = LocalDensity.current
+        // Interim predicted cursor: where this phone just put the desk's pointer, drawn at once
+        // instead of waiting for the next frame to show the real one. Read in draw only.
+        val localCursor = remember { mutableStateOf<Offset?>(null) }
 
         val sink = object : DesktopGestureSink {
             private fun point(at: Offset) = desktopPointFor(
                 at.x, at.y, zoomTransform, size.width, size.height, desktopWidth, desktopHeight,
-            )
+            ).also { if (it != null && controlEnabled && !trackpad) localCursor.value = at }
             private fun pad() = if (controlEnabled) mousePadPlugin() else null
 
             private val trackpad get() = controlMode == ControlMode.Trackpad
@@ -406,6 +419,15 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                             translationX = left * (zoomTransform.scale - 1f) + zoomTransform.offsetX
                             translationY = top * (zoomTransform.scale - 1f) + zoomTransform.offsetY
                         },
+                )
+            }
+            if (controlEnabled && controlMode != ControlMode.Trackpad) {
+                Spacer(
+                    Modifier.matchParentSize().drawWithContent {
+                        val at = localCursor.value ?: return@drawWithContent
+                        drawCircle(Color.Black.copy(alpha = 0.55f), 8.dp.toPx(), at)
+                        drawCircle(Color.White, 5.5.dp.toPx(), at)
+                    },
                 )
             }
             // Live but without control, the amber notice says so (see ImmersiveDesktop).

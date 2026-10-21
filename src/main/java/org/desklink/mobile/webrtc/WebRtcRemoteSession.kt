@@ -97,6 +97,12 @@ data class WebRtcRemoteSessionControlMessage(
     /** `request-view` / `request-control`: the desktop's session password, when one is known
      * (see [SessionPassword]). Omitted, never empty. */
     val password: String? = null,
+    /**
+     * `request-view` for the desk's screen (V1): the long side this phone shows it at (its real
+     * landscape width) and the frame rate it wants. Omitted otherwise; an older desk ignores them.
+     */
+    val maxDimension: Int? = null,
+    val fps: Int? = null,
 ) {
     fun validate(wire: WebRtcWireBinding, attemptId: String, now: Long) {
         require(remoteSessionVersion == VERSION) { "Unsupported DeskLink remote-session version" }
@@ -151,6 +157,8 @@ data class WebRtcRemoteSessionControlMessage(
             editable?.let { value.put("editable", it) }
             screenCount?.let { value.put("screenCount", it) }
             password?.takeIf(String::isNotEmpty)?.let { value.put("password", it) }
+            maxDimension?.let { value.put("maxDimension", it) }
+            fps?.let { value.put("fps", it) }
         }
 
     companion object {
@@ -181,6 +189,8 @@ data class WebRtcRemoteSessionControlMessage(
                 editable = value.takeIf { it.has("editable") }?.getBoolean("editable"),
                 screenCount = value.takeIf { it.has("screenCount") }?.getInt("screenCount")?.coerceIn(0, 16),
                 password = value.optString("password").takeIf(String::isNotEmpty),
+                maxDimension = value.takeIf { it.has("maxDimension") }?.getInt("maxDimension"),
+                fps = value.takeIf { it.has("fps") }?.getInt("fps"),
             )
     }
 }
@@ -311,6 +321,8 @@ class WebRtcRemoteSessionController(
         screenHeight: Int? = null,
         screenRotation: Int? = null,
         password: String? = null,
+        maxDimension: Int? = null,
+        fps: Int? = null,
     ): WebRtcRemoteSessionControlMessage = WebRtcRemoteSessionControlMessage(
         remoteSessionVersion = WebRtcRemoteSessionControlMessage.VERSION,
         kind = kind,
@@ -330,6 +342,8 @@ class WebRtcRemoteSessionController(
         screenHeight = screenHeight,
         screenRotation = screenRotation,
         password = password,
+        maxDimension = maxDimension,
+        fps = fps,
     )
 
     /** Applies a validated peer control message and returns the automatic
@@ -608,3 +622,11 @@ class WebRtcRemoteSessionController(
         private const val LEASE_MILLIS = 30_000L
     }
 }
+
+/**
+ * What this phone asks of the desk's screen (V1): its real landscape long side (2400 on a
+ * 1080×2400 panel), clamped to the desk's 640..2560, and 60 fps on the LAN when the display runs
+ * at 60 Hz or more, else 30.
+ */
+internal fun desktopViewRequest(displayLongSide: Int, refreshHz: Float, lan: Boolean): Pair<Int, Int> =
+    displayLongSide.coerceIn(640, 2560) to (if (lan && refreshHz >= 59f) 60 else 30)
