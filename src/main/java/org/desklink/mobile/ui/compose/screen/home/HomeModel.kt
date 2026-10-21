@@ -13,6 +13,8 @@ import org.desklink.mobile.R
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.clipboard.ClipboardPlugin
 import org.desklink.mobile.plugins.mpris.MprisPlugin
+import org.desklink.mobile.plugins.mpris.MediaControl as MprisControlState
+import androidx.compose.ui.graphics.asImageBitmap
 import org.desklink.mobile.plugins.screen.PhoneScreenCaptureService
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.share.TransferProgress
@@ -72,22 +74,38 @@ object HomeModel {
         )
     }
 
-    /** The desk's player, playing first; null (no card) until the desk reports one with a title. */
+    /**
+     * The desk's current player ([MprisPlugin.currentPlayerName]); null (no card) only when the
+     * desk has no player at all.
+     */
     private fun media(context: Context, device: Device): HomeMedia? {
         val plugin = device.getPlugin(MprisPlugin::class.java) ?: return null
-        val player = plugin.playingPlayer ?: plugin.playerList.mapNotNull(plugin::getPlayerStatus).firstOrNull { it.title.isNotBlank() } ?: return null
-        if (player.title.isBlank()) return null
-        val where = context.getString(if (player.isPlaying) R.string.home_media_playing_on else R.string.home_media_paused_on, device.name)
+        @Suppress("UNUSED_VARIABLE") val changed = plugin.revision // recompose on every push
+        val name = plugin.currentPlayerName() ?: return null
+        val player = plugin.getPlayerStatus(name)
+        val now = android.os.SystemClock.elapsedRealtime()
+        val reported = player?.isPlaying == true
+        val art = player?.takeIf { it.albumArtUrl.startsWith("http://") || it.albumArtUrl.startsWith("https://") }?.getAlbumArt()
         return HomeMedia(
-            title = player.title,
-            subtitle = listOf(player.artist, where).filter(String::isNotBlank).joinToString(" · "),
-            playing = player.isPlaying,
-            canNext = player.isGoNextAllowed,
+            player = name,
+            players = plugin.playerList,
+            title = player?.title?.takeIf(String::isNotBlank) ?: name,
+            artist = player?.artist.orEmpty(),
+            playing = MprisControlState.shownPlaying(reported, plugin.pendingPlaying, plugin.pendingSince, now),
+            pending = MprisControlState.isPending(reported, plugin.pendingPlaying, plugin.pendingSince, now),
+            canPlayPause = player == null || player.isPlayAllowed || player.isPauseAllowed,
+            canNext = player?.isGoNextAllowed ?: true,
+            canPrevious = player?.isGoPreviousAllowed ?: true,
+            canSeek = player != null && player.seekAllowed && player.length > 0,
+            lengthMs = player?.length ?: -1,
+            positionMs = player?.lastPosition ?: 0,
+            // MprisPlayer stamps positions with the wall clock.
+            positionAt = player?.lastPositionTime ?: System.currentTimeMillis(),
+            reportedPlaying = reported,
+            volume = player?.volume?.takeIf { it in 0..100 },
+            art = art?.asImageBitmap(),
+            desk = device.name,
+            subtitleFallback = context.getString(R.string.home_media_on, device.name),
         )
-    }
-
-    fun mediaPlayer(device: Device): MprisPlugin.MprisPlayer? {
-        val plugin = device.getPlugin(MprisPlugin::class.java) ?: return null
-        return plugin.playingPlayer ?: plugin.playerList.mapNotNull(plugin::getPlayerStatus).firstOrNull { it.title.isNotBlank() }
     }
 }

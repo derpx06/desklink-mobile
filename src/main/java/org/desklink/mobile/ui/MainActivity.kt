@@ -362,8 +362,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 showMessage(getString(R.string.home_looking_for, device.name))
             },
             onEndLive = { SessionLiveNotification.endAll(this, id) },
-            onPlayPause = { HomeModel.mediaPlayer(device)?.sendPlayPause() },
-            onNext = { HomeModel.mediaPlayer(device)?.sendNext() },
+            // Each goes to the desk's current player through the plugin of *now* (never one held
+            // from before a reconnect), exactly one request per tap; tick shows the result at once.
+            onPlayPause = { media(device) { it.togglePlayPause() } },
+            onNext = { media(device) { it.next() } },
+            onPrevious = { media(device) { it.previous() } },
+            onSeek = { ms -> media(device) { it.seekTo(ms) } },
+            onVolume = { level -> media(device) { it.setVolume(level) } },
+            onSelectPlayer = { name -> media(device) { it.selectedPlayer = name } },
             onTerminals = { startActivity(TerminalActivity.intent(this, id)) },
             onDeskScreen = {
                 if (device.getPlugin(org.desklink.mobile.plugins.screen.ScreenControlPlugin::class.java) == null) showMessage(getString(R.string.home_feature_off))
@@ -419,6 +425,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             },
             onUnavailable = ::showMessage,
         )
+    }
+
+    private fun media(device: Device, action: (org.desklink.mobile.plugins.mpris.MprisPlugin) -> Unit) {
+        val plugin = device.getPlugin(org.desklink.mobile.plugins.mpris.MprisPlugin::class.java)
+        if (plugin == null) showMessage(getString(R.string.home_feature_off)) else action(plugin)
+        tick++
     }
 
     /** Written at once, applied off the main thread: reloading plugins is blocking. */

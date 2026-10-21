@@ -97,10 +97,6 @@ import org.desklink.mobile.webrtc.WebRtcConnectionPath
 @Immutable
 data class ComputerRow(val id: String, val name: String, val connection: DeviceConnection)
 
-/** What the desk is playing (MPRIS); null hides the card. */
-@Immutable
-data class HomeMedia(val title: String, val subtitle: String, val playing: Boolean, val canNext: Boolean)
-
 /** The newest file transfer with this computer. */
 @Immutable
 data class HomeTransfer(val name: String, val label: String, val progress: Float?, val upload: Boolean)
@@ -147,6 +143,10 @@ class HomeActions(
     val onEndLive: () -> Unit,
     val onPlayPause: () -> Unit,
     val onNext: () -> Unit,
+    val onPrevious: () -> Unit,
+    val onSeek: (Long) -> Unit,
+    val onVolume: (Int) -> Unit,
+    val onSelectPlayer: (String) -> Unit,
     val onTerminals: () -> Unit,
     val onDeskScreen: () -> Unit,
     val onSendFiles: () -> Unit,
@@ -189,7 +189,8 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             StatusCard(state, actions)
-            if (state.media?.playing == true) MediaCard(state.media, actions)
+            // One place, playing or paused: directly under the status card.
+            state.media?.let { MediaCard(it, actions) }
             SectionLabel(stringResource(R.string.home_open_on, state.name))
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TerminalsTile(state, Modifier.weight(1f)) { gate(actions.onTerminals) }
@@ -197,7 +198,6 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
             }
             SectionLabel(stringResource(R.string.home_quick_actions))
             QuickActions(state, gate, actions) { linkDialog = true }
-            if (state.media != null && !state.media.playing) MediaCard(state.media, actions)
             TransferAndClipboard(state, actions)
             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars).padding(bottom = 6.dp))
         }
@@ -372,42 +372,6 @@ private fun LiveRow(live: LiveSessions, onEnd: () -> Unit) {
 }
 
 // ---- media --------------------------------------------------------------------------------------------
-
-@Composable
-private fun MediaCard(media: HomeMedia, actions: HomeActions) {
-    val t = tokens
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(t.surface, RoundedCornerShape(24.dp))
-            .border(1.dp, t.hairline, RoundedCornerShape(24.dp))
-            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Box(Modifier.size(44.dp).background(Brush.linearGradient(listOf(Color(0xFF3A2F55), Color(0xFFB07A8D))), RoundedCornerShape(12.dp)))
-        Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(media.title, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(media.subtitle, fontSize = 12.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        val playLabel = stringResource(if (media.playing) R.string.mpris_pause else R.string.mpris_play)
-        Box(
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .clickable(role = Role.Button, onClickLabel = playLabel, onClick = actions.onPlayPause)
-                .semantics { contentDescription = playLabel },
-            contentAlignment = Alignment.Center,
-        ) {
-            IconCircle(if (media.playing) R.drawable.sym_pause else R.drawable.sym_play_arrow, 44.dp, 24.dp, background = t.text, tint = t.bg)
-        }
-        if (media.canNext) {
-            IconButton(onClick = actions.onNext, modifier = Modifier.size(48.dp)) {
-                Icon(painterResource(R.drawable.sym_skip_next), contentDescription = stringResource(R.string.mpris_next), tint = t.text)
-            }
-        }
-    }
-}
 
 // ---- open on the desk -------------------------------------------------------------------------------
 

@@ -35,6 +35,10 @@ import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.R
 import java.net.MalformedURLException
 import java.util.concurrent.ConcurrentHashMap
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 @LoadablePlugin
 class MprisPlugin : Plugin() {
@@ -186,6 +190,73 @@ class MprisPlugin : Plugin() {
     }
 
     private val players = ConcurrentHashMap<String, MprisPlayer>()
+
+    /** Bumped on every state or list change, so Compose readers recompose at once. */
+    var revision by mutableIntStateOf(0)
+        private set
+
+    /** The player the person picked in the player sheet; kept only while the desk lists it. */
+    var selectedPlayer: String? by mutableStateOf(null)
+
+    /** A play/pause tapped here and not yet confirmed by the desk ([MediaControl.shownPlaying]). */
+    var pendingPlaying: Boolean? by mutableStateOf(null)
+        private set
+    var pendingSince = 0L
+        private set
+
+    /** The player every control goes to; see [MediaControl.pickPlayer]. */
+    fun currentPlayerName(): String? = MediaControl.pickPlayer(selectedPlayer, playerList, playingPlayer?.playerName)
+
+    fun currentPlayer(): MprisPlayer? = currentPlayerName()?.let { players[it] }
+
+    /**
+     * Exactly one `desklink.mpris.request` per call, to the current player (or to none, letting the
+     * desk pick, before its list has arrived). Nothing here second-guesses the desk's `can*` flags:
+     * the buttons are disabled from them, and a tap that reaches this is always sent.
+     */
+    private fun request(fill: NetworkPacket.() -> Unit) {
+        val np = NetworkPacket(PACKET_TYPE_MPRIS_REQUEST).apply {
+            currentPlayerName()?.let { this["player"] = it }
+            fill()
+        }
+        device.sendPacket(np, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
+            override fun onSuccess() = Unit
+            override fun onFailure(e: Throwable) {
+                Log.w("MprisControl", "Media request not sent: ${e.message}")
+                pendingPlaying = null
+                revision++
+            }
+        })
+    }
+
+    /** Play/pause, shown at once as [pendingPlaying] until the desk's next state. */
+    fun togglePlayPause() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val reported = currentPlayer()?.isPlaying ?: false
+        pendingPlaying = !MediaControl.shownPlaying(reported, pendingPlaying, pendingSince, now)
+        pendingSince = now
+        revision++
+        request { this["action"] = "PlayPause" }
+    }
+
+    fun next() = request { this["action"] = "Next" }
+
+    fun previous() = request { this["action"] = "Previous" }
+
+    fun seekTo(positionMs: Long) {
+        currentPlayer()?.let {
+            it.lastPosition = positionMs
+            it.lastPositionTime = System.currentTimeMillis()
+        }
+        revision++
+        request { this["SetPosition"] = positionMs }
+    }
+
+    fun setVolume(volume: Int) {
+        currentPlayer()?.volume = volume
+        revision++
+        request { this["setVolume"] = volume.coerceIn(0, 100) }
+    }
     private var supportAlbumArtPayload = false
     private val playerStatusUpdated = ConcurrentHashMap<String, () -> Unit>()
     private val playerListUpdated = ConcurrentHashMap<String, () -> Unit>()
@@ -264,59 +335,8 @@ class MprisPlugin : Plugin() {
         // open — a leaked descriptor and an undeleted temp file per packet.
         np.payload?.close()
 
-        if (np.has("player")) {
-            val playerStatus = players[np.getString("player")]
-            if (playerStatus != null) {
-                val wasPlaying = playerStatus.isPlaying
-                //Note: title, artist and album will not be available for all desktop clients
-                playerStatus.title = np.getString("title", playerStatus.title)
-                playerStatus.artist = np.getString("artist", playerStatus.artist)
-                playerStatus.album = np.getString("album", playerStatus.album)
-                playerStatus.url = np.getString("url", playerStatus.url)
-                if (isInvalidPlayerUrl(playerStatus.url)) {
-                    playerStatus.url = ""
-                }
-                if (np.has("loopStatus")) {
-                    playerStatus.loopStatus = np.getString("loopStatus", playerStatus.loopStatus)
-                    playerStatus.isLoopStatusAllowed = true
-                }
-                if (np.has("shuffle")) {
-                    playerStatus.shuffle = np.getBoolean("shuffle", playerStatus.shuffle)
-                    playerStatus.isShuffleAllowed = true
-                }
-                playerStatus.volume = np.getInt("volume", playerStatus.volume)
-                playerStatus.length = np.getLong("length", playerStatus.length)
-                if (np.has("pos")) {
-                    playerStatus.lastPosition = np.getLong("pos", playerStatus.lastPosition)
-                    playerStatus.lastPositionTime = System.currentTimeMillis()
-                }
-                playerStatus.isPlaying = np.getBoolean("isPlaying", playerStatus.isPlaying)
-                playerStatus.isPlayAllowed = np.getBoolean("canPlay", playerStatus.isPlayAllowed)
-                playerStatus.isPauseAllowed = np.getBoolean("canPause", playerStatus.isPauseAllowed)
-                playerStatus.isGoNextAllowed = np.getBoolean("canGoNext", playerStatus.isGoNextAllowed)
-                playerStatus.isGoPreviousAllowed = np.getBoolean("canGoPrevious", playerStatus.isGoPreviousAllowed)
-                playerStatus.seekAllowed = np.getBoolean("canSeek", playerStatus.seekAllowed)
-                val newAlbumArtUrlString = np.getString("albumArtUrl", playerStatus.albumArtUrl)
-                val newAlbumArtUrl = newAlbumArtUrlString.toUri()
-                if (newAlbumArtUrl.scheme in AlbumArtCache.ALLOWED_SCHEMES) {
-                    playerStatus.albumArtUrl = newAlbumArtUrl.toString()
-                } else {
-                    Log.w("MprisControl", "Invalid album art URL: $newAlbumArtUrlString")
-                    playerStatus.albumArtUrl = ""
-                }
-
-                notifyPlayerStatusUpdated()
-
-                // Check to see if a stream has stopped playing and we should deliver a notification
-                if (np.has("isPlaying") && !playerStatus.isPlaying && wasPlaying) {
-                    showContinueWatchingNotification(playerStatus)
-                }
-            }
-        }
-
-        // Remember if the connected device support album art payloads
-        supportAlbumArtPayload = np.getBoolean("supportAlbumArtPayload", supportAlbumArtPayload)
-
+        // The list first: after a reconnect the first packet names a player this side does not
+        // know yet, and its state used to be dropped until the next push (none while paused).
         val newPlayerList = np.getStringList("playerList")
         if (newPlayerList != null) {
             var equals = true
@@ -347,6 +367,61 @@ class MprisPlugin : Plugin() {
                 notifyPlayerListUpdated()
             }
         }
+
+        if (np.has("player")) {
+            val playerStatus = players[np.getString("player")]
+            if (playerStatus != null) {
+                val wasPlaying = playerStatus.isPlaying
+                //Note: title, artist and album will not be available for all desktop clients
+                playerStatus.title = np.getString("title", playerStatus.title)
+                playerStatus.artist = np.getString("artist", playerStatus.artist)
+                playerStatus.album = np.getString("album", playerStatus.album)
+                playerStatus.url = np.getString("url", playerStatus.url)
+                if (isInvalidPlayerUrl(playerStatus.url)) {
+                    playerStatus.url = ""
+                }
+                if (np.has("loopStatus")) {
+                    playerStatus.loopStatus = np.getString("loopStatus", playerStatus.loopStatus)
+                    playerStatus.isLoopStatusAllowed = true
+                }
+                if (np.has("shuffle")) {
+                    playerStatus.shuffle = np.getBoolean("shuffle", playerStatus.shuffle)
+                    playerStatus.isShuffleAllowed = true
+                }
+                playerStatus.volume = np.getInt("volume", playerStatus.volume)
+                playerStatus.length = np.getLong("length", playerStatus.length)
+                if (np.has("pos")) {
+                    playerStatus.lastPosition = np.getLong("pos", playerStatus.lastPosition)
+                    playerStatus.lastPositionTime = System.currentTimeMillis()
+                }
+                playerStatus.isPlaying = np.getBoolean("isPlaying", playerStatus.isPlaying)
+                // The desk answered (or reported on its own): the optimistic play/pause is settled.
+                if (np.has("isPlaying") && playerStatus.playerName == currentPlayerName()) pendingPlaying = null
+                playerStatus.isPlayAllowed = np.getBoolean("canPlay", playerStatus.isPlayAllowed)
+                playerStatus.isPauseAllowed = np.getBoolean("canPause", playerStatus.isPauseAllowed)
+                playerStatus.isGoNextAllowed = np.getBoolean("canGoNext", playerStatus.isGoNextAllowed)
+                playerStatus.isGoPreviousAllowed = np.getBoolean("canGoPrevious", playerStatus.isGoPreviousAllowed)
+                playerStatus.seekAllowed = np.getBoolean("canSeek", playerStatus.seekAllowed)
+                val newAlbumArtUrlString = np.getString("albumArtUrl", playerStatus.albumArtUrl)
+                val newAlbumArtUrl = newAlbumArtUrlString.toUri()
+                if (newAlbumArtUrl.scheme in AlbumArtCache.ALLOWED_SCHEMES) {
+                    playerStatus.albumArtUrl = newAlbumArtUrl.toString()
+                } else {
+                    Log.w("MprisControl", "Invalid album art URL: $newAlbumArtUrlString")
+                    playerStatus.albumArtUrl = ""
+                }
+
+                notifyPlayerStatusUpdated()
+
+                // Check to see if a stream has stopped playing and we should deliver a notification
+                if (np.has("isPlaying") && !playerStatus.isPlaying && wasPlaying) {
+                    showContinueWatchingNotification(playerStatus)
+                }
+            }
+        }
+
+        // Remember if the connected device support album art payloads
+        supportAlbumArtPayload = np.getBoolean("supportAlbumArtPayload", supportAlbumArtPayload)
 
         return true
     }
@@ -412,6 +487,7 @@ class MprisPlugin : Plugin() {
     }
 
     fun notifyPlayerStatusUpdated() {
+        revision++
         for ((key, callback) in playerStatusUpdated) {
             try {
                 callback()
@@ -432,6 +508,7 @@ class MprisPlugin : Plugin() {
     }
 
     fun notifyPlayerListUpdated() {
+        revision++
         for ((key, callback) in playerListUpdated) {
             try {
                 callback()

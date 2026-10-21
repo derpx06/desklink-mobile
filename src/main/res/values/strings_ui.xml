@@ -349,4 +349,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_open">Open</string>
     <string name="settings_perm_oem">Keep DeskLink running</string>
     <string name="settings_perm_oem_summary">This phone stops apps in the background. Allow background activity and auto-launch so %1$s stays connected.</string>
+
+    <string name="home_media_on">On %1$s</string>
+    <string name="home_media_now_playing">Now playing on %1$s</string>
+    <string name="home_media_open">Open the player</string>
+    <string name="home_media_position">Position</string>
+    <string name="home_media_position_value">%1$s of %2$s</string>
+    <string name="home_media_player">Player</string>
 </resources>
