@@ -161,8 +161,12 @@ data class HomeMedia(
     val vibrant: Int? = null,
     /** Changes with the cover (or, without one, the title): what the artwork animates on. */
     val artKey: String = title,
+    /** The feature link is down: the desk's last report, frozen, controls off. */
+    val stale: Boolean = false,
+    /** "Waiting for <desk>…", shown in place of the subtitle while [stale]. */
+    val waiting: String = "",
 ) {
-    val subtitle get() = listOf(artist, player).filter(String::isNotBlank).distinct().joinToString(" · ").ifEmpty { subtitleFallback }
+    val subtitle get() = if (stale && waiting.isNotEmpty()) waiting else listOf(artist, player).filter(String::isNotBlank).distinct().joinToString(" · ").ifEmpty { subtitleFallback }
 }
 
 /** The card's tint and the accent from the cover, animated between tracks; tokens when unreadable. */

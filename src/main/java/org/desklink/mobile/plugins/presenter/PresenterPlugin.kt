@@ -51,16 +51,21 @@ class PresenterPlugin : Plugin() {
 
     override val outgoingPacketTypes: Array<String> = arrayOf(PACKET_TYPE_MOUSEPAD_REQUEST, PACKET_TYPE_PRESENTER)
 
-    fun sendNext() {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_PAGE_DOWN)
-        device.sendPacket(np)
-    }
+    /** [onSent] runs (on the main thread) only once the desk has the key: the slide counter follows it. */
+    fun sendNext(onSent: () -> Unit = {}) = sendKey(KeyEvent.KEYCODE_PAGE_DOWN, onSent)
 
-    fun sendPrevious() {
+    fun sendPrevious(onSent: () -> Unit = {}) = sendKey(KeyEvent.KEYCODE_PAGE_UP, onSent)
+
+    private fun sendKey(keyCode: Int, onSent: () -> Unit) {
         val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_PAGE_UP)
-        device.sendPacket(np)
+        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(keyCode)
+        device.sendPacket(np, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
+            override fun onSuccess() {
+                android.os.Handler(android.os.Looper.getMainLooper()).post(onSent)
+            }
+
+            override fun onFailure(e: Throwable) = Unit
+        })
     }
 
     fun sendFullscreen() {

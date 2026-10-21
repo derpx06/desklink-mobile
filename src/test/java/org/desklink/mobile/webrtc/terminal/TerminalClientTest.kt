@@ -201,6 +201,23 @@ class TerminalClientTest {
     }
 
     @Test
+    fun aLostLinkMakesTheListStaleButKeepsWhatIsWanted() {
+        val h = Harness()
+        h.ready()
+        h.listed(bash)
+        h.open()
+        assertTrue(h.state().listLoaded)
+        h.client.onLinkLost(wire)
+        assertFalse(h.state().listLoaded)
+        assertTrue(h.session().wanted)
+        assertFalse(h.session().attached)
+        // The next link lists and re-attaches it.
+        h.sent.clear()
+        h.ready(wire.copy(sessionId = 8))
+        assertEquals(listOf(TerminalAction.LIST, TerminalAction.ATTACH), h.controls().map { it.action })
+    }
+
+    @Test
     fun nothingIsSentWhileTheLinkIsDown() {
         val h = Harness()
         h.client.refresh()

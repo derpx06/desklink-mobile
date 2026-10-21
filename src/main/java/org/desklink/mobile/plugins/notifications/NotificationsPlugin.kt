@@ -53,9 +53,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private val currentNotifications = mutableSetOf<String>()
     // Here we will map every notification to it's icon(hash)
     private val notificationsIcons = mutableMapOf<String, String>()
-    /** A later active-notification snapshot cannot describe an already
-     * dismissed notification, so dismissal delivery is retried explicitly. */
-    private val pendingCancellations = mutableSetOf<String>()
     /**
      * Delivery callbacks run on DeskLink's outbound worker, while Android
      * notification callbacks run on the main thread. Keep synchronization
@@ -106,7 +103,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         synchronized(notificationDeliveryLock) {
             currentNotifications.clear()
             notificationsIcons.clear()
-            pendingCancellations.clear()
         }
         pendingIntents.clear()
         pendingActions.clear()
@@ -132,25 +128,25 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     }
 
     /**
-     * Reconcile Android's active notifications immediately after the
-     * authenticated WebRTC feature transport becomes usable. Notifications
-     * posted while handover was in progress must not be treated as delivered
-     * merely because they entered the local outbound queue.
+     * Feature-ready: the full snapshot (contract S1). The ids first, so the desk drops whatever was
+     * dismissed while the link was down (no retried cancellations needed), then each body silent.
      */
-    fun resyncAfterWebRtcReady() {
+    override fun onFeatureReady() {
         if (!isDeviceInitialized || !NotificationReceiver.hasReadNotificationsPermission(context)) {
+            sendSnapshot(emptyList())
             return
         }
         NotificationReceiver.RunCommand(context) { service ->
             serviceReady = service.isConnected
-            if (serviceReady) {
-                val cancellations = synchronized(notificationDeliveryLock) {
-                    pendingCancellations.toList()
-                }
-                cancellations.forEach(::sendNotificationCancellation)
-                sendCurrentNotifications(service)
-            }
+            if (serviceReady) sendCurrentNotifications(service)
         }
+    }
+
+    /** Turned off: the desk drops every notification it shows from this phone. */
+    override fun onTurnedOff() = sendSnapshot(emptyList())
+
+    private fun sendSnapshot(ids: List<String>) {
+        device.sendPacket(snapshotPacket(ids))
     }
 
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification?) {
@@ -217,6 +213,25 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     private fun cancelDelayedNotification(key: String) {
         mainHandler.removeCallbacksAndMessages(key)
+    }
+
+    /** Whether [sendNotification] would mirror it: also what the snapshot's `ids` list. */
+    private fun isMirrored(statusBarNotification: StatusBarNotification): Boolean {
+        val notification = statusBarNotification.notification
+        if ((notification.flags and Notification.FLAG_FOREGROUND_SERVICE) != 0
+            || (notification.flags and Notification.FLAG_ONGOING_EVENT) != 0
+            || (notification.flags and Notification.FLAG_LOCAL_ONLY) != 0
+            || (notification.flags and NotificationCompat.FLAG_GROUP_SUMMARY) != 0
+        ) {
+            return false
+        }
+        val packageName = statusBarNotification.packageName
+        if (!appDatabase.isEnabled(packageName)) return false
+        if ("com.android.systemui" == packageName) {
+            if ("low_battery" == statusBarNotification.tag) return false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && "MediaOngoingActivity" == notification.channelId) return false
+        }
+        return "org.desklink.mobile" != packageName && "org.desklink.mobile.debug" != packageName
     }
 
     // isPreexisting is true for notifications that we are sending in response to a request command
@@ -361,25 +376,13 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         })
     }
 
+    /** Best effort: a dismissal lost while the link is down is corrected by the next snapshot. */
     private fun sendNotificationCancellation(id: String) {
         if (id.isBlank()) return
         val packet = NetworkPacket(PACKET_TYPE_NOTIFICATION)
         packet["id"] = id
         packet["isCancel"] = true
-        device.sendPacket(packet, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
-            override fun onSuccess() {
-                synchronized(notificationDeliveryLock) {
-                    pendingCancellations.remove(id)
-                }
-            }
-
-            override fun onFailure(e: Throwable) {
-                synchronized(notificationDeliveryLock) {
-                    pendingCancellations.add(id)
-                }
-                Log.w(TAG, "Unable to synchronize notification dismissal $id; it will be retried", e)
-            }
-        })
+        device.sendPacket(packet)
     }
 
     private fun extractText(notification: Notification): String? {
@@ -590,7 +593,10 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         if (notifications == null) {
             return // Can happen only on API 23 and lower
         }
-        for (notification in notifications) {
+        val mirrored = notifications.filter { runCatching { isMirrored(it) }.getOrDefault(false) }
+        // The ids first: the desk drops every other notification it holds from this phone.
+        sendSnapshot(mirrored.map(::getNotificationKeyCompat))
+        for (notification in mirrored) {
             // A single malformed third-party notification must not prevent
             // the rest of the active notification set from being mirrored.
             try {
@@ -691,6 +697,12 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
 
     companion object {
+        /** `desklink.notification {snapshot: true, ids}` (contract S1). */
+        fun snapshotPacket(ids: List<String>) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_NOTIFICATION).apply {
+            this["snapshot"] = true
+            this["ids"] = org.json.JSONArray(ids)
+        }
+
         private const val PACKET_TYPE_NOTIFICATION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION
         private const val PACKET_TYPE_NOTIFICATION_REQUEST = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REQUEST
         private const val PACKET_TYPE_NOTIFICATION_CANCEL = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_CANCEL

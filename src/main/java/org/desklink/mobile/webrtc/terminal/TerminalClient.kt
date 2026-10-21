@@ -671,6 +671,8 @@ class TerminalClient(
 
     private fun markLinkDown() {
         linkUp = false
+        // The list is the desk's: stale until the next one. What is wanted stays wanted.
+        listLoaded = false
         unproven = null
         pendingCreate = null
         sessions.values.forEach { it.attached = false; it.awaitingAttach = false }

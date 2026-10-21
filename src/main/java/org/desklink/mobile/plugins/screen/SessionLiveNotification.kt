@@ -44,11 +44,23 @@ object SessionLiveNotification {
         }
     }
 
-    /** What the desk screen ([screen]) or the terminal screen ([terminals]) has open now; null keeps the other's. */
-    fun update(context: Context, deviceId: String?, screen: Boolean? = null, terminals: Int? = null) {
+    /**
+     * Derived, never asserted: what is live is read from the session state itself (the desk view
+     * from the screen plugin, terminals from the app-owned terminal client), so a lost link, a
+     * closed activity or a reconnect can never leave the notification out of step.
+     */
+    fun refresh(context: Context, deviceId: String?) {
+        deviceId ?: return
+        val app = DeskLinkApplication.getInstance()
+        val screen = app.getDevice(deviceId)?.getPlugin(ScreenControlPlugin::class.java)?.remoteLive == true
+        val terminals = app.terminalClient(deviceId)?.state?.value?.sessions?.count { it.attached && !it.gone } ?: 0
+        update(context, deviceId, screen, terminals)
+    }
+
+    private fun update(context: Context, deviceId: String?, screen: Boolean, terminals: Int) {
         deviceId ?: return
         val now = live.compute(deviceId) { _, old ->
-            (old ?: Live()).let { Live(screen ?: it.screen, terminals ?: it.terminals) }.takeIf { it.screen || it.terminals > 0 }
+            Live(screen, terminals).takeIf { it.screen || it.terminals > 0 }
         }
         val manager = NotificationManagerCompat.from(context)
         val id = BASE_ID + (deviceId.hashCode() and 0xFFF)
@@ -105,4 +117,7 @@ object SessionLiveNotification {
         }
         update(context, deviceId, screen = false, terminals = 0)
     }
+
+    /** Whether a notification is up for [deviceId] (for tests and the Home row). */
+    fun isLive(deviceId: String) = live.containsKey(deviceId)
 }

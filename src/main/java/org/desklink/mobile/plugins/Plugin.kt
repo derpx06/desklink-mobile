@@ -110,6 +110,19 @@ abstract class Plugin {
     open val isEnabledByDefault: Boolean = true
 
     /**
+     * The WebRTC feature transport just became ready (a new connection, or a rebuilt one). A plugin
+     * that owns state the other side caches sends its full snapshot here, independent of its own
+     * lifecycle (contract Phase 1 S1/S2): the desk replaces its copy with it.
+     */
+    open fun onFeatureReady() {}
+
+    /**
+     * The person turned this plugin off for the device. A plugin that owns state the desk shows
+     * sends the empty form here, before it is unloaded, so the desk clears it (contract S2).
+     */
+    open fun onTurnedOff() {}
+
+    /**
      * Return true if this plugin needs a specific UI settings.
      */
     open fun hasSettings(): Boolean = false

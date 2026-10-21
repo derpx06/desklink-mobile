@@ -8,6 +8,8 @@ import org.desklink.mobile.Device
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.helpers.TransferCheckpoint
 import org.desklink.mobile.helpers.TransferCheckpointStore
+import org.desklink.mobile.plugins.share.TransferHistory
+import org.desklink.mobile.plugins.share.TransferProgress
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import java.io.File
 import java.io.FileInputStream
@@ -162,6 +164,7 @@ class WebRtcFileTransferManager(
             return false
         }
         payload.close()
+        TransferHistory.peekSource(packet)?.let { TransferHistory.rememberResumable(appContext, transferId, it) }
         val checksum = digest.digest().toHex()
         val checkpoint = TransferCheckpoint(
             transferId = transferId,
@@ -372,7 +375,10 @@ class WebRtcFileTransferManager(
         }
     }
 
-    /** The session ended. Checkpoints are kept (paused) so the peer's next offer resumes them. */
+    /**
+     * The session ended. Checkpoints are kept (paused) so the next connection resumes them, and a
+     * send's owner hears [TransferResumingException], not a failure: it shows "resuming".
+     */
     @Synchronized
     fun close(reason: String) {
         val transfers = active.values.toList()
@@ -380,7 +386,7 @@ class WebRtcFileTransferManager(
         transfers.forEach { transfer ->
             checkpointStore.save(transfer.checkpoint.copy(state = "paused"))
             if (transfer is ActiveTransfer.Sender) {
-                transfer.callback.onFailure(IllegalStateException(reason))
+                transfer.callback.onFailure(TransferResumingException(reason))
                 transfer.completion.complete(false)
             }
         }
@@ -414,10 +420,7 @@ class WebRtcFileTransferManager(
                     connectionGeneration = wire.generation,
                 )
                 checkpointStore.save(checkpoint)
-                val callback = object : Device.SendPacketStatusCallback() {
-                    override fun onSuccess() = Unit
-                    override fun onFailure(e: Throwable) = Unit
-                }
+                val callback = resumedSendCallback(wire.peerDeviceId, id, filename, checkpoint.totalSize)
                 val sender = ActiveTransfer.Sender(
                     wire,
                     checkpoint,
@@ -798,7 +801,27 @@ class WebRtcFileTransferManager(
     private fun discardSend(transferId: String) {
         sourceFile(transferId).delete()
         checkpointStore.remove(transferId)
+        TransferHistory.forgetResumable(appContext, transferId)
     }
+
+    /** A resumed send reports like the original job did: Home's transfer row and the history. */
+    private fun resumedSendCallback(deviceId: String, transferId: String, filename: String, size: Long) =
+        object : Device.SendPacketStatusCallback() {
+            private val jobId = RESUMED_JOB_BASE + (transferId.hashCode().toLong() and 0xffffffffL)
+
+            override fun onPayloadProgressChanged(percent: Int) =
+                TransferProgress.update(deviceId, jobId, true, filename, percent, size)
+
+            override fun onSuccess() {
+                TransferProgress.update(deviceId, jobId, true, filename, 100, size)
+                TransferProgress.finish(jobId, filename, false)
+                TransferHistory.recordResumedSent(appContext, deviceId, transferId, filename, size)
+            }
+
+            override fun onFailure(e: Throwable) {
+                if (e is TransferResumingException) TransferProgress.resuming(jobId) else TransferProgress.finish(jobId, filename, true)
+            }
+        }
 
     private fun control(
         wire: WebRtcWireBinding,
@@ -867,6 +890,9 @@ class WebRtcFileTransferManager(
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
     companion object {
+        /** Job ids for resumed sends, apart from the share plugin's own. */
+        private const val RESUMED_JOB_BASE = 1L shl 40
+
         /** Most incoming transfers one peer may hold open at once. The desktop
          * uses its own bound; this one only has to stop a peer from making the
          * phone allocate a partial file per invented transfer ID. */
@@ -880,3 +906,6 @@ class WebRtcFileTransferManager(
         private val RESUMABLE_STATES = setOf("pending", "transferring", "paused")
     }
 }
+
+/** The link went away mid-send; the checkpoint is kept and the next connection resumes it. */
+class TransferResumingException(reason: String) : IllegalStateException(reason)

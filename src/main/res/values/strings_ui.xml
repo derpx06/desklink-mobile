@@ -357,4 +357,24 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_media_position_value">%1$s of %2$s</string>
     <string name="home_media_player">Player</string>
     <string name="home_media_close">Close the player</string>
+
+    <!-- Phase 1: one writer per setting -->
+    <string name="settings_this_phone">This phone</string>
+    <string name="settings_phone_clipboard">Share this phone\'s clipboard</string>
+    <string name="settings_phone_notifications">Send this phone\'s notifications to %1$s</string>
+    <string name="settings_phone_relay">Use the relay from this phone</string>
+    <string name="settings_desk_relay">%1$s reachable from anywhere</string>
+    <string name="settings_desk_clipboard_summary">%1$s shares its clipboard with this phone</string>
+    <string name="settings_desk_shows_notifications">%1$s shows this phone\'s notifications</string>
+    <string name="settings_waiting_for">Waiting for %1$s…</string>
+    <string name="settings_saving">Saving…</string>
+    <string name="settings_session_password">Session password</string>
+    <string name="settings_session_password_set">Set on %1$s. Asked once per connection.</string>
+    <string name="settings_session_password_unset">Not set on %1$s</string>
+    <plurals name="queued_actions_expired">
+        <item quantity="one">%2$s was offline: %1$d action was not sent</item>
+        <item quantity="other">%2$s was offline: %1$d actions were not sent</item>
+    </plurals>
+    <string name="transfer_resuming">%1$s is paused. It continues when %2$s is back.</string>
+    <string name="home_transfer_resuming">Resumes when back</string>
 </resources>

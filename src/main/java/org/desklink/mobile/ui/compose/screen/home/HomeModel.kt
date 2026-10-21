@@ -53,6 +53,7 @@ object HomeModel {
                 HomeTransfer(
                     name = tr.title,
                     label = when {
+                        tr.resuming -> context.getString(R.string.home_transfer_resuming)
                         tr.failed -> context.getString(R.string.home_transfer_failed)
                         tr.finished -> context.getString(if (tr.upload) R.string.home_transfer_sent else R.string.home_transfer_received)
                         else -> tr.percent?.let { "$it%" } ?: context.getString(if (tr.upload) R.string.home_transfer_sending else R.string.home_transfer_receiving)
@@ -67,7 +68,8 @@ object HomeModel {
                 device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby == true &&
                 device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java) != null &&
                 device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST),
-            hasCommands = device.getPlugin(org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)?.commandItems?.isNotEmpty() == true &&
+            hasCommands = device.hasActiveWebRtcFeatureTransport &&
+                device.getPlugin(org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)?.commandItems?.isNotEmpty() == true &&
                 device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND_REQUEST),
             relayAvailable = org.desklink.mobile.backends.relay.RelaySettings.enabled(context) &&
                 org.desklink.mobile.backends.relay.RelayLinkProvider.statusLive.value == org.desklink.mobile.backends.relay.RelayLinkProvider.Status.ONLINE,
@@ -84,7 +86,10 @@ object HomeModel {
         val name = plugin.currentPlayerName() ?: return null
         val player = plugin.getPlayerStatus(name)
         val now = android.os.SystemClock.elapsedRealtime()
-        val reported = player?.isPlaying == true
+        // Without the feature link the desk's report may be out of date: shown as it was, still,
+        // with the controls off ("Waiting for <desk>…") until the next snapshot replaces it.
+        val stale = !device.hasActiveWebRtcFeatureTransport
+        val reported = player?.isPlaying == true && !stale
         // The desk's inline cover first, then an http(s) one; otherwise the card draws a gradient.
         val art = MprisArt.get(player?.artId)
             ?: player?.takeIf { it.albumArtUrl.startsWith("http://") || it.albumArtUrl.startsWith("https://") }
@@ -96,10 +101,10 @@ object HomeModel {
             artist = player?.artist.orEmpty(),
             playing = MprisControlState.shownPlaying(reported, plugin.pendingPlaying, plugin.pendingSince, now),
             pending = MprisControlState.isPending(reported, plugin.pendingPlaying, plugin.pendingSince, now),
-            canPlayPause = player == null || player.isPlayAllowed || player.isPauseAllowed,
-            canNext = player?.isGoNextAllowed ?: true,
-            canPrevious = player?.isGoPreviousAllowed ?: true,
-            canSeek = player != null && player.seekAllowed && player.length > 0,
+            canPlayPause = !stale && (player == null || player.isPlayAllowed || player.isPauseAllowed),
+            canNext = !stale && (player?.isGoNextAllowed ?: true),
+            canPrevious = !stale && (player?.isGoPreviousAllowed ?: true),
+            canSeek = !stale && player != null && player.seekAllowed && player.length > 0,
             lengthMs = player?.length ?: -1,
             positionMs = player?.lastPosition ?: 0,
             // MprisPlayer stamps positions with the wall clock.
@@ -111,6 +116,8 @@ object HomeModel {
             artKey = player?.artId ?: player?.albumArtUrl?.takeIf { art != null } ?: "title:" + (player?.title ?: name),
             desk = device.name,
             subtitleFallback = context.getString(R.string.home_media_on, device.name),
+            stale = stale,
+            waiting = context.getString(R.string.settings_waiting_for, device.name),
         )
     }
 }

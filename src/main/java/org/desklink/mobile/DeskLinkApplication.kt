@@ -42,6 +42,9 @@ import org.slf4j.impl.HandroidLoggerAdapter
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.Date
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
@@ -249,8 +252,37 @@ class DeskLinkApplication : Application() {
     fun sessionPassword(deviceId: String?): String? = getDevice(deviceId)?.let { webRtcCoordinatorFor(it).sessionPassword.get() }
 
     /** The terminal client of a paired device; it outlives any activity, so rotation keeps sessions. */
+    /**
+     * The terminal client of a paired device. Application-owned and never creating a coordinator:
+     * it outlives each one, so an open terminal keeps its client across reconnects (it used to
+     * hold the closed coordinator's dead client).
+     */
     fun terminalClient(deviceId: String?): TerminalClient? =
-        getDevice(deviceId)?.takeIf { it.isPaired }?.let { webRtcCoordinatorFor(it).terminal }
+        getDevice(deviceId)?.takeIf { it.isPaired }?.let(::terminalClientFor)
+
+    private val terminalClients = ConcurrentHashMap<String, TerminalClient>()
+
+    private fun terminalClientFor(device: Device): TerminalClient = terminalClients.computeIfAbsent(device.deviceId) { id ->
+        TerminalClient(
+            // Through whichever coordinator is current; none means the link is down.
+            sender = { type, payload, callback ->
+                webRtcCoordinators[id]?.sendTerminalMessage(type, payload, callback)
+                    ?: callback.onFailure(org.desklink.mobile.transport.TransportError(org.desklink.mobile.transport.TransportErrorCode.CLOSED, "No DeskLink WebRTC session"))
+            },
+            sinkFactory = org.desklink.mobile.plugins.terminal.TerminalSinks.factory(this, id),
+            executor = TerminalClient.newExecutor("DeskLink-Terminal-$id"),
+            discard = { message, error -> Log.w("DeskLink/Terminal", message, error) },
+            password = sessionPasswords.computeIfAbsent(id) { AtomicReference() },
+            onJobFinished = { finished -> org.desklink.mobile.plugins.terminal.TerminalAttentionNotifier.jobFinished(this, id, finished) },
+        ).also { client ->
+            // The live-session notification follows the attached sessions, whoever changed them.
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob()).launch {
+                client.state.map { state -> state.sessions.count { it.attached && !it.gone } }.distinctUntilChanged().collect {
+                    org.desklink.mobile.plugins.screen.SessionLiveNotification.refresh(this@DeskLinkApplication, id)
+                }
+            }
+        }
+    }
 
     fun switchRemoteScreen(deviceId: String?) {
         getDevice(deviceId)?.let { webRtcCoordinatorFor(it).switchRemoteScreen() }
@@ -268,6 +300,7 @@ class DeskLinkApplication : Application() {
         org.desklink.mobile.ui.SessionGate.forget(this, device.deviceId)
         sessionPasswords.remove(device.deviceId)?.set(null)
         screenResumes.remove(device.deviceId)?.set(false)
+        terminalClients.remove(device.deviceId)?.shutdown()
         device.clearWebRtcBindingsForUnpair()
         sessionManager.revokePairing(device.deviceId)
     }
@@ -531,6 +564,7 @@ class DeskLinkApplication : Application() {
             webRtcCoordinators.remove(device.deviceId)?.close()
             sessionPasswords.remove(device.deviceId)?.set(null)
             screenResumes.remove(device.deviceId)
+            terminalClients.remove(device.deviceId)?.shutdown()
             devices.remove(device.deviceId)
         }
     }
@@ -561,9 +595,13 @@ class DeskLinkApplication : Application() {
             sessionManager,
             sessionPasswords.computeIfAbsent(device.deviceId) { AtomicReference() },
             screenResumes.computeIfAbsent(device.deviceId) { java.util.concurrent.atomic.AtomicBoolean() },
+            terminalClientFor(device),
         ) { state, detail ->
             Log.i("DeskLink/WebRTC", "${device.deviceId}: $state${detail?.let { " ($it)" } ?: ""}")
             onDeviceListChanged()
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                org.desklink.mobile.plugins.screen.SessionLiveNotification.refresh(this, device.deviceId)
+            }
         }
 
     companion object {

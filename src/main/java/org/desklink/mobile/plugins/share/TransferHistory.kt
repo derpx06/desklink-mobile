@@ -169,6 +169,24 @@ object TransferHistory {
     @JvmStatic
     fun rememberSource(packet: NetworkPacket, uri: Uri) = synchronized(sources) { sources[packet] = uri }
 
+    /** Where a send came from, without consuming it (the send may still resume later). */
+    fun peekSource(packet: NetworkPacket): Uri? = synchronized(sources) { sources[packet] }
+
+    private fun resumeSources(context: Context) = context.getSharedPreferences("transfer_resume_sources", Context.MODE_PRIVATE)
+
+    /** Kept across a lost link, so a resumed send lands in the history with its original file. */
+    fun rememberResumable(context: Context, transferId: String, uri: Uri) =
+        resumeSources(context).edit().putString(transferId, uri.toString()).apply()
+
+    fun forgetResumable(context: Context, transferId: String) = resumeSources(context).edit().remove(transferId).apply()
+
+    /** A send that finished on a later connection than it started on. */
+    fun recordResumedSent(context: Context, deviceId: String, transferId: String, name: String, size: Long) {
+        val uri = resumeSources(context).getString(transferId, null)?.let(Uri::parse) ?: return
+        forgetResumable(context, transferId)
+        append(context, deviceId, name, size, sent = true, uri, context.contentResolver.getType(uri))
+    }
+
     @JvmStatic
     fun recordSent(context: Context, deviceId: String, packet: NetworkPacket) {
         val uri = synchronized(sources) { sources.remove(packet) } ?: return

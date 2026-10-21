@@ -268,6 +268,30 @@ public class MprisReceiverPlugin extends Plugin {
         players.put(player.getName(), player);
     }
 
+    /** Feature-ready: the whole state, list and each player, past the throttle (contract S2). */
+    @Override
+    public void onFeatureReady() {
+        if (players == null) {
+            sendEmptyPlayerList();
+            return;
+        }
+        sendPlayerList();
+        lastSent.clear();
+        for (MprisReceiverPlayer player : new ArrayList<>(players.values())) sendMetadata(player);
+    }
+
+    /** Turned off: the desk stops showing this phone's media. */
+    @Override
+    public void onTurnedOff() {
+        sendEmptyPlayerList();
+    }
+
+    private void sendEmptyPlayerList() {
+        NetworkPacket np = new NetworkPacket(PACKET_TYPE_MPRIS);
+        np.set("playerList", new ArrayList<String>());
+        getDevice().sendPacket(np);
+    }
+
     private void sendPlayerList() {
         NetworkPacket np = new NetworkPacket(PACKET_TYPE_MPRIS);
         np.set("playerList", players.keySet());

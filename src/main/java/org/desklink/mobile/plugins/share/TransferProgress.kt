@@ -30,6 +30,8 @@ object TransferProgress {
         val totalBytes: Long = 0,
         /** Smoothed; 0 until two updates are known. */
         val bytesPerSecond: Long = 0,
+        /** The link went away mid-send: it continues by itself when the desk is back. */
+        val resuming: Boolean = false,
     )
 
     /** A finished transfer stays on Home this long. */
@@ -60,6 +62,12 @@ object TransferProgress {
         current?.takeIf { it.jobId == jobId }?.let { current = it.copy(title = it.title.ifEmpty { title }, finished = true, failed = failed, updatedAt = SystemClock.elapsedRealtime()) }
     }
 
+    /** Paused by a lost link, not failed: the next connection resumes it. */
+    @JvmStatic
+    fun resuming(jobId: Long) {
+        current?.takeIf { it.jobId == jobId }?.let { current = it.copy(resuming = true, bytesPerSecond = 0, updatedAt = SystemClock.elapsedRealtime()) }
+    }
+
     @JvmStatic
     fun cancel(jobId: Long) {
         if (current?.jobId == jobId) current = null
@@ -74,5 +82,5 @@ object TransferProgress {
 
     /** What Home shows for [deviceId] now: running, or finished in the last few seconds. */
     fun visibleFor(deviceId: String, now: Long = SystemClock.elapsedRealtime()): Transfer? =
-        current?.takeIf { it.deviceId == deviceId && (!it.finished || now - it.updatedAt < SHOW_FINISHED_MS) }
+        current?.takeIf { it.deviceId == deviceId && (!it.finished || it.resuming || now - it.updatedAt < SHOW_FINISHED_MS) }
 }

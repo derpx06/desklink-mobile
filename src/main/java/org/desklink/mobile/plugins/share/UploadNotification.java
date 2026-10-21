@@ -85,6 +85,15 @@ class UploadNotification {
                 .setChannelId(NotificationHelper.Channels.FILETRANSFER_ERROR);
     }
 
+    /** Paused by a lost link: an ongoing-looking notice, not an error. */
+    public void setResuming(String message) {
+        builder.setContentText(message)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+                .setProgress(0, 0, false)
+                .setOngoing(false)
+                .setAutoCancel(true);
+    }
+
     public void cancel() {
         TransferProgress.cancel(jobId);
         notificationManager.cancel(notificationId);

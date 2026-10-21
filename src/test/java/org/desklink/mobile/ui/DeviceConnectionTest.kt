@@ -5,20 +5,23 @@ package org.desklink.mobile.ui
 
 import org.desklink.mobile.ui.compose.extensions.device.deviceConnection
 import org.desklink.mobile.ui.compose.model.device.DeviceConnection
+import org.desklink.mobile.webrtc.WebRtcConnectionPath
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DeviceConnectionTest {
     @Test
-    fun connectionPillFollowsTheLiveTransport() {
-        assertEquals(DeviceConnection.OFFLINE, deviceConnection(reachable = false, featuresReady = false, lan = true, relay = true))
+    fun connectionPillFollowsTheLiveTransportAndItsIcePath() {
+        assertEquals(DeviceConnection.OFFLINE, deviceConnection(reachable = false, featuresReady = false, path = null))
         // A link alone is not "connected": features only travel once WebRTC is ready.
-        assertEquals(DeviceConnection.CONNECTING, deviceConnection(reachable = true, featuresReady = false, lan = true, relay = false))
-        assertEquals(DeviceConnection.LOCAL, deviceConnection(reachable = true, featuresReady = true, lan = true, relay = true))
-        assertEquals(DeviceConnection.AWAY, deviceConnection(reachable = true, featuresReady = true, lan = false, relay = true))
-        assertEquals(DeviceConnection.CONNECTED, deviceConnection(reachable = true, featuresReady = true, lan = false, relay = false))
-        // The bootstrap link is being re-established while WebRTC still carries every feature.
-        assertEquals(DeviceConnection.CONNECTED, deviceConnection(reachable = false, featuresReady = true, lan = false, relay = false))
+        assertEquals(DeviceConnection.CONNECTING, deviceConnection(reachable = true, featuresReady = false, path = WebRtcConnectionPath.LAN))
+        // LOCAL only for a LAN pair, as the desk decides "on this network" for unlock.
+        assertEquals(DeviceConnection.LOCAL, deviceConnection(reachable = true, featuresReady = true, path = WebRtcConnectionPath.LAN))
+        assertEquals(DeviceConnection.AWAY, deviceConnection(reachable = true, featuresReady = true, path = WebRtcConnectionPath.DIRECT))
+        assertEquals(DeviceConnection.AWAY, deviceConnection(reachable = true, featuresReady = true, path = WebRtcConnectionPath.TURN))
+        assertEquals(DeviceConnection.CONNECTED, deviceConnection(reachable = true, featuresReady = true, path = null))
+        // The bootstrap link is being re-established while WebRTC still carries every feature: no flicker.
+        assertEquals(DeviceConnection.LOCAL, deviceConnection(reachable = false, featuresReady = true, path = WebRtcConnectionPath.LAN))
     }
 }
 

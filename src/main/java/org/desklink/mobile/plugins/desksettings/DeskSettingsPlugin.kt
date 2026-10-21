@@ -27,6 +27,8 @@ data class DeskSettingsState(
     val commandAlerts: Boolean,
     /** Set on the desk only; the phone may read it, never change it. */
     val unlockNearby: Boolean,
+    /** Whether a session password is set at the desk (S4); null from a desk that does not say. */
+    val sessionPasswordSet: Boolean? = null,
 )
 
 /**
@@ -39,6 +41,20 @@ class DeskSettingsPlugin : Plugin() {
     var settings by mutableStateOf<DeskSettingsState?>(null)
         private set
 
+    /**
+     * Switches flipped here that the desk has not reported back yet: shown as asked, marked
+     * pending. The next report (or a lost link) settles them.
+     */
+    var pending by mutableStateOf<Map<String, Boolean>>(emptyMap())
+        private set
+
+    /** The link dropped: the desk's report may no longer be true, and nothing pending will land. */
+    fun markStale() {
+        pending = emptyMap()
+    }
+
+    override fun onFeatureReady() = markStale()
+
     override val displayName: String
         get() = context.getString(R.string.pref_plugin_desk_settings)
 
@@ -47,13 +63,23 @@ class DeskSettingsPlugin : Plugin() {
 
     override fun onPacketReceived(np: NetworkPacket): Boolean {
         if (np.type != DeskLinkProtocol.PACKET_TYPE_SETTINGS) return false
-        parse(np)?.let { settings = it }
+        parse(np)?.let {
+            settings = it
+            pending = emptyMap()
+        }
         return true
     }
 
     /** Asks the desk to change [key]; the screen follows the desk's reply, not the request. */
     fun set(key: String, value: Boolean) {
-        requestPacket(key, value, settings?.relayConfigured == true)?.let(device::sendPacket)
+        val packet = requestPacket(key, value, settings?.relayConfigured == true) ?: return
+        pending = pending + (key to value)
+        device.sendPacket(packet, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
+            override fun onSuccess() = Unit
+            override fun onFailure(e: Throwable) {
+                pending = pending - key
+            }
+        })
     }
 
     override val supportedPacketTypes: Array<String> = arrayOf(DeskLinkProtocol.PACKET_TYPE_SETTINGS)
@@ -81,8 +107,12 @@ class DeskSettingsPlugin : Plugin() {
                 relay = np.getBoolean(RELAY),
                 commandAlerts = np.getBoolean(COMMAND_ALERTS),
                 unlockNearby = np.getBoolean("unlockNearby"),
+                sessionPasswordSet = if (np.has("sessionPasswordSet")) np.getBoolean("sessionPasswordSet") else null,
             )
         }
+
+        /** What a switch shows: the asked value while pending, else the desk's. */
+        fun shown(key: String, reported: Boolean, pending: Map<String, Boolean>): Boolean = pending[key] ?: reported
 
         /** `{set: {key: value}}`, or null for a key the desk would ignore. */
         fun requestPacket(key: String, value: Boolean, relayConfigured: Boolean): NetworkPacket? {

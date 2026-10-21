@@ -167,6 +167,7 @@ public class RunCommandPlugin extends Plugin {
 
             canAddCommand = np.getBoolean("canAddCommand", false);
             terminalOff = false;
+            listLocked = false;
 
             return true;
         }
@@ -216,17 +217,13 @@ public class RunCommandPlugin extends Plugin {
 
     private void onRunRefused(String error) {
         String key = lastRunKey;
+        String name = key;
+        for (CommandEntry entry : commandItems) if (entry.getKey().equals(key)) name = entry.getName();
+        // Any refusal is the desk's word (contract S5): no list here, and none in Device Controls.
+        if (ERROR_LOCKED.equals(error)) listLocked = true; else terminalOff = true;
+        clearCommands();
         if (key == null) {
             // The answer to the list request on connect, not to a tap: no message, only the state.
-            if (ERROR_LOCKED.equals(error)) {
-                listLocked = true;
-            } else {
-                terminalOff = true;
-                commandItems.clear();
-                commandList.clear();
-                for (CommandsChangedCallback aCallback : callbacks) aCallback.update();
-                getDevice().onPluginsChanged();
-            }
             return;
         }
         RefusalAction action = refusalAction(error, lastRunRetried);
@@ -235,8 +232,6 @@ public class RunCommandPlugin extends Plugin {
                 lastRunRetried = true;
                 // The terminal screen asks for the session password, proves it on its list, then
                 // runs the command once more and opens the session it starts.
-                String name = key;
-                for (CommandEntry entry : commandItems) if (entry.getKey().equals(key)) name = entry.getName();
                 Intent intent = org.desklink.mobile.plugins.terminal.TerminalActivity.Companion.intent(context, getDevice().getDeviceId())
                         .putExtra(org.desklink.mobile.plugins.terminal.TerminalActivity.EXTRA_RUN_KEY, key)
                         .putExtra(org.desklink.mobile.plugins.terminal.TerminalActivity.EXTRA_OPEN_TITLE, name)
@@ -253,14 +248,21 @@ public class RunCommandPlugin extends Plugin {
                 toast(context.getString(R.string.runcommand_locked, getDevice().getName()));
                 break;
             case TELL_TERMINAL_OFF:
-                terminalOff = true;
-                commandItems.clear();
-                commandList.clear();
-                for (CommandsChangedCallback aCallback : callbacks) aCallback.update();
-                getDevice().onPluginsChanged();
                 toast(context.getString(R.string.runcommand_terminal_off, getDevice().getName()));
                 break;
         }
+    }
+
+    /** Empties the list here and the copy Device Controls shows without the app. */
+    private void clearCommands() {
+        commandItems.clear();
+        commandList.clear();
+        if (sharedPreferences != null) {
+            sharedPreferences.edit().remove(KEY_COMMANDS_PREFERENCE + getDevice().getDeviceId()).apply();
+        }
+        forceRefreshWidgets(context);
+        for (CommandsChangedCallback aCallback : callbacks) aCallback.update();
+        getDevice().onPluginsChanged();
     }
 
     private void toast(String message) {

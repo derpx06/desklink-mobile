@@ -29,4 +29,12 @@ internal class BoundedPendingQueue<T>(private val maximumSize: Int) {
     fun drain(): List<T> = buildList(items.size) {
         while (items.isNotEmpty()) add(items.removeFirst())
     }
+
+    /** Removes and returns, in order, every item matching [predicate]. */
+    @Synchronized
+    fun removeIf(predicate: (T) -> Boolean): List<T> {
+        val removed = items.filter(predicate)
+        items.removeAll(removed.toSet())
+        return removed
+    }
 }

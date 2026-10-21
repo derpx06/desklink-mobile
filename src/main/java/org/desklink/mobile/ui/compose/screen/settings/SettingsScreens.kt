@@ -122,7 +122,9 @@ const val KEY_APP_THEME = "theme_pref"
 data class DeskSettings(
     val id: String,
     val name: String,
+    /** This phone's clipboard plugin (phone-owned; the desk's own switch is in [remote]). */
     val clipboardOn: Boolean,
+    /** This phone's notifications plugin (phone-owned). */
     val notificationsOn: Boolean,
     /** "3C:91:0B:7E", the start of its certificate fingerprint. */
     val key: String,
@@ -132,12 +134,17 @@ data class DeskSettings(
     val remote: org.desklink.mobile.plugins.desksettings.DeskSettingsState? = null,
     /** This phone's media is shown and controlled on the desk. */
     val phoneMediaOn: Boolean = false,
+    /** Desk-side switches the desk has not confirmed yet. */
+    val pending: Map<String, Boolean> = emptyMap(),
+    /** The feature link is up: only then are desk-owned rows live. */
+    val ready: Boolean = true,
 )
 
 class SettingsActions(
     val onBack: () -> Unit,
-    val onDeskClipboard: (Boolean) -> Unit,
-    val onDeskNotifications: (Boolean) -> Unit,
+    /** This phone's own clipboard and notifications plugins (phone settings). */
+    val onPhoneClipboard: (Boolean) -> Unit,
+    val onPhoneNotifications: (Boolean) -> Unit,
     /** A desk-side switch (`desklink.settings.request {set: {key: value}}`). */
     val onDeskSetting: (String, Boolean) -> Unit,
     val onPhoneMedia: (Boolean) -> Unit,
@@ -243,25 +250,23 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
         PermissionsSection(desk)
 
         if (desk != null) {
-            val remote = desk.remote
-            SectionLabel(desk.name)
+            DeskSection(desk, actions)
+            // Settings of this phone, not of the desk: each written only here.
+            SectionLabel(stringResource(R.string.settings_this_phone))
             RowGroup {
-                // On only when both ends are on; a switch here turns both.
-                val clipboard = deskSwitch(desk.clipboardOn, remote?.clipboard)
                 GroupRow(
-                    stringResource(R.string.home_clipboard_sync),
+                    stringResource(R.string.settings_phone_clipboard),
                     icon = R.drawable.sym_content_paste,
                     subtitle = stringResource(clipboardSummary()),
-                    checked = clipboard,
-                    onClick = { actions.onDeskClipboard(!clipboard) },
+                    checked = desk.clipboardOn,
+                    onClick = { actions.onPhoneClipboard(!desk.clipboardOn) },
                 )
-                val notifications = deskSwitch(desk.notificationsOn, remote?.notifications)
                 GroupRow(
-                    stringResource(R.string.settings_desk_notifications),
+                    stringResource(R.string.settings_phone_notifications, desk.name),
                     icon = R.drawable.sym_notifications,
                     subtitle = stringResource(R.string.settings_desk_notifications_summary),
-                    checked = notifications,
-                    onClick = { actions.onDeskNotifications(!notifications) },
+                    checked = desk.notificationsOn,
+                    onClick = { actions.onPhoneNotifications(!desk.notificationsOn) },
                 )
                 GroupRow(
                     stringResource(R.string.settings_phone_media, desk.name),
@@ -270,37 +275,11 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                     checked = desk.phoneMediaOn,
                     onClick = { actions.onPhoneMedia(!desk.phoneMediaOn) },
                 )
-            }
-            if (remote != null) {
-                RowGroup {
-                    GroupRow(
-                        stringResource(R.string.settings_keep_awake, desk.name),
-                        icon = R.drawable.sym_coffee,
-                        subtitle = stringResource(R.string.settings_keep_awake_summary),
-                        checked = remote.keepAwake,
-                        onClick = { actions.onDeskSetting(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.KEEP_AWAKE, !remote.keepAwake) },
-                    )
-                    GroupRow(
-                        stringResource(R.string.settings_command_alerts),
-                        icon = R.drawable.sym_notifications_active,
-                        subtitle = stringResource(R.string.settings_command_alerts_summary),
-                        checked = remote.commandAlerts,
-                        onClick = { actions.onDeskSetting(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.COMMAND_ALERTS, !remote.commandAlerts) },
-                    )
-                    // Turned on at the desk only: it lets this phone unlock it.
-                    GroupRow(
-                        stringResource(R.string.settings_unlock_nearby),
-                        icon = R.drawable.sym_lock_open,
-                        subtitle = stringResource(if (remote.unlockNearby) R.string.settings_unlock_nearby_on else R.string.settings_unlock_nearby_off, desk.name),
-                    )
-                }
-            }
-            RowGroup {
                 // Without a relay address the switch has nothing to turn on: say so, and wait for one.
                 val configured = RelaySettings.configured(context)
                 val relayOn = configured && prefs.getBoolean(RelaySettings.KEY_ENABLED, true)
                 GroupRow(
-                    stringResource(R.string.settings_reach_anywhere),
+                    stringResource(R.string.settings_phone_relay),
                     icon = R.drawable.sym_public,
                     subtitle = if (!configured) {
                         stringResource(R.string.settings_relay_not_set_up)
@@ -312,8 +291,6 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                     onClick = {
                         prefs.edit { putBoolean(RelaySettings.KEY_ENABLED, !relayOn) }
                         relaySettingChanged()
-                        // The desk follows when it has a relay set up too.
-                        if (remote?.relayConfigured == true) actions.onDeskSetting(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.RELAY, !relayOn)
                         revision++
                     },
                 )
@@ -405,8 +382,65 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
     }
 }
 
-/** A switch both ends hold: on only when both are (an older desk reports nothing: the phone decides). */
-fun deskSwitch(phone: Boolean, desk: Boolean?): Boolean = phone && desk != false
+/**
+ * The desk's own settings: the desk is their only writer. A switch here asks it; the row shows the
+ * asked value as pending until the desk's next report. Without the feature link (or before the
+ * desk's first report) the rows are shown disabled, "Waiting for <desk>…".
+ */
+@Composable
+private fun DeskSection(desk: DeskSettings, actions: SettingsActions) {
+    val remote = desk.remote
+    val live = desk.ready && remote != null
+    val waiting = stringResource(R.string.settings_waiting_for, desk.name)
+    val saving = stringResource(R.string.settings_saving)
+    SectionLabel(desk.name)
+    RowGroup {
+        @Composable
+        fun deskRow(key: String, title: String, icon: Int, summary: String, reported: Boolean) {
+            val pending = key in desk.pending
+            val on = org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.shown(key, reported, desk.pending)
+            GroupRow(
+                title,
+                icon = icon,
+                subtitle = when {
+                    !live -> waiting
+                    pending -> saving
+                    else -> summary
+                },
+                checked = on,
+                enabled = live && !pending,
+                onClick = { actions.onDeskSetting(key, !on) },
+            )
+        }
+        val keys = org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin
+        deskRow(keys.CLIPBOARD, stringResource(R.string.home_clipboard_sync), R.drawable.sym_content_paste, stringResource(R.string.settings_desk_clipboard_summary, desk.name), remote?.clipboard == true)
+        deskRow(keys.NOTIFICATIONS, stringResource(R.string.settings_desk_notifications), R.drawable.sym_notifications, stringResource(R.string.settings_desk_shows_notifications, desk.name), remote?.notifications == true)
+        deskRow(keys.KEEP_AWAKE, stringResource(R.string.settings_keep_awake, desk.name), R.drawable.sym_coffee, stringResource(R.string.settings_keep_awake_summary), remote?.keepAwake == true)
+        deskRow(keys.COMMAND_ALERTS, stringResource(R.string.settings_command_alerts), R.drawable.sym_notifications_active, stringResource(R.string.settings_command_alerts_summary), remote?.commandAlerts == true)
+        if (remote?.relayConfigured == true) {
+            deskRow(keys.RELAY, stringResource(R.string.settings_desk_relay, desk.name), R.drawable.sym_public, stringResource(R.string.settings_reach_anywhere_summary), remote.relay)
+        }
+        // Read-only: set at the desk.
+        GroupRow(
+            stringResource(R.string.settings_unlock_nearby),
+            icon = R.drawable.sym_lock_open,
+            subtitle = when {
+                !live -> waiting
+                remote?.unlockNearby == true -> stringResource(R.string.settings_unlock_nearby_on, desk.name)
+                else -> stringResource(R.string.settings_unlock_nearby_off, desk.name)
+            },
+            enabled = live,
+        )
+        remote?.sessionPasswordSet?.let { set ->
+            GroupRow(
+                stringResource(R.string.settings_session_password),
+                icon = R.drawable.sym_fingerprint,
+                subtitle = if (!live) waiting else stringResource(if (set) R.string.settings_session_password_set else R.string.settings_session_password_unset, desk.name),
+                enabled = live,
+            )
+        }
+    }
+}
 
 /** Android 10+ keeps background apps off the clipboard: the phone's side needs a tap. */
 fun clipboardSummary(): Int =

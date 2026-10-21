@@ -110,9 +110,12 @@ class DeskUnlockPlugin : Plugin() {
     }
 
     /** "Unlock desk": the desk answers with a nonce if it may be unlocked now, else with its reason. */
-    fun ask() {
+    fun ask(): Boolean {
+        // Only with the link up: a nonce asked for and delivered late would be spent by nobody.
+        if (!device.hasActiveWebRtcFeatureTransport) return false
         refusal = null
         device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST).apply { this["ask"] = true })
+        return true
     }
 
     /** After the biometric prompt succeeded: spends the nonce. False when it has expired here. */

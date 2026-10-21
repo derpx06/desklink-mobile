@@ -130,14 +130,13 @@ class TerminalAttentionNotifier(
          * Whether a `finished` event alerts: not while that terminal is on screen here, and not when
          * the desk reports its command alerts off (it should not send then; an older desk might).
          */
-        fun shouldAlertFinished(visibleTerminalId: String?, terminalId: String, commandAlerts: Boolean?): Boolean =
-            visibleTerminalId != terminalId && commandAlerts != false
+        /** The desk sends `finished` only while this phone's commandAlerts is on (its one writer). */
+        fun shouldAlertFinished(visibleTerminalId: String?, terminalId: String): Boolean =
+            visibleTerminalId != terminalId
 
         /** The desk's `finished` event: "cargo finished after 2 min 4 s". */
         fun jobFinished(context: Context, deviceId: String, finished: org.desklink.mobile.webrtc.terminal.TerminalJobFinished) {
-            val commandAlerts = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)
-                ?.settings?.commandAlerts
-            if (!shouldAlertFinished(TerminalForeground.terminalId, finished.terminalId, commandAlerts)) return
+            if (!shouldAlertFinished(TerminalForeground.terminalId, finished.terminalId)) return
             val job = finished.job?.takeIf(String::isNotBlank) ?: finished.title.ifBlank { context.getString(R.string.terminal_job_default) }
             val detail = finished.secs?.let { context.getString(R.string.terminal_job_finished_after, job, formatDuration(it)) }
                 ?: context.getString(R.string.terminal_job_finished, job)

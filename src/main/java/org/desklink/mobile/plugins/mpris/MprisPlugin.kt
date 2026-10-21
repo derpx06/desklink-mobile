@@ -298,6 +298,12 @@ class MprisPlugin : Plugin() {
         return true
     }
 
+    /** A new link: the desk sends its whole state (S3); nothing tapped before it is still pending. */
+    override fun onFeatureReady() {
+        pendingPlaying = null
+        requestPlayerList()
+    }
+
     override fun onDestroy() {
         players.clear()
         deregisterPlugin(this)

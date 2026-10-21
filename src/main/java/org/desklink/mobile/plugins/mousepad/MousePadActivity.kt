@@ -175,7 +175,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         prefs.unregisterOnSharedPreferenceChangeListener(this)
         if (isFinishing && !isChangingConfigurations) {
             sendStopScreen()
-            SessionLiveNotification.update(this, deviceId, screen = false)
+            SessionLiveNotification.refresh(this, deviceId)
         }
         super.onDestroy()
     }
@@ -225,7 +225,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 keyboardView?.clearFocus()
             }
         }
-        LaunchedEffect(live) { SessionLiveNotification.update(this@MousePadActivity, deviceId, screen = live) }
+        LaunchedEffect(live) { SessionLiveNotification.refresh(this@MousePadActivity, deviceId) }
         ImmersiveDesktop(controlEnabled, live)
         if (plugin != null && prompt != null) {
             SessionPasswordDialog(

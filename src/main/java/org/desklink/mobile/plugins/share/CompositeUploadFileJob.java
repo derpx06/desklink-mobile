@@ -125,6 +125,14 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                 reportResult(null);
             }
         } catch (RuntimeException e) {
+            if (lastFailure instanceof org.desklink.mobile.webrtc.TransferResumingException) {
+                // Not failed: the file is kept and resumes by itself when the desk is back.
+                TransferProgress.resuming(getId());
+                uploadNotification.setResuming(getDevice().getContext().getString(R.string.transfer_resuming, currentFileName, getDevice().getName()));
+                uploadNotification.show();
+                reportError(e);
+                return;
+            }
             int failedFiles;
             synchronized (lock) {
                 failedFiles = (totalNumFiles - currentFileNum + 1);
@@ -151,6 +159,9 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
             networkPacket.set(SharePlugin.KEY_TOTAL_PAYLOAD_SIZE, totalPayloadSize);
         }
     }
+
+    /** Why the last send failed, as its callback said. */
+    private volatile Throwable lastFailure;
 
     private void setProgress(int progress) {
         synchronized (lock) {
@@ -247,6 +258,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
         @Override
         public void onFailure(Throwable e) {
             // Handled in the run() function when sendPacketBlocking returns false
+            lastFailure = e;
         }
     }
 }

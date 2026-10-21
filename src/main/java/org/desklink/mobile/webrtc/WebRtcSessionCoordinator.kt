@@ -19,11 +19,9 @@ import org.desklink.mobile.helpers.security.RsaHelper
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.screen.PhoneScreenCaptureService
 import org.desklink.mobile.plugins.mousereceiver.MouseReceiverService
-import org.desklink.mobile.plugins.notifications.NotificationsPlugin
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.desklink.mobile.session.DeviceManager
 import org.desklink.mobile.session.SessionBinding
-import org.desklink.mobile.plugins.terminal.TerminalSinks
 import org.desklink.mobile.transport.TransportCallback
 import org.desklink.mobile.transport.TransportError
 import org.desklink.mobile.transport.TransportErrorCode
@@ -67,6 +65,13 @@ class WebRtcSessionCoordinator(
      * like [sessionPassword]; cleared by an explicit stop.
      */
     private val resumeScreen: AtomicBoolean = AtomicBoolean(),
+    /**
+     * Terminal sessions on `desklink-terminal-v1`, owned by the application per device: a
+     * replaced coordinator hands the same client to the next, so open terminals and their
+     * wanted attachments survive a reconnect. Not a packet type: routed by
+     * [handleTerminalEnvelope] before the packet bridge.
+     */
+    val terminal: TerminalClient,
     private val onStateChanged: (String, String?) -> Unit,
 ) : Device.ControlPacketHandler {
     private val lock = Any()
@@ -118,21 +123,6 @@ class WebRtcSessionCoordinator(
         Thread(runnable, "DeskLink-WebRTC-File-${device.deviceId}").apply { isDaemon = true }
     }
     private val fileTransfers = WebRtcFileTransferManager(context, device, ::sendFileMessage)
-
-    /**
-     * Terminal sessions on `desklink-terminal-v1`. Not a packet type: it is routed by
-     * [handleTerminalEnvelope] before the packet bridge and is deliberately absent from
-     * [WebRtcFeatureProfile]. The client runs on its own thread and never calls back here
-     * synchronously, so it is safe to reach from libwebrtc's callback thread.
-     */
-    val terminal = TerminalClient(
-        sender = ::sendTerminalMessage,
-        sinkFactory = TerminalSinks.factory(context, device.deviceId),
-        executor = TerminalClient.newExecutor("DeskLink-Terminal-${device.deviceId}"),
-        discard = { message, error -> Log.w(TAG, message, error) },
-        password = sessionPassword,
-        onJobFinished = { finished -> org.desklink.mobile.plugins.terminal.TerminalAttentionNotifier.jobFinished(context, device.deviceId, finished) },
-    )
 
     /** Link up/down events for [terminal], queued here so they are never delivered under [lock]. */
     private val terminalLink = DeferredTaskExecutor(
@@ -807,7 +797,6 @@ class WebRtcSessionCoordinator(
         remoteActionExecutor.close()
         peerEvents.close()
         terminalLink.close()
-        terminal.shutdown()
     }
 
     /**
@@ -831,7 +820,6 @@ class WebRtcSessionCoordinator(
         remoteActionExecutor.close()
         peerEvents.close()
         terminalLink.close()
-        terminal.shutdown()
     }
 
     /**
@@ -1295,10 +1283,9 @@ class WebRtcSessionCoordinator(
                     recovery.reset()
                     startLivenessLocked(binding, attemptId)
                     publish("FeatureReady", "LAN is now bootstrap and signaling only")
-                    // Android notifications may have arrived while the
-                    // feature channel was still gated. Reconcile only after
-                    // the same WebRTC transport is installed for plugins.
-                    device.getPlugin(NotificationsPlugin::class.java)?.resyncAfterWebRtcReady()
+                    // Every owner sends its full snapshot (battery, phone media, clipboard,
+                    // notifications…); the desk replaces its copy (contract Phase 1).
+                    device.onFeatureReady()
                     // The person was watching the desktop when the old peer went:
                     // ask again. Control follows the picture in MousePadActivity,
                     // and the session password is offered again with the request.
@@ -1588,7 +1575,10 @@ class WebRtcSessionCoordinator(
     private fun startLivenessLocked(binding: SessionBinding, attemptId: String) {
         cancelLivenessLocked()
         peerLiveness.start(SystemClock.elapsedRealtime())
+        var ticks = 0
         liveness = recoveryExecutor.scheduleWithFixedDelay({
+            // The ICE path can move (LAN → TURN): LOCAL/AWAY follow it every 10 s.
+            if (++ticks % 10 == 0) device.requestConnectionStats { }
             val dead = synchronized(lock) {
                 val active = transport
                 if (closed || activeAttemptId != attemptId || !sessions.isCurrent(binding) ||
@@ -1644,7 +1634,7 @@ class WebRtcSessionCoordinator(
      * Sends one terminal message. Never throws: an unavailable transport is reported through
      * [callback], which is how the client learns the link is down.
      */
-    private fun sendTerminalMessage(messageType: String, payload: ByteArray, callback: TransportCallback) {
+    fun sendTerminalMessage(messageType: String, payload: ByteArray, callback: TransportCallback) {
         val active = synchronized(lock) { transport?.takeIf { it.isReadyForPackets() } }
         if (active == null) {
             callback.onFailure(TransportError(TransportErrorCode.CLOSED, "WebRTC terminal transport is not ready"))

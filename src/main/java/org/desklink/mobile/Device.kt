@@ -458,8 +458,19 @@ class Device : PacketReceiver {
     @AnyThread
     fun requestConnectionStats(callback: org.desklink.mobile.webrtc.WebRtcConnectionStatsCallback) {
         val transport = webRtcTransport ?: return callback.onStats(null)
-        transport.requestConnectionStats(!hasLanLink && relayLink != null, callback)
+        transport.requestConnectionStats(!hasLanLink && relayLink != null) { stats ->
+            if (webRtcTransport === transport) connectionPath = stats?.path
+            callback.onStats(stats)
+        }
     }
+
+    /**
+     * The live peer's ICE path as last measured (the desk's unlock check uses the same rule), or
+     * null while unknown. What decides LOCAL or AWAY, not which bootstrap link exists.
+     */
+    @Volatile
+    var connectionPath: org.desklink.mobile.webrtc.WebRtcConnectionPath? = null
+        private set
 
     /** The preferred link is pinned TLS over the LAN (not, e.g., Bluetooth). */
     /** Whether [packetType] is in the feature set shared with this computer (both profiles agree). */
@@ -509,9 +520,24 @@ class Device : PacketReceiver {
         setWebRtcTransport(transport, reloadPlugins = true)
     }
 
+    /**
+     * Feature-ready: every loaded plugin sends its snapshot. Queued behind the plugin reload that
+     * [setWebRtcTransport] starts, so a plugin loaded by it is included.
+     */
+    fun onFeatureReady() {
+        lifecycle.enqueue("feature-ready snapshots") {
+            loadedPlugins.values.forEach { plugin ->
+                runCatching { plugin.onFeatureReady() }
+                    .onFailure { Log.w("DeskLink/Device", "${plugin.pluginKey} failed its feature-ready snapshot", it) }
+            }
+        }
+    }
+
     fun setWebRtcTransport(transport: WebRtcTransport?, reloadPlugins: Boolean) {
         if (webRtcTransport === transport) return
         webRtcTransport = transport
+        connectionPath = null
+        if (transport?.isReadyForPackets() == true) requestConnectionStats { }
         if (transport?.isReadyForPackets() == true) flushPendingFeaturePackets()
         // Plugin availability is calculated from reachability. Re-evaluate it
         // when WebRTC becomes ready or is closed so a transient loss of the
@@ -538,20 +564,36 @@ class Device : PacketReceiver {
             val batch = pendingFeaturePackets.drain()
             if (batch.isEmpty()) break
             val now = android.os.SystemClock.elapsedRealtime()
-            batch.forEach { queued ->
-                if (now - queued.queuedAt > PENDING_FEATURE_MAX_AGE_MS) {
-                    queued.callback.onFailure(
-                        IllegalStateException("DeskLink dropped stale queued ${queued.packet.type}"),
-                    )
-                } else {
-                    sendPacketBlocking(queued.packet, queued.callback)
-                }
-            }
+            val (stale, fresh) = batch.partition { now - it.queuedAt > PENDING_FEATURE_MAX_AGE_MS }
+            failExpired(stale)
+            fresh.forEach { queued -> sendPacketBlocking(queued.packet, queued.callback) }
             if (webRtcTransport?.isReadyForPackets() != true) break
         }
     }
 
     private val sendOrderLock = Any()
+
+    private val expiryHandler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
+
+    /** Queued packets the link did not come back for in time fail, even while it stays down. */
+    private fun expireStalePending() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        failExpired(synchronized(sendOrderLock) { pendingFeaturePackets.removeIf { now - it.queuedAt > PENDING_FEATURE_MAX_AGE_MS } })
+    }
+
+    /**
+     * Fails each expired packet's callback, and tells the person once when any of them was
+     * something they asked for (a lock, a ring, a switch…): it was never sent.
+     */
+    private fun failExpired(expired: List<QueuedFeature>) {
+        if (expired.isEmpty()) return
+        expired.forEach { it.callback.onFailure(QueuedPacketExpiredException(it.packet.type)) }
+        val actions = expiredUserActions(expired.map { it.packet.type })
+        if (actions > 0) {
+            val message = context.resources.getQuantityString(R.plurals.queued_actions_expired, actions, actions, name)
+            expiryHandler.post { android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show() }
+        }
+    }
 
     private fun sendOnTransport(
         transport: WebRtcTransport,
@@ -1137,6 +1179,7 @@ class Device : PacketReceiver {
                     countSent(deviceId, np.type, false)
                     return false
                 }
+                expiryHandler.postDelayed(::expireStalePending, PENDING_FEATURE_MAX_AGE_MS + 1_000)
                 pendingFeaturePackets.offer(QueuedFeature(np, callback))?.let { dropped ->
                     dropped.callback.onFailure(
                         IllegalStateException("DeskLink dropped queued ${dropped.packet.type}: queue full"),
@@ -1285,6 +1328,7 @@ class Device : PacketReceiver {
     }
 
     fun setPluginEnabled(pluginKey: String, value: Boolean) {
+        if (!value) runCatching { loadedPlugins[pluginKey]?.onTurnedOff() }.onFailure { Log.w("DeskLink/Device", "$pluginKey could not send its empty state", it) }
         TrustedDevices.getDeviceSettings(context, deviceId).edit { putBoolean(pluginKey, value) }
         reloadPluginsFromSettings()
     }
@@ -1399,6 +1443,22 @@ internal fun heartbeatPacket(reply: Boolean, interactive: Boolean): NetworkPacke
         if (reply) this["reply"] = true
         this["dozing"] = !interactive
     }
+
+/** A queued packet that waited longer than [PENDING_FEATURE_MAX_AGE_MS] and was never sent. */
+class QueuedPacketExpiredException(type: String) : IllegalStateException("DeskLink dropped stale queued $type")
+
+/** Packets that are something the person asked for: their expiry is said out loud. */
+internal val USER_ACTION_TYPES = setOf(
+    DeskLinkProtocol.PACKET_TYPE_PING,
+    DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST,
+    DeskLinkProtocol.PACKET_TYPE_LOCK_REQUEST,
+    DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST,
+    DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND_REQUEST,
+    DeskLinkProtocol.PACKET_TYPE_MPRIS_REQUEST,
+    DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
+)
+
+internal fun expiredUserActions(types: Collection<String>): Int = types.count { it in USER_ACTION_TYPES }
 
 /** Queued features older than this are failed, not sent. Matches the desktop. */
 internal const val PENDING_FEATURE_MAX_AGE_MS = 30_000L

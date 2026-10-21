@@ -16,7 +16,6 @@ import org.desklink.mobile.plugins.runcommand.RunCommandPlugin
 import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.plugins.terminal.TerminalAttentionNotifier
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
-import org.desklink.mobile.ui.compose.screen.settings.deskSwitch
 import org.desklink.mobile.webrtc.terminal.TerminalSessionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -62,12 +61,16 @@ class DeskFeaturesTest {
     }
 
     @Test
-    fun aSharedSwitchIsOnOnlyWhenBothEndsAre() {
-        assertTrue(deskSwitch(phone = true, desk = true))
-        assertFalse(deskSwitch(phone = true, desk = false))
-        assertFalse(deskSwitch(phone = false, desk = true))
-        // An older desk reports nothing: the phone's own switch decides.
-        assertTrue(deskSwitch(phone = true, desk = null))
+    fun aSwitchShowsTheAskedValueUntilTheDeskReports() {
+        assertTrue(DeskSettingsPlugin.shown("keepAwake", reported = false, pending = mapOf("keepAwake" to true)))
+        assertFalse(DeskSettingsPlugin.shown("keepAwake", reported = false, pending = mapOf("clipboard" to true)))
+        assertTrue(DeskSettingsPlugin.shown("keepAwake", reported = true, pending = emptyMap()))
+    }
+
+    @Test
+    fun theSessionPasswordFlagIsOptional() {
+        assertNull(DeskSettingsPlugin.parse(settings())!!.sessionPasswordSet)
+        assertEquals(true, DeskSettingsPlugin.parse(settings().apply { this["sessionPasswordSet"] = true })!!.sessionPasswordSet)
     }
 
     // ---- §5 unlock ----------------------------------------------------------------------------
@@ -131,6 +134,30 @@ class DeskFeaturesTest {
         assertNull(Handoff.parse(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HANDOFF)))
     }
 
+    // ---- Phase 1: snapshots and offline actions ----------------------------------------------
+
+    @Test
+    fun theNotificationSnapshotListsIdsFirst() {
+        val packet = org.desklink.mobile.plugins.notifications.NotificationsPlugin.snapshotPacket(listOf("a", "b"))
+        assertEquals(DeskLinkProtocol.PACKET_TYPE_NOTIFICATION, packet.type)
+        assertTrue(packet.getBoolean("snapshot", false))
+        assertEquals(listOf("a", "b"), packet.getStringList("ids"))
+        assertEquals(emptyList<String>(), org.desklink.mobile.plugins.notifications.NotificationsPlugin.snapshotPacket(emptyList()).getStringList("ids"))
+    }
+
+    @Test
+    fun turningBatteryOffClearsItAtTheDesk() {
+        val packet = BatteryPlugin.turnedOffPacket()
+        assertEquals(DeskLinkProtocol.PACKET_TYPE_BATTERY, packet.type)
+        assertEquals(-1, packet.getInt("currentCharge"))
+    }
+
+    @Test
+    fun onlyExpiredUserActionsAreSaidOutLoud() {
+        assertEquals(2, org.desklink.mobile.expiredUserActions(listOf(DeskLinkProtocol.PACKET_TYPE_PING, DeskLinkProtocol.PACKET_TYPE_BATTERY, DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST)))
+        assertEquals(0, org.desklink.mobile.expiredUserActions(listOf(DeskLinkProtocol.PACKET_TYPE_BATTERY, DeskLinkProtocol.PACKET_TYPE_CLIPBOARD)))
+    }
+
     // ---- §2 run command -----------------------------------------------------------------------
 
     @Test
@@ -160,11 +187,10 @@ class DeskFeaturesTest {
     // ---- §7 finished --------------------------------------------------------------------------
 
     @Test
-    fun aFinishedJobAlertsUnlessItsTerminalIsOnScreenOrAlertsAreOff() {
-        assertTrue(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = null, terminalId = "t1", commandAlerts = true))
-        assertTrue(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = "t2", terminalId = "t1", commandAlerts = null))
-        assertFalse(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = "t1", terminalId = "t1", commandAlerts = true))
-        assertFalse(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = null, terminalId = "t1", commandAlerts = false))
+    fun aFinishedJobAlertsUnlessItsTerminalIsOnScreen() {
+        assertTrue(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = null, terminalId = "t1"))
+        assertTrue(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = "t2", terminalId = "t1"))
+        assertFalse(TerminalAttentionNotifier.shouldAlertFinished(visibleTerminalId = "t1", terminalId = "t1"))
     }
 
     @Test

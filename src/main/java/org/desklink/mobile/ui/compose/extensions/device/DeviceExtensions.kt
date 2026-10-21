@@ -6,6 +6,8 @@
 
 package org.desklink.mobile.ui.compose.extensions.device
 
+import org.desklink.mobile.webrtc.WebRtcConnectionPath
+
 import org.desklink.mobile.Device
 import org.desklink.mobile.PairingHandler
 import org.desklink.mobile.plugins.battery.BatteryPlugin
@@ -22,7 +24,7 @@ fun Device.toUiModel(): DeviceUiModel {
         summaryRes = if (compareProtocolVersion() > 0) R.string.protocol_version_newer else 0,
         isReachable = isReachable,
         isPaired = isPaired,
-        connection = deviceConnection(isReachable, hasActiveWebRtcFeatureTransport, hasLanLink, relayLink != null),
+        connection = deviceConnection(isReachable, hasActiveWebRtcFeatureTransport, connectionPath),
         batteryPercent = battery?.currentCharge,
         charging = battery?.isCharging == true,
         wantsToPair = pairStatus == PairingHandler.PairState.RequestedByPeer,
@@ -30,14 +32,16 @@ fun Device.toUiModel(): DeviceUiModel {
 }
 
 /**
- * A LAN link wins over the relay: when both exist the handover prefers the LAN. A live WebRTC
- * feature transport is connected even while the bootstrap link is being re-established (features
- * work; only signalling waits).
+ * From the live feature transport and its ICE path, as the desk decides "on this network": LOCAL
+ * only for a LAN pair, AWAY for a direct or relayed one, plain CONNECTED until the path is known.
+ * The transport alive means connected even while the bootstrap link is being re-established.
  */
-fun deviceConnection(reachable: Boolean, featuresReady: Boolean, lan: Boolean, relay: Boolean): DeviceConnection = when {
-    featuresReady && lan -> DeviceConnection.LOCAL
-    featuresReady && relay -> DeviceConnection.AWAY
-    featuresReady -> DeviceConnection.CONNECTED
+fun deviceConnection(reachable: Boolean, featuresReady: Boolean, path: WebRtcConnectionPath?): DeviceConnection = when {
+    featuresReady -> when (path) {
+        WebRtcConnectionPath.LAN -> DeviceConnection.LOCAL
+        WebRtcConnectionPath.DIRECT, WebRtcConnectionPath.TURN -> DeviceConnection.AWAY
+        null -> DeviceConnection.CONNECTED
+    }
     !reachable -> DeviceConnection.OFFLINE
     else -> DeviceConnection.CONNECTING
 }

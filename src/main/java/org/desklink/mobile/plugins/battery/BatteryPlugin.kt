@@ -98,6 +98,17 @@ class BatteryPlugin : Plugin() {
         return true
     }
 
+    /** Feature-ready: the current state, even when nothing changed since the last send (S2). */
+    override fun onFeatureReady() {
+        context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let { receiver.onReceive(context, it) }
+        device.sendPacket(batteryInfo)
+    }
+
+    /** Turned off: the desk stops showing this phone's battery. */
+    override fun onTurnedOff() {
+        device.sendPacket(turnedOffPacket())
+    }
+
     override fun onDestroy() {
         // It's okay to call this only once, even though we registered it for two filters
         context.unregisterReceiver(receiver)
@@ -137,6 +148,13 @@ class BatteryPlugin : Plugin() {
             } else {
                 -1
             }
+
+        /** `currentCharge: -1`: the desk clears the battery it shows (contract S2). */
+        fun turnedOffPacket() = NetworkPacket(PACKET_TYPE_BATTERY).apply {
+            this["currentCharge"] = -1
+            this["isCharging"] = false
+            this["thresholdEvent"] = THRESHOLD_EVENT_NONE
+        }
 
         fun isLowBattery(info: DeviceBatteryInfo): Boolean {
             return info.thresholdEvent == THRESHOLD_EVENT_BATTERY_LOW

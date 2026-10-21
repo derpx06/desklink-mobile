@@ -194,7 +194,8 @@ import org.desklink.mobile.webrtc.terminal.TerminalSessionState
  */
 class TerminalActivity : AppCompatActivity() {
     private var deviceId: String = ""
-    private var client: TerminalClient? = null
+    /** Looked up each time: the application owns the client, per device. */
+    private val client: TerminalClient? get() = DeskLinkApplication.getInstance().terminalClient(deviceId)
     private var openId by mutableStateOf<String?>(null)
     private var openTitle by mutableStateOf<String?>(null)
     private var openSince = 0L
@@ -231,7 +232,6 @@ class TerminalActivity : AppCompatActivity() {
             finish()
             return
         }
-        client = terminalClient
         TerminalPalette.apply(
             (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES,
         )
@@ -284,7 +284,7 @@ class TerminalActivity : AppCompatActivity() {
         // notifications still fire and the screen is current when the person returns.
         if (isFinishing && !isChangingConfigurations) {
             client?.detachAll()
-            SessionLiveNotification.update(this, deviceId, terminals = 0)
+            SessionLiveNotification.refresh(this, deviceId)
         }
         super.onDestroy()
     }
@@ -344,7 +344,7 @@ class TerminalActivity : AppCompatActivity() {
         LaunchedEffect(current, resumed) { TerminalForeground.terminalId = if (resumed) current else null }
         // The coral notification with End while this phone has terminals open.
         val attached = state.sessions.count { it.attached && !it.gone }
-        LaunchedEffect(attached) { SessionLiveNotification.update(this@TerminalActivity, deviceId, terminals = attached) }
+        LaunchedEffect(attached) { SessionLiveNotification.refresh(this@TerminalActivity, deviceId) }
         LaunchedEffect(state.createdId) {
             state.createdId?.let {
                 openId = it

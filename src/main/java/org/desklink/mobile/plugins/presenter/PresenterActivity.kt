@@ -133,15 +133,10 @@ class PresenterActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun next() {
-        plugin.sendNext()
-        slide = if (total > 0) minOf(slide + 1, total) else slide + 1
-    }
+    // The counter moves only for a key the desk received: offline, nothing pretends to advance.
+    private fun next() = plugin.sendNext { slide = if (total > 0) minOf(slide + 1, total) else slide + 1 }
 
-    private fun previous() {
-        plugin.sendPrevious()
-        slide = maxOf(1, slide - 1)
-    }
+    private fun previous() = plugin.sendPrevious { slide = maxOf(1, slide - 1) }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         // Only when the media session cannot take the volume keys (Android 13–15).

@@ -86,6 +86,9 @@ class ClipboardPlugin : Plugin() {
         return true
     }
 
+    /** Every feature-ready, not only when the plugin loads (contract S2). */
+    override fun onFeatureReady() = sendConnectPacket()
+
     override fun onDestroy() {
         ClipboardListener.instance(context).removeObserver(observer)
     }
