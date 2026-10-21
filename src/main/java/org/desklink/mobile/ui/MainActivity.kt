@@ -732,6 +732,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 pending = it.getPlugin(DeskSettingsPlugin::class.java)?.pending.orEmpty(),
                 callsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)),
                 showCaller = org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(this, it.deviceId),
+                deskNotificationsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java)),
                 ready = it.hasActiveWebRtcFeatureTransport,
             )
         }
@@ -769,6 +770,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                         d.launchBackgroundReloadPluginsFromSettings()
                     }
                     tick++
+                },
+                onDeskNotifications = { on ->
+                    device?.let { setPluginEnabled(it, Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java), on) }
+                    if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) requestMissing(listOf(Manifest.permission.POST_NOTIFICATIONS))
                 },
                 onQuickCommands = { push(QUICK) },
                 onMore = { push(MORE) },

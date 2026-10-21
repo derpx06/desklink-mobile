@@ -215,6 +215,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.handoff.HandoffPlugin$DismissReceiver"
             android:exported="false" />
 
+        <!-- A desk notification swiped away on the phone: closed on the desk too. -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin$DismissReceiver"
+            android:exported="false" />
+
         <!-- Pairing notification actions. Not exported: no other app may accept or reject a pairing. -->
         <receiver
             android:name="org.desklink.mobile.PairingActionReceiver"

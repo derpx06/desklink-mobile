@@ -6,7 +6,8 @@
 package org.desklink.mobile.plugins.receivenotifications
 
 import android.Manifest
-import android.app.Notification
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
@@ -14,10 +15,12 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
-import org.desklink.mobile.helpers.NotificationHelper
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
@@ -68,17 +71,25 @@ class ReceiveNotificationsPlugin : Plugin() {
         // Both of these returned without touching the payload. Over WebRTC a
         // payload is a FileInputStream over a temp file whose deletion happens
         // in Payload.close(), so dropping one leaks a file descriptor *and*
-        // leaves the temp file behind. The silent case is the common one:
-        // NotificationsPlugin attaches an icon on every resync and marks it
-        // silent, so each reconnect leaked one per notification.
-        if ("ticker" !in np || "appName" !in np || "id" !in np) {
+        // leaves the temp file behind.
+        val manager = ContextCompat.getSystemService(context, NotificationManager::class.java)
+        if (np.getBoolean("snapshot", false)) {
+            // S1 desk -> phone: every posted notification of this desk not listed is gone there.
+            np.payload?.close()
+            val keep = np.getStringList("ids").orEmpty().toSet()
+            val posted = manager?.activeNotifications.orEmpty().mapNotNull { it.tag }
+            DeskNotification.stale(posted, device.deviceId, keep).forEach { manager?.cancel(it, NOTIFICATION_ID) }
+            return true
+        }
+        val note = DeskNotification.parse(np)
+        if (note == null) {
             Log.e("NotificationsPlugin", "Received notification packet lacks properties")
             np.payload?.close()
             return true
         }
-
-        if (np.getBoolean("silent", false)) {
+        if (note.cancel) {
             np.payload?.close()
+            manager?.cancel(DeskNotification.tag(device.deviceId, note.id), NOTIFICATION_ID)
             return true
         }
 
@@ -129,25 +140,46 @@ class ReceiveNotificationsPlugin : Plugin() {
             }
         }
 
-        val notificationManager = ContextCompat.getSystemService(context, NotificationManager::class.java) ?: return true
+        val notificationManager = manager ?: return true
+        val channel = DeskNotification.channelId(device.deviceId)
+        // Its own channel, "From <desk>", so the person can silence the desk without the rest.
+        NotificationManagerCompat.from(context).createNotificationChannel(
+            NotificationChannelCompat.Builder(channel, NotificationManagerCompat.IMPORTANCE_DEFAULT)
+                .setName(context.getString(R.string.desk_notifications_channel, device.name))
+                .build(),
+        )
+        val tag = DeskNotification.tag(device.deviceId, note.id)
+        // Swiped away here: closed on the desk too (contract C1).
+        val dismiss = PendingIntent.getBroadcast(
+            context,
+            tag.hashCode(),
+            Intent(context, DismissReceiver::class.java)
+                .putExtra(EXTRA_DEVICE, device.deviceId)
+                .putExtra(EXTRA_ID, note.id),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
 
         val noti =
-            NotificationCompat.Builder(context, NotificationHelper.Channels.RECEIVENOTIFICATION)
-                .setContentTitle(np.getString("appName"))
-                .setContentText(np.getString("ticker"))
+            NotificationCompat.Builder(context, channel)
+                .setContentTitle(note.title)
+                .setContentText(note.text)
+                .setSubText(note.appName.takeIf { it != note.title })
                 .setContentIntent(resultPendingIntent)
-                .setTicker(np.getString("ticker"))
+                .setDeleteIntent(dismiss)
+                .setTicker(note.text)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setLargeIcon(largeIcon)
                 .setAutoCancel(true)
+                .setOngoing(!note.clearable)
                 .setLocalOnly(true) // to avoid bouncing the notification back to other kdeconnect nodes
-                .setDefaults(Notification.DEFAULT_ALL)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(np.getString("ticker")))
+                // A resync (silent) re-posts what is already here: never a second sound.
+                .setSilent(note.silent)
+                .setOnlyAlertOnce(true)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(note.text))
+                .apply { if (note.time > 0) setWhen(note.time).setShowWhen(true) }
                 .build()
 
-        val id = np.getString("id")
-        val intId = try { id.toInt() } catch (e: NumberFormatException) { 0 }
-        notificationManager.notify("kdeconnectId:${id}", intId, noti)
+        notificationManager.notify(tag, NOTIFICATION_ID, noti)
 
         return true
     }
@@ -164,7 +196,20 @@ class ReceiveNotificationsPlugin : Plugin() {
 
     override val permissionExplanation: Int = R.string.receive_notifications_permission_explanation
 
+    /** Swiped away on the phone: ask the desk to close it (`notification.request {cancel}`). */
+    class DismissReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val deviceId = intent.getStringExtra(EXTRA_DEVICE) ?: return
+            val id = intent.getStringExtra(EXTRA_ID) ?: return
+            val device = DeskLinkApplication.getInstance().getDevice(deviceId) ?: return
+            device.sendPacket(NetworkPacket(PACKET_TYPE_NOTIFICATION_REQUEST).apply { this["cancel"] = id })
+        }
+    }
+
     companion object {
+        private const val NOTIFICATION_ID = 7330
+        private const val EXTRA_DEVICE = "deviceId"
+        private const val EXTRA_ID = "id"
         private const val PACKET_TYPE_NOTIFICATION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION
         private const val PACKET_TYPE_NOTIFICATION_REQUEST = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REQUEST
     }

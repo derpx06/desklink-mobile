@@ -142,6 +142,8 @@ data class DeskSettings(
     /** "Calls on <desk>" (phone-owned, off by default) and "Show caller on <desk>". */
     val callsOn: Boolean = false,
     val showCaller: Boolean = false,
+    /** The desk's notifications shown on this phone (phone-owned, off by default). */
+    val deskNotificationsOn: Boolean = false,
 )
 
 class SettingsActions(
@@ -154,6 +156,7 @@ class SettingsActions(
     val onPhoneMedia: (Boolean) -> Unit,
     val onCalls: (Boolean) -> Unit = {},
     val onShowCaller: (Boolean) -> Unit = {},
+    val onDeskNotifications: (Boolean) -> Unit = {},
     val onQuickCommands: () -> Unit,
     val onMore: () -> Unit,
     val onUnpair: () -> Unit,
@@ -331,6 +334,13 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                     subtitle = stringResource(R.string.settings_desk_notifications_summary),
                     checked = desk.notificationsOn,
                     onClick = { actions.onPhoneNotifications(!desk.notificationsOn) },
+                )
+                GroupRow(
+                    stringResource(R.string.settings_desk_notifications_here, desk.name),
+                    icon = R.drawable.sym_notifications_active,
+                    subtitle = stringResource(R.string.settings_desk_notifications_here_summary, desk.name),
+                    checked = desk.deskNotificationsOn,
+                    onClick = { actions.onDeskNotifications(!desk.deskNotificationsOn) },
                 )
                 GroupRow(
                     stringResource(R.string.settings_phone_media, desk.name),
