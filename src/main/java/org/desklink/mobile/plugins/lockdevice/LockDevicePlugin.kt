@@ -90,7 +90,7 @@ class LockDevicePlugin : Plugin() {
         PluginUiMenuEntry(context.getString(R.string.lock_remote_device)) {
             val np = NetworkPacket(PACKET_TYPE_LOCK_REQUEST)
             np["setLocked"] = true
-            device.sendPacket(np)
+            device.sendUserAction(np)
         }
     )
 

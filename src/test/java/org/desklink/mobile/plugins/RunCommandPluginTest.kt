@@ -33,6 +33,9 @@ class RunCommandPluginTest {
                 val sentPacket = arg<NetworkPacket>(0)
                 packet = sentPacket
             }
+            every { sendPacket(any(), any()) } answers {
+                packet = arg<NetworkPacket>(0)
+            }
             every { onPluginsChanged() } returns Unit
         }
         runCommandPlugin = RunCommandPlugin().apply {

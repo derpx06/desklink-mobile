@@ -115,7 +115,7 @@ public class RunCommandPlugin extends Plugin {
     public boolean onPacketReceived(@NonNull NetworkPacket np) {
         // The desk refused a run: "terminal-off", or "locked" until the session password is proven.
         if (np.has("error")) {
-            onRunRefused(np.getString("error", ""));
+            onRunRefused(np.getString("error", ""), np.getStringOrNull("key"));
             return true;
         }
 
@@ -187,7 +187,9 @@ public class RunCommandPlugin extends Plugin {
     /** The desk said terminal access is off for this phone (it then sends no command list). */
     private volatile boolean terminalOff = false;
     /** The last run asked for, and whether it was already retried after "locked". */
+    /** The last command tapped, and when it was sent: only a refusal naming it within {@link #TAP_ANSWER_MS} answers it. */
     private volatile String lastRunKey = null;
+    private volatile long lastRunAt = 0;
     private volatile boolean lastRunRetried = false;
 
     public boolean getTerminalOff() {
@@ -215,8 +217,27 @@ public class RunCommandPlugin extends Plugin {
         requestCommandList();
     }
 
-    private void onRunRefused(String error) {
-        String key = lastRunKey;
+    /** How long after a tap the desk's refusal can still be its answer. */
+    static final long TAP_ANSWER_MS = 15_000;
+
+    /**
+     * Whether a `{error, key}` answers this phone's own tap. The desk also pushes `{error}` on
+     * feature-ready and on access or password changes; reading those as the old tap's refusal
+     * ran that command again after the password prompt.
+     */
+    public static boolean isTapRefusal(@Nullable String refusedKey, @Nullable String tappedKey, long tappedAt, long now) {
+        return refusedKey != null && refusedKey.equals(tappedKey) && now - tappedAt < TAP_ANSWER_MS;
+    }
+
+    /** A new link: whatever was tapped before it is no longer waiting for an answer. */
+    @Override
+    public void onFeatureReady() {
+        lastRunKey = null;
+    }
+
+    private void onRunRefused(String error, @Nullable String refusedKey) {
+        String key = isTapRefusal(refusedKey, lastRunKey, lastRunAt, android.os.SystemClock.elapsedRealtime()) ? lastRunKey : null;
+        if (key != null) lastRunKey = null;
         String name = key;
         for (CommandEntry entry : commandItems) if (entry.getKey().equals(key)) name = entry.getName();
         // Any refusal is the desk's word (contract S5): no list here, and none in Device Controls.
@@ -284,15 +305,20 @@ public class RunCommandPlugin extends Plugin {
 
     private void sendRun(String cmdKey) {
         lastRunKey = cmdKey;
+        lastRunAt = android.os.SystemClock.elapsedRealtime();
         listLocked = false;
         NetworkPacket np = new NetworkPacket(PACKET_TYPE_RUNCOMMAND_REQUEST);
         np.set("key", cmdKey);
-        getDevice().sendPacket(np);
+        getDevice().sendPacket(np, new org.desklink.mobile.UserActionCallback() {
+            @Override
+            public void onFailure(@NonNull Throwable e) {
+                // Never sent: nothing will answer it.
+                if (cmdKey.equals(lastRunKey)) lastRunKey = null;
+            }
+        });
     }
 
     private void requestCommandList() {
-        // A refusal from here on answers this list request, not an earlier tap.
-        lastRunKey = null;
         NetworkPacket np = new NetworkPacket(PACKET_TYPE_RUNCOMMAND_REQUEST);
         np.set("requestCommandList", true);
         getDevice().sendPacket(np);

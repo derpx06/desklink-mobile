@@ -279,12 +279,21 @@ class DeskLinkApplication : Application() {
             onJobFinished = { finished -> org.desklink.mobile.plugins.terminal.TerminalAttentionNotifier.jobFinished(this, id, finished) },
         ).also { client ->
             // The live-session notification follows the attached sessions, whoever changed them.
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob()).launch {
+            // The job lives exactly as long as the client (shutDownTerminalClient).
+            terminalWatchers[id] = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob()).launch {
                 client.state.map { state -> state.sessions.count { it.attached && !it.gone } }.distinctUntilChanged().collect {
                     org.desklink.mobile.plugins.screen.SessionLiveNotification.refresh(this@DeskLinkApplication, id)
                 }
             }
         }
+    }
+
+    private val terminalWatchers = ConcurrentHashMap<String, kotlinx.coroutines.Job>()
+
+    /** Unpair or deletion: the client's thread and its watcher both end. */
+    private fun shutDownTerminalClient(deviceId: String) {
+        terminalWatchers.remove(deviceId)?.cancel()
+        terminalClients.remove(deviceId)?.shutdown()
     }
 
     fun switchRemoteScreen(deviceId: String?) {
@@ -303,7 +312,7 @@ class DeskLinkApplication : Application() {
         org.desklink.mobile.ui.SessionGate.forget(this, device.deviceId)
         sessionPasswords.remove(device.deviceId)?.set(null)
         screenResumes.remove(device.deviceId)?.set(false)
-        terminalClients.remove(device.deviceId)?.shutdown()
+        shutDownTerminalClient(device.deviceId)
         device.clearWebRtcBindingsForUnpair()
         sessionManager.revokePairing(device.deviceId)
     }
@@ -567,7 +576,7 @@ class DeskLinkApplication : Application() {
             webRtcCoordinators.remove(device.deviceId)?.close()
             sessionPasswords.remove(device.deviceId)?.set(null)
             screenResumes.remove(device.deviceId)
-            terminalClients.remove(device.deviceId)?.shutdown()
+            shutDownTerminalClient(device.deviceId)
             devices.remove(device.deviceId)
         }
     }

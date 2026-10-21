@@ -532,6 +532,9 @@ class Device : PacketReceiver {
                 runCatching { plugin.onFeatureReady() }
                     .onFailure { Log.w("DeskLink/Device", "${plugin.pluginKey} failed its feature-ready snapshot", it) }
             }
+            // A phone-owned feature that is off or has no permission has no plugin to speak for
+            // it: the empty form goes out here, so the desk never keeps a stale copy (S2).
+            emptyStatesFor(this).forEach { runCatching { sendPacket(it) } }
         }
     }
 
@@ -578,6 +581,8 @@ class Device : PacketReceiver {
     private val expiryHandler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
 
     /** Queued packets the link did not come back for in time fail, even while it stays down. */
+    private val expireTask = Runnable { expireStalePending() }
+
     private fun expireStalePending() {
         val now = android.os.SystemClock.elapsedRealtime()
         failExpired(synchronized(sendOrderLock) { pendingFeaturePackets.removeIf { now - it.queuedAt > PENDING_FEATURE_MAX_AGE_MS } })
@@ -590,7 +595,7 @@ class Device : PacketReceiver {
     private fun failExpired(expired: List<QueuedFeature>) {
         if (expired.isEmpty()) return
         expired.forEach { it.callback.onFailure(QueuedPacketExpiredException(it.packet.type)) }
-        val actions = expiredUserActions(expired.map { it.packet.type })
+        val actions = expiredUserActions(expired.map { it.callback })
         if (actions > 0) {
             val message = context.resources.getQuantityString(R.plurals.queued_actions_expired, actions, actions, name)
             expiryHandler.post { android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show() }
@@ -1074,6 +1079,9 @@ class Device : PacketReceiver {
     @AnyThread
     fun sendPacket(np: NetworkPacket) = sendPacket(np, defaultCallback)
 
+    /** Something the person asked for: said out loud if it expires unsent while offline. */
+    fun sendUserAction(np: NetworkPacket) = sendPacket(np, UserActionCallback())
+
     /**
      * Sends only discovery/pairing/signaling packets on the bootstrap LAN
      * link. Paired feature packets must never use this path.
@@ -1190,7 +1198,9 @@ class Device : PacketReceiver {
                     countSent(deviceId, np.type, false)
                     return false
                 }
-                expiryHandler.postDelayed(::expireStalePending, PENDING_FEATURE_MAX_AGE_MS + 1_000)
+                // One check, pushed back by each new packet: at most one toast per outage.
+                expiryHandler.removeCallbacks(expireTask)
+                expiryHandler.postDelayed(expireTask, PENDING_FEATURE_MAX_AGE_MS + 1_000)
                 pendingFeaturePackets.offer(QueuedFeature(np, callback))?.let { dropped ->
                     dropped.callback.onFailure(
                         IllegalStateException("DeskLink dropped queued ${dropped.packet.type}: queue full"),
@@ -1455,21 +1465,36 @@ internal fun heartbeatPacket(reply: Boolean, interactive: Boolean): NetworkPacke
         this["dozing"] = !interactive
     }
 
+/**
+ * The empty snapshots for phone-owned features that are turned off or lack their permission:
+ * battery, notifications, this phone's media. A loaded plugin sends its own instead.
+ */
+internal fun emptyStatesFor(device: Device): List<NetworkPacket> {
+    fun silent(cls: Class<out org.desklink.mobile.plugins.Plugin>): Boolean {
+        val key = org.desklink.mobile.plugins.Plugin.getPluginKey(cls)
+        return !device.isPluginEnabled(key) || device.loadedPlugins[key] == null || device.pluginsWithoutPermissions.containsKey(key)
+    }
+    return buildList {
+        if (silent(org.desklink.mobile.plugins.battery.BatteryPlugin::class.java)) add(org.desklink.mobile.plugins.battery.BatteryPlugin.turnedOffPacket())
+        if (silent(org.desklink.mobile.plugins.notifications.NotificationsPlugin::class.java)) add(org.desklink.mobile.plugins.notifications.NotificationsPlugin.snapshotPacket(emptyList()))
+        if (silent(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin::class.java)) add(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin.emptyStatePacket())
+    }
+}
+
 /** A queued packet that waited longer than [PENDING_FEATURE_MAX_AGE_MS] and was never sent. */
 class QueuedPacketExpiredException(type: String) : IllegalStateException("DeskLink dropped stale queued $type")
 
-/** Packets that are something the person asked for: their expiry is said out loud. */
-internal val USER_ACTION_TYPES = setOf(
-    DeskLinkProtocol.PACKET_TYPE_PING,
-    DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST,
-    DeskLinkProtocol.PACKET_TYPE_LOCK_REQUEST,
-    DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST,
-    DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND_REQUEST,
-    DeskLinkProtocol.PACKET_TYPE_MPRIS_REQUEST,
-    DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
-)
+/**
+ * A send the person asked for (a tap: ping, ring, lock, a switch…), as opposed to one the app
+ * makes by itself on load or on a timer. Only these say so out loud when they expire unsent.
+ */
+open class UserActionCallback @JvmOverloads constructor(private val inner: Device.SendPacketStatusCallback? = null) : Device.SendPacketStatusCallback() {
+    override fun onSuccess() { inner?.onSuccess() }
+    override fun onFailure(e: Throwable) { inner?.onFailure(e) }
+    override fun onPayloadProgressChanged(percent: Int) { inner?.onPayloadProgressChanged(percent) }
+}
 
-internal fun expiredUserActions(types: Collection<String>): Int = types.count { it in USER_ACTION_TYPES }
+internal fun expiredUserActions(callbacks: Collection<Device.SendPacketStatusCallback>): Int = callbacks.count { it is UserActionCallback }
 
 /** Queued features older than this are failed, not sent. Matches the desktop. */
 internal const val PENDING_FEATURE_MAX_AGE_MS = 30_000L

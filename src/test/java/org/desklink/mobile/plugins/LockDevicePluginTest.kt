@@ -20,6 +20,7 @@ class LockDevicePluginTest {
         val device = mockk<Device> {
             every { deviceId } returns "device-id"
             every { sendPacket(any()) } returns Unit
+            every { sendUserAction(any()) } returns Unit
         }
 
         plugin.setContext(context, device)
@@ -27,7 +28,7 @@ class LockDevicePluginTest {
         plugin.getUiMenuEntries().single().onClick(mockk())
 
         verify(exactly = 1) {
-            device.sendPacket(match { packet ->
+            device.sendUserAction(match { packet ->
                 packet.type == "desklink.lock.request" && packet.getBoolean("setLocked")
             })
         }

@@ -84,7 +84,7 @@ class PingPlugin : Plugin() {
     override fun getUiMenuEntries(): List<PluginUiMenuEntry> = listOf(
         PluginUiMenuEntry(context.getString(R.string.send_ping)) { parentActivity ->
             if (isDeviceInitialized) {
-                device.sendPacket(NetworkPacket(PACKET_TYPE_PING))
+                device.sendUserAction(NetworkPacket(PACKET_TYPE_PING))
             }
         }
     )

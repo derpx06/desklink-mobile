@@ -30,6 +30,7 @@ class PingPluginTest {
         val device = mockk<Device> {
             every { name } returns "Test Device"
             every { sendPacket(any()) } returns Unit
+            every { sendUserAction(any()) } returns Unit
         }
         mockkStatic(PendingIntent::class) {
             every<PendingIntent> {
@@ -49,7 +50,7 @@ class PingPluginTest {
         executeWithMocks { device, plugin, notificationManager ->
             val entries = plugin.getUiMenuEntries()
             entries.single().onClick(mockk())
-            verify(exactly = 1) { device.sendPacket(match { np -> np.type == "desklink.ping" && np.payload == null }) }
+            verify(exactly = 1) { device.sendUserAction(match { np -> np.type == "desklink.ping" && np.payload == null }) }
         }
     }
 

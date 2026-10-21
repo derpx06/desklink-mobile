@@ -103,7 +103,7 @@ public class MprisReceiverPlugin extends Plugin {
             manager.addOnActiveSessionsChangedListener(mediaSessionChangeListener, new ComponentName(context, NotificationReceiver.class), new Handler(Looper.getMainLooper()));
 
             createPlayers(manager.getActiveSessions(new ComponentName(context, NotificationReceiver.class)));
-            sendPlayerList();
+            sendFullState();
             handler.postDelayed(positionTick, POSITION_INTERVAL_MS);
         } catch (Exception e) {
             Log.e(TAG, "Exception", e);
@@ -147,7 +147,7 @@ public class MprisReceiverPlugin extends Plugin {
         }
 
         if (np.getBoolean("requestPlayerList")) {
-            sendPlayerList();
+            sendFullState();
             return true;
         }
 
@@ -252,7 +252,7 @@ public class MprisReceiverPlugin extends Plugin {
             players.clear();
 
             createPlayers(controllers);
-            sendPlayerList();
+            sendFullState();
 
         }
     }
@@ -275,9 +275,7 @@ public class MprisReceiverPlugin extends Plugin {
             sendEmptyPlayerList();
             return;
         }
-        sendPlayerList();
-        lastSent.clear();
-        for (MprisReceiverPlayer player : new ArrayList<>(players.values())) sendMetadata(player);
+        sendFullState();
     }
 
     /** Turned off: the desk stops showing this phone's media. */
@@ -287,9 +285,24 @@ public class MprisReceiverPlugin extends Plugin {
     }
 
     private void sendEmptyPlayerList() {
+        getDevice().sendPacket(emptyStatePacket());
+    }
+
+    /** `playerList: []`: the desk clears this phone's media (S2). Needs no plugin instance. */
+    public static NetworkPacket emptyStatePacket() {
         NetworkPacket np = new NetworkPacket(PACKET_TYPE_MPRIS);
         np.set("playerList", new ArrayList<String>());
-        getDevice().sendPacket(np);
+        return np;
+    }
+
+    /**
+     * The list, then every player's state past the throttle: a list-only packet would replace the
+     * desk's whole media cache (S3) with names and nothing else.
+     */
+    private void sendFullState() {
+        sendPlayerList();
+        lastSent.clear();
+        for (MprisReceiverPlayer player : new ArrayList<>(players.values())) sendMetadata(player);
     }
 
     private void sendPlayerList() {

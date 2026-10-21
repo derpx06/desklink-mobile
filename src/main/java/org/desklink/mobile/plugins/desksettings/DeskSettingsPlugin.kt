@@ -74,7 +74,7 @@ class DeskSettingsPlugin : Plugin() {
     fun set(key: String, value: Boolean) {
         val packet = requestPacket(key, value, settings?.relayConfigured == true) ?: return
         pending = pending + (key to value)
-        device.sendPacket(packet, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
+        device.sendPacket(packet, object : org.desklink.mobile.UserActionCallback() {
             override fun onSuccess() = Unit
             override fun onFailure(e: Throwable) {
                 pending = pending - key

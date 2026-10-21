@@ -27,4 +27,14 @@ class TransferProgressTest {
         assertNull(TransferProgress.visibleFor("d1", now = SystemClock.elapsedRealtime() + 60_000))
         TransferProgress.cancel(43)
     }
+
+    @Test
+    fun aDiscardedPausedSendLeavesHome() {
+        TransferProgress.update("d2", 50, true, "c.jpg", 10, 100)
+        TransferProgress.resuming(50)
+        TransferProgress.dropResuming("other")
+        assertTrue(TransferProgress.visibleFor("d2")!!.resuming)
+        TransferProgress.dropResuming("d2")
+        assertNull(TransferProgress.visibleFor("d2"))
+    }
 }

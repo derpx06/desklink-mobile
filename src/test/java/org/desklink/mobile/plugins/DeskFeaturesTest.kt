@@ -153,9 +153,23 @@ class DeskFeaturesTest {
     }
 
     @Test
-    fun onlyExpiredUserActionsAreSaidOutLoud() {
-        assertEquals(2, org.desklink.mobile.expiredUserActions(listOf(DeskLinkProtocol.PACKET_TYPE_PING, DeskLinkProtocol.PACKET_TYPE_BATTERY, DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST)))
-        assertEquals(0, org.desklink.mobile.expiredUserActions(listOf(DeskLinkProtocol.PACKET_TYPE_BATTERY, DeskLinkProtocol.PACKET_TYPE_CLIPBOARD)))
+    fun onlyExpiredTapsAreSaidOutLoudNotAutomaticSends() {
+        val auto = object : org.desklink.mobile.Device.SendPacketStatusCallback() {
+            override fun onSuccess() = Unit
+            override fun onFailure(e: Throwable) = Unit
+        }
+        assertEquals(2, org.desklink.mobile.expiredUserActions(listOf(org.desklink.mobile.UserActionCallback(), auto, org.desklink.mobile.UserActionCallback(auto))))
+        assertEquals(0, org.desklink.mobile.expiredUserActions(listOf(auto, auto)))
+    }
+
+    @Test
+    fun onlyARefusalNamingTheRecentTapAnswersIt() {
+        // The desk's own push (no key, or another command's) never re-runs the tap.
+        assertFalse(RunCommandPlugin.isTapRefusal(null, "k1", 0, 1_000))
+        assertFalse(RunCommandPlugin.isTapRefusal("k2", "k1", 0, 1_000))
+        assertFalse(RunCommandPlugin.isTapRefusal("k1", null, 0, 1_000))
+        assertFalse(RunCommandPlugin.isTapRefusal("k1", "k1", 0, 60_000))
+        assertTrue(RunCommandPlugin.isTapRefusal("k1", "k1", 0, 1_000))
     }
 
     // ---- §2 run command -----------------------------------------------------------------------

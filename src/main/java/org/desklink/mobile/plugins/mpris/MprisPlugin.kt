@@ -222,7 +222,7 @@ class MprisPlugin : Plugin() {
             currentPlayerName()?.let { this["player"] = it }
             fill()
         }
-        device.sendPacket(np, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
+        device.sendPacket(np, object : org.desklink.mobile.UserActionCallback() {
             override fun onSuccess() = Unit
             override fun onFailure(e: Throwable) {
                 Log.w("MprisControl", "Media request not sent: ${e.message}")

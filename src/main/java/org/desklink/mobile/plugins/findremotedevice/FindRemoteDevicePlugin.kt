@@ -23,7 +23,7 @@ class FindRemoteDevicePlugin : Plugin() {
 
     override fun getUiMenuEntries(): List<PluginUiMenuEntry> = listOf(
         PluginUiMenuEntry(context.getString(R.string.ring)) { parentActivity ->
-            device.sendPacket(NetworkPacket(FindMyPhonePlugin.PACKET_TYPE_FINDMYPHONE_REQUEST))
+            device.sendUserAction(NetworkPacket(FindMyPhonePlugin.PACKET_TYPE_FINDMYPHONE_REQUEST))
         }
     )
 

@@ -802,6 +802,8 @@ class WebRtcFileTransferManager(
         sourceFile(transferId).delete()
         checkpointStore.remove(transferId)
         TransferHistory.forgetResumable(appContext, transferId)
+        // Only if no other paused send of this device is left to resume.
+        if (checkpointStore.list().none { it.direction == "send" && it.deviceId == device.deviceId }) TransferProgress.dropResuming(device.deviceId)
     }
 
     /** A resumed send reports like the original job did: Home's transfer row and the history. */

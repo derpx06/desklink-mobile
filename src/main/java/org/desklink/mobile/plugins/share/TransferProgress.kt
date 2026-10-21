@@ -68,6 +68,12 @@ object TransferProgress {
         current?.takeIf { it.jobId == jobId }?.let { current = it.copy(resuming = true, bytesPerSecond = 0, updatedAt = SystemClock.elapsedRealtime()) }
     }
 
+    /** The paused send for [deviceId] will never resume (discarded): its "resumes when back" row goes. */
+    @JvmStatic
+    fun dropResuming(deviceId: String) {
+        if (current?.let { it.deviceId == deviceId && it.resuming } == true) current = null
+    }
+
     @JvmStatic
     fun cancel(jobId: Long) {
         if (current?.jobId == jobId) current = null

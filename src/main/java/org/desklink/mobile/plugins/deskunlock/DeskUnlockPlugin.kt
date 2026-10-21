@@ -114,7 +114,7 @@ class DeskUnlockPlugin : Plugin() {
         // Only with the link up: a nonce asked for and delivered late would be spent by nobody.
         if (!device.hasActiveWebRtcFeatureTransport) return false
         refusal = null
-        device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST).apply { this["ask"] = true })
+        device.sendUserAction(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST).apply { this["ask"] = true })
         return true
     }
 
@@ -123,7 +123,7 @@ class DeskUnlockPlugin : Plugin() {
         val current = offer ?: return false
         clear()
         if (!current.isFresh(SystemClock.elapsedRealtime())) return false
-        device.sendPacket(approvalPacket(current.nonce))
+        device.sendUserAction(approvalPacket(current.nonce))
         return true
     }
 
