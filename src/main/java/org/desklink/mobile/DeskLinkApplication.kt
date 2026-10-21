@@ -123,6 +123,7 @@ class DeskLinkApplication : Application() {
         NotificationHelper.initializeChannels(this)
         CrashReporter.offerPendingReport(this)
         LifecycleHelper.initializeObserver()
+        org.desklink.mobile.plugins.clipboard.ClipboardListener.followForeground(this)
         loadRememberedDevicesFromSettings()
         // The transfer history keeps 30 days: prune it once per start, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.plugins.share.TransferHistory.store(this).prune() }

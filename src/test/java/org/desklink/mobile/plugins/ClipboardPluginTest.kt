@@ -38,7 +38,11 @@ class ClipboardPluginTest {
         every { ClipboardListener.instance(context) } returns clipboardListener
 
         device = mockk {
+            every { name } returns "Desk"
             every { sendPacket(any()) } answers {
+                packet = arg<NetworkPacket>(0)
+            }
+            every { sendPacket(any(), any()) } answers {
                 packet = arg<NetworkPacket>(0)
             }
         }
@@ -114,6 +118,7 @@ class ClipboardPluginTest {
     fun testOnCreate() {
         val content = "B7n30xe0NNO6Y1J7PXOFj6pGd"
         every { clipboardListener.currentContent } returns content
+        every { clipboardListener.updateTimestamp } returns 0L
 
         Assert.assertTrue(clipboardPlugin.onCreate())
 

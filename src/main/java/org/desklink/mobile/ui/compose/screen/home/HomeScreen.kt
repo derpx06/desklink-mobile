@@ -562,7 +562,7 @@ private fun TransferAndClipboard(state: HomeState, actions: HomeActions) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(clipboard, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 Text(
-                    stringResource(if (state.clipboardOn) org.desklink.mobile.ui.compose.screen.settings.clipboardSummary() else R.string.home_clipboard_off),
+                    if (state.clipboardOn) org.desklink.mobile.ui.compose.screen.settings.clipboardSummary(state.name) else stringResource(R.string.home_clipboard_off),
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     color = t.textDim,

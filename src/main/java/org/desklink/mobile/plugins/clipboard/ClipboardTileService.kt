@@ -7,13 +7,11 @@
 package org.desklink.mobile.plugins.clipboard
 
 import android.app.PendingIntent
-import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.TileService
 import androidx.annotation.RequiresApi
 import androidx.core.service.quicksettings.PendingIntentActivityWrapper
 import androidx.core.service.quicksettings.TileServiceCompat
-import org.desklink.mobile.DeskLinkApplication
 
 @RequiresApi(Build.VERSION_CODES.N)
 class ClipboardTileService : TileService() {
@@ -26,16 +24,9 @@ class ClipboardTileService : TileService() {
     override fun onClick() {
         super.onClick()
 
+        // A tap is an explicit send: forced, with a toast saying what happened.
         TileServiceCompat.startActivityAndCollapse(this, PendingIntentActivityWrapper(
-            this, 0, Intent(this, ClipboardFloatingActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
-                val ids = DeskLinkApplication.getInstance().devices.values
-                    .asSequence()
-                    .filter { it.isReachable && it.isPaired }
-                    .map { it.deviceId }
-                    .toCollection(ArrayList())
-                putExtra("connectedDeviceIds", ids)
-            }, PendingIntent.FLAG_ONE_SHOT, true
+            this, 0, ClipboardFloatingActivity.getIntent(this, true), PendingIntent.FLAG_ONE_SHOT, true
         ))
     }
 }

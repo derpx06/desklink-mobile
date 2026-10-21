@@ -408,12 +408,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onRing = { run(menu(R.string.ring), R.string.home_rang) },
             onTransfers = { push(TRANSFERS) },
             onSendClipboard = {
-                // A button below Android 10, a menu entry from 10 on: the same action either way.
-                val send = device.loadedPlugins.values.flatMap { it.getUiButtons() }.firstOrNull { it.name == getString(R.string.send_clipboard) }?.onClick
-                    ?: menu(R.string.send_clipboard)?.onClick
-                if (send == null) showMessage(getString(R.string.home_feature_off)) else {
-                    send(this)
-                    showMessage(getString(R.string.home_clipboard_sent, device.name))
+                val clipboard = device.getPlugin(org.desklink.mobile.plugins.clipboard.ClipboardPlugin::class.java)
+                when {
+                    clipboard == null -> showMessage(getString(R.string.home_feature_off))
+                    clipboard.sendNow() -> showMessage(getString(R.string.home_clipboard_sent, device.name))
+                    else -> showMessage(getString(R.string.clipboard_nothing_sent))
                 }
             },
             onClipboard = { on -> setPluginEnabled(device, HomeModel.clipboardKey, on) },

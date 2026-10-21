@@ -52,10 +52,12 @@ public class ClipboardFloatingActivity extends AppCompatActivity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
-            // We are now sure that clipboard can be accessed from here.
-            ClipboardListener.instance(this).onClipboardChanged();
-            if (shouldShowToast()) {
-                Toast.makeText(this, R.string.pref_plugin_clipboard_sent, Toast.LENGTH_SHORT).show();
+            // We are now sure that clipboard can be accessed from here. A tap (tile, notification,
+            // widget) sends whatever is there; the automatic path sends only a new copy.
+            boolean asked = shouldShowToast();
+            boolean sent = ClipboardListener.instance(this).sync(asked);
+            if (asked) {
+                Toast.makeText(this, sent ? R.string.pref_plugin_clipboard_sent : R.string.clipboard_nothing_sent, Toast.LENGTH_SHORT).show();
             }
             finish();
         }

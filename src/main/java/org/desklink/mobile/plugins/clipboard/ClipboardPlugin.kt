@@ -5,16 +5,11 @@
 */
 package org.desklink.mobile.plugins.clipboard
 
-import android.Manifest
-import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.os.Build
-import android.widget.Toast
+import android.util.Log
 import androidx.annotation.VisibleForTesting
-import androidx.core.content.ContextCompat
+import org.desklink.mobile.Device
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
@@ -64,10 +59,24 @@ class ClipboardPlugin : Plugin() {
 
     @VisibleForTesting
     fun propagateClipboard(content: String) {
-        if (content.toByteArray(Charsets.UTF_8).size > maxClipboardBytes) return
+        if (content.toByteArray(Charsets.UTF_8).size > maxClipboardBytes) {
+            Log.w(TAG, "clipboard: ${content.length} chars is over 1 MiB, not sent")
+            return
+        }
         val np = NetworkPacket(PACKET_TYPE_CLIPBOARD)
         np["content"] = content
-        device.sendPacket(np)
+        val name = device.name
+        device.sendPacket(np, object : Device.SendPacketStatusCallback() {
+            override fun onSuccess() { Log.i(TAG, "clipboard: sent to $name") }
+            override fun onFailure(e: Throwable) { Log.w(TAG, "clipboard: not sent to $name: ${e.message}") }
+        })
+    }
+
+    /** Home's "Send clipboard to <desk>": whatever text is on the clipboard, to this desk only. */
+    fun sendNow(): Boolean {
+        val content = ClipboardListener.instance(context).readNow() ?: return false
+        propagateClipboard(content)
+        return true
     }
 
     private fun sendConnectPacket() {
@@ -96,40 +105,6 @@ class ClipboardPlugin : Plugin() {
     override val supportedPacketTypes: Array<String> = arrayOf(PACKET_TYPE_CLIPBOARD, PACKET_TYPE_CLIPBOARD_CONNECT)
 
     override val outgoingPacketTypes: Array<String> = arrayOf(PACKET_TYPE_CLIPBOARD, PACKET_TYPE_CLIPBOARD_CONNECT)
-
-    override fun getUiButtons(): List<PluginUiButton> {
-        return if (!canSyncAutomatically(context)) {
-            listOf(PluginUiButton(context.getString(R.string.send_clipboard), R.drawable.ic_baseline_content_paste_24) { _: Activity? ->
-                userInitiatedSendClipboard()
-            })
-        } else {
-            emptyList()
-        }
-    }
-
-    override fun getUiMenuEntries(): List<PluginUiMenuEntry> {
-        return if (canSyncAutomatically(context)) {
-            // If automatic sync is supported, add the manual action less prominently, as a menu entry instead of a button.
-            listOf(PluginUiMenuEntry(context.getString(R.string.send_clipboard)) { _: Activity? ->
-                userInitiatedSendClipboard()
-            })
-        } else {
-            emptyList()
-        }
-    }
-
-    private fun userInitiatedSendClipboard() {
-        if (isDeviceInitialized) {
-            val clipboardManager = ContextCompat.getSystemService<ClipboardManager>(this.context, ClipboardManager::class.java)
-            val item: ClipData.Item
-            if (clipboardManager!!.hasPrimaryClip()) {
-                item = clipboardManager.primaryClip!!.getItemAt(0)
-                val content = item.coerceToText(this.context).toString()
-                this.propagateClipboard(content)
-                Toast.makeText(this.context, R.string.pref_plugin_clipboard_sent, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
 
     companion object {
         /**
@@ -160,13 +135,11 @@ class ClipboardPlugin : Plugin() {
          */
         private const val PACKET_TYPE_CLIPBOARD_CONNECT = DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT
 
-        fun canSyncAutomatically(context: Context): Boolean {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                return true
-            }
-            // Check if hack to read clipboard changes from logs is enabled
-            return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
-        }
+        private const val TAG = "DeskLink/Clipboard"
+
+        /** Below Android 10, or with "Automatic sync (advanced)": no tap needed for the phone's copies. */
+        fun canSyncAutomatically(context: Context): Boolean =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ClipboardListener.autoSyncActive(context)
 
     }
 }

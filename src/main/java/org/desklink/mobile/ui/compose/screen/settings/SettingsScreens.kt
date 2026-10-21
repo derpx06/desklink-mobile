@@ -54,6 +54,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -187,6 +188,61 @@ private fun rememberResumeTick(): Int {
 
 // ---- settings ------------------------------------------------------------------------------------------------
 
+/**
+ * "Automatic sync (advanced)", KDE Connect's way: READ_LOGS, granted only over adb, lets DeskLink
+ * see Android refuse it a new copy and read it for a moment. Never required.
+ */
+@androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
+@Composable
+private fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.SharedPreferences, onMessage: (String) -> Unit, changed: () -> Unit) {
+    val context = LocalContext.current
+    val listener = org.desklink.mobile.plugins.clipboard.ClipboardListener
+    val resumed = rememberResumeTick()
+    // A grant made over adb while DeskLink runs takes effect on the next visit here.
+    LaunchedEffect(resumed) { listener.instance(context).refreshAutoSync() }
+    if (!listener.readLogsGranted(context)) {
+        val command = listener.grantCommand(context)
+        val copied = stringResource(R.string.settings_clipboard_auto_copied)
+        GroupRow(
+            stringResource(R.string.settings_clipboard_auto),
+            icon = R.drawable.sym_refresh,
+            subtitle = stringResource(R.string.settings_clipboard_auto_grant, command),
+            onClick = {
+                val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+                cm?.setPrimaryClip(android.content.ClipData.newPlainText("adb", command))
+                onMessage(copied)
+            },
+        )
+        return
+    }
+    val on = listener.autoSyncActive(context)
+    GroupRow(
+        stringResource(R.string.settings_clipboard_auto),
+        icon = R.drawable.sym_refresh,
+        subtitle = stringResource(if (on) R.string.settings_clipboard_auto_on else R.string.settings_clipboard_auto_off, deskName),
+        checked = on,
+        onClick = {
+            prefs.edit { putBoolean(listener.KEY_AUTO_SYNC, !on) }
+            listener.instance(context).refreshAutoSync()
+            changed()
+        },
+    )
+    if (on && !android.provider.Settings.canDrawOverlays(context)) {
+        GroupRow(
+            stringResource(R.string.settings_clipboard_overlay),
+            icon = R.drawable.sym_open_in_new,
+            subtitle = stringResource(R.string.settings_clipboard_overlay_summary),
+            onClick = {
+                runCatching {
+                    context.startActivity(
+                        Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${context.packageName}")),
+                    )
+                }
+            },
+        ) { Chevron() }
+    }
+}
+
 @Composable
 fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
     val context = LocalContext.current
@@ -262,10 +318,13 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                 GroupRow(
                     stringResource(R.string.settings_phone_clipboard),
                     icon = R.drawable.sym_content_paste,
-                    subtitle = stringResource(clipboardSummary()),
+                    subtitle = clipboardSummary(desk.name),
                     checked = desk.clipboardOn,
                     onClick = { actions.onPhoneClipboard(!desk.clipboardOn) },
                 )
+                if (desk.clipboardOn && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    ClipboardAutoSyncRows(desk.name, prefs, actions.onMessage) { revision++ }
+                }
                 GroupRow(
                     stringResource(R.string.settings_phone_notifications, desk.name),
                     icon = R.drawable.sym_notifications,
@@ -463,9 +522,16 @@ private fun DeskSection(desk: DeskSettings, actions: SettingsActions) {
     }
 }
 
-/** Android 10+ keeps background apps off the clipboard: the phone's side needs a tap. */
-fun clipboardSummary(): Int =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) R.string.home_clipboard_on_q else R.string.home_clipboard_on
+/** Exactly when the clipboard syncs: Android 10+ keeps background apps off it unless automatic sync is on. */
+@Composable
+fun clipboardSummary(deskName: String): String {
+    val context = LocalContext.current
+    return when {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q -> stringResource(R.string.home_clipboard_on)
+        org.desklink.mobile.plugins.clipboard.ClipboardListener.autoSyncActive(context) -> stringResource(R.string.home_clipboard_on_auto, deskName)
+        else -> stringResource(R.string.home_clipboard_on_q, deskName)
+    }
+}
 
 @Composable
 private fun Chevron() = Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = tokens.textDim, modifier = Modifier.size(20.dp))
