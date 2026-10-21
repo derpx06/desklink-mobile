@@ -514,6 +514,8 @@ class WebRtcTransport(
         height: Int = 720,
         fps: Int = 12,
     ) {
+        // The camera (C4) holds the same video sender: one at a time.
+        check(synchronized(this) { cameraCapturer } == null) { "The camera is in use by the desk" }
         // A replacement capture is intentional. Do not turn its old
         // MediaProjection callback into a false "screen locked" event for the
         // new remote session.
@@ -769,6 +771,72 @@ class WebRtcTransport(
         }.onFailure { Log.w(TAG, "Could not set screen sender parameters", it) }
     }
 
+    // ---- phone camera (contract C4) ----------------------------------------------------------------
+
+    private var cameraCapturer: org.webrtc.CameraVideoCapturer? = null
+    private var cameraTextureHelper: SurfaceTextureHelper? = null
+
+    /** Whether the phone→desk video sender is busy with the screen share (camera and share exclude). */
+    @Synchronized
+    fun screenCaptureActive(): Boolean = activeScreenCaptureEpoch != null
+
+    /**
+     * The phone's camera into the phone→desk video track: the same sender as the screen share, which
+     * every negotiation already carries, so no renegotiation. Returns the facing actually opened
+     * ("front"/"back"), or throws when there is no camera or the share is running.
+     */
+    @Synchronized
+    fun startCameraCapture(facing: String, width: Int, height: Int, fps: Int): String {
+        check(activeScreenCaptureEpoch == null) { "busy" }
+        stopCameraCaptureLocked()
+        val enumerator = org.webrtc.Camera2Enumerator(context)
+        val names = enumerator.deviceNames.toList()
+        val wantFront = facing == "front"
+        val name = names.firstOrNull { enumerator.isFrontFacing(it) == wantFront } ?: names.firstOrNull()
+            ?: error("no-camera")
+        val capturer = enumerator.createCapturer(name, null) ?: error("no-camera")
+        val helper = SurfaceTextureHelper.create("DeskLink-camera", WebRtcRuntime.eglContext(context))
+        try {
+            videoSource.setIsScreencast(false)
+            capturer.initialize(helper, context, videoSource.capturerObserver)
+            capturer.startCapture(width, height, fps)
+        } catch (error: Throwable) {
+            runCatching { capturer.dispose() }
+            helper.dispose()
+            videoSource.setIsScreencast(true)
+            throw error
+        }
+        cameraCapturer = capturer
+        cameraTextureHelper = helper
+        captureFps = fps
+        configureScreenSender(fps)
+        return if (enumerator.isFrontFacing(name)) "front" else "back"
+    }
+
+    /** Front ↔ back; [done] gets the facing now in use, or null when it could not switch. */
+    @Synchronized
+    fun switchCamera(done: (String?) -> Unit) {
+        val capturer = cameraCapturer ?: return done(null)
+        capturer.switchCamera(object : org.webrtc.CameraVideoCapturer.CameraSwitchHandler {
+            override fun onCameraSwitchDone(isFrontCamera: Boolean) = done(if (isFrontCamera) "front" else "back")
+            override fun onCameraSwitchError(errorDescription: String?) = done(null)
+        })
+    }
+
+    @Synchronized
+    fun stopCameraCapture() = stopCameraCaptureLocked()
+
+    private fun stopCameraCaptureLocked() {
+        val capturer = cameraCapturer ?: return
+        val helper = cameraTextureHelper
+        cameraCapturer = null
+        cameraTextureHelper = null
+        runCatching { capturer.stopCapture() }
+        capturer.dispose()
+        helper?.dispose()
+        videoSource.setIsScreencast(true)
+    }
+
     /**
      * Ends a locally requested capture without reporting it as a privacy
      * revocation. The MediaProjection callback may arrive later, so it is
@@ -824,6 +892,7 @@ class WebRtcTransport(
         val previous = stateRef.getAndSet(TransportState.CLOSING)
         if (previous == TransportState.CLOSED || previous == TransportState.CLOSING) return
         stopScreenCapture()
+        stopCameraCapture()
         pathExecutor.shutdownNow()
         inboundStatsTimer?.cancel()
         videoTrack.dispose()

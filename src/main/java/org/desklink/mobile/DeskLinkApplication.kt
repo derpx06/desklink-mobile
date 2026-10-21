@@ -591,6 +591,9 @@ class DeskLinkApplication : Application() {
      * accepting a request) registers no new bootstrap session. Without this the
      * desktop's answers queued forever and the device read "Connecting…".
      */
+    /** The live coordinator for [deviceId], if any (the camera service and its consent use it). */
+    fun webRtcCoordinator(deviceId: String?): WebRtcSessionCoordinator? = deviceId?.let { webRtcCoordinators[it] }
+
     private fun webRtcCoordinatorFor(device: Device): WebRtcSessionCoordinator {
         var created = false
         val coordinator = webRtcCoordinators.computeIfAbsent(device.deviceId) {

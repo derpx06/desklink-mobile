@@ -84,6 +84,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <!-- "Phone as webcam" (C4): the camera service, started only from a visible DeskLink window. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
 
@@ -109,6 +111,17 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.screen.PhoneScreenCaptureService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+        <service
+            android:name="org.desklink.mobile.plugins.camera.CameraService"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
+        <!-- "<desk> wants to use this phone's camera": asked once per desk, then remembered. -->
+        <activity
+            android:name="org.desklink.mobile.plugins.camera.CameraConsentActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Transparent" />
         <service
             android:name="org.desklink.mobile.plugins.remotekeyboard.RemoteKeyboardService"
             android:label="@string/remote_keyboard_service"

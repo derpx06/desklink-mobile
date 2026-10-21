@@ -1405,6 +1405,134 @@ class WebRtcSessionCoordinator(
         )
     }
 
+    // ---- phone as webcam (contract C4) ------------------------------------------------------------
+
+    private var cameraSequence = 0L
+
+    /** A camera control message for [remoteSessionId]. Caller holds `lock`; false with no link. */
+    private fun sendCameraLocked(
+        kind: WebRtcRemoteSessionControlKind,
+        remoteSessionId: String,
+        reason: String? = null,
+        facing: String? = null,
+        width: Int? = null,
+        height: Int? = null,
+    ): Boolean {
+        val binding = activeBinding ?: return false
+        val attemptId = activeAttemptId ?: return false
+        val wire = activeWireBinding ?: return false
+        if (transport?.isReadyForPackets() != true) return false
+        sendRemoteSessionControlLocked(
+            binding,
+            attemptId,
+            WebRtcRemoteSessionControlMessage(
+                remoteSessionVersion = WebRtcRemoteSessionControlMessage.VERSION,
+                kind = kind,
+                sessionAttemptId = attemptId,
+                deviceId = DeviceHelper.getDeviceId(context),
+                sessionId = wire.sessionId,
+                connectionGeneration = wire.generation,
+                remoteSessionId = remoteSessionId,
+                sequence = ++cameraSequence,
+                timestamp = System.currentTimeMillis(),
+                reason = reason,
+                facing = facing,
+                width = width,
+                height = height,
+                // Mic audio needs an audio m-line this peer does not negotiate: never sent yet.
+                audio = false.takeIf { kind == WebRtcRemoteSessionControlKind.CAMERA_READY },
+            ),
+        )
+        return true
+    }
+
+    private fun handleCameraMessageLocked(message: WebRtcRemoteSessionControlMessage) {
+        val camera = org.desklink.mobile.plugins.camera.PhoneCamera
+        val live = camera.state.live?.takeIf { it.deviceId == device.deviceId }
+        when (message.kind) {
+            WebRtcRemoteSessionControlKind.CAMERA_REQUEST -> {
+                val request = org.desklink.mobile.plugins.camera.CameraRequest.of(
+                    device.deviceId, message.remoteSessionId, message.facing, message.width, message.height, message.fps, message.audio,
+                )
+                if (transport?.screenCaptureActive() == true || PhoneScreenCaptureService.sharingDeviceId != null) {
+                    sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_STOPPED, request.remoteSessionId, reason = "busy")
+                    return
+                }
+                when (camera.state.offer(request)) {
+                    org.desklink.mobile.plugins.camera.CameraState.Offer.BUSY ->
+                        sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_STOPPED, request.remoteSessionId, reason = "busy")
+                    org.desklink.mobile.plugins.camera.CameraState.Offer.ALREADY_LIVE ->
+                        sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_READY, request.remoteSessionId, facing = liveFacing, width = live?.width, height = live?.height)
+                    org.desklink.mobile.plugins.camera.CameraState.Offer.ACCEPTED -> camera.ask(context, device.name, request)
+                }
+            }
+            WebRtcRemoteSessionControlKind.CAMERA_CONTROL -> {
+                if (live?.remoteSessionId != message.remoteSessionId) return
+                when (message.action) {
+                    "flip" -> flipCameraLocked()
+                    "stop" -> stopCameraLocked("stopped", notifyPeer = true)
+                    // No audio m-line on this peer: the mic stays off, and camera-ready says so.
+                    else -> sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_READY, live.remoteSessionId, facing = liveFacing, width = live.width, height = live.height)
+                }
+            }
+            WebRtcRemoteSessionControlKind.CAMERA_STOPPED -> {
+                val ours = camera.state.live ?: camera.state.pending
+                if (ours?.deviceId == device.deviceId && ours.remoteSessionId == message.remoteSessionId) {
+                    stopCameraLocked(message.reason ?: "stopped", notifyPeer = false)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    @Volatile private var liveFacing: String? = null
+
+    /** The person allowed the pending request (from [org.desklink.mobile.plugins.camera.CameraService]). */
+    fun startCamera(): Boolean = synchronized(lock) {
+        val camera = org.desklink.mobile.plugins.camera.PhoneCamera
+        val request = camera.state.start(device.deviceId) ?: return@synchronized false
+        val active = transport
+        val facing = try {
+            requireNotNull(active) { "no-link" }.startCameraCapture(request.facing, request.width, request.height, request.fps)
+        } catch (error: Throwable) {
+            Log.w(TAG, "Camera did not start", error)
+            camera.state.end(device.deviceId)
+            sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_STOPPED, request.remoteSessionId, reason = error.message ?: "failed")
+            return@synchronized false
+        }
+        liveFacing = facing
+        sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_READY, request.remoteSessionId, facing = facing, width = request.width, height = request.height)
+        publish("CameraLive", facing)
+        true
+    }
+
+    fun flipCamera() = synchronized(lock) { flipCameraLocked() }
+
+    private fun flipCameraLocked() {
+        val request = org.desklink.mobile.plugins.camera.PhoneCamera.state.live?.takeIf { it.deviceId == device.deviceId } ?: return
+        transport?.switchCamera { facing ->
+            if (facing == null) return@switchCamera
+            synchronized(lock) {
+                liveFacing = facing
+                sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_READY, request.remoteSessionId, facing = facing, width = request.width, height = request.height)
+            }
+        }
+    }
+
+    /** Ends this desk's camera, pending or live; tells the desk when [notifyPeer]. Idempotent. */
+    fun stopCamera(reason: String, notifyPeer: Boolean) = synchronized(lock) { stopCameraLocked(reason, notifyPeer) }
+
+    private fun stopCameraLocked(reason: String, notifyPeer: Boolean) {
+        val camera = org.desklink.mobile.plugins.camera.PhoneCamera
+        val ended = camera.state.end(device.deviceId) ?: return
+        transport?.stopCameraCapture()
+        liveFacing = null
+        camera.clearAsk(context, device.deviceId)
+        if (notifyPeer) sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_STOPPED, ended.remoteSessionId, reason = reason)
+        context.stopService(Intent(context, org.desklink.mobile.plugins.camera.CameraService::class.java))
+        publish("CameraStopped", reason)
+    }
+
     private fun sendRemoteSessionControlLocked(
         binding: SessionBinding,
         attemptId: String,
@@ -1434,6 +1562,12 @@ class WebRtcSessionCoordinator(
         val message = WebRtcRemoteSessionControlMessage.fromJson(
             JSONObject(String(payload, Charsets.UTF_8)),
         )
+        // The camera (C4) is its own session beside the screen's: it never touches that controller.
+        if (message.kind in CAMERA_KINDS) {
+            message.validate(wire, attemptId, System.currentTimeMillis())
+            handleCameraMessageLocked(message)
+            return@synchronized
+        }
         // The session transition may clear its direction. Keep the prior
         // direction so an explicit peer stop can also end a local
         // MediaProjection capture that was sending phone pixels to desktop.
@@ -2130,6 +2264,8 @@ class WebRtcSessionCoordinator(
             resumeScreen.set(true)
         }
         remoteSession.stop()
+        // The camera goes with the peer that carried it; the desk asks again on the next link.
+        org.desklink.mobile.plugins.camera.PhoneCamera.onPeerGone(context, device.deviceId)
         device.getPlugin(ScreenControlPlugin::class.java)?.let { screen ->
             screen.clearRemoteVideoTrack()
             if (transport != null) screen.onCapturePeerClosed()
@@ -2267,6 +2403,12 @@ class WebRtcSessionCoordinator(
 
     companion object {
         private const val TAG = "DeskLink/WebRTC"
+        private val CAMERA_KINDS = setOf(
+            WebRtcRemoteSessionControlKind.CAMERA_REQUEST,
+            WebRtcRemoteSessionControlKind.CAMERA_READY,
+            WebRtcRemoteSessionControlKind.CAMERA_CONTROL,
+            WebRtcRemoteSessionControlKind.CAMERA_STOPPED,
+        )
         private val RESUMABLE_REMOTE_STATES = setOf(
             WebRtcRemoteSessionState.VIEWING,
             WebRtcRemoteSessionState.REQUESTING_CONTROL,

@@ -125,6 +125,17 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="link_open">Open</string>
     <string name="link_copy">Copy</string>
     <string name="open_on_desk">Open on computer</string>
+    <string name="camera_request_title">%1$s wants to use this phone\'s camera</string>
+    <string name="camera_request_tap_answer">Tap to answer</string>
+    <string name="camera_request_tap_start">Tap to start the camera</string>
+    <string name="camera_consent_title">Let %1$s use this phone\'s camera?</string>
+    <string name="camera_consent_text">%1$s sees what this camera sees until you or it stops. You\'ll always see a notification while it\'s on, and DeskLink remembers your answer for %1$s.</string>
+    <string name="camera_consent_allow">Allow</string>
+    <string name="camera_consent_deny">Don\'t allow</string>
+    <string name="camera_live_title">%1$s is using this camera</string>
+    <string name="camera_live_text">Video only. Stop here or on the computer</string>
+    <string name="camera_flip">Flip</string>
+    <string name="camera_stop">Stop</string>
     <string name="clipboard_nothing_sent">The clipboard has no text to send</string>
     <string name="settings_clipboard_auto">Automatic sync (advanced)</string>
     <string name="settings_clipboard_auto_grant">Sends each copy without a tap. Needs a one-time command from a computer with adb — tap to copy it: %1$s</string>
