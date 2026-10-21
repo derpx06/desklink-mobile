@@ -47,6 +47,9 @@ import java.util.Locale
 class ClipboardListener private constructor(ctx: Context) {
     interface ClipboardObserver {
         fun clipboardChanged(content: String)
+
+        /** An image copy, already a PNG (contract C3). Called off the main thread. */
+        fun clipboardImage(png: ByteArray) {}
     }
 
     // Concurrent: registerObserver runs on the packet-dispatch thread while
@@ -122,12 +125,38 @@ class ClipboardListener private constructor(ctx: Context) {
         lastClipStamp = stamp
         // Password managers mark their copies sensitive: never sent unless asked for.
         if (!force && isSensitive(description)) return false
+        if (description.hasMimeType("image/*")) return syncImage(force)
         val previous = currentContent
         val content = readNow() ?: return false
         if (!force && content == previous) return false
         Log.i(TAG, "clipboard: ${content.length} chars to ${observers.size} desk(s) (${if (force) "asked" else "new copy"})")
         observers.forEach { it.clipboardChanged(content) }
         return true
+    }
+
+    /** An image copy goes as a PNG file transfer; decoding happens off the main thread. */
+    @MainThread
+    private fun syncImage(force: Boolean): Boolean {
+        val uri = try { cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri } catch (_: Exception) { null } ?: return false
+        val key = "image:$uri"
+        if (!force && key == currentContent) return false
+        currentContent = key
+        updateTimestamp = System.currentTimeMillis()
+        val targets = observers.toList()
+        Log.i(TAG, "clipboard: image to ${targets.size} desk(s) (${if (force) "asked" else "new copy"})")
+        execute {
+            val png = ClipboardImages.encodePng(context, uri) ?: return@execute
+            targets.forEach { it.clipboardImage(png) }
+        }
+        return true
+    }
+
+    /** The desk's image copy (a content URI of ours): on this phone's clipboard, never sent back. */
+    fun setImage(uri: android.net.Uri) {
+        remoteSetAt = SystemClock.elapsedRealtime()
+        updateTimestamp = System.currentTimeMillis()
+        currentContent = "image:$uri"
+        cm.setPrimaryClip(ClipData.newUri(context.contentResolver, "DeskLink", uri))
     }
 
     /** The desk's copy: put on this phone's clipboard, and never sent back. */

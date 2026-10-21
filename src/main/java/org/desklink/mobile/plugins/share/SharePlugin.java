@@ -36,7 +36,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.desklink.mobile.helpers.FilesHelper;
-import org.desklink.mobile.helpers.IntentHelper;
 import org.desklink.mobile.NetworkPacket;
 import org.desklink.mobile.plugins.Plugin;
 import org.desklink.mobile.plugins.PluginFactory;
@@ -225,7 +224,10 @@ public class SharePlugin extends Plugin {
             // to return with one still open, which over WebRTC leaks a file
             // descriptor and leaves the backing temp file undeleted, because
             // Payload.close() is what removes it.
-            if (np.has("filename")) {
+            if (np.has("filename") && org.desklink.mobile.plugins.clipboard.ClipboardImages.INSTANCE.isClipboardImage(np)) {
+                // C3: the desk's image copy goes on the clipboard, never into Downloads.
+                org.desklink.mobile.plugins.clipboard.ClipboardImages.INSTANCE.receive(context, np);
+            } else if (np.has("filename")) {
                 receiveFile(np);
             } else if (np.has("text")) {
                 Log.i("SharePlugin", "hasText");
@@ -273,12 +275,9 @@ public class SharePlugin extends Plugin {
             return;
         }
 
-        Log.i("SharePlugin", "Opening a shared URL");
-
-        Intent browserIntent = new Intent(Intent.ACTION_VIEW, uri);
-        browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-        IntentHelper.startActivityFromBackgroundOrCreateNotification(context, browserIntent, url);
+        // Android 10+ forbids opening it from the background: a heads-up with Open and Copy (C3).
+        Log.i("SharePlugin", "Offering a shared URL");
+        LinkFromDesk.INSTANCE.show(context, getDevice().getName(), url);
     }
 
     private void receiveText(NetworkPacket np) {
@@ -373,6 +372,12 @@ public class SharePlugin extends Plugin {
                     isUrl = true;
                 } catch (MalformedURLException e) {
                     isUrl = false;
+                }
+                // "Open on <desk>" (C3): the link inside "Title https://…" is what the desk opens.
+                String link = LinkFromDesk.INSTANCE.openOnDeskLink(intent, text);
+                if (link != null) {
+                    text = link;
+                    isUrl = true;
                 }
                 NetworkPacket np = new NetworkPacket(SharePlugin.PACKET_TYPE_SHARE_REQUEST);
                 np.set(isUrl ? "url" : "text", text);

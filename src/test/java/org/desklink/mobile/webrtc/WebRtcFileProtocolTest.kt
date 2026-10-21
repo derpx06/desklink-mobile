@@ -101,6 +101,17 @@ class WebRtcFileProtocolTest {
     // ---- control records: the JSON is the wire contract with the desktop ----
 
     @Test
+    fun aClipboardImageOfferSaysSoAndRoundTrips() {
+        val clip = offer().copy(filename = "clipboard.png", clipboard = true, mimeType = "image/png")
+        val json = clip.toJson()
+        assertEquals(true, json.getBoolean("clipboard"))
+        assertEquals("image/png", json.getString("mimeType"))
+        assertEquals(clip, WebRtcFileControl.fromJson(JSONObject(json.toString())))
+        // An ordinary offer carries neither key, so older desks see nothing new.
+        assertTrue(!offer().toJson().has("clipboard") && !offer().toJson().has("mimeType"))
+    }
+
+    @Test
     fun controlJsonUsesTheDesktopCamelCaseKeysAndOmitsAbsentOptionals() {
         assertEquals(
             setOf(

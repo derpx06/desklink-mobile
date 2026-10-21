@@ -215,6 +215,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.handoff.HandoffPlugin$DismissReceiver"
             android:exported="false" />
 
+        <!-- "Copy" on "Open link from <desk>". -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.share.LinkFromDesk$CopyReceiver"
+            android:exported="false" />
+
         <!-- A desk notification swiped away on the phone: closed on the desk too. -->
         <receiver
             android:name="org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin$DismissReceiver"
@@ -411,6 +416,20 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
                 android:name="android.service.chooser.chooser_target_service"
                 android:value="org.desklink.mobile.plugins.share.ShareChooserTargetService" />
         </activity>
+
+        <!-- "Open on computer" in the share sheet: a link shared here opens on the desk (C3). -->
+        <activity-alias
+            android:name="org.desklink.mobile.plugins.share.OpenOnDesk"
+            android:exported="true"
+            android:icon="@drawable/sym_open_in_new"
+            android:label="@string/open_on_desk"
+            android:targetActivity="org.desklink.mobile.plugins.share.ShareActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
 
         <receiver android:name="org.desklink.mobile.plugins.share.ShareBroadcastReceiver"
             android:exported="true">

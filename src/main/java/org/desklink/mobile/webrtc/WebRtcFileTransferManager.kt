@@ -47,6 +47,8 @@ class WebRtcFileTransferManager(
         check(mkdirs() || isDirectory) { "Could not create DeskLink transfer directory" }
     }
     private val active = ConcurrentHashMap<String, ActiveTransfer>()
+    /** Incoming offers flagged as a clipboard image (contract C3), by transfer id. */
+    private val clipboardOffers: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     /** [DURABLE_EVERY_BYTES], except in crash-recovery tests. */
     @androidx.annotation.VisibleForTesting
@@ -193,6 +195,10 @@ class WebRtcFileTransferManager(
                         filename = filename,
                         totalSize = size,
                         sha256 = checksum,
+                    ).copy(
+                        // C3: a clipboard image says so, and what it is.
+                        clipboard = true.takeIf { packet.getBoolean("clipboard", false) },
+                        mimeType = packet.getStringOrNull("mimeType").takeIf { packet.getBoolean("clipboard", false) },
                     ),
                 ),
             )
@@ -516,6 +522,12 @@ class WebRtcFileTransferManager(
             if (previous == null) partial.delete()
             throw error
         }
+        if (message.clipboard == true && message.mimeType == org.desklink.mobile.plugins.clipboard.ClipboardImages.MIME &&
+            totalSize <= org.desklink.mobile.plugins.clipboard.ClipboardImages.MAX_BYTES
+        ) {
+            // ponytail: in memory only; a clipboard image resumed after a process death lands in Downloads.
+            clipboardOffers.add(id)
+        }
         val receiver = ActiveTransfer.Receiver(wire, checkpoint)
         active[id] = receiver
         if (offset == totalSize) {
@@ -595,6 +607,10 @@ class WebRtcFileTransferManager(
         val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
             this["filename"] = requireNotNull(checkpoint.filename)
             this["sha256"] = requireNotNull(checkpoint.sha256)
+            if (clipboardOffers.remove(checkpoint.transferId)) {
+                this["clipboard"] = true
+                this["mimeType"] = org.desklink.mobile.plugins.clipboard.ClipboardImages.MIME
+            }
             payload = NetworkPacket.Payload(
                 FileInputStream(partial),
                 checkpoint.totalSize,
@@ -635,6 +651,7 @@ class WebRtcFileTransferManager(
     }
 
     private fun discardReceive(transferId: String) {
+        clipboardOffers.remove(transferId)
         partialFile(transferId).delete()
         checkpointStore.remove(transferId)
     }

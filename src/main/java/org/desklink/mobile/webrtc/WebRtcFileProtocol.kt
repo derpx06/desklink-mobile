@@ -44,6 +44,12 @@ data class WebRtcFileControl(
      * send, and a receiver that understands it echoes what it accepts.
      */
     val maxChunkSize: Int? = null,
+    /**
+     * Share fields on an Offer (contract C3), ignored by older peers: `clipboard: true` with
+     * `mimeType: "image/png"` puts the file on the receiver's clipboard instead of Downloads.
+     */
+    val clipboard: Boolean? = null,
+    val mimeType: String? = null,
 ) {
     fun validate(wire: WebRtcWireBinding) {
         require(protocolVersion == VERSION) { "Unsupported DeskLink WebRTC file version" }
@@ -96,6 +102,8 @@ data class WebRtcFileControl(
             sha256?.let { value.put("sha256", it) }
             error?.let { value.put("error", it) }
             maxChunkSize?.let { value.put("maxChunkSize", it) }
+            clipboard?.let { value.put("clipboard", it) }
+            mimeType?.let { value.put("mimeType", it) }
         }
 
     companion object {
@@ -124,6 +132,8 @@ data class WebRtcFileControl(
             chunkSize = value.getInt("chunkSize"),
             error = value.optString("error").takeIf(String::isNotEmpty),
             maxChunkSize = value.optInt("maxChunkSize").takeIf { value.has("maxChunkSize") },
+            clipboard = value.optBoolean("clipboard").takeIf { value.has("clipboard") },
+            mimeType = value.optString("mimeType").takeIf(String::isNotEmpty)?.take(128),
         )
     }
 }

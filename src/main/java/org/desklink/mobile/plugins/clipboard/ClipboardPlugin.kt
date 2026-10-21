@@ -55,6 +55,14 @@ class ClipboardPlugin : Plugin() {
         override fun clipboardChanged(content: String) {
             return this@ClipboardPlugin.propagateClipboard(content)
         }
+
+        override fun clipboardImage(png: ByteArray) {
+            val name = device.name
+            device.sendPacket(ClipboardImages.packet(png), object : Device.SendPacketStatusCallback() {
+                override fun onSuccess() { Log.i(TAG, "clipboard: image sent to $name") }
+                override fun onFailure(e: Throwable) { Log.w(TAG, "clipboard: image not sent to $name: ${e.message}") }
+            })
+        }
     }
 
     @VisibleForTesting
@@ -72,12 +80,8 @@ class ClipboardPlugin : Plugin() {
         })
     }
 
-    /** Home's "Send clipboard to <desk>": whatever text is on the clipboard, to this desk only. */
-    fun sendNow(): Boolean {
-        val content = ClipboardListener.instance(context).readNow() ?: return false
-        propagateClipboard(content)
-        return true
-    }
+    /** Home's "Send clipboard to <desk>": whatever is on the clipboard, text or image, sent now. */
+    fun sendNow(): Boolean = ClipboardListener.instance(context).sync(force = true)
 
     private fun sendConnectPacket() {
         val content = ClipboardListener.instance(context).currentContent ?: return // Send clipboard only if it had been initialized
