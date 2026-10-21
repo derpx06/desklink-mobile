@@ -102,6 +102,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.heightIn
 import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
 import org.desklink.mobile.ui.compose.SessionPasswordDialog
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.sp
+import org.desklink.mobile.ui.compose.MonoFamily
+import org.desklink.mobile.plugins.screen.SessionLiveNotification
 
 class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
     private var deviceId: String? = null
@@ -132,8 +141,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         prefs.registerOnSharedPreferenceChangeListener(this)
         applyPrefs()
         // How the screen starts; the top bar changes both for this session.
-        if (prefs.getString(getString(R.string.remote_pref_default_mode), "touch") == "trackpad") {
-            controlMode = ControlMode.Trackpad
+        when (prefs.getString(getString(R.string.remote_pref_default_mode), "touch")) {
+            "trackpad" -> controlMode = ControlMode.Trackpad
+            "view" -> controlMode = ControlMode.View
         }
         fillScreen = prefs.getBoolean(getString(R.string.remote_pref_edge_to_edge), false)
         // A rotation recreates this activity but must not stop/re-request the
@@ -162,6 +172,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         prefs.unregisterOnSharedPreferenceChangeListener(this)
         if (isFinishing && !isChangingConfigurations) {
             sendStopScreen()
+            SessionLiveNotification.update(this, deviceId, screen = false)
         }
         super.onDestroy()
     }
@@ -172,7 +183,6 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
     @Composable
     private fun RemoteControlScreen() {
-        val screenStatus = ScreenControlPlugin.latestStatus.ifBlank { statusText }
         val plugin = screenControlPlugin()
         val controlEnabled = plugin?.remoteControlEnabled == true
         val live = plugin?.remoteLive == true
@@ -182,9 +192,10 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         // desktop grants at once when its portal approved input, which it does
         // in the same dialog as the screen. Not while the password is being
         // asked for, nor once the person declined to give it.
-        LaunchedEffect(live, controlEnabled, prompt, controlPasswordDeclined) {
+        val viewOnly = controlMode == ControlMode.View
+        LaunchedEffect(live, controlEnabled, prompt, controlPasswordDeclined, viewOnly) {
             var first = true
-            while (live && !controlEnabled && prompt == null && !controlPasswordDeclined) {
+            while (live && !controlEnabled && prompt == null && !controlPasswordDeclined && !viewOnly) {
                 // Retries keep quiet: a refusal's reason (e.g. "allow remote
                 // interaction on the computer") must stay shown.
                 if (DeskLinkApplication.getInstance().requestRemoteControl(deviceId) && first) {
@@ -199,10 +210,20 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         // A text input on the desktop took focus: up comes the keyboard, the
         // way it does for the phone's own fields — and down when it leaves.
         val textFocused = plugin?.desktopTextFocused == true
-        LaunchedEffect(textFocused, controlEnabled) {
-            if (controlEnabled && autoKeyboard) setKeyboardShown(textFocused)
+        val input = controlEnabled && controlMode != ControlMode.View
+        LaunchedEffect(textFocused, input) {
+            if (input && autoKeyboard) setKeyboardShown(textFocused)
         }
-        ImmersiveDesktop(controlEnabled, screenStatus)
+        // View sends nothing: the keyboard goes away and what is still typed is dropped.
+        LaunchedEffect(input) {
+            keyboardView?.setInputEnabled(input)
+            if (!input) {
+                setKeyboardShown(false)
+                keyboardView?.clearFocus()
+            }
+        }
+        LaunchedEffect(live) { SessionLiveNotification.update(this@MousePadActivity, deviceId, screen = live) }
+        ImmersiveDesktop(controlEnabled, live)
         if (plugin != null && prompt != null) {
             SessionPasswordDialog(
                 wrong = prompt.wrong,
@@ -268,7 +289,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             override fun tap(at: Offset) {
                 // The dark bars beside the picture are not the desktop: a tap
                 // there shows or hides the controls, like a video player.
-                if (point(at) == null) {
+                if (point(at) == null || controlMode == ControlMode.View) {
                     onBarsTapped()
                     return
                 }
@@ -383,7 +404,8 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                         },
                 )
             }
-            if (plugin?.remoteLive != true || !controlEnabled) {
+            // Live but without control, the amber notice says so (see ImmersiveDesktop).
+            if (plugin?.remoteLive != true) {
                 StatusOverlay(live = plugin?.remoteLive == true, modifier = Modifier.align(if (plugin?.remoteLive == true) Alignment.TopCenter else Alignment.Center))
             }
         }
@@ -405,7 +427,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         )
         if (live) {
             if (stage.isBlank()) return
-            Bar(modifier.padding(top = 80.dp, start = 24.dp, end = 24.dp).widthIn(max = 520.dp)) {
+            Pill(modifier.padding(top = 80.dp, start = 24.dp, end = 24.dp).widthIn(max = 520.dp)) {
                 Text(
                     stage,
                     style = MaterialTheme.typography.bodyMedium,
@@ -451,6 +473,14 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         }
     }
 
+    /** Stages that are progress, not a reason: the notice does not repeat them. */
+    private fun progressStages() = setOf(
+        getString(R.string.remote_screen_requesting),
+        getString(R.string.remote_screen_waiting_frame),
+        getString(R.string.remote_control_requesting),
+        getString(R.string.remote_screen_connected),
+    )
+
     private fun deviceName(): String = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
 
     @Composable
@@ -472,7 +502,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         )
     }
 
-    /** Keys a phone keyboard lacks, and the keyboard itself, on one bar. */
+    /** Keys a phone keyboard lacks; over the picture while the keyboard is up. */
     @Composable
     private fun KeyBar(controlEnabled: Boolean, modifier: Modifier = Modifier, onUsed: () -> Unit = {}) {
         val pad = { mousePadPlugin() }
@@ -483,101 +513,19 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             stickyModifiers.applyTo(np)
             pad()?.sendPacket(np)
         }
-        Bar(modifier) {
+        Pill(modifier) {
             Row(
-                modifier = Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BarIconButton(R.drawable.sym_keyboard, stringResource(R.string.remote_key_keyboard), enabled = controlEnabled) { onUsed(); toggleKeyboard() }
-                BarKey("Ctrl", controlEnabled, selected = stickyModifiers.ctrl) { onUsed(); stickyModifiers.ctrl = !stickyModifiers.ctrl }
-                BarKey("Alt", controlEnabled, selected = stickyModifiers.alt) { onUsed(); stickyModifiers.alt = !stickyModifiers.alt }
-                BarKey("Super", controlEnabled) { special(SPECIAL_SUPER) }
-                BarKey("Esc", controlEnabled) { special(SPECIAL_ESCAPE) }
-                BarKey("Tab", controlEnabled) { special(SPECIAL_TAB) }
-                BarIconButton(R.drawable.sym_arrow_back, stringResource(R.string.terminal_key_left), enabled = controlEnabled) { special(SPECIAL_LEFT) }
-                BarIconButton(R.drawable.sym_arrow_upward, stringResource(R.string.terminal_key_up), enabled = controlEnabled) { special(SPECIAL_UP) }
-                BarIconButton(R.drawable.sym_arrow_downward, stringResource(R.string.terminal_key_down), enabled = controlEnabled) { special(SPECIAL_DOWN) }
-                BarIconButton(R.drawable.sym_arrow_forward, stringResource(R.string.terminal_key_right), enabled = controlEnabled) { special(SPECIAL_RIGHT) }
-                if (zoomTransform.scale > 1f) {
-                    BarKey(stringResource(R.string.remote_zoom_fit), true) { onUsed(); fillScreen = false; zoomTransform = DesktopViewTransform() }
-                }
-            }
-        }
-    }
-
-    /** A control bar over the picture: one solid tone, nearly opaque, so it reads on any desktop. */
-    @Composable
-    private fun Bar(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-        Surface(
-            shape = RoundedCornerShape(percent = 50),
-            color = org.desklink.mobile.ui.compose.tokens.surface2.copy(alpha = 0.92f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            border = androidx.compose.foundation.BorderStroke(1.dp, org.desklink.mobile.ui.compose.tokens.hairline),
-            modifier = modifier,
-            content = content,
-        )
-    }
-
-    /** A key; full strength even before control is granted, only a latched modifier is tinted. */
-    @Composable
-    private fun BarKey(
-        label: String,
-        enabled: Boolean,
-        selected: Boolean = false,
-        onClick: () -> Unit,
-    ) {
-        Surface(
-            onClick = onClick,
-            enabled = enabled,
-            shape = RoundedCornerShape(percent = 50),
-            color = if (selected) org.desklink.mobile.ui.compose.tokens.accent.copy(alpha = 0.18f) else Color.Transparent,
-            contentColor = if (selected) org.desklink.mobile.ui.compose.tokens.accent else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .heightIn(min = 48.dp)
-                .widthIn(min = 48.dp)
-                .semantics { this.selected = selected },
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
-                Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-            }
-        }
-    }
-
-    @Composable
-    private fun BarIconButton(
-        @androidx.annotation.DrawableRes icon: Int,
-        description: String,
-        enabled: Boolean = true,
-        onClick: () -> Unit,
-    ) {
-        IconButton(
-            onClick = onClick,
-            enabled = enabled,
-            colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                disabledContentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-            modifier = Modifier.size(48.dp),
-        ) {
-            Icon(painterResource(icon), contentDescription = description)
-        }
-    }
-
-    /** Touch or Trackpad, as Material's segmented buttons. */
-    @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-    @Composable
-    private fun ModeSwitch(onUsed: () -> Unit) {
-        val modes = listOf(ControlMode.Touch to R.string.remote_mode_touch, ControlMode.Trackpad to R.string.remote_mode_trackpad)
-        androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 8.dp)) {
-            modes.forEachIndexed { index, (mode, label) ->
-                SegmentedButton(
-                    selected = controlMode == mode,
-                    onClick = { onUsed(); controlMode = mode },
-                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, modes.size),
-                ) { Text(stringResource(label)) }
+                PillText("ctrl", controlEnabled, selected = stickyModifiers.ctrl, mono = true) { onUsed(); stickyModifiers.ctrl = !stickyModifiers.ctrl }
+                PillText("alt", controlEnabled, selected = stickyModifiers.alt, mono = true) { onUsed(); stickyModifiers.alt = !stickyModifiers.alt }
+                PillText("esc", controlEnabled, mono = true) { special(SPECIAL_ESCAPE) }
+                PillText("tab", controlEnabled, mono = true) { special(SPECIAL_TAB) }
+                PillIcon(R.drawable.sym_arrow_back, stringResource(R.string.terminal_key_left), controlEnabled) { special(SPECIAL_LEFT) }
+                PillIcon(R.drawable.sym_arrow_upward, stringResource(R.string.terminal_key_up), controlEnabled) { special(SPECIAL_UP) }
+                PillIcon(R.drawable.sym_arrow_downward, stringResource(R.string.terminal_key_down), controlEnabled) { special(SPECIAL_DOWN) }
+                PillIcon(R.drawable.sym_arrow_forward, stringResource(R.string.terminal_key_right), controlEnabled) { special(SPECIAL_RIGHT) }
             }
         }
     }
@@ -591,6 +539,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             factory = { context ->
                 KeyListenerView(context, null).also {
                     it.setDeviceId(deviceId)
+                    it.setInputEnabled(screenControlPlugin()?.remoteControlEnabled == true && controlMode != ControlMode.View)
                     it.setStickyModifiers(stickyModifiers)
                     keyboardView = it
                 }
@@ -599,27 +548,31 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     }
 
     /**
-     * The desktop filling the screen, like a video in landscape. Controls float
-     * over it and fade after a few seconds; the handle in the corner brings
-     * them back. Taps on the picture stay clicks on the desktop, which is why
-     * the controls have their own handle instead of YouTube's tap-to-show.
+     * The desktop filling the screen, like a video in landscape, with the design's floating pills:
+     * back, name and latency top left; End top right; the amber notice while control is not
+     * granted; and the mode, clicks, keyboard and Super at the bottom. They fade after a few
+     * seconds; the handle in the corner (or a tap on the bars beside the picture) brings them back.
      */
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     @Composable
-    private fun ImmersiveDesktop(controlEnabled: Boolean, status: String) {
+    private fun ImmersiveDesktop(controlEnabled: Boolean, live: Boolean) {
         var controlsVisible by remember { mutableStateOf(true) }
         var lastUse by remember { mutableStateOf(0L) }
+        var more by remember { mutableStateOf(false) }
         val touch = { lastUse = SystemClock.uptimeMillis() }
-        LaunchedEffect(controlsVisible, lastUse, autoHideControls) {
-            if (controlsVisible && autoHideControls) {
+        LaunchedEffect(controlsVisible, lastUse, autoHideControls, more) {
+            if (controlsVisible && autoHideControls && !more) {
                 kotlinx.coroutines.delay(CONTROLS_HIDE_MS)
                 controlsVisible = false
             }
         }
         val deviceName = remember { deviceName() }
+        val input = controlEnabled && controlMode != ControlMode.View
+        val keyboardUp = WindowInsets.isImeVisible
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             DesktopScreen(
                 modifier = Modifier.fillMaxSize(),
-                controlEnabled = controlEnabled,
+                controlEnabled = input,
                 rounded = false,
                 fill = fillScreen,
                 onBarsTapped = {
@@ -627,77 +580,64 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                     touch()
                 },
             )
-            androidx.compose.animation.AnimatedVisibility(
+            DeskControls(
                 visible = controlsVisible,
-                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
-                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { -it / 2 },
-                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { -it / 2 },
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Bar {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 16.dp)) {
-                            BarIconButton(R.drawable.sym_close, stringResource(R.string.remote_close)) { finish() }
-                            Column(Modifier.widthIn(max = 280.dp)) {
-                                Text(deviceName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                rememberConnectionStats(deviceId)?.let {
-                                    Text(
-                                        connectionStatsLabel(it),
-                                        style = MaterialTheme.typography.bodySmall.merge(TabularNumbers),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
+                deviceName = deviceName,
+                rttMs = rememberConnectionStats(deviceId)?.roundTripTimeMs,
+                live = live,
+                controlEnabled = controlEnabled,
+                mode = controlMode,
+                onMode = { touch(); controlMode = it },
+                onBack = { finish() },
+                onEnd = { finish() },
+                onLeft = { touch(); mousePadPlugin()?.sendLeftClick() },
+                onRight = { touch(); mousePadPlugin()?.sendRightClick() },
+                onKeyboard = { touch(); toggleKeyboard() },
+                onSuper = {
+                    touch()
+                    val np = NetworkPacket(MousePadPlugin.PACKET_TYPE_MOUSEPAD_REQUEST)
+                    np["specialKey"] = SPECIAL_SUPER
+                    mousePadPlugin()?.sendPacket(np)
+                },
+                keys = { if (keyboardUp) KeyBar(input, onUsed = touch) },
+                onMore = { touch(); more = true },
+                reason = ScreenControlPlugin.latestStatus.takeUnless { it in progressStages() },
+                moreMenu = {
+                    androidx.compose.material3.DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(stringResource(if (fillScreen) R.string.remote_zoom_fit else R.string.remote_zoom_fill)) },
+                            onClick = { more = false; fillScreen = !fillScreen },
+                        )
+                        if (zoomTransform.scale > 1f) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(stringResource(R.string.remote_zoom_reset)) },
+                                onClick = { more = false; fillScreen = false; zoomTransform = DesktopViewTransform() },
+                            )
                         }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Bar {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(4.dp)) {
-                            ModeSwitch(onUsed = touch)
-                            if ((screenControlPlugin()?.remoteScreenCount ?: 1) > 1) {
-                                BarIconButton(R.drawable.sym_desktop_windows, stringResource(R.string.remote_switch_screen)) {
-                                    touch()
-                                    DeskLinkApplication.getInstance().switchRemoteScreen(deviceId)
-                                }
-                            }
-                            BarIconButton(
-                                if (fillScreen) R.drawable.sym_fullscreen_exit else R.drawable.sym_fullscreen,
-                                stringResource(if (fillScreen) R.string.remote_zoom_fit else R.string.remote_zoom_fill),
-                            ) { touch(); fillScreen = !fillScreen }
-                            BarIconButton(R.drawable.sym_refresh, stringResource(R.string.remote_screen_retry)) {
-                                touch(); requestDesktopScreen()
-                            }
-                            BarIconButton(R.drawable.sym_settings, stringResource(R.string.settings)) {
-                                touch(); openSettings()
-                            }
+                        if ((screenControlPlugin()?.remoteScreenCount ?: 1) > 1) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(stringResource(R.string.remote_switch_screen)) },
+                                onClick = { more = false; DeskLinkApplication.getInstance().switchRemoteScreen(deviceId) },
+                            )
                         }
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(stringResource(R.string.remote_screen_retry)) },
+                            onClick = { more = false; requestDesktopScreen() },
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings)) },
+                            onClick = { more = false; openSettings() },
+                        )
                     }
-                }
-            }
-            androidx.compose.animation.AnimatedVisibility(
-                visible = controlsVisible,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
-                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
-            ) {
-                KeyBar(
-                    controlEnabled = controlEnabled,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    onUsed = touch,
-                )
-            }
+                },
+            )
             if (!controlsVisible) {
-                Bar(
+                Pill(
                     Modifier
                         .align(Alignment.BottomEnd)
                         .padding(16.dp),
                 ) {
-                    BarIconButton(R.drawable.sym_expand_less, stringResource(R.string.remote_show_controls)) {
+                    PillIcon(R.drawable.sym_expand_less, stringResource(R.string.remote_show_controls)) {
                         controlsVisible = true; touch()
                     }
                 }
@@ -851,13 +791,6 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         accelerationProfile =
             PointerAccelerationProfileFactory.getProfileWithName(accelerationProfileName ?: "default")
         prefsApplied = true
-    }
-
-    /** How a touch on the picture acts: directly where it lands (touch), or
-     * moving the desktop pointer like a laptop's trackpad. */
-    private enum class ControlMode {
-        Touch,
-        Trackpad,
     }
 
     companion object {

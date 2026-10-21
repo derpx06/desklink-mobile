@@ -192,6 +192,8 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                             throw new RuntimeException("Failed to finalize received file: " + currentFinalFileName);
                         }
                         publishFile(fileDocument, received);
+                        TransferHistory.recordReceived(getDevice().getContext(), getDevice().getDeviceId(),
+                                fileDocument.getName() != null ? fileDocument.getName() : currentFileName, received, fileDocument.getUri(), fileDocument.getType());
                         if (transferId != null) {
                             checkpointStore.remove(transferId);
                         }
@@ -204,6 +206,8 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                         throw new RuntimeException("Failed to finalize received file: " + currentFinalFileName);
                     }
                     publishFile(fileDocument, 0);
+                    TransferHistory.recordReceived(getDevice().getContext(), getDevice().getDeviceId(),
+                            fileDocument.getName() != null ? fileDocument.getName() : currentFileName, 0, fileDocument.getUri(), fileDocument.getType());
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -437,6 +441,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
 
     private void setProgress(int progress) {
         synchronized (lock) {
+            TransferProgress.update(getDevice().getDeviceId(), getId(), false, currentFileName, progress, totalPayloadSize);
             receiveNotification.setProgress(progress, getDevice().getContext().getResources()
                     .getQuantityString(R.plurals.incoming_files_text, totalNumFiles, currentFileName, currentFileNum, totalNumFiles));
         }

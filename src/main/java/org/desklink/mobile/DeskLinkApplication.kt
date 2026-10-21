@@ -121,6 +121,8 @@ class DeskLinkApplication : Application() {
         CrashReporter.offerPendingReport(this)
         LifecycleHelper.initializeObserver()
         loadRememberedDevicesFromSettings()
+        // The transfer history keeps 30 days: prune it once per start, off the main thread.
+        org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.plugins.share.TransferHistory.store(this).prune() }
 
         if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             StrictMode.setVmPolicy(

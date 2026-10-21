@@ -65,6 +65,13 @@ public class KeyListenerView extends View {
         deviceId = id;
     }
 
+    /** Off in the desk screen's View mode (and before control is granted): nothing typed is sent. */
+    private boolean inputEnabled = true;
+
+    public void setInputEnabled(boolean enabled) {
+        inputEnabled = enabled;
+    }
+
     @Nullable
     private StickyModifiers stickyModifiers;
 
@@ -102,6 +109,9 @@ public class KeyListenerView extends View {
     }
 
     public void sendChars(CharSequence chars) {
+        if (!inputEnabled) {
+            return;
+        }
         MousePadPlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
         if (plugin == null) {
             return;
@@ -121,6 +131,9 @@ public class KeyListenerView extends View {
     }
 
     private void sendKeyPressPacket(final NetworkPacket np) {
+        if (!inputEnabled) {
+            return;
+        }
         MousePadPlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MousePadPlugin.class);
         if (plugin == null) {
             return;

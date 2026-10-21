@@ -30,7 +30,7 @@ import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.helpers.ThreadHelper.execute
 import org.desklink.mobile.NetworkPacket
-import org.desklink.mobile.ui.SettingsFragment
+import org.desklink.mobile.ui.compose.screen.settings.KEY_BLUETOOTH_ENABLED
 import org.desklink.mobile.extensions.getParcelableArrayCompat
 import org.desklink.mobile.extensions.getParcelableCompat
 import java.io.IOException
@@ -74,7 +74,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
 
     override fun onStart() {
         val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        if (!preferences.getBoolean(SettingsFragment.KEY_BLUETOOTH_ENABLED, false)) {
+        if (!preferences.getBoolean(KEY_BLUETOOTH_ENABLED, false)) {
             return
         }
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
@@ -154,7 +154,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                 Log.e("DeskLink", "Security Exception for CONNECT", e)
 
                 PreferenceManager.getDefaultSharedPreferences(context).edit {
-                    putBoolean(SettingsFragment.KEY_BLUETOOTH_ENABLED, false)
+                    putBoolean(KEY_BLUETOOTH_ENABLED, false)
                 }
 
                 return

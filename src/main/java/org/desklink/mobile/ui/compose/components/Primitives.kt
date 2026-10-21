@@ -36,7 +36,7 @@ val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
 /** The live WebRTC path and round trip for [deviceId], polled while on screen; null until known. */
 @Composable
 fun rememberConnectionStats(deviceId: String?): WebRtcConnectionStats? {
-    var stats by remember { mutableStateOf<WebRtcConnectionStats?>(null) }
+    var stats by remember(deviceId) { mutableStateOf<WebRtcConnectionStats?>(null) }
     val view = LocalView.current
     LaunchedEffect(deviceId) {
         while (true) {

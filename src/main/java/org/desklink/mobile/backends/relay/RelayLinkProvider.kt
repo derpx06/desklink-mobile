@@ -48,9 +48,15 @@ object RelaySettings {
 
     fun enabled(context: Context) = prefs(context).getBoolean(KEY_ENABLED, true)
 
-    /** Empty means the built-in default. */
+    /** Empty means the built-in default, which is itself empty unless the build names a relay. */
     fun url(context: Context): String =
         prefs(context).getString(KEY_URL, "").orEmpty().trim().ifEmpty { BuildConfig.DEFAULT_RELAY_URL }
+
+    /** A relay address exists (entered, or built in). Without one nothing relay-related runs or shows. */
+    fun configured(context: Context) = url(context).isNotBlank()
+
+    /** Whether the relay connection runs: switched on, an address to reach, and someone paired to reach. */
+    fun shouldRun(enabled: Boolean, url: String, hasPairedDevices: Boolean) = enabled && url.isNotBlank() && hasPairedDevices
 
     fun useTurn(context: Context) = prefs(context).getBoolean(KEY_USE_TURN, true)
 
@@ -206,8 +212,9 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
         }
     }
 
+    // No address means no relay at all: no lookup, no ladder, no "unavailable" (status stays OFF).
     private fun wanted(): Boolean =
-        RelaySettings.enabled(context) && TrustedDevices.getAllTrustedDevices(context).isNotEmpty()
+        RelaySettings.shouldRun(RelaySettings.enabled(context), RelaySettings.url(context), TrustedDevices.getAllTrustedDevices(context).isNotEmpty())
 
     private fun connectLocked() {
         retry?.cancel(false)

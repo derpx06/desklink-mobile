@@ -335,6 +335,7 @@ public class SharePlugin extends Plugin {
             NetworkPacket np = FilesHelper.uriToNetworkPacket(context, uri, PACKET_TYPE_SHARE_REQUEST);
 
             if (np != null) {
+                TransferHistory.rememberSource(np, uri);
                 job.addNetworkPacket(np);
             }
         }

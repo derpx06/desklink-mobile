@@ -10,42 +10,54 @@ import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.edit
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -54,17 +66,23 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -72,74 +90,96 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.edit
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import android.view.HapticFeedbackConstants
-import androidx.annotation.DrawableRes
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.ListItem
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.style.TextDecoration
-import org.desklink.mobile.ui.compose.components.TabularNumbers
-import org.desklink.mobile.ui.compose.components.connectionStatsLabel
-import org.desklink.mobile.ui.compose.components.rememberConnectionStats
+import org.desklink.mobile.DeskLinkApplication
+import org.desklink.mobile.R
+import org.desklink.mobile.plugins.screen.SessionLiveNotification
+import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
 import org.desklink.mobile.ui.compose.DeskLinkType
-import org.desklink.mobile.ui.compose.tokens
+import org.desklink.mobile.ui.compose.MonoFamily
+import org.desklink.mobile.ui.compose.SessionPasswordDialog
 import org.desklink.mobile.ui.compose.components.EmptyState
 import org.desklink.mobile.ui.compose.components.EmptyTerminalTile
 import org.desklink.mobile.ui.compose.components.Hairline
 import org.desklink.mobile.ui.compose.components.LabelChip
+import org.desklink.mobile.ui.compose.components.LargeTitle
+import org.desklink.mobile.ui.compose.components.PillButton
+import org.desklink.mobile.ui.compose.components.PresenceDot
+import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.components.SessionPreview
 import org.desklink.mobile.ui.compose.components.SessionPreviews
+import org.desklink.mobile.ui.compose.components.TabularNumbers
 import org.desklink.mobile.ui.compose.components.TerminalTile
+import org.desklink.mobile.ui.compose.components.connectionStatsLabel
+import org.desklink.mobile.ui.compose.components.rememberConnectionStats
 import org.desklink.mobile.ui.compose.components.shimmer
-import org.desklink.mobile.DeskLinkApplication
-import org.desklink.mobile.R
-import org.desklink.mobile.ui.compose.DeskLinkTheme
-import org.desklink.mobile.ui.compose.DeskLinkTopAppBar
-import org.desklink.mobile.ui.compose.SessionPasswordDialog
 import org.desklink.mobile.ui.compose.sessionPasswordLockedMessage
+import org.desklink.mobile.ui.compose.tokens
 import org.desklink.mobile.webrtc.SessionPasswordDenial
 import org.desklink.mobile.webrtc.terminal.TerminalClient
 import org.desklink.mobile.webrtc.terminal.TerminalClientState
@@ -221,7 +261,10 @@ class TerminalActivity : AppCompatActivity() {
     override fun onDestroy() {
         // Leaving for good stops output; a rotation or a background stay keeps it flowing so
         // notifications still fire and the screen is current when the person returns.
-        if (isFinishing && !isChangingConfigurations) client?.detachAll()
+        if (isFinishing && !isChangingConfigurations) {
+            client?.detachAll()
+            SessionLiveNotification.update(this, deviceId, terminals = 0)
+        }
         super.onDestroy()
     }
 
@@ -278,6 +321,9 @@ class TerminalActivity : AppCompatActivity() {
 
         LaunchedEffect(Unit) { client.refresh() }
         LaunchedEffect(current, resumed) { TerminalForeground.terminalId = if (resumed) current else null }
+        // The coral notification with End while this phone has terminals open.
+        val attached = state.sessions.count { it.attached && !it.gone }
+        LaunchedEffect(attached) { SessionLiveNotification.update(this@TerminalActivity, deviceId, terminals = attached) }
         LaunchedEffect(state.createdId) {
             state.createdId?.let {
                 openId = it
@@ -333,7 +379,6 @@ class TerminalActivity : AppCompatActivity() {
 
     // ---- session list ---------------------------------------------------------------------------------
 
-    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun SessionListScreen(
         client: TerminalClient,
@@ -343,63 +388,47 @@ class TerminalActivity : AppCompatActivity() {
     ) {
         var renaming by remember { mutableStateOf<TerminalSessionState?>(null) }
         var closing by remember { mutableStateOf<TerminalSessionState?>(null) }
+        var newSheet by rememberSaveable { mutableStateOf(false) }
+        var searching by rememberSaveable { mutableStateOf(false) }
+        var query by rememberSaveable { mutableStateOf("") }
         val connected = state.link == TerminalLinkState.CONNECTED
         val locked = state.passwordNeeded != null
-        // Sessions can also start at the desk (any tmux session there is
-        // listed), which the desktop does not announce: look again while the
-        // list is on screen. Not while it is locked: only the person retries that.
-        androidx.compose.runtime.LaunchedEffect(connected, locked) {
+        val t = tokens
+        // Sessions can also start at the desk, which the desktop does not announce: look again
+        // while the list is on screen. Not while it is locked: only the person retries that.
+        LaunchedEffect(connected, locked) {
             while (connected && !locked) {
                 client.refresh()
                 kotlinx.coroutines.delay(LIST_REFRESH_MS)
             }
         }
+        val live = state.sessions.filter { !it.gone }
 
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    navigationIcon = {
-                        IconButton(onClick = { finish() }) {
-                            Icon(
-                                painterResource(R.drawable.sym_arrow_back),
-                                contentDescription = getString(androidx.appcompat.R.string.abc_action_bar_up_description),
-                            )
-                        }
+        Box(Modifier.fillMaxSize().background(t.bg).safeDrawingPadding()) {
+            Column(Modifier.fillMaxSize()) {
+                ScreenHeader(onBack = { finish() })
+                LargeTitle(
+                    stringResource(R.string.terminal_section),
+                    subtitle = if (connected) {
+                        pluralStringResource(R.plurals.terminal_count_on, live.size, live.size, deskName())
+                    } else {
+                        stringResource(R.string.terminal_status_reconnecting)
                     },
-                    title = {
-                        Column {
-                            Text(stringResource(R.string.terminal_title))
-                            Text(
-                                stringResource(if (connected) R.string.terminal_status_connected else R.string.terminal_status_reconnecting),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { client.refresh() }, enabled = connected) {
-                            Icon(painterResource(R.drawable.sym_refresh), contentDescription = stringResource(R.string.terminal_refresh))
-                        }
-                    },
-                )
-            },
-            snackbarHost = { SnackbarHost(snackbar) },
-            floatingActionButton = {
-                if (!state.notAllowed && !locked) {
-                    NewSession(client, state.launchers) { open ->
-                        ExtendedFloatingActionButton(
-                            onClick = { if (connected) open() },
-                            icon = { Icon(painterResource(R.drawable.sym_add), contentDescription = null) },
-                            text = { Text(stringResource(R.string.terminal_new_session)) },
-                            containerColor = tokens.accent,
-                            contentColor = tokens.onAccent,
-                        )
+                ) {
+                    IconButton(onClick = { searching = !searching; if (!searching) query = "" }, modifier = Modifier.size(48.dp)) {
+                        Icon(painterResource(R.drawable.sym_search), contentDescription = stringResource(R.string.terminal_search), tint = t.text)
                     }
                 }
-            },
-        ) { padding ->
-            Column(Modifier.padding(padding).fillMaxSize()) {
-                if (!connected) ReconnectingBanner()
+                if (searching) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it.take(80) },
+                        singleLine = true,
+                        placeholder = { Text(stringResource(R.string.terminal_search_hint)) },
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                    )
+                }
+                if (!connected && state.listLoaded) ReconnectingBanner()
                 when {
                     state.notAllowed -> StatePanel(
                         title = stringResource(R.string.terminal_not_allowed_title),
@@ -408,7 +437,7 @@ class TerminalActivity : AppCompatActivity() {
                         onAction = { client.refresh() },
                     )
                     state.passwordNeeded != null -> Locked(state.passwordNeeded, onEnterPassword, onRetry = { client.refresh() })
-                    connected && !state.listLoaded -> CenteredProgress()
+                    !state.listLoaded -> CenteredProgress()
                     state.sessions.isEmpty() -> Column(Modifier.padding(16.dp)) {
                         EmptyTerminalTile(
                             launchers = listOf(stringResource(R.string.terminal_launch_shell) to { client.create(DEFAULT_ROWS, DEFAULT_COLS, null) }) +
@@ -418,21 +447,24 @@ class TerminalActivity : AppCompatActivity() {
                     }
                     else -> {
                         // Previews re-read the screens now and then: output arrives without a state change.
-                        var tick by remember { mutableStateOf(0) }
+                        var tick by remember { mutableIntStateOf(0) }
                         LaunchedEffect(Unit) {
                             while (true) {
                                 kotlinx.coroutines.delay(PREVIEW_REFRESH_MS)
                                 tick++
                             }
                         }
-                        val previews = remember(state, tick, labels.toMap()) { SessionPreviews.of(this@TerminalActivity, deviceId) }.associateBy { it.id }
+                        val previews = remember(state, tick, labels.toMap()) { SessionPreviews.of(this@TerminalActivity, deviceId, lineCount = 2) }.associateBy { it.id }
+                        val shown = state.sessions.filter { s ->
+                            query.isBlank() || (labels[s.id] ?: s.title).contains(query.trim(), ignoreCase = true)
+                        }
                         LazyColumn(
                             Modifier.fillMaxSize(),
                             // Clear of the floating button.
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            items(state.sessions, key = { it.id }) { session ->
+                            items(shown, key = { it.id }) { session ->
                                 val preview = previews[session.id] ?: SessionPreview(
                                     id = session.id,
                                     name = labels[session.id] ?: agentName(session.title) ?: session.title.ifBlank { session.id.take(8) },
@@ -441,7 +473,7 @@ class TerminalActivity : AppCompatActivity() {
                                     lines = emptyList(),
                                     size = stringResource(R.string.terminal_session_size, session.cols, session.rows),
                                 )
-                                SessionTile(
+                                SessionCard(
                                     session = session,
                                     preview = preview,
                                     connected = connected,
@@ -458,8 +490,16 @@ class TerminalActivity : AppCompatActivity() {
                     }
                 }
             }
+            if (!state.notAllowed && !locked) {
+                NewTerminalButton(
+                    Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    onClick = { if (connected) newSheet = true },
+                )
+            }
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
         }
 
+        if (newSheet) NewTerminalSheet(state.launchers, onDismiss = { newSheet = false }) { command -> newSheet = false; client.create(DEFAULT_ROWS, DEFAULT_COLS, command) }
         renaming?.let { session ->
             RenameDialog(
                 initial = labels[session.id].orEmpty(),
@@ -487,26 +527,78 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * [button] starts a shell, or opens a plain menu of the agent CLIs the desktop says it has
-     * installed. Those sessions are titled by their command, which [agentName] turns back into a name.
-     */
+    private fun deskName(): String = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+
     @Composable
-    private fun NewSession(client: TerminalClient, launchers: List<String>, button: @Composable (open: () -> Unit) -> Unit) {
-        var menu by remember { mutableStateOf(false) }
-        val create = { command: List<String>? ->
-            menu = false
-            client.create(DEFAULT_ROWS, DEFAULT_COLS, command)
+    private fun NewTerminalButton(modifier: Modifier, onClick: () -> Unit) {
+        val t = tokens
+        Row(
+            modifier
+                .shadow(8.dp, RoundedCornerShape(18.dp))
+                .height(56.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(t.accentContainer)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(start = 16.dp, end = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(painterResource(R.drawable.sym_add), contentDescription = null, tint = t.onAccentContainer)
+            Text(stringResource(R.string.terminal_new_terminal), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer)
         }
-        Box {
-            button { if (launchers.isEmpty()) create(null) else menu = true }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.terminal_launch_shell)) }, onClick = { create(null) })
-                launchers.forEach { launcher ->
-                    agentName(launcher)?.let { name ->
-                        DropdownMenuItem(text = { Text(name) }, onClick = { create(listOf(launcher)) })
+    }
+
+    /**
+     * What to start: a shell or one of the agent CLIs the desktop has. The "Start in" folder chips
+     * go between the choice and the button once the desktop reports folders.
+     */
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    private fun NewTerminalSheet(launchers: List<String>, onDismiss: () -> Unit, onStart: (List<String>?) -> Unit) {
+        val t = tokens
+        val options = listOf<Pair<String, List<String>?>>(stringResource(R.string.terminal_launch_shell) to null) +
+            launchers.mapNotNull { launcher -> agentName(launcher)?.let { it to listOf(launcher) } }
+        var choice by rememberSaveable { mutableIntStateOf(0) }
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = t.surface2,
+            // The stock handle: TalkBack names it and it expands or collapses the sheet.
+            dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(width = 32.dp, height = 4.dp, color = t.hairlineStrong) },
+        ) {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.terminal_new_terminal), fontSize = 22.sp, fontWeight = FontWeight.Medium, modifier = Modifier.semantics { heading() })
+                    Text(stringResource(R.string.terminal_new_runs_on, deskName()), fontSize = 14.sp, color = t.textDim)
+                }
+                Text(stringResource(R.string.terminal_new_start), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.textDim)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
+                    options.forEachIndexed { index, (label, _) ->
+                        val selected = index == choice
+                        Box(
+                            Modifier
+                                .heightIn(min = 48.dp)
+                                .selectable(selected = selected, role = Role.RadioButton) { choice = index },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                label,
+                                fontSize = 14.sp,
+                                color = if (selected) t.onAccentContainer else t.text,
+                                modifier = Modifier
+                                    .background(if (selected) t.accentContainer else Color.Transparent, RoundedCornerShape(18.dp))
+                                    .border(1.dp, if (selected) Color.Transparent else t.hairlineStrong, RoundedCornerShape(18.dp))
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                            )
+                        }
                     }
                 }
+                PillButton(
+                    stringResource(R.string.terminal_new_start_button),
+                    { onStart(options.getOrNull(choice)?.second) },
+                    Modifier.fillMaxWidth().padding(top = 6.dp),
+                    icon = R.drawable.sym_terminal,
+                )
             }
         }
     }
@@ -518,9 +610,9 @@ class TerminalActivity : AppCompatActivity() {
         else -> null
     }
 
-    /** A session as a dark terminal tile with its last lines; finished ones offer Restart. */
+    /** A session as a dark card: name, its last lines, and whether this phone has it open. */
     @Composable
-    private fun SessionTile(
+    private fun SessionCard(
         session: TerminalSessionState,
         preview: SessionPreview,
         connected: Boolean,
@@ -531,18 +623,24 @@ class TerminalActivity : AppCompatActivity() {
     ) {
         val finished = session.gone || session.exitStatus != null
         var menu by remember { mutableStateOf(false) }
+        val here = session.attached && !finished
         Column {
-            TerminalTile(
-                preview,
-                Modifier.fillMaxWidth(),
-                menu = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(TermBg)
+                    .then(if (here) Modifier.border(1.5.dp, TermCoral.copy(alpha = 0.6f), RoundedCornerShape(24.dp)) else Modifier)
+                    .clickable(onClickLabel = stringResource(R.string.terminal_open_session), onClick = onOpen)
+                    .padding(start = 18.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(preview.name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text("${preview.badge} · ${preview.size}", fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim)
                     Box {
-                        IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) {
-                            Icon(
-                                painterResource(R.drawable.sym_more_vert),
-                                contentDescription = stringResource(R.string.terminal_session_options, preview.name),
-                                tint = Color(0xFFB8BBC4),
-                            )
+                        IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.terminal_session_options, preview.name), tint = TermIcon)
                         }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(text = { Text(stringResource(R.string.terminal_rename)) }, onClick = { menu = false; onRename() })
@@ -553,18 +651,36 @@ class TerminalActivity : AppCompatActivity() {
                             )
                         }
                     }
-                },
-                onClick = onOpen,
-            )
-            if (finished) {
-                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (session.gone) stringResource(R.string.terminal_chip_ended) else stringResource(R.string.terminal_chip_exited, session.exitStatus ?: 0L),
-                        style = DeskLinkType.mono,
-                        color = tokens.textDim,
-                        modifier = Modifier.weight(1f).padding(start = 4.dp),
-                    )
-                    if (connected) TextButton(onClick = onRestart) { Text(stringResource(R.string.terminal_restart)) }
+                }
+                Column(Modifier.padding(end = 14.dp)) {
+                    if (preview.lines.isEmpty()) {
+                        Text(stringResource(R.string.terminal_preview_open), fontFamily = MonoFamily, fontSize = 11.sp, lineHeight = 16.sp, color = TermDim, maxLines = 1)
+                    } else {
+                        preview.lines.takeLast(2).forEach {
+                            Text(it, fontFamily = MonoFamily, fontSize = 11.sp, lineHeight = 16.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+                Row(Modifier.heightIn(min = 40.dp).padding(end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    when {
+                        finished -> Text(
+                            if (session.gone) stringResource(R.string.terminal_chip_ended) else stringResource(R.string.terminal_chip_exited, session.exitStatus ?: 0L),
+                            fontSize = 12.sp,
+                            color = TermDim,
+                        )
+                        here -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            PresenceDot(color = TermCoral)
+                            Text(stringResource(R.string.terminal_you_are_here), fontSize = 12.sp, color = TermCoralText)
+                        }
+                        else -> Text(stringResource(R.string.terminal_running_on, deskName()), fontSize = 12.sp, color = TermDim)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Icon(painterResource(R.drawable.sym_arrow_forward), contentDescription = null, tint = TermIcon, modifier = Modifier.size(20.dp))
+                }
+            }
+            if (finished && connected) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onRestart) { Text(stringResource(R.string.terminal_restart)) }
                 }
             }
         }
@@ -596,7 +712,7 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
-    /** Loading the list: tiles shaped like the real ones, with a sheen. */
+    /** Loading the list: cards shaped like the real ones, with a sheen. */
     @Composable
     private fun CenteredProgress() {
         Column(
@@ -604,21 +720,21 @@ class TerminalActivity : AppCompatActivity() {
                 .fillMaxSize()
                 .padding(16.dp)
                 .semantics { contentDescription = getString(R.string.terminal_loading) },
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             repeat(3) {
-                Box(Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(14.dp)).shimmer())
+                Box(Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(24.dp)).shimmer())
             }
         }
     }
 
     @Composable
-    private fun ReconnectingBanner() {
-        Surface(color = tokens.surface2, modifier = Modifier.fillMaxWidth()) {
+    private fun ReconnectingBanner(dark: Boolean = false) {
+        Surface(color = if (dark) TermBar else tokens.surface2, modifier = Modifier.fillMaxWidth()) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = if (dark) TermAccent else tokens.accent)
                 Spacer(Modifier.size(12.dp))
-                Text(stringResource(R.string.terminal_reconnecting), style = MaterialTheme.typography.bodyMedium, color = tokens.textDim)
+                Text(stringResource(R.string.terminal_reconnecting), style = MaterialTheme.typography.bodyMedium, color = if (dark) TermIcon else tokens.textDim)
             }
         }
     }
@@ -644,7 +760,7 @@ class TerminalActivity : AppCompatActivity() {
 
     // ---- terminal ------------------------------------------------------------------------------------------
 
-    @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalLayoutApi::class)
     @Composable
     private fun TerminalScreenUi(client: TerminalClient, state: TerminalClientState, id: String, snackbar: SnackbarHostState) {
         val context = LocalContext.current
@@ -659,8 +775,14 @@ class TerminalActivity : AppCompatActivity() {
         var ctrl by remember { mutableStateOf(Sticky.OFF) }
         var alt by remember { mutableStateOf(Sticky.OFF) }
         var viewRef by remember { mutableStateOf<TerminalView?>(null) }
+        var menu by remember { mutableStateOf(false) }
+        var newSheet by rememberSaveable { mutableStateOf(false) }
+        var composing by rememberSaveable { mutableStateOf(false) }
+        var draft by rememberSaveable { mutableStateOf("") }
         val imeVisible = WindowInsets.isImeVisible
         val canDictate = remember { SpeechRecognizer.isRecognitionAvailable(context) }
+        val resumes = rememberResumes()
+        val quick = remember(resumes) { QuickCommands.load(QuickCommands.prefs(context), deviceId) }
 
         val host = remember(id) {
             object : TerminalView.Host {
@@ -676,7 +798,7 @@ class TerminalActivity : AppCompatActivity() {
                 override fun onGridChanged(rows: Int, cols: Int) = client.attachOrResize(id, rows, cols)
 
                 override fun onTap() {
-                    viewRef?.showKeyboard()
+                    if (!composing) viewRef?.showKeyboard()
                 }
 
                 override fun onFontSizeChanged(sizePx: Int) = Unit
@@ -684,15 +806,13 @@ class TerminalActivity : AppCompatActivity() {
         }
 
         val name = labels[id] ?: session?.title?.let { agentName(it) ?: it.ifBlank { null } } ?: id.take(8)
+        val rttMs = rememberConnectionStats(deviceId)?.roundTripTimeMs
         val subtitle = when {
             !connected -> stringResource(R.string.terminal_status_reconnecting)
             session == null || session.gone -> stringResource(R.string.terminal_chip_ended)
             session.exitStatus != null -> stringResource(R.string.terminal_chip_exited, session.exitStatus)
-            else -> stringResource(R.string.terminal_chip_running)
+            else -> null
         }
-        val running = connected && session != null && !session.gone && session.exitStatus == null
-        val stats = rememberConnectionStats(deviceId)
-        var switcher by remember { mutableStateOf(false) }
 
         // Typed like the key bar's symbols, armed modifiers included, and never followed by Enter:
         // the person reads what was recognised before running it.
@@ -700,113 +820,90 @@ class TerminalActivity : AppCompatActivity() {
             val m = host.takeModifiers()
             host.send(TerminalKeys.text(text, m.ctrl, m.alt))
         }
+        /** A quick command or the compose bar: the text, then Enter. Several lines go as one paste. */
+        val run = { text: String ->
+            if ('\n' in text) screen.withEmulator { it.paste(text) } else host.send(TerminalKeys.text(text))
+            host.send(byteArrayOf('\r'.code.toByte()))
+        }
         LaunchedEffect(dictated) {
             dictated?.let {
                 dictated = null
-                type(it)
+                if (composing) draft += it else type(it)
             }
         }
 
+        org.desklink.mobile.ui.compose.components.DarkSystemBars()
         DisposableEffect(fullscreen) {
             setSystemBarsHidden(fullscreen)
             onDispose { setSystemBarsHidden(false) }
         }
 
-        Scaffold(
-            // The chrome follows the theme; the terminal itself stays dark (see below).
-            modifier = Modifier.background(MaterialTheme.colorScheme.background).safeDrawingPadding(),
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = {
-                if (!fullscreen) TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                    navigationIcon = {
-                        IconButton(onClick = { leaveTerminal(client, id) }) {
-                            Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.terminal_back_to_sessions))
-                        }
-                    },
-                    title = {
-                        // Tapping the title switches to another session.
-                        Box {
-                            Column(
-                                Modifier
-                                    .clickable(enabled = state.sessions.size > 1, onClickLabel = stringResource(R.string.terminal_switch_session)) { switcher = true }
-                                    .padding(vertical = 4.dp),
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    LabelChip(SessionPreviews.badgeOf(session?.title.orEmpty()), onDark = false)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (running) {
-                                        Box(Modifier.size(7.dp).background(tokens.mint, CircleShape))
-                                        Spacer(Modifier.width(8.dp))
-                                    }
-                                    Text(
-                                        listOfNotNull(subtitle, stats?.takeIf { connected }?.let { connectionStatsLabel(it) }).joinToString(" · "),
-                                        style = DeskLinkType.mono,
-                                        color = tokens.textDim,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                            DropdownMenu(expanded = switcher, onDismissRequest = { switcher = false }) {
-                                state.sessions.filter { it.id != id }.forEach { other ->
-                                    val otherName = labels[other.id] ?: agentName(other.title) ?: other.title.ifBlank { other.id.take(8) }
-                                    DropdownMenuItem(
-                                        text = { Text(otherName) },
-                                        onClick = {
-                                            switcher = false
-                                            leaveTerminal(client, id)
-                                            openId = other.id
-                                        },
-                                    )
-                                }
+        Box(Modifier.fillMaxSize().background(TermBg).safeDrawingPadding()) {
+            Column(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { leaveTerminal(client, id) }, modifier = Modifier.size(48.dp)) {
+                        Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.terminal_back_to_sessions), tint = TermText)
+                    }
+                    Column(Modifier.weight(1f).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(name, fontFamily = MonoFamily, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(deskName(), fontSize = 12.sp, color = TermIcon, maxLines = 1)
+                            val meta = subtitle ?: rttMs?.let { stringResource(R.string.home_meta_rtt, it.toInt()) }
+                            meta?.let {
+                                Text(" · ", fontSize = 12.sp, color = TermIcon)
+                                Text(it, fontFamily = if (subtitle == null) MonoFamily else null, fontSize = 12.sp, color = TermIcon, maxLines = 1)
                             }
                         }
-                    },
-                    actions = {
-                        // Shown when the session is not receiving output and nothing is about to change that.
-                        if (connected && !state.notAllowed && session != null && !session.gone && !session.wanted && !session.attached && session.exitStatus == null) {
-                            IconButton(onClick = { client.reattach(id) }) {
-                                Icon(painterResource(R.drawable.sym_refresh), contentDescription = stringResource(R.string.terminal_reattach))
+                    }
+                    Box {
+                        IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
+                            Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.terminal_session_options, name), tint = TermText)
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            // Shown when the session is not receiving output and nothing is about to change that.
+                            if (connected && !state.notAllowed && session != null && !session.gone && !session.wanted && !session.attached && session.exitStatus == null) {
+                                DropdownMenuItem(text = { Text(stringResource(R.string.terminal_reattach)) }, onClick = { menu = false; client.reattach(id) })
                             }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(if (fullscreen) R.string.terminal_show_system_bars else R.string.remote_fullscreen)) },
+                                onClick = { menu = false; rememberFullscreen(!fullscreen) },
+                            )
+                            DropdownMenuItem(text = { Text(stringResource(R.string.terminal_paste)) }, onClick = { menu = false; paste(context, screen, snackbar) })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.terminal_rename)) }, onClick = { menu = false; renamingOpen = id })
                         }
-                        IconButton(onClick = { rememberFullscreen(true) }) {
-                            Icon(painterResource(R.drawable.sym_open_in_full), contentDescription = stringResource(R.string.remote_fullscreen))
-                        }
-                    },
-                )
-            },
-            snackbarHost = { SnackbarHost(snackbar) },
-        ) { padding ->
-            Column(Modifier.padding(padding).fillMaxSize()) {
+                    }
+                }
+                SessionChips(state, id, onPick = { other -> leaveTerminal(client, id); openId = other }, onNew = { newSheet = true })
                 if (state.notAllowed) {
                     Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            stringResource(R.string.terminal_not_allowed_message),
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        Text(stringResource(R.string.terminal_not_allowed_message), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
                     }
                 } else if (!connected) {
-                    ReconnectingBanner()
+                    ReconnectingBanner(dark = true)
                 }
                 AndroidView(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .background(tokens.terminalBg)
-                        .padding(horizontal = 4.dp),
+                        // The view scrolls its own content: without a clip it paints over the header.
+                        .clipToBounds()
+                        .background(TermBg)
+                        .padding(horizontal = 8.dp),
                     factory = { ctx -> TerminalView(ctx, host).also { it.attach(screen); viewRef = it } },
                 )
+                if (quick.isNotEmpty()) QuickCommandChips(quick, enabled = connected, onRun = run)
+                if (composing) ComposeBar(draft, { draft = it }, enabled = connected) {
+                    if (draft.isNotEmpty()) {
+                        run(draft)
+                        draft = ""
+                    }
+                }
                 KeyBar(
-                    fullscreen = fullscreen,
-                    onExitFullscreen = { rememberFullscreen(false) },
                     ctrl = ctrl,
                     alt = alt,
                     imeVisible = imeVisible,
+                    composing = composing,
+                    onCompose = { composing = !composing; if (!composing) viewRef?.showKeyboard() },
                     onCtrl = { ctrl = ctrl.tap() },
                     onCtrlLong = { ctrl = ctrl.longPress() },
                     onAlt = { alt = alt.tap() },
@@ -815,6 +912,16 @@ class TerminalActivity : AppCompatActivity() {
                         val cursorApp = screen.withEmulator { it.isCursorKeysApplicationMode }
                         val m = host.takeModifiers()
                         TerminalKeys.key(keyCode, ctrl = m.ctrl, alt = m.alt, cursorApp = cursorApp)?.let(host::send)
+                    },
+                    onArrow = { keyCode ->
+                        // Modifiers are taken once per press: a held Ctrl+← repeats as Ctrl+←.
+                        val m = host.takeModifiers()
+                        val send = {
+                            val cursorApp = screen.withEmulator { it.isCursorKeysApplicationMode }
+                            TerminalKeys.key(keyCode, ctrl = m.ctrl, alt = m.alt, cursorApp = cursorApp)?.let(host::send)
+                            Unit
+                        }
+                        send
                     },
                     onText = type,
                     onMic = if (canDictate) ::dictate else null,
@@ -827,6 +934,150 @@ class TerminalActivity : AppCompatActivity() {
                         }
                     },
                 )
+            }
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp))
+        }
+        if (newSheet) NewTerminalSheet(state.launchers, onDismiss = { newSheet = false }) { command -> newSheet = false; client.create(DEFAULT_ROWS, DEFAULT_COLS, command) }
+        renamingOpen?.let { renameId ->
+            RenameDialog(
+                initial = labels[renameId].orEmpty(),
+                onDismiss = { renamingOpen = null },
+                onConfirm = { setLabel(renameId, it); renamingOpen = null },
+            )
+        }
+    }
+
+    private var renamingOpen by mutableStateOf<String?>(null)
+
+    @Composable
+    private fun rememberResumes(): Int {
+        var resumes by remember { mutableIntStateOf(0) }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumes++ }
+        return resumes
+    }
+
+    /** Every session, the open one lit; "+" starts another. Replaces the old title switcher. */
+    @Composable
+    private fun SessionChips(state: TerminalClientState, current: String, onPick: (String) -> Unit, onNew: () -> Unit) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(start = 12.dp, end = 12.dp)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            state.sessions.filter { !it.gone }.forEach { s ->
+                val selected = s.id == current
+                val label = labels[s.id] ?: agentName(s.title) ?: s.title.ifBlank { s.id.take(8) }
+                Box(
+                    Modifier
+                        .heightIn(min = 48.dp)
+                        .selectable(selected = selected, role = Role.Tab) { if (!selected) onPick(s.id) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        Modifier
+                            .height(32.dp)
+                            .background(if (selected) TermChipOn else TermChip, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (s.attached && !selected) PresenceDot(color = TermCoral)
+                        Text(label, fontFamily = MonoFamily, fontSize = 12.sp, color = if (selected) TermChipOnText else TermText, maxLines = 1)
+                    }
+                }
+            }
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clickable(role = Role.Button, onClickLabel = stringResource(R.string.terminal_new_terminal), onClick = onNew)
+                    .semantics { contentDescription = getString(R.string.terminal_new_terminal) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(32.dp).background(TermChip, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                    Icon(painterResource(R.drawable.sym_add), contentDescription = null, tint = TermText, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+
+    /** One tap: the command and Enter. Edited per computer in Settings → Quick commands. */
+    @Composable
+    private fun QuickCommandChips(commands: List<String>, enabled: Boolean, onRun: (String) -> Unit) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            commands.forEach { command ->
+                Box(
+                    Modifier
+                        .heightIn(min = 48.dp)
+                        .focusProperties { canFocus = false }
+                        .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.terminal_run_command, command)) { onRun(command) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        command,
+                        fontFamily = MonoFamily,
+                        fontSize = 12.sp,
+                        color = TermText,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Type a whole command before sending it: a plain multi-line field (never a password type, which
+     * blacks out screen capture on ColorOS). Send writes it, then Enter.
+     */
+    @Composable
+    private fun ComposeBar(text: String, onText: (String) -> Unit, enabled: Boolean, onSend: () -> Unit) {
+        val focus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { focus.requestFocus() }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
+                .heightIn(min = 48.dp)
+                .background(TermField, RoundedCornerShape(24.dp))
+                .padding(start = 14.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("❯", fontFamily = MonoFamily, fontSize = 13.sp, color = TermPrompt)
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (text.isEmpty()) Text(stringResource(R.string.terminal_compose_hint), fontFamily = MonoFamily, fontSize = 13.sp, color = TermDim)
+                BasicTextField(
+                    value = text,
+                    onValueChange = { onText(it.take(MAX_PASTE_CHARS)) },
+                    textStyle = TextStyle(fontFamily = MonoFamily, fontSize = 13.sp, color = TermText),
+                    cursorBrush = SolidColor(TermAccent),
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, keyboardType = KeyboardType.Text),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focus).semantics { contentDescription = getString(R.string.terminal_compose_hint) },
+                )
+            }
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clickable(enabled = enabled && text.isNotEmpty(), role = Role.Button, onClick = onSend)
+                    .semantics { contentDescription = getString(R.string.terminal_compose_send) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(38.dp).background(TermAccent, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(painterResource(R.drawable.sym_keyboard_return), contentDescription = null, tint = TermOnAccent, modifier = Modifier.size(20.dp))
+                }
             }
         }
     }
@@ -844,93 +1095,122 @@ class TerminalActivity : AppCompatActivity() {
 
     // ---- key bar ------------------------------------------------------------------------------------------
 
-    @OptIn(ExperimentalFoundationApi::class)
+    /**
+     * Row one is fixed: Ctrl, Alt and the four arrows always in reach (Esc and Tab too where eight
+     * 48dp keys fit). Row two scrolls through the rest, with compose, dictation and the keyboard
+     * pinned at its end.
+     */
     @Composable
     private fun KeyBar(
-        fullscreen: Boolean,
-        onExitFullscreen: () -> Unit,
         ctrl: Sticky,
         alt: Sticky,
         imeVisible: Boolean,
+        composing: Boolean,
+        onCompose: () -> Unit,
         onCtrl: () -> Unit,
         onCtrlLong: () -> Unit,
         onAlt: () -> Unit,
         onAltLong: () -> Unit,
         onKey: (Int) -> Unit,
+        /** Starts a press of an arrow; the returned sender repeats it while held. */
+        onArrow: (Int) -> (() -> Unit),
         onText: (String) -> Unit,
         onMic: (() -> Unit)?,
         onPaste: () -> Unit,
         onKeyboard: () -> Unit,
     ) {
         var functionRow by remember { mutableStateOf(false) }
-        Surface(color = tokens.surface) {
-            Column(Modifier.padding(vertical = 6.dp)) {
-                Hairline(Modifier.padding(bottom = 6.dp))
+        BoxWithConstraints(Modifier.fillMaxWidth().background(TermBar).padding(vertical = 2.dp)) {
+            val roomy = maxWidth >= 48.dp * 8
+            Column(Modifier.fillMaxWidth()) {
                 if (functionRow) {
-                    Row(
-                        Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
                         TerminalKeys.FUNCTION_KEYS.forEachIndexed { index, keyCode ->
                             Key("F${index + 1}", stringResource(R.string.terminal_key_function, index + 1)) { onKey(keyCode) }
                         }
                     }
                 }
+                Row(Modifier.fillMaxWidth()) {
+                    val each = Modifier.weight(1f)
+                    if (roomy) {
+                        Key("esc", stringResource(R.string.terminal_key_escape), modifier = each) { onKey(KeyEvent.KEYCODE_ESCAPE) }
+                        Key("tab", stringResource(R.string.terminal_key_tab), modifier = each) { onKey(KeyEvent.KEYCODE_TAB) }
+                    }
+                    Key("ctrl", stringResource(R.string.terminal_key_ctrl) + stickySuffix(ctrl), state = ctrl, onLongClick = onCtrlLong, modifier = each, onClick = onCtrl)
+                    Key("alt", stringResource(R.string.terminal_key_alt) + stickySuffix(alt), state = alt, onLongClick = onAltLong, modifier = each, onClick = onAlt)
+                    // Fixed bytes, so these arrows never mirror in right-to-left layouts.
+                    ArrowKey(R.drawable.sym_arrow_back, stringResource(R.string.terminal_key_left), each) { onArrow(KeyEvent.KEYCODE_DPAD_LEFT) }
+                    ArrowKey(R.drawable.sym_arrow_upward, stringResource(R.string.terminal_key_up), each) { onArrow(KeyEvent.KEYCODE_DPAD_UP) }
+                    ArrowKey(R.drawable.sym_arrow_downward, stringResource(R.string.terminal_key_down), each) { onArrow(KeyEvent.KEYCODE_DPAD_DOWN) }
+                    ArrowKey(R.drawable.sym_arrow_forward, stringResource(R.string.terminal_key_right), each) { onArrow(KeyEvent.KEYCODE_DPAD_RIGHT) }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(
-                        Modifier
-                            .weight(1f)
-                            .horizontalScroll(rememberScrollState())
-                            .padding(start = 8.dp, end = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        // The app bar is hidden in full screen; this is the way back to it.
-                        if (fullscreen) IconKey(R.drawable.sym_close_fullscreen, stringResource(R.string.remote_exit_fullscreen), onExitFullscreen)
-                        Key("Esc", stringResource(R.string.terminal_key_escape)) { onKey(KeyEvent.KEYCODE_ESCAPE) }
-                        Key("Tab", stringResource(R.string.terminal_key_tab)) { onKey(KeyEvent.KEYCODE_TAB) }
-                        Key(
-                            "Ctrl",
-                            stringResource(R.string.terminal_key_ctrl) + stickySuffix(ctrl),
-                            state = ctrl,
-                            onLongClick = onCtrlLong,
-                            onClick = onCtrl,
-                        )
-                        Key(
-                            "Alt",
-                            stringResource(R.string.terminal_key_alt) + stickySuffix(alt),
-                            state = alt,
-                            onLongClick = onAltLong,
-                            onClick = onAlt,
-                        )
-                        // Fixed bytes, so these arrows never mirror in right-to-left layouts.
-                        IconKey(R.drawable.sym_arrow_back, stringResource(R.string.terminal_key_left)) { onKey(KeyEvent.KEYCODE_DPAD_LEFT) }
-                        IconKey(R.drawable.sym_arrow_downward, stringResource(R.string.terminal_key_down)) { onKey(KeyEvent.KEYCODE_DPAD_DOWN) }
-                        IconKey(R.drawable.sym_arrow_upward, stringResource(R.string.terminal_key_up)) { onKey(KeyEvent.KEYCODE_DPAD_UP) }
-                        IconKey(R.drawable.sym_arrow_forward, stringResource(R.string.terminal_key_right)) { onKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
+                    Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(start = 4.dp)) {
+                        if (!roomy) {
+                            Key("esc", stringResource(R.string.terminal_key_escape)) { onKey(KeyEvent.KEYCODE_ESCAPE) }
+                            Key("tab", stringResource(R.string.terminal_key_tab)) { onKey(KeyEvent.KEYCODE_TAB) }
+                        }
                         for (symbol in listOf("|", "~", "/", "-", "_", "\\", "`")) Key(symbol, null) { onText(symbol) }
                         Key("Home", stringResource(R.string.terminal_key_home)) { onKey(KeyEvent.KEYCODE_MOVE_HOME) }
                         Key("End", stringResource(R.string.terminal_key_end)) { onKey(KeyEvent.KEYCODE_MOVE_END) }
                         Key("PgUp", stringResource(R.string.terminal_key_page_up)) { onKey(KeyEvent.KEYCODE_PAGE_UP) }
                         Key("PgDn", stringResource(R.string.terminal_key_page_down)) { onKey(KeyEvent.KEYCODE_PAGE_DOWN) }
-                        Key(
-                            "F1–F12",
-                            stringResource(R.string.terminal_key_function_row),
-                            state = if (functionRow) Sticky.LOCKED else Sticky.OFF,
-                        ) { functionRow = !functionRow }
-                        IconKey(R.drawable.sym_content_paste, stringResource(R.string.terminal_paste), onPaste)
+                        Key("F1–F12", stringResource(R.string.terminal_key_function_row), state = if (functionRow) Sticky.LOCKED else Sticky.OFF) { functionRow = !functionRow }
+                        IconKey(R.drawable.sym_content_paste, stringResource(R.string.terminal_paste), onClick = onPaste)
                     }
-                    // Always in reach, never scrolled away: dictation and the keyboard.
-                    if (onMic != null) {
-                        IconKey(R.drawable.sym_mic, stringResource(R.string.terminal_dictate), onMic)
-                        Spacer(Modifier.width(6.dp))
-                    }
+                    // Always in reach, never scrolled away: the compose bar, dictation and the keyboard.
+                    IconKey(R.drawable.sym_edit_note, stringResource(if (composing) R.string.terminal_compose_hide else R.string.terminal_compose_show), latched = composing, onClick = onCompose)
+                    if (onMic != null) IconKey(R.drawable.sym_mic, stringResource(R.string.terminal_dictate), onClick = onMic)
                     IconKey(
                         if (imeVisible) R.drawable.sym_keyboard_hide else R.drawable.sym_keyboard,
                         stringResource(if (imeVisible) R.string.terminal_hide_keyboard else R.string.terminal_show_keyboard),
-                        onKeyboard,
+                        onClick = onKeyboard,
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(4.dp))
                 }
+            }
+        }
+    }
+
+    /**
+     * An arrow that repeats while held, like a hardware key: one press at once, then after 400 ms
+     * every 50 ms until released. TalkBack's double tap sends one.
+     */
+    @Composable
+    private fun ArrowKey(@DrawableRes icon: Int, description: String, modifier: Modifier, onPress: () -> (() -> Unit)) {
+        val view = LocalView.current
+        val scope = rememberCoroutineScope()
+        val press by rememberUpdatedState(onPress)
+        Box(
+            modifier
+                .height(48.dp)
+                .focusProperties { canFocus = false }
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown()
+                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        val send = press()
+                        send()
+                        val repeat = scope.launch {
+                            kotlinx.coroutines.delay(ARROW_REPEAT_DELAY_MS)
+                            while (true) {
+                                send()
+                                kotlinx.coroutines.delay(ARROW_REPEAT_MS)
+                            }
+                        }
+                        waitForUpOrCancellation()
+                        repeat.cancel()
+                    }
+                }
+                .semantics {
+                    contentDescription = description
+                    role = Role.Button
+                    onClick { press()(); true }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.padding(horizontal = 2.dp).fillMaxWidth().height(40.dp).background(TermKey, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                Icon(painterResource(icon), contentDescription = null, tint = TermText, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -943,8 +1223,8 @@ class TerminalActivity : AppCompatActivity() {
     }
 
     /**
-     * A key chip. A latched modifier is the only key that changes color: armed (next key only) or
-     * locked, which also underlines its label.
+     * A key cap (40dp tall in a 48dp touch target). A latched modifier is the only key that
+     * changes colour: armed (next key only) or locked, which also underlines its label.
      */
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
@@ -953,31 +1233,38 @@ class TerminalActivity : AppCompatActivity() {
         description: String?,
         state: Sticky = Sticky.OFF,
         onLongClick: (() -> Unit)? = null,
+        modifier: Modifier = Modifier,
         onClick: () -> Unit,
     ) {
-        val colors = MaterialTheme.colorScheme
         val latched = state != Sticky.OFF
         val view = LocalView.current
-        Surface(
-            shape = MaterialTheme.shapes.small,
-            color = if (latched) tokens.accent.copy(alpha = 0.18f) else tokens.surface2,
-            contentColor = if (latched) tokens.accent else colors.onSurface,
-            modifier = Modifier
-                .widthIn(min = 44.dp)
-                .height(44.dp)
+        Box(
+            modifier
+                .widthIn(min = 48.dp)
+                .height(48.dp)
                 // Keys must never take focus: that would pull the keyboard away from the terminal.
                 .focusProperties { canFocus = false }
-                .clip(MaterialTheme.shapes.small)
                 .combinedClickable(
                     onClick = { view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); onClick() },
                     onLongClick = onLongClick,
                 )
                 .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+            Box(
+                // A weighted key (the fixed first row) fills its share; the rest size to the label.
+                (if (modifier == Modifier) Modifier.widthIn(min = 44.dp) else Modifier.padding(horizontal = 2.dp).fillMaxWidth())
+                    .height(40.dp)
+                    .background(if (latched) TermAccent else TermKey, RoundedCornerShape(8.dp))
+                    .padding(horizontal = if (modifier == Modifier) 10.dp else 0.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelLarge,
+                    fontFamily = MonoFamily,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (latched) TermOnAccent else TermText,
                     textDecoration = if (state == Sticky.LOCKED) TextDecoration.Underline else null,
                     maxLines = 1,
                 )
@@ -986,19 +1273,19 @@ class TerminalActivity : AppCompatActivity() {
     }
 
     @Composable
-    private fun IconKey(@DrawableRes icon: Int, description: String, onClick: () -> Unit) {
+    private fun IconKey(@DrawableRes icon: Int, description: String, latched: Boolean = false, onClick: () -> Unit) {
         val view = LocalView.current
-        Surface(
-            shape = MaterialTheme.shapes.small,
-            color = tokens.surface2,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .size(44.dp)
+        Box(
+            Modifier
+                .size(48.dp)
                 .focusProperties { canFocus = false }
-                .clip(MaterialTheme.shapes.small)
-                .clickable { view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); onClick() },
+                .clickable(role = Role.Button) { view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); onClick() }
+                .semantics { contentDescription = description; if (latched) selected = true },
+            contentAlignment = Alignment.Center,
         ) {
-            Box(contentAlignment = Alignment.Center) { Icon(painterResource(icon), contentDescription = description, modifier = Modifier.size(20.dp)) }
+            Box(Modifier.size(44.dp, 40.dp).background(if (latched) TermAccent else TermKey, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                Icon(painterResource(icon), contentDescription = null, tint = if (latched) TermOnAccent else TermText, modifier = Modifier.size(18.dp))
+            }
         }
     }
 
@@ -1040,10 +1327,33 @@ internal object TerminalPalette {
 
     /** [dark]: the app's theme; the terminal black is a shade deeper there. */
     fun apply(dark: Boolean) {
-        val background = if (dark) "#050506" else "#0b0c0e"
+        @Suppress("UNUSED_VARIABLE") val unused = dark
+        val background = "#0e0f11"
         com.termux.terminal.TerminalColors.COLOR_SCHEME.updateWith(java.util.Properties().apply { putAll(colors + ("background" to background)) })
     }
 }
+
+// The terminal screen and cards are dark in both themes (the design's terminal black).
+private val TermBg = Color(0xFF0E0F11)
+private val TermBar = Color(0xFF16171A)
+private val TermKey = Color(0xFF2A2B31)
+private val TermField = Color(0xFF1B1C1F)
+private val TermChip = Color(0x14FFFFFF)
+private val TermChipOn = Color(0xFFF2F2F3)
+private val TermChipOnText = Color(0xFF18181B)
+private val TermText = Color(0xFFD9DBE0)
+private val TermIcon = Color(0xFFA1A1AA)
+/** 6:1 on the terminal black; the design's #6e737d is 4.0:1. */
+private val TermDim = Color(0xFF8B9099)
+private val TermPrompt = Color(0xFF86D3A8)
+private val TermAccent = Color(0xFFA9B8FF)
+private val TermOnAccent = Color(0xFF14204F)
+private val TermCoral = Color(0xFFFF7C66)
+private val TermCoralText = Color(0xFFFF9A88)
+
+/** A held arrow repeats like a hardware key: after this long, then this often. */
+private const val ARROW_REPEAT_DELAY_MS = 400L
+private const val ARROW_REPEAT_MS = 50L
 
 /** How often the session list re-reads the preview tiles' screens. */
 private const val PREVIEW_REFRESH_MS = 1_500L

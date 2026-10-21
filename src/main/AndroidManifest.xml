@@ -196,6 +196,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:label="@string/findmyphone_title"
             android:launchMode="singleInstance" />
 
+        <!-- End on the coral live-session notification. Not exported. -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.screen.SessionLiveNotification$EndReceiver"
+            android:exported="false" />
+
         <!-- Pairing notification actions. Not exported: no other app may accept or reject a pairing. -->
         <receiver
             android:name="org.desklink.mobile.PairingActionReceiver"

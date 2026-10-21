@@ -52,7 +52,9 @@ android {
         // from the DESKLINK_RELAY_URL Gradle property or environment variable,
         // else a placeholder that reaches nothing. Release builds must set it
         // (docs/RELEASE.md). Users may override it in settings.
-        val relayUrl = releaseSigningValue("DESKLINK_RELAY_URL") ?: "wss://relay.desklink.example/v1"
+        // No relay is deployed by default: without DESKLINK_RELAY_URL the app has none until the
+        // person enters one (Settings → More → Advanced network), and never looks one up.
+        val relayUrl = releaseSigningValue("DESKLINK_RELAY_URL") ?: ""
         buildConfigField("String", "DEFAULT_RELAY_URL", "\"$relayUrl\"")
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }

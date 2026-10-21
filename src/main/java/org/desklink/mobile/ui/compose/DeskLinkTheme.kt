@@ -25,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -36,75 +37,116 @@ import org.desklink.mobile.R
 import org.desklink.mobile.ui.ThemeUtil
 
 /**
- * DeskLink's tokens, identical in both apps. Dark is the signature look (near-black, macky-like);
- * light is warm paper. The terminal stays dark in both.
+ * DeskLink's tokens: the design's phone palette (`pl` light, `pd` dark), value for value. Colour
+ * has one meaning each: accent = actions, mint = connected, coral = the desk (or another device)
+ * is using this one, amber = waiting on you, red = stop or error. The terminal stays dark in both.
  */
 @Immutable
 data class DeskLinkColors(
     val isDark: Boolean,
+    /** `w`: the window. */
     val bg: Color,
+    /** `c`: cards. */
     val surface: Color,
+    /** `s`: sheets, key caps and other raised secondary surfaces. */
     val surface2: Color,
+    /** `l`: card edges and dividers. */
     val hairline: Color,
+    /** `b`: outlines of buttons and sheet handles. */
     val hairlineStrong: Color,
+    /** `t`, `t2`: text. */
     val text: Color,
     val textDim: Color,
+    /** `t3`: never text (under 4.5:1); offline glyphs and disabled icons only. */
     val textFaint: Color,
+    /** `a`, `at`, `ao`: actions, accent text, text on an accent fill. */
     val accent: Color,
-    val accentPressed: Color,
+    val accentText: Color,
     val onAccent: Color,
-    /** Connected and success, and nothing else. */
+    /** `ac`, `aco`: tonal accent fills and their text. */
+    val accentContainer: Color,
+    val onAccentContainer: Color,
+    /** `m`: connected and success, and nothing else. */
     val mint: Color,
-    /** Attention: the cursor, an unread count. */
+    /** Mint dark enough to be text (the light `m` is 3.5:1 on a card). */
+    val mintText: Color,
+    /** `o`, `ot`, `ob`: the desk is using this phone. Always paired with an End. */
     val coral: Color,
+    val coralText: Color,
+    val coralContainer: Color,
+    /** `k`: the faint fill behind icons. */
+    val fill: Color,
+    /** `sw`: a switch track when off. */
+    val switchOff: Color,
+    /** `inv`, `invt`: snackbars and other inverted surfaces. */
+    val inverse: Color,
+    val onInverse: Color,
+    /** `rd`: stop, error, unpair. */
     val red: Color,
-    /** Pairing in progress or wanted. */
+    /** Waiting on you: a permission to grant, a pairing to answer. */
     val amber: Color,
     val terminalBg: Color,
     val terminalFg: Color,
 )
 
-val DarkTokens = DeskLinkColors(
-    isDark = true,
-    bg = Color(0xFF0B0C0E),
-    surface = Color(0xFF131418),
-    surface2 = Color(0xFF1A1C21),
-    hairline = Color(0xFF262931),
-    hairlineStrong = Color(0xFF33363F),
-    text = Color(0xFFEDEDEF),
-    textDim = Color(0xFF9A9CA4),
-    textFaint = Color(0xFF6B6E77),
-    accent = Color(0xFF6E8CFF),
-    accentPressed = Color(0xFF5A78F0),
-    onAccent = Color(0xFF0B0C0E),
-    mint = Color(0xFF34D1A0),
-    coral = Color(0xFFFF7A62),
-    red = Color(0xFFFF5C5C),
-    amber = Color(0xFFFFC24D),
-    terminalBg = Color(0xFF050506),
-    terminalFg = Color(0xFFE6E6E6),
-)
-
 val LightTokens = DeskLinkColors(
     isDark = false,
-    bg = Color(0xFFF6F6F4),
+    bg = Color(0xFFF7F7F4),
     surface = Color(0xFFFFFFFF),
-    surface2 = Color(0xFFF0F0EE),
-    hairline = Color(0xFFE4E4E0),
-    hairlineStrong = Color(0xFFD6D6D1),
-    text = Color(0xFF121317),
-    textDim = Color(0xFF5E616A),
-    textFaint = Color(0xFF8C8F97),
-    accent = Color(0xFF3B6CF6),
-    accentPressed = Color(0xFF2F5BE0),
+    surface2 = Color(0xFFECECE8),
+    hairline = Color(0x12000000),
+    hairlineStrong = Color(0xFFD4D4CF),
+    text = Color(0xFF18181B),
+    textDim = Color(0xFF5F5F67),
+    textFaint = Color(0xFF8F8F97),
+    accent = Color(0xFF3256D6),
+    accentText = Color(0xFF2A4CC4),
     onAccent = Color(0xFFFFFFFF),
-    mint = Color(0xFF13A57A),
-    coral = Color(0xFFE8573F),
-    red = Color(0xFFD93636),
-    amber = Color(0xFFC98A00),
-    // The terminal is the hero object: it stays dark on paper too.
-    terminalBg = Color(0xFF0B0C0E),
-    terminalFg = Color(0xFFE6E6E6),
+    accentContainer = Color(0xFFE2E8FB),
+    onAccentContainer = Color(0xFF1B2F7A),
+    mint = Color(0xFF0F9B72),
+    mintText = Color(0xFF0B7A59),
+    coral = Color(0xFFE5533D),
+    coralText = Color(0xFFB9402B),
+    coralContainer = Color(0xFFFBEBE7),
+    fill = Color(0x0D000000),
+    switchOff = Color(0x2E000000),
+    inverse = Color(0xFF2F3036),
+    onInverse = Color(0xFFF1F1F3),
+    red = Color(0xFFC93030),
+    amber = Color(0xFF9A6412),
+    terminalBg = Color(0xFF0E0F11),
+    terminalFg = Color(0xFFD9DBE0),
+)
+
+val DarkTokens = DeskLinkColors(
+    isDark = true,
+    bg = Color(0xFF111113),
+    surface = Color(0xFF1A1A1D),
+    surface2 = Color(0xFF1E1E21),
+    hairline = Color(0x12FFFFFF),
+    hairlineStrong = Color(0xFF38383D),
+    text = Color(0xFFF2F2F3),
+    textDim = Color(0xFFA1A1AA),
+    textFaint = Color(0xFF71717A),
+    accent = Color(0xFFA9B8FF),
+    accentText = Color(0xFFA9B8FF),
+    onAccent = Color(0xFF14204F),
+    accentContainer = Color(0xFF262D52),
+    onAccentContainer = Color(0xFFDFE5FF),
+    mint = Color(0xFF3FD1A2),
+    mintText = Color(0xFF3FD1A2),
+    coral = Color(0xFFFF7C66),
+    coralText = Color(0xFFFF9A88),
+    coralContainer = Color(0xFF34201C),
+    fill = Color(0x0FFFFFFF),
+    switchOff = Color(0x33FFFFFF),
+    inverse = Color(0xFFE6E6EA),
+    onInverse = Color(0xFF18181B),
+    red = Color(0xFFFF6B6B),
+    amber = Color(0xFFF5B84A),
+    terminalBg = Color(0xFF0E0F11),
+    terminalFg = Color(0xFFD9DBE0),
 )
 
 val LocalDeskLinkColors = staticCompositionLocalOf { LightTokens }
@@ -114,45 +156,19 @@ val tokens: DeskLinkColors
     @Composable get() = LocalDeskLinkColors.current
 
 private fun schemeOf(t: DeskLinkColors): ColorScheme {
-    // Accent at 14% over the card surface: the tint of icon squircles and latched keys.
-    val tint = t.accent.copy(alpha = 0.14f).compositeOver(t.surface)
-    val onTint = if (t.isDark) Color(0xFFC9D4FF) else Color(0xFF1C3A99)
-    return if (t.isDark) {
-        darkColorScheme(
-            primary = t.accent, onPrimary = t.onAccent, primaryContainer = tint, onPrimaryContainer = onTint,
-            secondary = t.textDim, onSecondary = t.bg, secondaryContainer = tint, onSecondaryContainer = onTint,
-            tertiary = t.mint, onTertiary = t.bg, tertiaryContainer = t.mint.copy(alpha = 0.16f).compositeOver(t.surface), onTertiaryContainer = t.mint,
-            error = t.red, onError = t.bg, errorContainer = t.red.copy(alpha = 0.16f).compositeOver(t.surface), onErrorContainer = t.red,
-            background = t.bg, onBackground = t.text, surface = t.bg, onSurface = t.text,
-            surfaceVariant = t.surface2, onSurfaceVariant = t.textDim, outline = t.hairlineStrong, outlineVariant = t.hairline,
-            inverseSurface = t.text, inverseOnSurface = t.surface, inversePrimary = LightTokens.accent, surfaceTint = t.accent,
-            surfaceBright = Color(0xFF1F2127), surfaceDim = t.bg, surfaceContainerLowest = Color(0xFF08090A),
-            surfaceContainerLow = t.surface, surfaceContainer = t.surface, surfaceContainerHigh = t.surface2,
-            surfaceContainerHighest = Color(0xFF22242A),
-        )
-    } else {
-        lightColorScheme(
-            primary = t.accent, onPrimary = t.onAccent, primaryContainer = tint, onPrimaryContainer = onTint,
-            secondary = t.textDim, onSecondary = t.surface, secondaryContainer = tint, onSecondaryContainer = onTint,
-            tertiary = t.mint, onTertiary = t.surface, tertiaryContainer = t.mint.copy(alpha = 0.14f).compositeOver(t.surface), onTertiaryContainer = Color(0xFF07533C),
-            error = t.red, onError = t.surface, errorContainer = t.red.copy(alpha = 0.12f).compositeOver(t.surface), onErrorContainer = Color(0xFF7A1010),
-            background = t.bg, onBackground = t.text, surface = t.bg, onSurface = t.text,
-            surfaceVariant = t.surface2, onSurfaceVariant = t.textDim, outline = t.hairlineStrong, outlineVariant = t.hairline,
-            inverseSurface = Color(0xFF2A2B30), inverseOnSurface = t.bg, inversePrimary = DarkTokens.accent, surfaceTint = t.accent,
-            surfaceBright = t.surface, surfaceDim = t.hairline, surfaceContainerLowest = t.surface,
-            surfaceContainerLow = t.surface, surfaceContainer = t.surface, surfaceContainerHigh = t.surface2,
-            surfaceContainerHighest = Color(0xFFE9E9E6),
-        )
-    }
-}
-
-private fun Color.compositeOver(background: Color): Color {
-    val a = alpha
-    return Color(
-        red = red * a + background.red * (1 - a),
-        green = green * a + background.green * (1 - a),
-        blue = blue * a + background.blue * (1 - a),
-        alpha = 1f,
+    val base = if (t.isDark) darkColorScheme() else lightColorScheme()
+    return base.copy(
+        primary = t.accent, onPrimary = t.onAccent, primaryContainer = t.accentContainer, onPrimaryContainer = t.onAccentContainer,
+        secondary = t.textDim, onSecondary = t.bg, secondaryContainer = t.accentContainer, onSecondaryContainer = t.onAccentContainer,
+        tertiary = t.mint, onTertiary = t.bg, tertiaryContainer = t.mint.copy(alpha = 0.16f).compositeOver(t.surface), onTertiaryContainer = t.mintText,
+        error = t.red, onError = t.surface, errorContainer = t.red.copy(alpha = 0.12f).compositeOver(t.surface), onErrorContainer = t.red,
+        background = t.bg, onBackground = t.text, surface = t.bg, onSurface = t.text,
+        surfaceVariant = t.surface2, onSurfaceVariant = t.textDim, outline = t.hairlineStrong, outlineVariant = t.hairline.compositeOver(t.bg),
+        inverseSurface = t.inverse, inverseOnSurface = t.onInverse, inversePrimary = (if (t.isDark) LightTokens else DarkTokens).accent,
+        surfaceTint = Color.Transparent, scrim = Color.Black,
+        surfaceBright = t.surface, surfaceDim = t.bg, surfaceContainerLowest = t.surface,
+        surfaceContainerLow = t.surface, surfaceContainer = t.surface, surfaceContainerHigh = t.surface2,
+        surfaceContainerHighest = t.surface2,
     )
 }
 
