@@ -732,6 +732,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 pending = it.getPlugin(DeskSettingsPlugin::class.java)?.pending.orEmpty(),
                 callsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)),
                 showCaller = org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(this, it.deviceId),
+                typeOnPhoneOn = org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.allowed(this, it.deviceId),
+                accessibilityOn = org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance != null,
                 deskNotificationsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java)),
                 ready = it.hasActiveWebRtcFeatureTransport,
             )
@@ -774,6 +776,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 onDeskNotifications = { on ->
                     device?.let { setPluginEnabled(it, Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java), on) }
                     if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) requestMissing(listOf(Manifest.permission.POST_NOTIFICATIONS))
+                },
+                onTypeOnPhone = { on ->
+                    device?.let { org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.setAllowed(this, it.deviceId, on) }
+                    // The accessibility service is asked for only now, when the person turns this on.
+                    if (on && org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance == null) {
+                        runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                    }
+                    tick++
                 },
                 onQuickCommands = { push(QUICK) },
                 onMore = { push(MORE) },

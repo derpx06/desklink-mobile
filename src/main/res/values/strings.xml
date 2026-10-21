@@ -790,5 +790,5 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="privacy_policy">Privacy policy</string>
     <string name="privacy_policy_summary">What DeskLink accesses and what the relay sees</string>
     <string name="privacy_policy_url" translatable="false">https://github.com/derpx06/desklink-mobile/blob/master/PRIVACY.md</string>
-    <string name="mouse_receiver_service_description">Lets your paired computer control this phone while you share its screen: taps, swipes, typing, and back, home, recents and lock. DeskLink acts only on input you send from your own computer, and does not collect or share data through this service.</string>
+    <string name="mouse_receiver_service_description">Lets your paired computer control this phone while you share its screen: taps, swipes, typing, and back, home, recents and lock; and, only if you turn on "Let your computer type on this phone", typing into the field you are in. DeskLink acts only on input you send from your own computer, and does not collect or share data through this service.</string>
 </resources>

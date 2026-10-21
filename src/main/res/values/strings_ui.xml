@@ -117,6 +117,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="desk_notifications_channel">From %1$s</string>
     <string name="settings_desk_notifications_here">Show %1$s\'s notifications here</string>
     <string name="settings_desk_notifications_here_summary">In their own channel. Swiping one away here closes it on %1$s</string>
+    <string name="settings_type_on_phone">Let %1$s type on this phone</string>
+    <string name="settings_type_on_phone_off">Off. %1$s\'s keyboard could type into the field you\'re in, through DeskLink\'s accessibility service</string>
+    <string name="settings_type_on_phone_on">%1$s\'s keyboard types into the field you\'re in</string>
+    <string name="settings_type_on_phone_service">Turn on DeskLink in Accessibility settings so %1$s can type here</string>
     <string name="clipboard_nothing_sent">The clipboard has no text to send</string>
     <string name="settings_clipboard_auto">Automatic sync (advanced)</string>
     <string name="settings_clipboard_auto_grant">Sends each copy without a tap. Needs a one-time command from a computer with adb — tap to copy it: %1$s</string>

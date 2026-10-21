@@ -19,7 +19,9 @@ object AccessibilityTyping {
     /** Desktop `specialKey` codes (`map_gdk_key_to_special`). */
     private const val BACKSPACE = 1
     private const val LEFT = 4
+    private const val UP = 5
     private const val RIGHT = 6
+    private const val DOWN = 7
     private const val HOME = 10
     private const val END = 11
     private const val ENTER = 12
@@ -109,11 +111,28 @@ object AccessibilityTyping {
                 return apply(node, key = "\n", special = 0, ctrl = false)
             }
             if (!node.isEditable) return false
-            return apply(node, key, special, ctrl)
+            if (special == UP || special == DOWN) {
+                // A line up or down: what the arrow means in a multi-line field.
+                val arguments = Bundle().apply {
+                    putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_MOVEMENT_GRANULARITY_INT, AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE)
+                    putBoolean(AccessibilityNodeInfo.ACTION_ARGUMENT_EXTEND_SELECTION_BOOLEAN, false)
+                }
+                val action = if (special == UP) AccessibilityNodeInfo.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY else AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY
+                return node.performAction(action, arguments)
+            }
+            if (apply(node, key, special, ctrl)) return true
+            // A field that refuses SET_TEXT (some web views, custom editors) still takes a paste.
+            return key != null && special == 0 && !ctrl && paste(service, node, key)
         } finally {
             @Suppress("DEPRECATION")
             node.recycle()
         }
+    }
+
+    /** Through the clipboard, as the desk's own copy so it is never sent back. */
+    private fun paste(service: AccessibilityService, node: AccessibilityNodeInfo, text: String): Boolean {
+        org.desklink.mobile.plugins.clipboard.ClipboardListener.instance(service).setText(text)
+        return node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
     }
 
     private fun apply(node: AccessibilityNodeInfo, key: String?, special: Int, ctrl: Boolean): Boolean {

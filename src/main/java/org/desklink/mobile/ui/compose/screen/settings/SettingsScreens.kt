@@ -144,6 +144,9 @@ data class DeskSettings(
     val showCaller: Boolean = false,
     /** The desk's notifications shown on this phone (phone-owned, off by default). */
     val deskNotificationsOn: Boolean = false,
+    /** "Let <desk> type on this phone" (phone-owned, off by default), and whether the service is on. */
+    val typeOnPhoneOn: Boolean = false,
+    val accessibilityOn: Boolean = false,
 )
 
 class SettingsActions(
@@ -157,6 +160,7 @@ class SettingsActions(
     val onCalls: (Boolean) -> Unit = {},
     val onShowCaller: (Boolean) -> Unit = {},
     val onDeskNotifications: (Boolean) -> Unit = {},
+    val onTypeOnPhone: (Boolean) -> Unit = {},
     val onQuickCommands: () -> Unit,
     val onMore: () -> Unit,
     val onUnpair: () -> Unit,
@@ -341,6 +345,20 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                     subtitle = stringResource(R.string.settings_desk_notifications_here_summary, desk.name),
                     checked = desk.deskNotificationsOn,
                     onClick = { actions.onDeskNotifications(!desk.deskNotificationsOn) },
+                )
+                GroupRow(
+                    stringResource(R.string.settings_type_on_phone, desk.name),
+                    icon = R.drawable.sym_keyboard,
+                    subtitle = stringResource(
+                        when {
+                            !desk.typeOnPhoneOn -> R.string.settings_type_on_phone_off
+                            !desk.accessibilityOn -> R.string.settings_type_on_phone_service
+                            else -> R.string.settings_type_on_phone_on
+                        },
+                        desk.name,
+                    ),
+                    checked = desk.typeOnPhoneOn,
+                    onClick = { actions.onTypeOnPhone(!desk.typeOnPhoneOn) },
                 )
                 GroupRow(
                     stringResource(R.string.settings_phone_media, desk.name),

@@ -377,8 +377,15 @@ public class MouseReceiverService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-
+        // "Type on <phone>": tell the desk whether a field has focus. Settled for a moment first,
+        // since one focus move sends several events.
+        handler.removeCallbacks(reportFocus);
+        handler.postDelayed(reportFocus, 150);
     }
+
+    private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable reportFocus = () ->
+            FocusedFieldTyping.INSTANCE.report(this, FocusedFieldTyping.INSTANCE.focusedFieldIn(this), false);
 
     @Override
     public void onInterrupt() {

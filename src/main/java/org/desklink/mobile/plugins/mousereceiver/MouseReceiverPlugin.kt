@@ -52,6 +52,13 @@ class MouseReceiverPlugin : Plugin() {
             return false
         }
 
+        // "Type on <phone>": the coordinator already checked the switch and that only keys came.
+        if (FocusedFieldTyping.targetsFocusedField(np)) {
+            return AccessibilityTyping.handle(np).also {
+                if (!it) Log.i("MouseReceiverPlugin", "No focused field took the key")
+            }
+        }
+
         if (RemoteKeyboardPlugin.getMousePadPacketType(np) != RemoteKeyboardPlugin.MousePadPacketType.Mouse) {
             return false // This packet will be handled by the remotekeyboard instead, silently ignore
         }
@@ -149,7 +156,16 @@ class MouseReceiverPlugin : Plugin() {
 
     override val supportedPacketTypes: Array<String> = arrayOf(PACKET_TYPE_MOUSEPAD_REQUEST)
 
-    override val outgoingPacketTypes: Array<String> = emptyArray()
+    /** "Type on <phone>": whether a field has focus here (contract C2). */
+    override val outgoingPacketTypes: Array<String> = arrayOf(DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE)
+
+    /** The current state on every handover, as for any state the phone owns. */
+    override fun onFeatureReady() {
+        if (FocusedFieldTyping.allowed(context, device.deviceId)) {
+            val focused = MouseReceiverService.instance?.let(FocusedFieldTyping::focusedFieldIn) ?: false
+            device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE).apply { this["state"] = focused })
+        }
+    }
 
     companion object {
         private const val PACKET_TYPE_MOUSEPAD_REQUEST = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST

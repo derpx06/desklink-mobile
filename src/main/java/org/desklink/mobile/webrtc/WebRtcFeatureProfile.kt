@@ -31,6 +31,8 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_LOCK,
         DeskLinkProtocol.PACKET_TYPE_LOCK_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST,
+        // "Type on <phone>" (C2): whether a field has focus here.
+        DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE,
         DeskLinkProtocol.PACKET_TYPE_MPRIS,
         DeskLinkProtocol.PACKET_TYPE_MPRIS_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_NOTIFICATION,

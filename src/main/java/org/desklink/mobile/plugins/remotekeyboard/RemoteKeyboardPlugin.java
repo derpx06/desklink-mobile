@@ -172,9 +172,8 @@ public class RemoteKeyboardPlugin extends Plugin implements SharedPreferences.On
 
     @Override
     public @NonNull String[] getOutgoingPacketTypes() {
-        // `keyboardstate` is not advertised because it is no longer sent — see
-        // notifyKeyboardState. Advertising a type nothing emits makes the
-        // capability exchange a description of intentions rather than of code.
+        // `keyboardstate` is not sent from here (see notifyKeyboardState): the
+        // MouseReceiverPlugin reports it for "Type on <phone>" (contract C2).
         return new String[]{PACKET_TYPE_MOUSEPAD_ECHO};
     }
 
@@ -366,6 +365,9 @@ public class RemoteKeyboardPlugin extends Plugin implements SharedPreferences.On
 
         if (getMousePadPacketType(np) != MousePadPacketType.Keyboard) {
             return false; // This packet will be handled by the MouseReceiverPlugin instead, silently ignore
+        }
+        if (org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.INSTANCE.targetsFocusedField(np)) {
+            return false; // "Type on <phone>": the MouseReceiverPlugin types it into the focused field
         }
 
         if (RemoteKeyboardService.instance == null) {

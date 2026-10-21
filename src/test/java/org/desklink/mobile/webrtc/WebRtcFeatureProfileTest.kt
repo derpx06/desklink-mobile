@@ -27,6 +27,7 @@ class WebRtcFeatureProfileTest {
                 "desklink.handoff",
                 "desklink.lock",
                 "desklink.lock.request",
+                "desklink.mousepad.keyboardstate",
                 "desklink.mousepad.request",
                 "desklink.mpris",
                 "desklink.mpris.request",
