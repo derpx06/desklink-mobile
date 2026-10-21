@@ -27,7 +27,11 @@ class ClipboardListener {
         fun clipboardChanged(content: String)
     }
 
-    private val observers: HashSet<ClipboardObserver> = HashSet()
+    // Concurrent: registerObserver runs on the packet-dispatch thread while
+    // onClipboardChanged iterates on the main thread, so a plain HashSet threw
+    // ConcurrentModificationException and dropped a clipboard sync.
+    private val observers: MutableSet<ClipboardObserver> =
+        java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     private val context: Context
     var currentContent: String? = null
@@ -101,8 +105,14 @@ class ClipboardListener {
         private var _instance: ClipboardListener? = null
 
         @JvmStatic
+        @Synchronized
         fun instance(context: Context): ClipboardListener {
             // FIXME: The _instance we return won't be completely initialized yet since initialization happens on a new thread (why?)
+            //
+            // Synchronized because the check-then-create was not atomic: two
+            // devices connecting at once each built a ClipboardListener, which
+            // meant two logcat reader subprocesses and every clipboard change
+            // being sent twice, permanently.
             return _instance ?: ClipboardListener(context).also { _instance = it }
         }
     }

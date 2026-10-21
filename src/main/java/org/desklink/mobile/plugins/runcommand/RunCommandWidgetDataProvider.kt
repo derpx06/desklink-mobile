@@ -65,7 +65,7 @@ internal class RunCommandWidgetDataProvider(private val context: Context, val in
         remoteView.setTextViewText(R.id.list_item_entry_summary, listItem.command)
         remoteView.setViewVisibility(R.id.list_item_entry_summary, View.VISIBLE)
 
-        val runCommandIntent = Intent(context, RunCommandWidgetProvider::class.java)
+        val runCommandIntent = Intent(context, RunCommandWidgetActionReceiver::class.java)
         runCommandIntent.action = RUN_COMMAND_ACTION
         runCommandIntent.putExtra(EXTRA_APPWIDGET_ID, widgetId)
         runCommandIntent.putExtra(TARGET_COMMAND, listItem.key)

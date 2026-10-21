@@ -1,0 +1,108 @@
+/*
+ * SPDX-FileCopyrightText: 2026 DeskLink contributors
+ *
+ * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ */
+
+package org.desklink.mobile.plugins.screen
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import org.desklink.mobile.DeskLinkApplication
+import org.desklink.mobile.R
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * The coral "in use" notification while this phone views the desk's screen or has its terminals
+ * open, with End. It is the way back to stopping a session after leaving the app; the phone's own
+ * screen share has its own notification (the MediaProjection one, with Stop).
+ */
+object SessionLiveNotification {
+    /** Shared with the MediaProjection notification: both say a session is live right now. */
+    const val CHANNEL = "desklink-screen-capture"
+    const val CORAL = 0xFFE5533D.toInt()
+    private const val ACTION_END = "org.desklink.mobile.plugins.screen.END_SESSION"
+    private const val EXTRA_DEVICE_ID = "deviceId"
+    private const val BASE_ID = 1710
+
+    private data class Live(val screen: Boolean = false, val terminals: Int = 0)
+
+    private val live = ConcurrentHashMap<String, Live>()
+
+    fun ensureChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(CHANNEL, context.getString(R.string.notification_channel_screen_sharing), NotificationManager.IMPORTANCE_LOW),
+            )
+        }
+    }
+
+    /** What the desk screen ([screen]) or the terminal screen ([terminals]) has open now; null keeps the other's. */
+    fun update(context: Context, deviceId: String?, screen: Boolean? = null, terminals: Int? = null) {
+        deviceId ?: return
+        val now = live.compute(deviceId) { _, old ->
+            (old ?: Live()).let { Live(screen ?: it.screen, terminals ?: it.terminals) }.takeIf { it.screen || it.terminals > 0 }
+        }
+        val manager = NotificationManagerCompat.from(context)
+        val id = BASE_ID + (deviceId.hashCode() and 0xFFF)
+        if (now == null) {
+            manager.cancel(id)
+            return
+        }
+        if (!manager.areNotificationsEnabled()) return
+        ensureChannel(context)
+        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val parts = buildList {
+            if (now.screen) add(context.getString(R.string.session_live_screen))
+            if (now.terminals > 0) add(context.resources.getQuantityString(R.plurals.session_live_terminals, now.terminals, now.terminals))
+        }
+        val end = PendingIntent.getBroadcast(
+            context,
+            id,
+            Intent(context, EndReceiver::class.java).setAction(ACTION_END).putExtra(EXTRA_DEVICE_ID, deviceId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.session_live_title, desk))
+            .setContentText(parts.joinToString(" · "))
+            .setColor(CORAL)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .addAction(R.drawable.sym_stop_circle, context.getString(R.string.active_session_end), end)
+            .build()
+        try {
+            manager.notify(id, notification)
+        } catch (_: SecurityException) {
+            // Notifications not allowed: the in-app row still offers End.
+        }
+    }
+
+    /** End from the notification: the same as Home's End. */
+    class EndReceiver : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != ACTION_END) return
+            val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
+            endAll(context, deviceId)
+        }
+    }
+
+    /** Stops the desk view, detaches the terminals and ends sharing this phone's screen. */
+    fun endAll(context: Context, deviceId: String) {
+        val app = DeskLinkApplication.getInstance()
+        app.stopRemoteSession(deviceId)
+        app.terminalClient(deviceId)?.detachAll()
+        if (PhoneScreenCaptureService.sharingDeviceId == deviceId) {
+            context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
+        }
+        update(context, deviceId, screen = false, terminals = 0)
+    }
+}

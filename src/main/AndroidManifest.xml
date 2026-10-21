@@ -9,6 +9,23 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Termux's emulator/renderer declare minSdk 24 but use no API above 23 (verified by
+         source audit); the app supports 23. The PTY JNI part is excluded, see build.gradle.kts. -->
+    <uses-sdk tools:overrideLibrary="com.termux.terminal,com.termux.view" />
+
+    <!-- SpeechRecognizer.isRecognitionAvailable sees no recognizer on Android 11+ without this:
+         the terminal's dictation key would never show. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <!-- The notification filter lists, and notifications name, launchable apps. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
@@ -35,6 +52,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required for any LAN traffic once targetSdk reaches 37 (Android 17);
+         ignored by older releases. Declared now so the upgrade can't silently
+         cut discovery, the TLS link and WebRTC host candidates. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
@@ -45,37 +66,29 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.SEND_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.READ_LOGS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <!-- Files: the desktop browses phone storage through SftpPlugin, which on Android 11+
+         needs All files access (Play Console declaration: docs/PLAY_DATA_SAFETY.md). -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
 
     <application
-        android:icon="@drawable/desklink_launcher"
-        android:roundIcon="@drawable/desklink_launcher"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:banner="@drawable/desklink_banner"
         android:supportsRtl="true"
@@ -84,25 +97,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/DeskLinkTheme.NoActionBar"
         android:name="org.desklink.mobile.DeskLinkApplication"
-        android:enableOnBackInvokedCallback="true"
-        android:requestLegacyExternalStorage="true"> <!-- requestLegacyExternalStorage is only used in Android 10: https://developer.android.com/training/data-storage/use-cases#opt-out-in-production-app -->
-
-
-        <receiver
-            android:name="com.android.mms.transaction.PushReceiver"
-            android:exported="true"
-            android:permission="android.permission.BROADCAST_WAP_PUSH">
-            <intent-filter>
-                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
-
-                <data android:mimeType="application/vnd.wap.mms-message" />
-            </intent-filter>
-        </receiver>
-
-        <service
-            android:name="com.android.mms.transaction.TransactionService"
-            android:enabled="true"
-            android:exported="true" />
+        android:enableOnBackInvokedCallback="true">
 
         <service
             android:name="org.desklink.mobile.BackgroundService"
@@ -201,6 +196,16 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:label="@string/findmyphone_title"
             android:launchMode="singleInstance" />
 
+        <!-- End on the coral live-session notification. Not exported. -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.screen.SessionLiveNotification$EndReceiver"
+            android:exported="false" />
+
+        <!-- Pairing notification actions. Not exported: no other app may accept or reject a pairing. -->
+        <receiver
+            android:name="org.desklink.mobile.PairingActionReceiver"
+            android:exported="false" />
+
         <receiver android:name="org.desklink.mobile.plugins.findmyphone.FindMyPhoneReceiver"
             android:exported="true">
             <intent-filter>
@@ -261,14 +266,20 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
-            <intent-filter>
-                <action android:name="RUN_COMMAND_ACTION" />
-            </intent-filter>
 
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/remotecommandplugin_widget" />
         </receiver>
+
+        <!--
+            Not exported: it runs commands on the paired desktop, and it is
+            reached only through a PendingIntent this application creates
+            itself. See RunCommandWidgetActionReceiver.
+        -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.runcommand.RunCommandWidgetActionReceiver"
+            android:exported="false" />
 
         <activity android:name="org.desklink.mobile.plugins.runcommand.RunCommandUrlActivity"
             android:exported="true">
@@ -299,12 +310,29 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.mousepad.MousePadActivity"
             android:label="@string/pref_plugin_mousepad"
             android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize|stateHidden"
             android:launchMode="singleTop"
             android:parentActivityName="org.desklink.mobile.ui.MainActivity">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="org.desklink.mobile.ui.MainActivity" />
         </activity>
+        <activity
+            android:name="org.desklink.mobile.plugins.terminal.TerminalActivity"
+            android:label="@string/terminal_title"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden"
+            android:windowSoftInputMode="adjustResize"
+            android:parentActivityName="org.desklink.mobile.ui.MainActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="org.desklink.mobile.ui.MainActivity" />
+        </activity>
+        <receiver
+            android:name="org.desklink.mobile.plugins.terminal.TerminalAttentionReceiver"
+            android:exported="false" />
         <activity
             android:name="org.desklink.mobile.plugins.mousepad.ComposeSendActivity"
             android:label="@string/compose_send_title"

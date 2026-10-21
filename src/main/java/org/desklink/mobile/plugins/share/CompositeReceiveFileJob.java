@@ -192,6 +192,8 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                             throw new RuntimeException("Failed to finalize received file: " + currentFinalFileName);
                         }
                         publishFile(fileDocument, received);
+                        TransferHistory.recordReceived(getDevice().getContext(), getDevice().getDeviceId(),
+                                fileDocument.getName() != null ? fileDocument.getName() : currentFileName, received, fileDocument.getUri(), fileDocument.getType());
                         if (transferId != null) {
                             checkpointStore.remove(transferId);
                         }
@@ -204,6 +206,8 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                         throw new RuntimeException("Failed to finalize received file: " + currentFinalFileName);
                     }
                     publishFile(fileDocument, 0);
+                    TransferHistory.recordReceived(getDevice().getContext(), getDevice().getDeviceId(),
+                            fileDocument.getName() != null ? fileDocument.getName() : currentFileName, 0, fileDocument.getUri(), fileDocument.getType());
                 }
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -338,7 +342,9 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
 
     private long receiveFile(InputStream input, OutputStream output, String transferId, String uri,
                              long resumeOffset, long totalSize, String expectedSha256) throws IOException {
-        byte[] data = new byte[4096];
+        // Large reads: on SAF/FUSE each call is costly, and 4 KiB made the
+        // copy into Downloads take longer than the transfer itself.
+        byte[] data = new byte[256 * 1024];
         int count;
         long received = resumeOffset;
 
@@ -365,7 +371,13 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
 
             long progressPercentage;
             synchronized (lock) {
-                progressPercentage = (totalReceived * 100 / totalPayloadSize);
+                // totalPayloadSize comes off the wire, and a peer can set it to
+                // zero at any point through a share.request.update — which threw
+                // ArithmeticException from inside the read loop and aborted the
+                // whole batch. Progress is cosmetic; never let it end a transfer.
+                progressPercentage = totalPayloadSize > 0
+                        ? (totalReceived * 100 / totalPayloadSize)
+                        : 0;
             }
             long curTimeMillis = System.currentTimeMillis();
 
@@ -383,8 +395,18 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
     }
 
     private void closeAllInputStreams() {
-        for (NetworkPacket np : networkPacketList) {
-            np.getPayload().close();
+        // Payloads are nullable and this class explicitly supports a missing one
+        // ("If the payload is missing, we'll just create an empty file"), so the
+        // unguarded close threw NPE on the first such entry — inside a finally
+        // block, which both masked the original exception and left every
+        // remaining payload open. The list is also mutated from the network
+        // thread by addNetworkPacket, hence the lock.
+        synchronized (lock) {
+            for (NetworkPacket np : networkPacketList) {
+                if (np.getPayload() != null) {
+                    np.getPayload().close();
+                }
+            }
         }
     }
 
@@ -419,6 +441,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
 
     private void setProgress(int progress) {
         synchronized (lock) {
+            TransferProgress.update(getDevice().getDeviceId(), getId(), false, currentFileName, progress, totalPayloadSize);
             receiveNotification.setProgress(progress, getDevice().getContext().getResources()
                     .getQuantityString(R.plurals.incoming_files_text, totalNumFiles, currentFileName, currentFileNum, totalNumFiles));
         }

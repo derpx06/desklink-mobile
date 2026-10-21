@@ -16,7 +16,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <style name="DeskLinkTheme" parent="DeskLinkThemeBase.V27" />
 
     <style name="PreferenceThemeOverlay" parent="BasePreferenceThemeOverlay">
-        <item name="preferenceCategoryTitleTextColor">?android:attr/colorAccent</item>
+        <item name="preferenceCategoryTitleTextColor">?attr/colorPrimary</item>
         <!--Applying m3 style switch-->
         <item name="switchPreferenceStyle">@style/Preference.SwitchPreferenceMaterial</item>
     </style>

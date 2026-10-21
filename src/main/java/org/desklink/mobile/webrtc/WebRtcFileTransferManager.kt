@@ -13,6 +13,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
@@ -25,7 +26,14 @@ sealed interface OutboundWebRtcFileMessage {
     data class Chunk(val value: ByteArray) : OutboundWebRtcFileMessage
 }
 
-/** Bounded, checkpointed Android side of the DeskLink WebRTC file protocol. */
+/**
+ * Bounded, checkpointed Android side of the DeskLink WebRTC file protocol.
+ *
+ * Every file this class touches lives at a path derived from a *validated*
+ * transfer ID (`.desklink-<id>.part` / `.desklink-<id>.send` in the private
+ * transfer root). Neither the peer's filename nor a URI read back from the
+ * checkpoint store ever selects where bytes are read, written or deleted.
+ */
 class WebRtcFileTransferManager(
     context: Context,
     private val device: Device,
@@ -38,6 +46,13 @@ class WebRtcFileTransferManager(
     }
     private val active = ConcurrentHashMap<String, ActiveTransfer>()
 
+    /** [DURABLE_EVERY_BYTES], except in crash-recovery tests. */
+    @androidx.annotation.VisibleForTesting
+    internal var durableEveryBytes = DURABLE_EVERY_BYTES
+
+    /** IDs a `sendPayload` call is still setting up, so two calls cannot share one copy. */
+    private val sending = ConcurrentHashMap.newKeySet<String>()
+
     private sealed interface ActiveTransfer {
         val wire: WebRtcWireBinding
         val checkpoint: TransferCheckpoint
@@ -48,26 +63,78 @@ class WebRtcFileTransferManager(
             val packet: NetworkPacket,
             val callback: Device.SendPacketStatusCallback,
             val completion: CompletableFuture<Boolean> = CompletableFuture(),
+            /** Highest byte sent; `checkpoint.offset` is the highest acknowledged. */
             @Volatile var awaitingOffset: Long? = null,
+            @Volatile var chunkSize: Int = WebRtcFileControl.LEGACY_CHUNK_BYTES,
         ) : ActiveTransfer
 
         data class Receiver(
             override val wire: WebRtcWireBinding,
             override var checkpoint: TransferCheckpoint,
-        ) : ActiveTransfer
+        ) : ActiveTransfer {
+            /**
+             * Running SHA-256 fed in order as chunks land, and how far it got.
+             * Re-reading the whole file to verify it blocked the peer-event
+             * thread for seconds on large files (long enough for the 15 s
+             * liveness check to drop a healthy link). A resumed transfer has
+             * none and falls back to one full hash. Mirrors the desktop.
+             */
+            var hasher: java.security.MessageDigest? = null
+            var hashedOffset = 0L
+        }
     }
 
+    private fun partialFile(transferId: String) = File(transferRoot, ".desklink-$transferId.part")
+
+    private fun sourceFile(transferId: String) = File(transferRoot, ".desklink-$transferId.send")
+
+    // ------------------------------------------------------------------ send
+
+    /**
+     * Blocks until the peer completes, cancels or fails the transfer. Every
+     * failure is reported through [callback] exactly once and returns false.
+     */
     fun sendPayload(
         wire: WebRtcWireBinding,
         packet: NetworkPacket,
         callback: Device.SendPacketStatusCallback,
     ): Boolean {
-        val payload = requireNotNull(packet.payload) { "File packet has no payload" }
-        val transferId = packet.getStringOrNull("transferId") ?: UUID.randomUUID().toString()
-        val filename = packet.getString("filename").also(::validateFilename)
+        val payload = packet.payload ?: run {
+            callback.onFailure(IllegalArgumentException("File packet has no payload"))
+            return false
+        }
+        val (transferId, filename) = try {
+            val id = (packet.getStringOrNull("transferId") ?: UUID.randomUUID().toString())
+                .also(::validateId)
+            id to packet.getString("filename").also(::validateFilename)
+        } catch (error: Throwable) {
+            payload.close()
+            callback.onFailure(error)
+            return false
+        }
+        val reserved = sending.add(transferId)
+        try {
+            if (!reserved || active.containsKey(transferId) || sourceFile(transferId).exists()) {
+                payload.close()
+                callback.onFailure(IllegalArgumentException("Transfer ID is already active"))
+                return false
+            }
+            return runSend(wire, packet, callback, payload, transferId, filename)
+        } finally {
+            if (reserved) sending.remove(transferId)
+        }
+    }
+
+    private fun runSend(
+        wire: WebRtcWireBinding,
+        packet: NetworkPacket,
+        callback: Device.SendPacketStatusCallback,
+        payload: NetworkPacket.Payload,
+        transferId: String,
+        filename: String,
+    ): Boolean {
         val token = UUID.randomUUID().toString()
-        val source = File(transferRoot, ".desklink-$transferId.send")
-        require(!source.exists()) { "Transfer ID is already active" }
+        val source = sourceFile(transferId)
         val digest = MessageDigest.getInstance("SHA-256")
         var size = 0L
         try {
@@ -110,32 +177,40 @@ class WebRtcFileTransferManager(
             connectionGeneration = wire.generation,
             direction = "send",
         )
-        check(checkpointStore.save(checkpoint)) { "Could not persist transfer checkpoint" }
         val sender = ActiveTransfer.Sender(wire, checkpoint, packet, callback)
-        check(active.putIfAbsent(transferId, sender) == null) { "Transfer ID is already active" }
-        send(
-            OutboundWebRtcFileMessage.Control(
-                control(
-                    wire,
-                    WebRtcFileAction.OFFER,
-                    checkpoint,
-                    filename = filename,
-                    totalSize = size,
-                    sha256 = checksum,
+        try {
+            check(active.putIfAbsent(transferId, sender) == null) { "Transfer ID is already active" }
+            check(checkpointStore.save(checkpoint)) { "Could not persist transfer checkpoint" }
+            send(
+                OutboundWebRtcFileMessage.Control(
+                    control(
+                        wire,
+                        WebRtcFileAction.OFFER,
+                        checkpoint,
+                        filename = filename,
+                        totalSize = size,
+                        sha256 = checksum,
+                    ),
                 ),
-            ),
-        )
+            )
+        } catch (error: Throwable) {
+            // The offer never left, so there is nothing to resume: leave no copy behind.
+            active.remove(transferId, sender)
+            discardSend(transferId)
+            callback.onFailure(error)
+            return false
+        }
         val deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(30)
         var result = false
         try {
             while (true) {
                 if (packet.isCanceled) {
-                    cancel(sender, "File transfer was cancelled")
+                    endSender(sender, WebRtcFileAction.CANCEL, "File transfer was cancelled")
                     break
                 }
                 val remaining = deadline - System.nanoTime()
                 if (remaining <= 0) {
-                    fail(sender, "File transfer timed out")
+                    endSender(sender, WebRtcFileAction.ERROR, "File transfer timed out")
                     break
                 }
                 try {
@@ -154,16 +229,18 @@ class WebRtcFileTransferManager(
         return result
     }
 
+    // --------------------------------------------------------------- inbound
+
     @Synchronized
     fun handleControl(wire: WebRtcWireBinding, message: WebRtcFileControl) {
         message.validate(wire)
         when (message.action) {
-            WebRtcFileAction.OFFER -> receiveOffer(wire, message)
+            WebRtcFileAction.OFFER -> answeringRefusalOf(wire, message) { receiveOffer(wire, message) }
             WebRtcFileAction.ACCEPT -> acceptSender(wire, message)
             WebRtcFileAction.ACKNOWLEDGE -> acknowledgeSender(wire, message)
             WebRtcFileAction.COMPLETE -> completeSender(wire, message)
-            WebRtcFileAction.CANCEL -> finishRemote(message, cancelled = true)
-            WebRtcFileAction.ERROR -> finishRemote(message, cancelled = false)
+            WebRtcFileAction.CANCEL -> finishRemote(wire, message, cancelled = true)
+            WebRtcFileAction.ERROR -> finishRemote(wire, message, cancelled = false)
         }
     }
 
@@ -176,6 +253,18 @@ class WebRtcFileTransferManager(
         require(receiver.checkpoint.transferToken == chunk.transferToken) {
             "WebRTC file chunk has the wrong transfer token"
         }
+        // From here the peer has proved it holds this transfer, so a failure is
+        // ours to report: the sender is waiting for an acknowledgement that a
+        // full disk or a bad chunk means it will never get.
+        try {
+            writeChunk(wire, receiver, chunk)
+        } catch (error: Throwable) {
+            failReceive(receiver, error.message ?: "Could not store the received data")
+            throw error
+        }
+    }
+
+    private fun writeChunk(wire: WebRtcWireBinding, receiver: ActiveTransfer.Receiver, chunk: WebRtcFileChunk) {
         require(receiver.checkpoint.offset == chunk.offset) {
             "WebRTC file chunk has the wrong offset"
         }
@@ -183,275 +272,498 @@ class WebRtcFileTransferManager(
         require(nextOffset <= receiver.checkpoint.totalSize) {
             "WebRTC file chunk exceeds the announced size"
         }
-        val partial = File(java.net.URI(receiver.checkpoint.uri))
-        require(!java.nio.file.Files.isSymbolicLink(partial.toPath())) {
-            "Refusing a symlink transfer path"
-        }
+        val partial = partialFile(chunk.transferId)
+        require(!Files.isSymbolicLink(partial.toPath())) { "Refusing a symlink transfer path" }
         require(partial.length() == receiver.checkpoint.offset) {
             "Partial file size does not match its checkpoint"
         }
-        RandomAccessFile(partial, "rw").use { file ->
-            file.seek(chunk.offset)
-            file.write(chunk.data)
-            file.fd.sync()
+        val updated = receiver.checkpoint.copy(offset = nextOffset, state = "transferring")
+        // Durability is batched like the desktop's: sync and commit the
+        // checkpoint every DURABLE_EVERY_BYTES (and at the end), not per chunk.
+        // A crash costs at most that much, which resume re-sends.
+        val durable = crossesDurabilityBoundary(chunk.offset, nextOffset, updated.totalSize)
+        try {
+            RandomAccessFile(partial, "rw").use { file ->
+                file.seek(chunk.offset)
+                file.write(chunk.data)
+                if (durable) file.fd.sync()
+            }
+            if (chunk.offset == 0L) {
+                receiver.hasher = java.security.MessageDigest.getInstance("SHA-256")
+                receiver.hashedOffset = 0L
+            }
+            if (receiver.hashedOffset == chunk.offset) {
+                receiver.hasher?.update(chunk.data)
+                receiver.hashedOffset = nextOffset
+            } else {
+                receiver.hasher = null
+            }
+            if (durable) check(checkpointStore.save(updated)) { "Could not persist incoming transfer checkpoint" }
+        } catch (error: Throwable) {
+            // Keep the partial file equal to the checkpoint, or the peer's retry of
+            // this very chunk could never be accepted again.
+            runCatching {
+                RandomAccessFile(partial, "rw").use { it.setLength(receiver.checkpoint.offset) }
+            }
+            throw error
         }
-        receiver.checkpoint = receiver.checkpoint.copy(
-            offset = nextOffset,
-            state = "transferring",
-        )
-        check(checkpointStore.save(receiver.checkpoint)) {
-            "Could not persist incoming transfer checkpoint"
-        }
+        receiver.checkpoint = updated
         send(
             OutboundWebRtcFileMessage.Control(
-                control(
-                    wire,
-                    WebRtcFileAction.ACKNOWLEDGE,
-                    receiver.checkpoint,
-                    offset = nextOffset,
-                ),
+                control(wire, WebRtcFileAction.ACKNOWLEDGE, updated, offset = nextOffset),
             ),
         )
-        if (nextOffset == receiver.checkpoint.totalSize) finalizeReceiver(receiver, partial)
+        if (nextOffset == updated.totalSize) finalizeReceiver(receiver)
     }
 
+    /** Ends an incoming transfer that cannot go on, and tells the sender why. */
+    private fun failReceive(receiver: ActiveTransfer.Receiver, reason: String) {
+        val id = receiver.checkpoint.transferId
+        if (!active.remove(id, receiver)) return
+        discardReceive(id)
+        runCatching {
+            send(
+                OutboundWebRtcFileMessage.Control(
+                    control(receiver.wire, WebRtcFileAction.ERROR, receiver.checkpoint, error = reason.take(256)),
+                ),
+            )
+        }
+    }
+
+    /**
+     * A refused offer for a transfer with no state here is answered, or the
+     * sender waits for an accept that will never come. An offer that disagrees
+     * with a checkpoint already stored is a stale or forged message and is not.
+     */
+    private fun answeringRefusalOf(wire: WebRtcWireBinding, message: WebRtcFileControl, block: () -> Unit) {
+        val known = runCatching { checkpointStore.load(message.transferId) != null }.getOrDefault(true)
+        try {
+            block()
+        } catch (error: Throwable) {
+            if (!known) {
+                runCatching {
+                    send(
+                        OutboundWebRtcFileMessage.Control(
+                            controlFor(
+                                wire,
+                                WebRtcFileAction.ERROR,
+                                message.transferId,
+                                message.transferToken,
+                                error = (error.message ?: "The file could not be received").take(256),
+                            ),
+                        ),
+                    )
+                }
+            }
+            throw error
+        }
+    }
+
+    /**
+     * Runs a step of an outgoing transfer the peer has proved it holds. If it
+     * fails the send ends and the receiver is told, instead of both sides waiting.
+     */
+    private fun failingSendWith(sender: ActiveTransfer.Sender, block: () -> Unit) {
+        try {
+            block()
+        } catch (error: Throwable) {
+            endSender(sender, WebRtcFileAction.ERROR, error.message ?: "The transfer failed")
+            throw error
+        }
+    }
+
+    /** The session ended. Checkpoints are kept (paused) so the peer's next offer resumes them. */
     @Synchronized
     fun close(reason: String) {
-        active.values.forEach { transfer ->
+        val transfers = active.values.toList()
+        active.clear()
+        transfers.forEach { transfer ->
             checkpointStore.save(transfer.checkpoint.copy(state = "paused"))
             if (transfer is ActiveTransfer.Sender) {
                 transfer.callback.onFailure(IllegalStateException(reason))
                 transfer.completion.complete(false)
             }
         }
-        active.clear()
     }
 
     @Synchronized
     fun resumeSends(wire: WebRtcWireBinding) {
         checkpointStore.list()
-            .filter {
-                it.direction == "send" &&
-                    it.deviceId == wire.peerDeviceId &&
-                    it.state !in setOf("completed", "cancelled")
-            }
+            .filter { it.direction == "send" && it.deviceId == wire.peerDeviceId }
             .forEach { stored ->
-                if (active.containsKey(stored.transferId)) return@forEach
-                val source = runCatching { File(java.net.URI(stored.uri)) }.getOrNull()
-                if (source == null || !source.isFile || source.length() != stored.totalSize ||
-                    !sha256(source).equals(stored.sha256, ignoreCase = true)
+                val id = stored.transferId
+                if (active.containsKey(id) || runCatching { validateId(id) }.isFailure) return@forEach
+                // Only a session that ended under the transfer is resumable. Anything a
+                // peer or the user ended (or that failed) is finished: reclaim its copy.
+                val source = sourceFile(id)
+                val filename = stored.filename
+                val checksum = stored.sha256
+                if (stored.state !in RESUMABLE_STATES || filename == null || checksum == null ||
+                    stored.transferToken == null || !source.isFile ||
+                    source.length() != stored.totalSize ||
+                    !sha256(source).equals(checksum, ignoreCase = true)
                 ) {
-                    checkpointStore.save(stored.copy(state = "failed"))
+                    discardSend(id)
                     return@forEach
                 }
                 val checkpoint = stored.copy(
+                    uri = source.toURI().toString(),
                     offset = 0,
                     state = "pending",
                     sessionId = wire.sessionId,
                     connectionGeneration = wire.generation,
                 )
                 checkpointStore.save(checkpoint)
-                val placeholder = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST)
                 val callback = object : Device.SendPacketStatusCallback() {
                     override fun onSuccess() = Unit
                     override fun onFailure(e: Throwable) = Unit
                 }
-                active[checkpoint.transferId] = ActiveTransfer.Sender(
+                val sender = ActiveTransfer.Sender(
                     wire,
                     checkpoint,
-                    placeholder,
+                    NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST),
                     callback,
                 )
-                send(
-                    OutboundWebRtcFileMessage.Control(
-                        control(
-                            wire,
-                            WebRtcFileAction.OFFER,
-                            checkpoint,
-                            filename = requireNotNull(checkpoint.filename),
-                            totalSize = checkpoint.totalSize,
-                            sha256 = requireNotNull(checkpoint.sha256),
+                active[id] = sender
+                try {
+                    send(
+                        OutboundWebRtcFileMessage.Control(
+                            control(
+                                wire,
+                                WebRtcFileAction.OFFER,
+                                checkpoint,
+                                filename = filename,
+                                totalSize = checkpoint.totalSize,
+                                sha256 = checksum,
+                            ),
                         ),
-                    ),
-                )
+                    )
+                } catch (error: Throwable) {
+                    active.remove(id, sender) // stays "pending": the next handover retries
+                    throw error
+                }
             }
     }
 
+    // --------------------------------------------------------------- receive
+
     private fun receiveOffer(wire: WebRtcWireBinding, message: WebRtcFileControl) {
-        val filename = requireNotNull(message.filename).also(::validateFilename)
+        val id = message.transferId
+        val filename = requireNotNull(message.filename)
         val totalSize = requireNotNull(message.totalSize)
         val checksum = requireNotNull(message.sha256)
-        val previous = checkpointStore.load(message.transferId)
-        val checkpoint = if (previous != null) {
+        val stored = checkpointStore.load(id)
+        require(stored?.direction != "send") { "Incoming file offer collides with an outgoing transfer" }
+        if (active[id] !is ActiveTransfer.Receiver &&
+            active.values.count { it is ActiveTransfer.Receiver } >= MAX_INCOMING_TRANSFERS
+        ) {
+            val reason = "Too many simultaneous incoming transfers"
+            // Tell the peer, or it waits for an accept that will never come.
+            runCatching {
+                send(
+                    OutboundWebRtcFileMessage.Control(
+                        controlFor(wire, WebRtcFileAction.ERROR, id, message.transferToken, error = reason),
+                    ),
+                )
+            }
+            throw IllegalArgumentException(reason)
+        }
+        // Within this process the live checkpoint runs ahead of the batched
+        // stored one, and the partial file really holds those bytes.
+        val live = (active[id] as? ActiveTransfer.Receiver)?.checkpoint
+            ?.takeIf { it.transferToken == message.transferToken }
+        val previous = live ?: stored?.takeIf { it.isUsableReceive() }
+        if (previous != null) {
             require(
                 previous.deviceId == wire.peerDeviceId &&
                     previous.filename == filename &&
                     previous.totalSize == totalSize &&
                     previous.sha256.equals(checksum, ignoreCase = true) &&
-                    previous.transferToken == message.transferToken &&
-                    previous.direction == "receive"
+                    previous.transferToken == message.transferToken,
             ) { "Incoming file offer does not match its checkpoint" }
-            val partial = File(java.net.URI(previous.uri))
-            require(partial.isFile && partial.length() == previous.offset) {
-                "Incoming partial file does not match its checkpoint"
-            }
-            previous.copy(
-                state = "transferring",
-                sessionId = wire.sessionId,
-                connectionGeneration = wire.generation,
-            )
+        }
+        val partial = partialFile(id)
+        val offset = if (previous != null) {
+            verifiedOffset(partial, previous.offset)
         } else {
-            val partial = File(transferRoot, ".desklink-${message.transferId}.part")
+            // No checkpoint, or one too damaged to trust: start over. A partial file
+            // with no checkpoint entry at all is never overwritten.
+            if (checkpointStore.exists(id)) discardReceive(id)
             require(partial.createNewFile()) { "Could not create incoming partial file" }
             FileOutputStream(partial).use { it.fd.sync() }
-            TransferCheckpoint(
-                transferId = message.transferId,
-                uri = partial.toURI().toString(),
-                offset = 0,
-                totalSize = totalSize,
-                state = "transferring",
-                filename = filename,
-                deviceId = wire.peerDeviceId,
-                sha256 = checksum,
-                transferToken = message.transferToken,
-                sessionId = wire.sessionId,
-                connectionGeneration = wire.generation,
-                direction = "receive",
-            )
+            0L
         }
-        check(checkpointStore.save(checkpoint)) { "Could not persist incoming transfer" }
+        val checkpoint = TransferCheckpoint(
+            transferId = id,
+            uri = partial.toURI().toString(),
+            offset = offset,
+            totalSize = totalSize,
+            state = "transferring",
+            filename = filename,
+            deviceId = wire.peerDeviceId,
+            sha256 = checksum,
+            transferToken = message.transferToken,
+            sessionId = wire.sessionId,
+            connectionGeneration = wire.generation,
+            direction = "receive",
+        )
+        try {
+            check(checkpointStore.save(checkpoint)) { "Could not persist incoming transfer" }
+        } catch (error: Throwable) {
+            if (previous == null) partial.delete()
+            throw error
+        }
         val receiver = ActiveTransfer.Receiver(wire, checkpoint)
-        active[message.transferId] = receiver
-        if (totalSize == 0L) {
-            finalizeReceiver(receiver, File(java.net.URI(checkpoint.uri)))
+        active[id] = receiver
+        if (offset == totalSize) {
+            // Empty file, or everything arrived before an earlier finalisation was
+            // interrupted: there are no chunks left to wait for.
+            finalizeReceiver(receiver)
         } else {
             send(
                 OutboundWebRtcFileMessage.Control(
-                    control(
-                        wire,
-                        WebRtcFileAction.ACCEPT,
-                        checkpoint,
-                        offset = checkpoint.offset,
+                    control(wire, WebRtcFileAction.ACCEPT, checkpoint, offset = offset).copy(
+                        // Only a sender that offered the upgrade is told more.
+                        maxChunkSize = message.maxChunkSize?.coerceAtMost(WebRtcFileControl.MAX_CHUNK_BYTES),
                     ),
                 ),
             )
         }
     }
 
-    private fun acceptSender(wire: WebRtcWireBinding, message: WebRtcFileControl) {
-        val sender = senderFor(wire, message)
-        require(message.offset in 0..sender.checkpoint.totalSize) { "Invalid resume offset" }
-        sender.checkpoint = sender.checkpoint.copy(offset = message.offset, state = "transferring")
-        check(checkpointStore.save(sender.checkpoint)) { "Could not save sender checkpoint" }
-        sendNext(sender)
+    /**
+     * The checkpoint is authoritative for what the peer has been acknowledged:
+     * bytes written after it (a crash between the chunk's fsync and its checkpoint
+     * commit) are dropped, and a partial file that lost acknowledged bytes restarts
+     * from zero.
+     */
+    private fun verifiedOffset(partial: File, checkpointOffset: Long): Long {
+        require(!Files.isSymbolicLink(partial.toPath())) { "Refusing a symlink transfer path" }
+        if (!partial.exists()) {
+            require(partial.createNewFile()) { "Could not create incoming partial file" }
+            return 0
+        }
+        require(partial.isFile) { "Incoming partial file is not a regular file" }
+        val length = partial.length()
+        val keep = if (length >= checkpointOffset) checkpointOffset else 0L
+        if (length != keep) {
+            RandomAccessFile(partial, "rw").use {
+                it.setLength(keep)
+                it.fd.sync()
+            }
+        }
+        return keep
     }
 
-    private fun acknowledgeSender(wire: WebRtcWireBinding, message: WebRtcFileControl) {
-        val sender = senderFor(wire, message)
-        require(sender.awaitingOffset == message.offset) {
-            "Receiver acknowledgement does not match the sent chunk"
-        }
-        sender.awaitingOffset = null
-        sender.checkpoint = sender.checkpoint.copy(offset = message.offset, state = "transferring")
-        check(checkpointStore.save(sender.checkpoint)) { "Could not save sender checkpoint" }
-        sender.callback.onPayloadProgressChanged(
-            if (sender.checkpoint.totalSize == 0L) 100
-            else ((message.offset * 100) / sender.checkpoint.totalSize).toInt(),
-        )
-        sendNext(sender)
-    }
+    private fun TransferCheckpoint.isUsableReceive() =
+        direction == "receive" && deviceId != null && filename != null && sha256 != null &&
+            transferToken != null && totalSize in 0..WebRtcFileControl.MAX_TRANSFER_BYTES &&
+            offset in 0..totalSize
 
-    private fun sendNext(sender: ActiveTransfer.Sender) {
-        val checkpoint = sender.checkpoint
-        if (checkpoint.offset == checkpoint.totalSize) return
-        val source = File(java.net.URI(checkpoint.uri))
-        require(source.isFile && source.length() == checkpoint.totalSize) {
-            "Shared file changed during transfer"
-        }
-        val count = minOf(
-            WebRtcFileControl.MAX_CHUNK_BYTES.toLong(),
-            checkpoint.totalSize - checkpoint.offset,
-        ).toInt()
-        val data = ByteArray(count)
-        RandomAccessFile(source, "r").use { file ->
-            file.seek(checkpoint.offset)
-            file.readFully(data)
-        }
-        sender.awaitingOffset = checkpoint.offset + count
-        send(
-            OutboundWebRtcFileMessage.Chunk(
-                WebRtcFileChunk(
-                    checkpoint.transferId,
-                    requireNotNull(checkpoint.transferToken),
-                    checkpoint.offset,
-                    data,
-                ).encode(),
-            ),
-        )
-    }
-
-    private fun completeSender(wire: WebRtcWireBinding, message: WebRtcFileControl) {
-        val sender = senderFor(wire, message)
-        require(message.offset == sender.checkpoint.totalSize) { "Completion has wrong size" }
-        require(message.sha256.equals(sender.checkpoint.sha256, ignoreCase = true)) {
-            "Completion has wrong checksum"
-        }
-        sender.checkpoint = sender.checkpoint.copy(
-            offset = sender.checkpoint.totalSize,
-            state = "completed",
-        )
-        checkpointStore.remove(message.transferId)
-        File(java.net.URI(sender.checkpoint.uri)).delete()
-        sender.callback.onPayloadProgressChanged(100)
-        sender.callback.onSuccess()
-        sender.completion.complete(true)
-    }
-
-    private fun finishRemote(message: WebRtcFileControl, cancelled: Boolean) {
-        val transfer = active.remove(message.transferId) ?: return
-        checkpointStore.save(
-            transfer.checkpoint.copy(state = if (cancelled) "cancelled" else "failed"),
-        )
-        if (transfer is ActiveTransfer.Sender) {
-            val error = IllegalStateException(
-                message.error ?: if (cancelled) "Peer cancelled file transfer" else "Peer rejected file transfer",
-            )
-            transfer.callback.onFailure(error)
-            transfer.completion.complete(false)
-        }
-    }
-
-    private fun finalizeReceiver(receiver: ActiveTransfer.Receiver, partial: File) {
-        require(partial.length() == receiver.checkpoint.totalSize) { "Received file has wrong size" }
-        require(sha256(partial).equals(receiver.checkpoint.sha256, ignoreCase = true)) {
-            "Received file checksum does not match the sender"
+    private fun finalizeReceiver(receiver: ActiveTransfer.Receiver) {
+        val checkpoint = receiver.checkpoint
+        val partial = partialFile(checkpoint.transferId)
+        val problem = runCatching {
+            when {
+                partial.length() != checkpoint.totalSize -> "Received file has wrong size"
+                !(
+                    receiver.hasher
+                        ?.takeIf { receiver.hashedOffset == checkpoint.totalSize }
+                        ?.digest()?.toHex()
+                        ?: sha256(partial)
+                    ).equals(checkpoint.sha256, ignoreCase = true) ->
+                    "Received file checksum does not match the sender"
+                else -> null
+            }
+        }.getOrDefault("Could not verify the received file")
+        if (problem != null) {
+            // Never publish it, and never leave it to wedge the transfer ID.
+            active.remove(checkpoint.transferId, receiver)
+            discardReceive(checkpoint.transferId)
+            runCatching {
+                send(
+                    OutboundWebRtcFileMessage.Control(
+                        control(receiver.wire, WebRtcFileAction.ERROR, checkpoint, error = problem),
+                    ),
+                )
+            }
+            throw IllegalArgumentException(problem)
         }
         val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
-            this["filename"] = requireNotNull(receiver.checkpoint.filename)
-            this["sha256"] = requireNotNull(receiver.checkpoint.sha256)
+            this["filename"] = requireNotNull(checkpoint.filename)
+            this["sha256"] = requireNotNull(checkpoint.sha256)
             payload = NetworkPacket.Payload(
                 FileInputStream(partial),
-                receiver.checkpoint.totalSize,
+                checkpoint.totalSize,
             ) { partial.delete() }
         }
-        receiver.checkpoint = receiver.checkpoint.copy(
-            offset = receiver.checkpoint.totalSize,
-            state = "completed",
-        )
-        checkpointStore.remove(receiver.checkpoint.transferId)
-        active.remove(receiver.checkpoint.transferId, receiver)
-        device.onWebRtcPacketReceived(packet)
+        receiver.checkpoint = checkpoint.copy(offset = checkpoint.totalSize, state = "completed")
+        checkpointStore.remove(checkpoint.transferId)
+        active.remove(checkpoint.transferId, receiver)
+        try {
+            device.onWebRtcPacketReceived(packet)
+        } catch (error: Throwable) {
+            packet.payload?.close() // deletes the partial file
+            runCatching {
+                send(
+                    OutboundWebRtcFileMessage.Control(
+                        control(
+                            receiver.wire,
+                            WebRtcFileAction.ERROR,
+                            checkpoint,
+                            error = "Could not deliver the received file",
+                        ),
+                    ),
+                )
+            }
+            throw error
+        }
         send(
             OutboundWebRtcFileMessage.Control(
                 control(
                     receiver.wire,
                     WebRtcFileAction.COMPLETE,
                     receiver.checkpoint,
-                    sha256 = receiver.checkpoint.sha256,
-                    offset = receiver.checkpoint.totalSize,
+                    sha256 = checkpoint.sha256,
+                    offset = checkpoint.totalSize,
                 ),
             ),
         )
+    }
+
+    private fun discardReceive(transferId: String) {
+        partialFile(transferId).delete()
+        checkpointStore.remove(transferId)
+    }
+
+    // ---------------------------------------------------- sender state machine
+
+    private fun acceptSender(wire: WebRtcWireBinding, message: WebRtcFileControl) {
+        val sender = senderFor(wire, message)
+        failingSendWith(sender) {
+            require(message.offset in 0..sender.checkpoint.totalSize) { "Invalid resume offset" }
+            sender.checkpoint = sender.checkpoint.copy(offset = message.offset, state = "transferring")
+            sender.awaitingOffset = null
+            sender.chunkSize = message.maxChunkSize
+                ?.coerceIn(WebRtcFileControl.LEGACY_CHUNK_BYTES, WebRtcFileControl.MAX_CHUNK_BYTES)
+                ?: WebRtcFileControl.LEGACY_CHUNK_BYTES
+            check(checkpointStore.save(sender.checkpoint)) { "Could not save sender checkpoint" }
+            fillSendWindow(sender)
+        }
+    }
+
+    private fun acknowledgeSender(wire: WebRtcWireBinding, message: WebRtcFileControl) {
+        val sender = senderFor(wire, message)
+        failingSendWith(sender) {
+            // Cumulative: anything between what was acknowledged and what was
+            // sent. An ack already covered by a later one is ignored, not fatal.
+            val sent = sender.awaitingOffset ?: sender.checkpoint.offset
+            require(message.offset <= sent) { "Receiver acknowledgement does not match the sent chunk" }
+            if (message.offset <= sender.checkpoint.offset) return@failingSendWith
+            val previous = sender.checkpoint.offset
+            sender.checkpoint = sender.checkpoint.copy(offset = message.offset, state = "transferring")
+            // On resume the receiver's own offset decides; this only needs to
+            // be roughly current.
+            if (crossesDurabilityBoundary(previous, message.offset, sender.checkpoint.totalSize)) {
+                check(checkpointStore.save(sender.checkpoint)) { "Could not save sender checkpoint" }
+            }
+            sender.callback.onPayloadProgressChanged(
+                if (sender.checkpoint.totalSize == 0L) 100
+                else ((message.offset * 100) / sender.checkpoint.totalSize).toInt(),
+            )
+            fillSendWindow(sender)
+        }
+    }
+
+    /**
+     * Keeps up to SEND_WINDOW_BYTES unacknowledged. Stop-and-wait (one chunk
+     * per round trip plus the receiver's syncs) capped transfers near 1 MB/s.
+     * Older receivers handle this unchanged: they take the ordered channel one
+     * chunk at a time and acknowledge each.
+     */
+    private fun fillSendWindow(sender: ActiveTransfer.Sender) {
+        val checkpoint = sender.checkpoint
+        val source = sourceFile(checkpoint.transferId)
+        try {
+            require(source.isFile && source.length() == checkpoint.totalSize) {
+                "Shared file changed during transfer"
+            }
+            RandomAccessFile(source, "r").use { file ->
+                while (true) {
+                    val sent = sender.awaitingOffset ?: checkpoint.offset
+                    if (sent >= checkpoint.totalSize || sent - checkpoint.offset >= SEND_WINDOW_BYTES) break
+                    val count = minOf(sender.chunkSize.toLong(), checkpoint.totalSize - sent).toInt()
+                    val data = ByteArray(count)
+                    file.seek(sent)
+                    file.readFully(data)
+                    send(
+                        OutboundWebRtcFileMessage.Chunk(
+                            WebRtcFileChunk(
+                                checkpoint.transferId,
+                                requireNotNull(checkpoint.transferToken),
+                                sent,
+                                data,
+                            ).encode(),
+                        ),
+                    )
+                    sender.awaitingOffset = sent + count
+                }
+            }
+        } catch (error: Throwable) {
+            // Fail now and tell the peer; waiting out the 30-minute deadline helps no one.
+            endSender(
+                sender,
+                WebRtcFileAction.ERROR,
+                error.message ?: "Shared file changed during transfer",
+            )
+        }
+    }
+
+    private fun completeSender(wire: WebRtcWireBinding, message: WebRtcFileControl) {
+        val sender = senderFor(wire, message)
+        failingSendWith(sender) {
+            require(message.offset == sender.checkpoint.totalSize) { "Completion has wrong size" }
+            require(message.sha256.equals(sender.checkpoint.sha256, ignoreCase = true)) {
+                "Completion has wrong checksum"
+            }
+        }
+        if (active.remove(message.transferId, sender)) {
+            discardSend(message.transferId)
+            sender.callback.onPayloadProgressChanged(100)
+            sender.callback.onSuccess()
+            sender.completion.complete(true)
+        }
+    }
+
+    /** The peer ended the transfer (Cancel or Error); nothing is resumed afterwards. */
+    private fun finishRemote(wire: WebRtcWireBinding, message: WebRtcFileControl, cancelled: Boolean) {
+        val id = message.transferId
+        val transfer = active[id]
+        if (transfer == null) {
+            // Not live here, but a checkpoint from an earlier session may still
+            // be waiting to resume; the peer's word ends it too.
+            val stored = checkpointStore.load(id) ?: return
+            if (stored.deviceId != wire.peerDeviceId) return
+            require(stored.transferToken == message.transferToken) { "WebRTC transfer message has the wrong token" }
+            if (stored.direction == "send") discardSend(id) else discardReceive(id)
+            return
+        }
+        require(transfer.wire == wire) { "WebRTC transfer message has a stale binding" }
+        require(transfer.checkpoint.transferToken == message.transferToken) {
+            "WebRTC transfer message has the wrong token"
+        }
+        if (!active.remove(id, transfer)) return
+        if (transfer is ActiveTransfer.Sender) {
+            discardSend(id)
+            transfer.callback.onFailure(
+                IllegalStateException(
+                    message.error ?: if (cancelled) "Peer cancelled file transfer" else "Peer rejected file transfer",
+                ),
+            )
+            transfer.completion.complete(false)
+        } else {
+            discardReceive(id)
+        }
     }
 
     private fun senderFor(
@@ -467,26 +779,25 @@ class WebRtcFileTransferManager(
         return sender
     }
 
-    private fun cancel(sender: ActiveTransfer.Sender, reason: String) {
-        send(
-            OutboundWebRtcFileMessage.Control(
-                control(
-                    sender.wire,
-                    WebRtcFileAction.CANCEL,
-                    sender.checkpoint,
-                    offset = sender.checkpoint.offset,
+    /** Ends a send this side can no longer continue, and tells the peer why. */
+    private fun endSender(sender: ActiveTransfer.Sender, action: WebRtcFileAction, reason: String) {
+        val id = sender.checkpoint.transferId
+        if (!active.remove(id, sender)) return
+        runCatching {
+            send(
+                OutboundWebRtcFileMessage.Control(
+                    control(sender.wire, action, sender.checkpoint, error = reason.take(4096)),
                 ),
-            ),
-        )
-        checkpointStore.save(sender.checkpoint.copy(state = "cancelled"))
+            )
+        }
+        discardSend(id)
         sender.callback.onFailure(IllegalStateException(reason))
         sender.completion.complete(false)
     }
 
-    private fun fail(sender: ActiveTransfer.Sender, reason: String) {
-        checkpointStore.save(sender.checkpoint.copy(state = "failed"))
-        sender.callback.onFailure(IllegalStateException(reason))
-        sender.completion.complete(false)
+    private fun discardSend(transferId: String) {
+        sourceFile(transferId).delete()
+        checkpointStore.remove(transferId)
     }
 
     private fun control(
@@ -498,28 +809,47 @@ class WebRtcFileTransferManager(
         sha256: String? = null,
         offset: Long = checkpoint.offset,
         error: String? = null,
+    ) = controlFor(
+        wire,
+        action,
+        checkpoint.transferId,
+        requireNotNull(checkpoint.transferToken),
+        offset,
+        filename,
+        totalSize,
+        sha256,
+        error,
+    )
+
+    private fun controlFor(
+        wire: WebRtcWireBinding,
+        action: WebRtcFileAction,
+        transferId: String,
+        token: String,
+        offset: Long = 0,
+        filename: String? = null,
+        totalSize: Long? = null,
+        sha256: String? = null,
+        error: String? = null,
     ) = WebRtcFileControl(
         protocolVersion = WebRtcFileControl.VERSION,
         action = action,
-        transferId = checkpoint.transferId,
+        transferId = transferId,
         deviceId = wire.senderDeviceId,
         sessionId = wire.sessionId,
         connectionGeneration = wire.generation,
-        transferToken = requireNotNull(checkpoint.transferToken),
+        transferToken = token,
         filename = filename,
         totalSize = totalSize,
         sha256 = sha256,
         offset = offset,
-        chunkSize = WebRtcFileControl.MAX_CHUNK_BYTES,
+        chunkSize = WebRtcFileControl.LEGACY_CHUNK_BYTES,
         error = error,
+        maxChunkSize = if (action == WebRtcFileAction.OFFER) WebRtcFileControl.MAX_CHUNK_BYTES else null,
     )
 
-    private fun validateFilename(value: String) {
-        require(
-            value.isNotEmpty() && value.length <= 255 && value != "." && value != ".." &&
-                '/' !in value && '\\' !in value && '\u0000' !in value
-        ) { "Unsafe DeskLink transfer filename" }
-    }
+    private fun crossesDurabilityBoundary(from: Long, to: Long, total: Long): Boolean =
+        to == total || from / durableEveryBytes != to / durableEveryBytes
 
     private fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -535,4 +865,18 @@ class WebRtcFileTransferManager(
     }
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+
+    companion object {
+        /** Most incoming transfers one peer may hold open at once. The desktop
+         * uses its own bound; this one only has to stop a peer from making the
+         * phone allocate a partial file per invented transfer ID. */
+        const val MAX_INCOMING_TRANSFERS = 8
+        /** Unacknowledged bytes in flight; matches the desktop. */
+        const val SEND_WINDOW_BYTES = 1024L * 1024
+        /** Sync + checkpoint interval; matches the desktop. */
+        const val DURABLE_EVERY_BYTES = 8L * 1024 * 1024
+
+        /** Sender states left by a session that ended under the transfer. */
+        private val RESUMABLE_STATES = setOf("pending", "transferring", "paused")
+    }
 }

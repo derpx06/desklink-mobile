@@ -24,7 +24,16 @@
 -keep class org.apache.sshd.** {*;}
 -dontwarn org.apache.sshd.**
 
-# The android-smsmms library uses class casting and reflection internally.
-# R8 optimization breaks PduPersister, causing SMSPlugin.onCreate() to crash.
--keep class com.google.android.mms.** {*;}
+# The webrtc-sdk AAR ships no consumer rules, and its native code finds Java
+# classes, fields and methods by name over JNI.
+-keep class org.webrtc.** { *; }
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# Release builds drop debug and verbose logging.
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+}
 

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 DeskLink contributors
+
+SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+-->
+<!-- DeskLink's tokens (design v3), used unless wallpaper colors are turned on. Mirrors
+     ui/compose/DeskLinkTheme.kt. -->
+<resources>
+    <color name="brand_primary">#3256D6</color>
+    <color name="brand_on_primary">#FFFFFF</color>
+    <color name="brand_primary_container">#E2E8FB</color>
+    <color name="brand_on_primary_container">#1B2F7A</color>
+    <color name="brand_secondary">#5F5F67</color>
+    <color name="brand_on_secondary">#FFFFFF</color>
+    <color name="brand_secondary_container">#E2E8FB</color>
+    <color name="brand_on_secondary_container">#1B2F7A</color>
+    <color name="brand_tertiary">#0F9B72</color>
+    <color name="brand_on_tertiary">#FFFFFF</color>
+    <color name="brand_tertiary_container">#D7F0E7</color>
+    <color name="brand_on_tertiary_container">#0B7A59</color>
+    <color name="brand_background">#F7F7F4</color>
+    <color name="brand_on_background">#18181B</color>
+    <color name="brand_surface_variant">#ECECE8</color>
+    <color name="brand_on_surface_variant">#5F5F67</color>
+    <color name="brand_outline">#D4D4CF</color>
+    <color name="brand_outline_variant">#E6E6E3</color>
+    <color name="brand_surface_container_lowest">#FFFFFF</color>
+    <color name="brand_surface_container_low">#FFFFFF</color>
+    <color name="brand_surface_container">#FFFFFF</color>
+    <color name="brand_surface_container_high">#ECECE8</color>
+    <color name="brand_surface_container_highest">#ECECE8</color>
+</resources>

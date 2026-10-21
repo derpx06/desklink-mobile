@@ -1,0 +1,6 @@
+DeskLink 2.0:
+- Shared terminals on your computer, with one-tap Claude Code and Codex
+- Remote control of your computer, and your phone screen on the desktop
+- Notifications with replies, clipboard and files
+- Works away from home through the DeskLink relay, with end-to-end encrypted signaling
+- No account needed

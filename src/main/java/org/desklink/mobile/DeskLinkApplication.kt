@@ -14,6 +14,10 @@ import android.util.Log
 import androidx.annotation.WorkerThread
 import org.desklink.mobile.backends.BaseLink
 import org.desklink.mobile.backends.BaseLinkProvider.ConnectionReceiver
+import org.desklink.mobile.backends.lan.LanLink
+import org.desklink.mobile.backends.relay.RelayLink
+import org.desklink.mobile.backends.relay.RelayLinkProvider
+import org.desklink.mobile.helpers.CrashReporter
 import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.LifecycleHelper
 import org.desklink.mobile.helpers.NotificationHelper
@@ -32,12 +36,14 @@ import org.desklink.mobile.transport.LegacyLanTransport
 import org.desklink.mobile.ui.ThemeUtil
 import org.desklink.mobile.webrtc.WebRtcSessionCoordinator
 import org.desklink.mobile.webrtc.WebRtcScreenDirection
+import org.desklink.mobile.webrtc.terminal.TerminalClient
 import org.desklink.mobile.BuildConfig
 import org.slf4j.impl.HandroidLoggerAdapter
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 
 /*
@@ -58,11 +64,52 @@ class DeskLinkApplication : Application() {
     private val legacyLanBindings = ConcurrentHashMap<BaseLink, SessionBinding>()
     private val webRtcCoordinators = ConcurrentHashMap<String, WebRtcSessionCoordinator>()
 
+    /** Each desktop's session password, in memory only. Outlives its coordinator, which is
+     * replaced on every reconnect; dropped on unpair, never persisted. */
+    private val sessionPasswords = ConcurrentHashMap<String, AtomicReference<String?>>()
+
+    /** Whether the person was viewing this desktop when its WebRTC peer went away, so the view
+     * is asked for again once a rebuilt peer is ready. Outlives the coordinator, like the password. */
+    private val screenResumes = ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicBoolean>()
+
+    /**
+     * The bootstrap link to this device is known-healthy right now, so make sure
+     * a WebRTC session exists.
+     *
+     * Called on every heartbeat, which is the point. WebRTC previously started
+     * only on a *reconnect* — so a link that came up once and then stayed up
+     * had exactly one chance, and if that attempt was lost the session sat in
+     * "Connecting" forever with every WebRTC-gated feature dead. Waiting for the
+     * desktop's `restart_request` was no better: it is one packet, unacked, and
+     * observed not to arrive.
+     *
+     * `onBootstrapReconnected` is idempotent — it returns immediately when a
+     * feature transport is already live — so calling it repeatedly costs a map
+     * lookup and a boolean, and turns the heartbeat into a self-healing tick
+     * rather than only a liveness probe.
+     */
+    fun onBootstrapHealthy(deviceId: String) {
+        webRtcCoordinators[deviceId]?.onBootstrapReconnected()
+    }
+
+    /** The local interface moved: every live WebRTC peer's candidates are stale. */
+    fun onLocalNetworkMoved() {
+        webRtcCoordinators.values.forEach(WebRtcSessionCoordinator::onLocalNetworkMoved)
+    }
+
+    /** The default network changed: peers bootstrapped away from home rebuild once (docs/RELAY.md §6). */
+    fun onDefaultNetworkMoved() {
+        devices.values.filter { !it.hasLanLink }.forEach { device ->
+            webRtcCoordinators[device.deviceId]?.onLocalNetworkMoved()
+        }
+    }
+
     private val deviceListChangedCallbacks = ConcurrentHashMap<String, DeviceListChangedCallback>()
 
     override fun onCreate() {
         super.onCreate()
         _instance = this
+        CrashReporter.install(this)
         setupSL4JLogging()
         Log.d("DeskLink/Application", "onCreate")
         ThemeUtil.setUserPreferredTheme(this)
@@ -71,8 +118,11 @@ class DeskLinkApplication : Application() {
         SslHelper.initialiseCertificate(this)
         PluginFactory.initPluginInfo(this)
         NotificationHelper.initializeChannels(this)
+        CrashReporter.offerPendingReport(this)
         LifecycleHelper.initializeObserver()
         loadRememberedDevicesFromSettings()
+        // The transfer history keeps 30 days: prune it once per start, off the main thread.
+        org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.plugins.share.TransferHistory.store(this).prune() }
 
         if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             StrictMode.setVmPolicy(
@@ -176,6 +226,19 @@ class DeskLinkApplication : Application() {
         }.getOrDefault(false)
     }
 
+    /** The desktop's session password, as the person typed it; offered with the next screen request. */
+    fun setSessionPassword(deviceId: String?, password: String) {
+        getDevice(deviceId)?.let { webRtcCoordinatorFor(it).sessionPassword.set(password) }
+    }
+
+    /** The terminal client of a paired device; it outlives any activity, so rotation keeps sessions. */
+    fun terminalClient(deviceId: String?): TerminalClient? =
+        getDevice(deviceId)?.takeIf { it.isPaired }?.let { webRtcCoordinatorFor(it).terminal }
+
+    fun switchRemoteScreen(deviceId: String?) {
+        getDevice(deviceId)?.let { webRtcCoordinatorFor(it).switchRemoteScreen() }
+    }
+
     fun stopRemoteSession(deviceId: String?) {
         getDevice(deviceId)?.let { webRtcCoordinatorFor(it).stopRemoteSession() }
     }
@@ -184,6 +247,8 @@ class DeskLinkApplication : Application() {
     @WorkerThread
     fun beginDeviceUnpair(device: Device) {
         webRtcCoordinators.remove(device.deviceId)?.closeForUnpair()
+        sessionPasswords.remove(device.deviceId)?.set(null)
+        screenResumes.remove(device.deviceId)?.set(false)
         device.clearWebRtcBindingsForUnpair()
         sessionManager.revokePairing(device.deviceId)
     }
@@ -197,7 +262,7 @@ class DeskLinkApplication : Application() {
     fun requestBootstrapReconnect() {
         val service = BackgroundService.instance
         if (service != null) {
-            service.onNetworkChange(null)
+            service.refreshDiscovery()
         } else {
             runCatching { BackgroundService.ForceRefreshConnections(this) }
                 .onFailure { error ->
@@ -241,6 +306,7 @@ class DeskLinkApplication : Application() {
 
         override fun pairingSuccessful() {
             devices.values.forEach { device -> webRtcCoordinatorFor(device).beginIfSupported() }
+            RelayLinkProvider.instance?.onTrustChanged()
             onDeviceListChanged()
         }
 
@@ -249,6 +315,10 @@ class DeskLinkApplication : Application() {
         }
 
         override fun unpaired(device: Device) {
+            // Either side unpaired: the password belongs to that pairing.
+            sessionPasswords[device.deviceId]?.set(null)
+            screenResumes[device.deviceId]?.set(false)
+            RelayLinkProvider.instance?.onTrustChanged()
             onDeviceListChanged()
             if (!device.isReachable) {
                 scheduleForDeletion(device)
@@ -259,6 +329,7 @@ class DeskLinkApplication : Application() {
     val connectionListener: ConnectionReceiver = object : ConnectionReceiver {
         @WorkerThread
         override fun onConnectionReceived(link: BaseLink) {
+            val previousInstance = devices[link.deviceId]?.peerInstanceId
             val device = devices[link.deviceId]?.also { existing ->
                 existing.addLink(link)
             } ?: run {
@@ -268,45 +339,10 @@ class DeskLinkApplication : Application() {
                 }
             }
 
-            if (link is org.desklink.mobile.backends.lan.LanLink) {
-                val pairingState = if (device.isPaired || TrustedDevices.isTrustedDevice(this@DeskLinkApplication, link.deviceId)) {
-                    PairingState.PAIRED
-                } else {
-                    PairingState.NOT_PAIRED
-                }
-                val coordinator = webRtcCoordinatorFor(device)
-                runCatching {
-                    val retainedBinding = sessionManager.currentBinding(link.deviceId)
-                        ?.takeIf { coordinator.hasActiveFeatureTransport() }
-                    if (retainedBinding != null) {
-                        // A replacement LAN connection is bootstrap/signaling
-                        // capacity only. Re-registering it would invalidate a
-                        // healthy WebRTC generation and make a screen lock
-                        // look like a full device disconnect.
-                        legacyLanBindings[link] = retainedBinding
-                        device.setSessionTransport(retainedBinding.transport)
-                        Log.i(
-                            "DeskLink/Session",
-                            "Retaining active WebRTC session while replacing LAN bootstrap link for ${link.deviceId}",
-                        )
-                    } else {
-                        val registration = sessionManager.register(
-                            link.deviceId,
-                            LegacyLanTransport(link),
-                            pairingState,
-                        )
-                        legacyLanBindings[link] = registration.binding
-                        device.setSessionTransport(registration.binding.transport)
-                    }
-                    device.setControlPacketHandler(coordinator)
-                    if (retainedBinding != null) {
-                        coordinator.onBootstrapReconnected()
-                    } else {
-                        coordinator.beginIfSupported()
-                    }
-                }.onFailure { error ->
-                    Log.e("DeskLink/Session", "Could not register LAN session", error)
-                }
+            // A relay link is a bootstrap link only while no LAN link exists; it
+            // stays attached otherwise, as the failover path (docs/RELAY.md §4).
+            if (link is LanLink || (link is RelayLink && device.relayLink === link && !device.hasLanLink)) {
+                registerBootstrapSession(device, link, previousInstance)
             }
             onDeviceListChanged()
         }
@@ -338,6 +374,12 @@ class DeskLinkApplication : Application() {
             }
             if (device != null) {
                 device.removeLink(link)
+                // The LAN went away but the relay is up: carry the session over
+                // at once instead of waiting for the LAN to come back.
+                val relay = device.relayLink
+                if (binding != null && link is LanLink && relay != null && !device.hasLanLink) {
+                    registerBootstrapSession(device, relay, device.peerInstanceId)
+                }
                 if (!device.isReachable && !device.isPaired) {
                     scheduleForDeletion(device)
                 }
@@ -363,9 +405,85 @@ class DeskLinkApplication : Application() {
 
         @WorkerThread
         override fun onConnectionReplaced(link: BaseLink) {
-            if (link !is org.desklink.mobile.backends.lan.LanLink) return
+            if (link !is LanLink) return
             val device = devices[link.deviceId] ?: return
-            webRtcCoordinatorFor(device).onBootstrapLinkReplaced()
+            val coordinator = webRtcCoordinatorFor(device)
+            // A replaced link (LanLink.reset) skips onConnectionReceived, so the
+            // restart check must happen here too: a desktop that died without
+            // a FIN leaves its stale link in place, and the new one arrives as
+            // a replacement carrying the new epoch.
+            val newInstance = link.deviceInfo.instanceId
+            if (DeviceInfo.peerRestarted(device.peerInstanceId, newInstance)) {
+                Log.i("DeskLink/Session", "${link.deviceId} restarted; replacing its WebRTC session")
+                coordinator.onPeerRestarted()
+            }
+            if (newInstance != null) device.peerInstanceId = newInstance
+            coordinator.onBootstrapLinkReplaced()
+        }
+    }
+
+    /**
+     * Makes [link] the device's bootstrap session: every LAN link, and a relay
+     * link while the device has no LAN link.
+     *
+     * A healthy WebRTC peer is kept across a replacement bootstrap link, except
+     * that a LAN link always supersedes a relay-bootstrapped session: that
+     * peer was negotiated for the path away from home, so coming home costs
+     * one rebuild (docs/RELAY.md §4).
+     */
+    @WorkerThread
+    private fun registerBootstrapSession(device: Device, link: BaseLink, previousInstance: String?) {
+        val pairingState = if (device.isPaired || TrustedDevices.isTrustedDevice(this, link.deviceId)) {
+            PairingState.PAIRED
+        } else {
+            PairingState.NOT_PAIRED
+        }
+        val coordinator = webRtcCoordinatorFor(device)
+        val newInstance = link.deviceInfo.instanceId
+        // The desktop restarted: its previous process's WebRTC peer is
+        // dead, so drop ours now instead of after the 15 s silence budget.
+        val restarted = DeviceInfo.peerRestarted(previousInstance, newInstance)
+        if (newInstance != null) device.peerInstanceId = newInstance
+        if (restarted) {
+            Log.i("DeskLink/Session", "${link.deviceId} restarted; replacing its WebRTC session")
+            coordinator.onPeerRestarted()
+        }
+        runCatching {
+            val current = sessionManager.currentBinding(link.deviceId)
+            val comingHome = link is LanLink && (current?.transport as? LegacyLanTransport)?.link is RelayLink
+            val retainedBinding = current
+                ?.takeIf { !restarted && !comingHome && coordinator.hasActiveFeatureTransport() }
+            if (retainedBinding != null) {
+                // A replacement bootstrap connection is signaling capacity
+                // only. Re-registering it would invalidate a healthy WebRTC
+                // generation and make a screen lock look like a full device
+                // disconnect.
+                legacyLanBindings[link] = retainedBinding
+                device.setSessionTransport(retainedBinding.transport)
+                Log.i(
+                    "DeskLink/Session",
+                    "Retaining active WebRTC session while replacing the bootstrap link for ${link.deviceId}",
+                )
+            } else {
+                val registration = sessionManager.register(
+                    link.deviceId,
+                    LegacyLanTransport(link),
+                    pairingState,
+                )
+                legacyLanBindings[link] = registration.binding
+                device.setSessionTransport(registration.binding.transport)
+            }
+            device.setControlPacketHandler(coordinator)
+            if (retainedBinding != null) {
+                coordinator.onBootstrapReconnected()
+            } else {
+                coordinator.beginIfSupported()
+                // A fresh path away from home: the phone offers if it initiates,
+                // otherwise it asks the desktop to (docs/RELAY.md §4).
+                if (link is RelayLink) coordinator.requestPeerRestart()
+            }
+        }.onFailure { error ->
+            Log.e("DeskLink/Session", "Could not register the ${link.name} session", error)
         }
     }
 
@@ -392,16 +510,41 @@ class DeskLinkApplication : Application() {
             Log.i("DeskLink", "Deleting unpaired and unreachable device: $device")
             device.removePairingCallback(devicePairingCallback)
             webRtcCoordinators.remove(device.deviceId)?.close()
+            sessionPasswords.remove(device.deviceId)?.set(null)
+            screenResumes.remove(device.deviceId)
             devices.remove(device.deviceId)
         }
     }
 
-    private fun webRtcCoordinatorFor(device: Device): WebRtcSessionCoordinator =
-        webRtcCoordinators.computeIfAbsent(device.deviceId) {
-            WebRtcSessionCoordinator(this, device, sessionManager) { state, detail ->
-                Log.i("DeskLink/WebRTC", "${device.deviceId}: $state${detail?.let { " ($it)" } ?: ""}")
-                onDeviceListChanged()
-            }
+    /**
+     * The device's coordinator, created on first use. A new one is attached as
+     * the device's signaling handler at once: unpair closes the old one and
+     * clears the handler, and re-pairing over the still-open link (QR, or
+     * accepting a request) registers no new bootstrap session. Without this the
+     * desktop's answers queued forever and the device read "Connecting…".
+     */
+    private fun webRtcCoordinatorFor(device: Device): WebRtcSessionCoordinator {
+        var created = false
+        val coordinator = webRtcCoordinators.computeIfAbsent(device.deviceId) {
+            created = true
+            newWebRtcCoordinator(device)
+        }
+        // Outside computeIfAbsent: attaching delivers queued signaling, which
+        // may look the coordinator up again.
+        if (created) device.setControlPacketHandler(coordinator)
+        return coordinator
+    }
+
+    private fun newWebRtcCoordinator(device: Device): WebRtcSessionCoordinator =
+        WebRtcSessionCoordinator(
+            this,
+            device,
+            sessionManager,
+            sessionPasswords.computeIfAbsent(device.deviceId) { AtomicReference() },
+            screenResumes.computeIfAbsent(device.deviceId) { java.util.concurrent.atomic.AtomicBoolean() },
+        ) { state, detail ->
+            Log.i("DeskLink/WebRTC", "${device.deviceId}: $state${detail?.let { " ($it)" } ?: ""}")
+            onDeviceListChanged()
         }
 
     companion object {

@@ -109,6 +109,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                 if (!getDevice().sendPacketBlocking(currentNetworkPacket, sendPacketStatusCallback, true)) {
                     throw new RuntimeException("Sending packet failed");
                 }
+                TransferHistory.recordSent(getDevice().getContext(), getDevice().getDeviceId(), currentNetworkPacket);
 
                 synchronized (lock) {
                     done = networkPacketList.isEmpty();
@@ -153,6 +154,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
 
     private void setProgress(int progress) {
         synchronized (lock) {
+            TransferProgress.update(getDevice().getDeviceId(), getId(), true, currentFileName, progress, totalPayloadSize);
             uploadNotification.setProgress(progress, getDevice().getContext().getResources()
                     .getQuantityString(R.plurals.outgoing_files_text, totalNumFiles, currentFileName, currentFileNum, totalNumFiles));
         }

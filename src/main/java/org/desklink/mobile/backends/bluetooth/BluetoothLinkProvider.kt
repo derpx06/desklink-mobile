@@ -30,7 +30,7 @@ import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.helpers.ThreadHelper.execute
 import org.desklink.mobile.NetworkPacket
-import org.desklink.mobile.ui.SettingsFragment
+import org.desklink.mobile.ui.compose.screen.settings.KEY_BLUETOOTH_ENABLED
 import org.desklink.mobile.extensions.getParcelableArrayCompat
 import org.desklink.mobile.extensions.getParcelableCompat
 import java.io.IOException
@@ -74,7 +74,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
 
     override fun onStart() {
         val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        if (!preferences.getBoolean(SettingsFragment.KEY_BLUETOOTH_ENABLED, false)) {
+        if (!preferences.getBoolean(KEY_BLUETOOTH_ENABLED, false)) {
             return
         }
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
@@ -116,9 +116,20 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
 
     fun disconnectedLink(link: BluetoothLink, remoteAddress: BluetoothDevice?) {
         Log.i("BluetoothLinkProvider", "disconnectedLink called")
-        synchronized(sockets) { sockets.remove(remoteAddress) }
-        synchronized(visibleDevices) { visibleDevices.remove(link.deviceId) }
-        onConnectionLost(link)
+        // Remove by value, not by key. `addLink` installs the replacement and
+        // then disconnects the old link, which routes here — so removing by key
+        // evicted the healthy *new* link from `visibleDevices`, dropped its
+        // socket entry, and reported a connected device as lost. LanLinkProvider
+        // already gets this right with the two-argument remove.
+        synchronized(visibleDevices) {
+            if (visibleDevices[link.deviceId] === link) {
+                visibleDevices.remove(link.deviceId)
+                synchronized(sockets) { sockets.remove(remoteAddress) }
+                onConnectionLost(link)
+            } else {
+                Log.i("BluetoothLinkProvider", "Ignoring a stale disconnect for ${link.deviceId}")
+            }
+        }
     }
 
     private inner class ServerRunnable : Runnable {
@@ -143,7 +154,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                 Log.e("DeskLink", "Security Exception for CONNECT", e)
 
                 PreferenceManager.getDefaultSharedPreferences(context).edit {
-                    putBoolean(SettingsFragment.KEY_BLUETOOTH_ENABLED, false)
+                    putBoolean(KEY_BLUETOOTH_ENABLED, false)
                 }
 
                 return
@@ -179,7 +190,15 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                 throw e
             }
             try {
-                ConnectionMultiplexer(socket).use { connection ->
+                // NOT `use`. The multiplexer owns the RFCOMM socket, and the
+                // BluetoothLink created below keeps using it — closing it when
+                // this block exited tore every inbound connection down
+                // microseconds after registering it, while leaving the entry in
+                // `sockets` so the peer was never retried. It is closed here
+                // only when no link was established.
+                val connection = ConnectionMultiplexer(socket)
+                var linkEstablished = false
+                try {
                     val outputStream = connection.defaultOutputStream
                     val inputStream = connection.defaultInputStream
 
@@ -223,7 +242,12 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                             deviceInfo, this@BluetoothLinkProvider)
                     Log.i("BTLinkProvider/Server", "About to addLink")
                     addLink(identityPacket, link)
+                    linkEstablished = true
                     Log.i("BTLinkProvider/Server", "Link Added")
+                } finally {
+                    if (!linkEstablished) {
+                        connection.close()
+                    }
                 }
             } catch (e: Exception) {
                 synchronized(sockets) {
@@ -373,7 +397,7 @@ class BluetoothLinkProvider(private val context: Context) : BaseLinkProvider() {
                 }
                 Log.i("BTLinkProvider/Client", "Device: " + device.address + " Before sb.toString()")
                 val message = sb.toString()
-                Log.i("BTLinkProvider/Client", "Device: " + device.address + " Before unserialize (message: '" + message + "')")
+                Log.i("BTLinkProvider/Client", "Device: " + device.address + " Before unserialize (" + message.length + " chars)")
                 val identityPacket = NetworkPacket.unserialize(message)
                 Log.i("BTLinkProvider/Client", "Device: " + device.address + " After unserialize")
 

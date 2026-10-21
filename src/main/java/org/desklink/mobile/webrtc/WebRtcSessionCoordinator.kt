@@ -6,10 +6,14 @@ package org.desklink.mobile.webrtc
 import android.content.Context
 import android.content.Intent
 import android.preference.PreferenceManager
+import android.os.SystemClock
 import android.util.Log
 import android.view.WindowManager
 import org.desklink.mobile.Device
 import org.desklink.mobile.NetworkPacket
+import org.desklink.mobile.R
+import org.desklink.mobile.backends.relay.RelayLinkProvider
+import org.desklink.mobile.backends.relay.RelaySettings
 import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.security.RsaHelper
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
@@ -19,6 +23,12 @@ import org.desklink.mobile.plugins.notifications.NotificationsPlugin
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.desklink.mobile.session.DeviceManager
 import org.desklink.mobile.session.SessionBinding
+import org.desklink.mobile.plugins.terminal.TerminalSinks
+import org.desklink.mobile.transport.TransportCallback
+import org.desklink.mobile.transport.TransportError
+import org.desklink.mobile.transport.TransportErrorCode
+import org.desklink.mobile.webrtc.terminal.TerminalClient
+import org.desklink.mobile.webrtc.terminal.TerminalProtocol
 import org.json.JSONObject
 import org.webrtc.IceCandidate
 import org.webrtc.SessionDescription
@@ -29,8 +39,11 @@ import java.util.LinkedHashSet
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import org.webrtc.PeerConnection
 
 /**
@@ -41,11 +54,27 @@ class WebRtcSessionCoordinator(
     private val context: Context,
     private val device: Device,
     private val sessions: DeviceManager,
+    /**
+     * The desktop's session password ([SessionPassword]) for this device, once the person gave it.
+     * Memory only, shared by the screen and [terminal]. Owned by the application so it outlives
+     * this coordinator: a reconnect offers it again instead of asking. Cleared when the desktop
+     * refuses it, and on unpair.
+     */
+    val sessionPassword: AtomicReference<String?> = AtomicReference(),
+    /**
+     * Set when this peer goes away while the person is viewing the desktop, so the next peer
+     * asks for the view again once it is feature-ready (docs/RELAY.md §6). Application-owned,
+     * like [sessionPassword]; cleared by an explicit stop.
+     */
+    private val resumeScreen: AtomicBoolean = AtomicBoolean(),
     private val onStateChanged: (String, String?) -> Unit,
 ) : Device.ControlPacketHandler {
     private val lock = Any()
     private val seenRequestIds = LinkedHashSet<String>()
+    private val seenEnvelopeIds = LinkedHashSet<String>()
     private var activeAttemptId: String? = null
+    /** The desktop's last offered attempt, named in a restart request so it is not taken for stale. */
+    private var lastPeerAttemptId: String? = null
     private var activeBinding: SessionBinding? = null
     private var activeWireBinding: WebRtcWireBinding? = null
     private var transport: WebRtcTransport? = null
@@ -53,9 +82,18 @@ class WebRtcSessionCoordinator(
     private var closed = false
     private var recoveryInProgress = false
     private var offerWatchdog: ScheduledFuture<*>? = null
+    private var answerWatchdog: ScheduledFuture<*>? = null
     private var disconnectedGrace: ScheduledFuture<*>? = null
     private var disconnectedGraceAttemptId: String? = null
     private var remoteHeartbeat: ScheduledFuture<*>? = null
+    // Data-channel liveness (mirrors the desktop's PEER_PROBE_AFTER /
+    // PEER_DEAD_AFTER). Only armed while feature-ready; see startLivenessLocked.
+    @Volatile private var lastInboundAt = 0L
+    private var lastProbeAt = 0L
+    // When the current initiator attempt began; a heartbeat may only replace
+    // an attempt that has visibly stalled (see onBootstrapReconnected).
+    private var attemptStartedAt = 0L
+    private var liveness: ScheduledFuture<*>? = null
     /** Increments whenever a control lease is replaced, paused, or released.
      * A queued timer from an older lease must never cancel or extend a newer
      * one. */
@@ -64,10 +102,48 @@ class WebRtcSessionCoordinator(
     private val recoveryExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "DeskLink-WebRTC-Recovery-${device.deviceId}").apply { isDaemon = true }
     }
+    private val transportCleanup = DeferredTaskExecutor(
+        "DeskLink-WebRTC-Cleanup-${device.deviceId}",
+    ) { error -> Log.w(TAG, "Failed to dispose the previous WebRTC transport", error) }
+    /** libwebrtc callbacks run here, never on its shared signaling thread. */
+    private val peerEvents = DeferredTaskExecutor(
+        "DeskLink-WebRTC-Events-${device.deviceId}",
+    ) { error -> Log.w(TAG, "WebRTC peer callback failed", error) }
+    private val remoteActionExecutor = DeferredTaskExecutor(
+        "DeskLink-WebRTC-RemoteAction-${device.deviceId}",
+    ) { error ->
+        Log.w(TAG, "Remote session action failed", error)
+        publish("RemoteSessionFailed", error.message)
+    }
+    /** Runs the blocking send of a file the peer asked to download. It must not
+     * share `fileExecutor`: that thread also processes the peer's ACCEPT and
+     * ACK, which the send waits for. */
+    private val fileSendExecutor = Executors.newCachedThreadPool { runnable ->
+        Thread(runnable, "DeskLink-WebRTC-FileSend-${device.deviceId}").apply { isDaemon = true }
+    }
     private val fileExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "DeskLink-WebRTC-File-${device.deviceId}").apply { isDaemon = true }
     }
     private val fileTransfers = WebRtcFileTransferManager(context, device, ::sendFileMessage)
+
+    /**
+     * Terminal sessions on `desklink-terminal-v1`. Not a packet type: it is routed by
+     * [handleTerminalEnvelope] before the packet bridge and is deliberately absent from
+     * [WebRtcFeatureProfile]. The client runs on its own thread and never calls back here
+     * synchronously, so it is safe to reach from libwebrtc's callback thread.
+     */
+    val terminal = TerminalClient(
+        sender = ::sendTerminalMessage,
+        sinkFactory = TerminalSinks.factory(context, device.deviceId),
+        executor = TerminalClient.newExecutor("DeskLink-Terminal-${device.deviceId}"),
+        discard = { message, error -> Log.w(TAG, message, error) },
+        password = sessionPassword,
+    )
+
+    /** Link up/down events for [terminal], queued here so they are never delivered under [lock]. */
+    private val terminalLink = DeferredTaskExecutor(
+        "DeskLink-WebRTC-TerminalLink-${device.deviceId}",
+    ) { error -> Log.w(TAG, "Terminal link event failed", error) }
     private val fileBrowser = WebRtcPhoneFileBrowser(context, device)
     /** Sole authority for WebRTC remote-view and remote-input lease state. */
     private val remoteSession = WebRtcRemoteSessionController {
@@ -116,14 +192,34 @@ class WebRtcSessionCoordinator(
             publish("WaitingForOffer", "The paired desktop is the deterministic WebRTC initiator")
             return
         }
-        synchronized(lock) {
-            if (closed) return
-            if (activeAttemptId != null && activeBinding?.let(sessions::isCurrent) == true) return
-            // A replacement LAN bootstrap connection invalidates the old
-            // binding. Dispose the old peer before starting a new signed
-            // attempt, otherwise its callbacks can keep a stale session alive.
-            if (activeAttemptId != null) closeLocked()
-            startInitiatorLocked(binding)
+        val negotiating = synchronized(lock) {
+            closed || (activeAttemptId != null && activeBinding?.let(sessions::isCurrent) == true)
+        }
+        if (negotiating) return
+        withIceServers { iceServers ->
+            synchronized(lock) {
+                if (closed || !sessions.isCurrent(binding)) return@synchronized
+                if (activeAttemptId != null && activeBinding?.let(sessions::isCurrent) == true) return@synchronized
+                // A replacement LAN bootstrap connection invalidates the old
+                // binding. Dispose the old peer before starting a new signed
+                // attempt, otherwise its callbacks can keep a stale session alive.
+                if (activeAttemptId != null) closeLocked()
+                startInitiatorLocked(binding, iceServers)
+            }
+        }
+    }
+
+    /**
+     * Runs [start] with this path's ICE servers. The relay's TURN grant can take
+     * up to 2 s to arrive, so it is fetched before [lock] is taken and never on
+     * the main thread (main-thread callbacks take [lock]).
+     */
+    private fun withIceServers(start: (List<PeerConnection.IceServer>) -> Unit) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            runCatching { recoveryExecutor.execute { start(iceServersForPath()) } }
+                .onFailure { Log.d(TAG, "WebRTC coordinator is closed", it) }
+        } else {
+            start(iceServersForPath())
         }
     }
 
@@ -145,6 +241,17 @@ class WebRtcSessionCoordinator(
             publish("BootstrapReconnected", "Retaining the active WebRTC feature transport")
             return
         }
+        if (!device.isPaired) return
+        // A heartbeat arrives every ~10 s. Restarting on each one tore down a
+        // negotiation still in progress and reset the backoff, so on any
+        // network where ICE needs more than ~10 s it never finished. Only an
+        // attempt that has visibly stalled, or a pending recovery that will
+        // start its own attempt, is left alone here.
+        val inFlight = synchronized(lock) {
+            recoveryInProgress || (activeAttemptId != null &&
+                SystemClock.elapsedRealtime() - attemptStartedAt < ATTEMPT_STALL_MS)
+        }
+        if (inFlight) return
         if (!shouldRestartAfterBootstrapReconnect(
                 localDeviceId,
                 device.deviceId,
@@ -154,15 +261,56 @@ class WebRtcSessionCoordinator(
             beginIfSupported()
             return
         }
-        synchronized(lock) {
-            if (closed || !sessions.isCurrent(binding)) return
-            publish("BootstrapReconnected", "Replacing the stale WebRTC peer")
-            closeLocked()
-            recovery.reset()
-            recoveryInProgress = false
-            device.setWebRtcRecoveryPending(true)
-            startInitiatorLocked(binding)
+        withIceServers { iceServers ->
+            synchronized(lock) {
+                if (closed || !sessions.isCurrent(binding)) return@synchronized
+                publish("BootstrapReconnected", "Replacing the stale WebRTC peer")
+                closeLocked()
+                recovery.reset()
+                recoveryInProgress = false
+                device.setWebRtcRecoveryPending(true)
+                startInitiatorLocked(binding, iceServers)
+            }
         }
+    }
+
+    /**
+     * A fresh bootstrap path (a relay link away from home): the deterministic
+     * initiator offers on its own, so the answering side asks it to with a
+     * signed `restart_request` instead of waiting (docs/RELAY.md §4).
+     */
+    fun requestPeerRestart() {
+        val binding = sessions.currentBinding(device.deviceId) ?: return
+        if (!device.isPaired || !remoteAcceptsSignal()) return
+        if (shouldInitiateForRestartRequest(DeviceHelper.getDeviceId(context), device.deviceId)) return
+        if (hasActiveFeatureTransport()) return
+        val attemptId = synchronized(lock) { activeAttemptId ?: lastPeerAttemptId } ?: UUID.randomUUID().toString()
+        publish("RestartRequested", "Asking the desktop to offer over the new bootstrap link")
+        sendSignal(binding, attemptId, SignalingMessageType.RESTART_REQUEST, JSONObject())
+    }
+
+    /**
+     * The phone's interface was lost or re-addressed, so this peer's ICE
+     * candidates point at an address that no longer exists. Rebuild now — via
+     * the backoff ladder, telling the desktop — instead of waiting out the 15 s
+     * silence budget. Never `restartIce()`: webrtcbin cannot do an ICE restart.
+     */
+    /** The peer's process restarted: its end of our peer is gone. */
+    fun onPeerRestarted() = synchronized(lock) {
+        if (closed) return@synchronized
+        closeLocked()
+        recovery.reset()
+        recoveryInProgress = false
+        device.setWebRtcRecoveryPending(false)
+    }
+
+    fun onLocalNetworkMoved() {
+        val current = synchronized(lock) {
+            val binding = activeBinding
+            val attemptId = activeAttemptId
+            if (closed || binding == null || attemptId == null) null else binding to attemptId
+        } ?: return
+        scheduleRecovery(current.first, current.second, "Local network changed", notifyPeer = true)
     }
 
     /**
@@ -202,9 +350,25 @@ class WebRtcSessionCoordinator(
             require(active.isReadyForPackets()) {
                 "DeskLink WebRTC screen transport is not ready"
             }
-            active.startScreenCapture(permissionData)
-            val remoteSessionId = remoteSession.markScreenReady(WebRtcScreenDirection.PHONE_TO_DESKTOP)
             val display = context.resources.displayMetrics
+            // Capture at the phone's real shape, not the 1280x720 landscape
+            // default. A portrait phone captured into a 16:9 landscape surface
+            // arrives squashed and letterboxed, and the desktop was
+            // simultaneously being told the screen was 1080x2400 in
+            // `screen-ready` below — so the geometry it mapped taps against did
+            // not describe the pixels it was shown.
+            //
+            // The reported geometry stays the *logical* screen size on purpose:
+            // the desktop scales between the decoded video's real dimensions
+            // and this, so 16-pixel alignment shaving a few columns off the
+            // capture does not have to be modelled on both sides.
+            active.startScreenCapture(
+                permissionData,
+                width = display.widthPixels,
+                height = display.heightPixels,
+                fps = 30,
+            )
+            val remoteSessionId = remoteSession.markScreenReady(WebRtcScreenDirection.PHONE_TO_DESKTOP)
             @Suppress("DEPRECATION")
             val rotation = (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
                 ?.defaultDisplay
@@ -270,83 +434,194 @@ class WebRtcSessionCoordinator(
 
     /** Called only from a user gesture in the remote-control UI. */
     fun requestRemoteView(direction: WebRtcScreenDirection) {
-        synchronized(lock) {
-            val binding = requireNotNull(activeBinding) { "DeskLink WebRTC session is not active" }
-            val attemptId = requireNotNull(activeAttemptId) { "DeskLink WebRTC session is not active" }
-            val wire = requireNotNull(activeWireBinding) { "DeskLink WebRTC session is not active" }
-            require(currentTransport(binding, attemptId).isReadyForPackets()) {
-                "DeskLink WebRTC feature transport is not ready"
+        remoteActionExecutor.execute {
+            try {
+                synchronized(lock) {
+                    val binding = requireNotNull(activeBinding) { "DeskLink WebRTC session is not active" }
+                    val attemptId = requireNotNull(activeAttemptId) { "DeskLink WebRTC session is not active" }
+                    val wire = requireNotNull(activeWireBinding) { "DeskLink WebRTC session is not active" }
+                    require(currentTransport(binding, attemptId).isReadyForPackets()) {
+                        "DeskLink WebRTC feature transport is not ready"
+                    }
+                    // A retry on a live view must end the old one first. The
+                    // desktop refuses a second view while one is active and
+                    // would answer "denied", leaving its capture running for an
+                    // id this side has already forgotten. The channel is
+                    // ordered, so the release reaches it before the request.
+                    remoteSession.snapshot().remoteSessionId?.let { previous ->
+                        sendReleaseLocked(previous)
+                    }
+                    val remoteSessionId = remoteSession.beginView(direction)
+                    sendRemoteSessionControlLocked(
+                        binding,
+                        attemptId,
+                        remoteSession.makeMessage(
+                            WebRtcRemoteSessionControlKind.REQUEST_VIEW,
+                            attemptId,
+                            wire,
+                            remoteSessionId = remoteSessionId,
+                            password = sessionPassword.get(),
+                        ),
+                    )
+                    publish("RequestingRemoteView", direction.wireName)
+                    scheduleRemoteRequestTimeout(control = false, remoteSessionId)
+                }
+            } catch (error: Exception) {
+                surfaceRemoteFailure(control = false, error)
             }
-            val remoteSessionId = remoteSession.beginView(direction)
-            sendRemoteSessionControlLocked(
-                binding,
-                attemptId,
-                remoteSession.makeMessage(
-                    WebRtcRemoteSessionControlKind.REQUEST_VIEW,
-                    attemptId,
-                    wire,
-                    remoteSessionId = remoteSessionId,
-                ),
-            )
-            publish("RequestingRemoteView", direction.wireName)
         }
     }
 
     /** Called only from the explicit Enable control UI action. */
     fun requestRemoteControl() {
-        synchronized(lock) {
-            val binding = requireNotNull(activeBinding) { "DeskLink WebRTC session is not active" }
-            val attemptId = requireNotNull(activeAttemptId) { "DeskLink WebRTC session is not active" }
-            val wire = requireNotNull(activeWireBinding) { "DeskLink WebRTC session is not active" }
-            require(currentTransport(binding, attemptId).isReadyForPackets()) {
-                "DeskLink WebRTC feature transport is not ready"
+        remoteActionExecutor.execute {
+            try {
+                synchronized(lock) {
+                    val binding = requireNotNull(activeBinding) { "DeskLink WebRTC session is not active" }
+                    val attemptId = requireNotNull(activeAttemptId) { "DeskLink WebRTC session is not active" }
+                    val wire = requireNotNull(activeWireBinding) { "DeskLink WebRTC session is not active" }
+                    require(currentTransport(binding, attemptId).isReadyForPackets()) {
+                        "DeskLink WebRTC feature transport is not ready"
+                    }
+                    val remoteSessionId = remoteSession.requestControl()
+                    sendRemoteSessionControlLocked(
+                        binding,
+                        attemptId,
+                        remoteSession.makeMessage(
+                            WebRtcRemoteSessionControlKind.REQUEST_CONTROL,
+                            attemptId,
+                            wire,
+                            remoteSessionId = remoteSessionId,
+                            password = sessionPassword.get(),
+                        ),
+                    )
+                    publish("RequestingRemoteControl", null)
+                    scheduleRemoteRequestTimeout(control = true, remoteSessionId)
+                }
+            } catch (error: Exception) {
+                surfaceRemoteFailure(control = true, error)
             }
-            val remoteSessionId = remoteSession.requestControl()
-            sendRemoteSessionControlLocked(
-                binding,
+        }
+    }
+
+    /** Sends a release for `remoteSessionId`. Caller holds `lock`. */
+    private fun sendReleaseLocked(remoteSessionId: String) {
+        val binding = activeBinding ?: return
+        val attemptId = activeAttemptId ?: return
+        val wire = activeWireBinding ?: return
+        sendRemoteSessionControlLocked(
+            binding,
+            attemptId,
+            remoteSession.makeMessage(
+                WebRtcRemoteSessionControlKind.RELEASE,
                 attemptId,
-                remoteSession.makeMessage(
-                    WebRtcRemoteSessionControlKind.REQUEST_CONTROL,
-                    attemptId,
-                    wire,
-                    remoteSessionId = remoteSessionId,
-                ),
+                wire,
+                remoteSessionId = remoteSessionId,
+            ),
+        )
+    }
+
+    /** Nothing may stay at "requesting" forever. The desktop times its own
+     * portal request out at two minutes and answers; this is the net under it
+     * for a desktop that is silent (an old build, a lost message). */
+    private fun scheduleRemoteRequestTimeout(control: Boolean, remoteSessionId: String) {
+        recoveryExecutor.schedule({
+            synchronized(lock) {
+                if (closed) return@synchronized
+                val timedOut = if (control) {
+                    remoteSession.controlRequestTimedOut(remoteSessionId)
+                } else {
+                    remoteSession.viewRequestTimedOut(remoteSessionId)
+                }
+                if (!timedOut) return@synchronized
+                // Tell the desktop to drop whatever it started, so a late
+                // approval cannot begin a share nobody is waiting for.
+                if (!control) runCatching { sendReleaseLocked(remoteSessionId) }
+                device.getPlugin(ScreenControlPlugin::class.java)?.onRemoteRequestTimedOut(control)
+                publish("RemoteRequestTimedOut", if (control) "control" else "view")
+            }
+        }, REMOTE_REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    }
+
+    /** Puts a failed remote action in front of the user instead of only in the log. */
+    private fun surfaceRemoteFailure(control: Boolean, error: Throwable) {
+        Log.w(TAG, "Remote ${if (control) "control" else "view"} request failed", error)
+        publish("RemoteSessionFailed", error.message)
+        val plugin = device.getPlugin(ScreenControlPlugin::class.java) ?: return
+        if (control) {
+            plugin.onRemoteControlDenied(error.message)
+        } else {
+            // These are `require` failures ("session is not active", "transport
+            // is not ready"); the user needs to know to wait and retry.
+            plugin.onRemoteViewFailed(
+                if (error is IllegalArgumentException || error is IllegalStateException) {
+                    context.getString(R.string.remote_screen_not_ready)
+                } else {
+                    error.message
+                },
             )
-            publish("RequestingRemoteControl", null)
         }
     }
 
     fun remoteSessionSnapshot(): WebRtcRemoteSessionController.Snapshot = remoteSession.snapshot()
 
-    fun stopRemoteSession() {
-        synchronized(lock) {
-            val binding = activeBinding ?: run {
-                remoteSession.stop()
-                cancelRemoteHeartbeatLocked()
-                return
-            }
-            val attemptId = activeAttemptId ?: run {
-                remoteSession.stop()
-                cancelRemoteHeartbeatLocked()
-                return
-            }
-            val wire = activeWireBinding ?: run {
-                remoteSession.stop()
-                cancelRemoteHeartbeatLocked()
-                return
-            }
-            val active = transport
-            if (active?.isReadyForPackets() == true && remoteSession.snapshot().remoteSessionId != null) {
+    /** Asks the desktop to show its next shared screen (a laptop and a
+     * monitor, say). */
+    fun switchRemoteScreen() {
+        remoteActionExecutor.execute {
+            synchronized(lock) {
+                val binding = activeBinding ?: return@synchronized
+                val attemptId = activeAttemptId ?: return@synchronized
+                val wire = activeWireBinding ?: return@synchronized
+                val remoteSessionId = remoteSession.snapshot().remoteSessionId ?: return@synchronized
+                if (transport?.isReadyForPackets() != true) return@synchronized
                 sendRemoteSessionControlLocked(
                     binding,
                     attemptId,
-                    remoteSession.makeMessage(WebRtcRemoteSessionControlKind.RELEASE, attemptId, wire),
+                    remoteSession.makeMessage(
+                        WebRtcRemoteSessionControlKind.SWITCH_SCREEN,
+                        attemptId,
+                        wire,
+                        remoteSessionId = remoteSessionId,
+                    ),
                 )
             }
-            remoteSession.stop()
-            cancelRemoteHeartbeatLocked()
-            device.getPlugin(ScreenControlPlugin::class.java)?.clearRemoteVideoTrack()
-            stopPhoneScreenCapture()
+        }
+    }
+
+    fun stopRemoteSession() {
+        resumeScreen.set(false)
+        remoteActionExecutor.execute {
+            synchronized(lock) {
+                val binding = activeBinding ?: run {
+                    remoteSession.stop()
+                    cancelRemoteHeartbeatLocked()
+                    return@synchronized
+                }
+                val attemptId = activeAttemptId ?: run {
+                    remoteSession.stop()
+                    cancelRemoteHeartbeatLocked()
+                    return@synchronized
+                }
+                val wire = activeWireBinding ?: run {
+                    remoteSession.stop()
+                    cancelRemoteHeartbeatLocked()
+                    return@synchronized
+                }
+                val active = transport
+                if (active?.isReadyForPackets() == true && remoteSession.snapshot().remoteSessionId != null) {
+                    sendRemoteSessionControlLocked(
+                        binding,
+                        attemptId,
+                        remoteSession.makeMessage(WebRtcRemoteSessionControlKind.RELEASE, attemptId, wire),
+                    )
+                }
+                remoteSession.stop()
+                cancelRemoteHeartbeatLocked()
+                // The video track stays: libwebrtc delivers it once per peer, so
+                // dropping it here left every later view black.
+                stopPhoneScreenCapture()
+            }
         }
     }
 
@@ -367,15 +642,55 @@ class WebRtcSessionCoordinator(
                     "Rejected unexpected WebRTC offer from non-initiator"
                 }
                 val sdp = requiredString(message.payload, "sdp", MAX_SDP_BYTES)
+                // Fetched before the lock: the relay's TURN grant may take 2 s.
+                val repeated = synchronized(lock) { activeAttemptId == message.sessionAttemptId }
+                val iceServers = if (repeated) emptyList() else iceServersForPath()
                 synchronized(lock) {
+                    // An attempt ID is random and carries no ordering, so a
+                    // second offer while one is already installed can only be a
+                    // delayed or duplicated record. Tearing the peer down for it
+                    // discarded a healthy connection; the desktop has always
+                    // rejected this case and Android now matches.
+                    val active = activeAttemptId
+                    if (active == message.sessionAttemptId) {
+                        // A repeated offer for the attempt already installed is
+                        // ignored rather than re-applied.
+                        //
+                        // Re-applying is not safe here. If our answer round is
+                        // still in flight, the pending `setLocalDescription`
+                        // would land against a changed remote description and
+                        // libwebrtc reports that as a set failure, which routes
+                        // into `scheduleRecovery` and tears down a negotiation
+                        // that was about to succeed. If the round has finished,
+                        // a second answer changes `handover.answerSdp`, and that
+                        // SDP is hashed into the authentication transcript both
+                        // peers sign — so re-applying after authentication would
+                        // invalidate a completed handover.
+                        //
+                        // The desktop does not produce this case: its
+                        // `request_local_description` gates offer creation on a
+                        // one-shot flag, so it emits exactly one offer per peer.
+                        Log.i(TAG, "Ignoring a repeated offer for the current WebRTC attempt")
+                        return@synchronized
+                    }
+                    // A new signed attempt from the paired initiator is a
+                    // restart, never a stale record: the initiator sends one
+                    // offer per attempt over one ordered TLS stream, so an
+                    // older offer cannot overtake a newer one, and replay is
+                    // already refused by `acceptRequestId` above (the request
+                    // ID is covered by the signature). Refusing it while our
+                    // transport still looked ready is what kept a restarted
+                    // desktop locked out until ICE consent freshness expired.
+                    // Mirrors the desktop's `offer_attempt_disposition`.
                     closeLocked()
                     activeAttemptId = message.sessionAttemptId
+                    lastPeerAttemptId = message.sessionAttemptId
                     activeBinding = binding
                     activeWireBinding = WebRtcWireBinding.fromAttempt(
                         DeviceHelper.getDeviceId(context), device.deviceId, message.sessionAttemptId,
                     )
                     handover.offerSdp = sdp
-                    transport = createTransport(binding, message.sessionAttemptId, createLocalChannels = false)
+                    transport = createTransport(binding, message.sessionAttemptId, createLocalChannels = false, iceServers)
                     publish("CreatingAnswer", null)
                     transport!!.setRemoteDescription(SessionDescription.Type.OFFER, sdp) {
                         transport?.createAnswer()
@@ -384,7 +699,10 @@ class WebRtcSessionCoordinator(
             }
             SignalingMessageType.ANSWER -> {
                 val sdp = requiredString(message.payload, "sdp", MAX_SDP_BYTES)
-                synchronized(lock) { handover.answerSdp = sdp }
+                synchronized(lock) {
+                    handover.answerSdp = sdp
+                    cancelAnswerWatchdogLocked()
+                }
                 currentTransport(binding, message.sessionAttemptId)
                     .setRemoteDescription(SessionDescription.Type.ANSWER, sdp)
             }
@@ -404,18 +722,33 @@ class WebRtcSessionCoordinator(
                     notifyPeer = false,
                 )
             }
-            SignalingMessageType.RESTART_REQUEST -> synchronized(lock) {
+            SignalingMessageType.RESTART_REQUEST -> {
                 val localDeviceId = DeviceHelper.getDeviceId(context)
                 require(shouldInitiateForRestartRequest(localDeviceId, device.deviceId)) {
                     "Only the deterministic DeskLink initiator may honor a restart request"
                 }
-                require(!closed) { "DeskLink WebRTC coordinator is closed" }
-                closeLocked()
-                recovery.reset()
-                recoveryInProgress = false
-                device.setWebRtcRecoveryPending(false)
-                publish("RestartRequested", "Rebuilding WebRTC after the peer restarted")
-                startInitiatorLocked(binding)
+                // An offer of ours still waiting for its answer already is the
+                // restart the desktop asks for; replacing it only costs time.
+                val inFlight = synchronized(lock) {
+                    require(!closed) { "DeskLink WebRTC coordinator is closed" }
+                    activeAttemptId != null && handover.answerSdp == null &&
+                        SystemClock.elapsedRealtime() - attemptStartedAt < ANSWER_TIMEOUT_MS
+                }
+                if (inFlight) {
+                    publish("RestartRequested", "An offer is already in flight")
+                } else {
+                    withIceServers { iceServers ->
+                        synchronized(lock) {
+                            if (closed) return@synchronized
+                            closeLocked()
+                            recovery.reset()
+                            recoveryInProgress = false
+                            device.setWebRtcRecoveryPending(false)
+                            publish("RestartRequested", "Rebuilding WebRTC after the peer restarted")
+                            startInitiatorLocked(binding, iceServers)
+                        }
+                    }
+                }
             }
             SignalingMessageType.CLOSE -> synchronized(lock) {
                 closeLocked()
@@ -440,6 +773,12 @@ class WebRtcSessionCoordinator(
         }
         recoveryExecutor.shutdownNow()
         fileExecutor.shutdownNow()
+        fileSendExecutor.shutdownNow()
+        transportCleanup.close()
+        remoteActionExecutor.close()
+        peerEvents.close()
+        terminalLink.close()
+        terminal.shutdown()
     }
 
     /**
@@ -459,6 +798,12 @@ class WebRtcSessionCoordinator(
         }
         recoveryExecutor.shutdownNow()
         fileExecutor.shutdownNow()
+        fileSendExecutor.shutdownNow()
+        transportCleanup.close()
+        remoteActionExecutor.close()
+        peerEvents.close()
+        terminalLink.close()
+        terminal.shutdown()
     }
 
     /**
@@ -499,14 +844,16 @@ class WebRtcSessionCoordinator(
         binding: SessionBinding,
         attemptId: String,
         createLocalChannels: Boolean,
+        iceServers: List<PeerConnection.IceServer>,
     ): WebRtcTransport = WebRtcTransport(
         context = context,
         factory = WebRtcRuntime.initialize(context),
         transportId = "webrtc:${device.deviceId}:${binding.sessionId}:${binding.connectionGeneration}",
         wireBinding = requireNotNull(activeWireBinding) { "WebRTC wire binding was not initialized" },
-        iceServers = configuredIceServers(),
+        iceServers = iceServers,
         createLocalChannels = createLocalChannels,
-        observer = object : WebRtcTransport.Observer {
+        relayOnly = RelaySettings.forceTurn(context),
+        observer = OffThreadObserver(events = peerEvents, target = object : WebRtcTransport.Observer {
             override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) {
                 when (type) {
                     SignalingMessageType.OFFER -> synchronized(lock) {
@@ -516,8 +863,20 @@ class WebRtcSessionCoordinator(
                         }
                         handover.offerSdp = payload.getString("sdp")
                         cancelOfferWatchdogLocked()
+                        armAnswerWatchdogLocked(binding, attemptId)
                     }
                     SignalingMessageType.ANSWER -> synchronized(lock) {
+                        // Same staleness guard the OFFER branch above has, and
+                        // for a sharper reason: answerSdp is hashed into the
+                        // signed authentication transcript. A late createAnswer
+                        // callback from a torn-down transport overwrote the new
+                        // attempt's answer, so the two peers computed different
+                        // transcripts, every signature verification failed, and
+                        // the handover froze there permanently.
+                        if (closed || activeAttemptId != attemptId || activeBinding != binding) {
+                            Log.w(TAG, "Ignoring stale WebRTC answer callback")
+                            return@synchronized
+                        }
                         handover.answerSdp = payload.getString("sdp")
                     }
                     else -> Unit
@@ -528,6 +887,31 @@ class WebRtcSessionCoordinator(
             override fun onEnvelope(envelope: WebRtcEnvelope) {
                 runCatching {
                     require(sessions.isCurrent(binding)) { "Stale DeskLink session" }
+                    lastInboundAt = SystemClock.elapsedRealtime()
+                    // Bind the envelope to the current wire before recording its
+                    // ID, so a message that was never entitled to this session
+                    // cannot burn an identifier. This deliberately does NOT
+                    // decode the payload: `validate` base64-decodes up to 128 KB,
+                    // and every branch below decodes again to obtain its bytes —
+                    // doing it here too would double the cost of every file
+                    // chunk on the network callback thread.
+                    val wire = requireNotNull(synchronized(lock) { activeWireBinding }) {
+                        "No active DeskLink WebRTC wire binding"
+                    }
+                    envelope.requireBoundTo(wire.peerDeviceId, wire.sessionId, wire.generation)
+                    // Terminal traffic is routed before the replay cache: a busy terminal would
+                    // wrap its 4096 entries in about a minute and evict every other feature's
+                    // replay protection. Only control messages are recorded there (see below).
+                    if (envelope.messageType.startsWith(TERMINAL_MESSAGE_PREFIX)) {
+                        handleTerminalEnvelope(binding, attemptId, wire, envelope)
+                        return@runCatching
+                    }
+                    // Accept each authenticated envelope exactly once. The
+                    // desktop has always enforced this; without the matching
+                    // check here a duplicated or replayed data-channel message
+                    // was applied again, and the input-realtime channel is
+                    // unordered so duplicates are not merely theoretical.
+                    acceptEnvelopeId(attemptId, envelope.messageId)
                     if (
                         envelope.channel == WebRtcChannel.CONTROL.label &&
                         envelope.messageType == WebRtcHandoverControlMessage.MESSAGE_TYPE
@@ -606,19 +990,26 @@ class WebRtcSessionCoordinator(
                                     JSONObject(String(response, Charsets.UTF_8)).optBoolean("ok")
                                 ) {
                                     val packet = fileBrowser.downloadPacket(payload)
-                                    fileTransfers.sendPayload(
-                                        wire,
-                                        packet,
-                                        object : Device.SendPacketStatusCallback() {
-                                            override fun onSuccess() {
-                                                publish("PhoneFileDownloadComplete", packet.getString("filename"))
-                                            }
+                                    // Blocks until the peer has the whole file,
+                                    // so it cannot run on this thread: the
+                                    // peer's ACCEPT and ACK are processed here.
+                                    fileSendExecutor.execute {
+                                        runCatching {
+                                            fileTransfers.sendPayload(
+                                                wire,
+                                                packet,
+                                                object : Device.SendPacketStatusCallback() {
+                                                    override fun onSuccess() {
+                                                        publish("PhoneFileDownloadComplete", packet.getString("filename"))
+                                                    }
 
-                                            override fun onFailure(error: Throwable) {
-                                                publish("PhoneFileDownloadFailed", error.message)
-                                            }
-                                        },
-                                    )
+                                                    override fun onFailure(error: Throwable) {
+                                                        publish("PhoneFileDownloadFailed", error.message)
+                                                    }
+                                                },
+                                            )
+                                        }.onFailure { publish("PhoneFileDownloadFailed", it.message) }
+                                    }
                                 }
                             }.onFailure { error ->
                                 publish("Failed", error.message)
@@ -655,6 +1046,12 @@ class WebRtcSessionCoordinator(
             }
 
             override fun onRemoteVideoTrack(track: org.webrtc.VideoTrack) {
+                // A track from a replaced or closed peer is disposed, and
+                // installing it would give the screen UI something that throws.
+                val current = synchronized(lock) {
+                    !closed && activeAttemptId == attemptId && activeBinding == binding
+                }
+                if (!current) return
                 device.getPlugin(ScreenControlPlugin::class.java)?.onRemoteVideoTrack(track)
                 publish("ScreenTrackReady", track.id())
             }
@@ -714,6 +1111,12 @@ class WebRtcSessionCoordinator(
                                 if (transport?.isReadyForPackets() == true) {
                                     device.setWebRtcRecoveryPending(false)
                                     recoveryInProgress = false
+                                    // Sends queued during the blip: the same transport came
+                                    // back, so setWebRtcTransport's flush never runs for it.
+                                    device.flushPendingFeaturePackets()
+                                    // The same peer recovering needs no new handshake; the
+                                    // terminal client ignores this unless it saw the link drop.
+                                    activeWireBinding?.let { recovered -> terminalLinkEvent { terminal.onLinkReady(recovered) } }
                                 }
                             }
                         }
@@ -731,7 +1134,15 @@ class WebRtcSessionCoordinator(
                         notifyPeer = true,
                     )
                     WebRtcPeerHealth.CLOSED -> {
-                        device.getPlugin(ScreenControlPlugin::class.java)?.clearRemoteVideoTrack()
+                        // Only the current peer's close may drop the track: a
+                        // late CLOSED from the peer just replaced would
+                        // otherwise blank the new one.
+                        val current = synchronized(lock) {
+                            !closed && activeAttemptId == attemptId && activeBinding == binding
+                        }
+                        if (current) {
+                            device.getPlugin(ScreenControlPlugin::class.java)?.clearRemoteVideoTrack()
+                        }
                         // A remote close is terminal for this peer generation.
                         // A local close during replacement clears activeAttemptId
                         // first, so `scheduleRecovery` safely ignores it.
@@ -755,7 +1166,7 @@ class WebRtcSessionCoordinator(
                     notifyPeer = true,
                 )
             }
-        },
+        }),
     )
 
     private fun beginHandover(binding: SessionBinding, attemptId: String) = synchronized(lock) {
@@ -900,16 +1311,26 @@ class WebRtcSessionCoordinator(
                         runCatching { fileTransfers.resumeSends(wire) }
                             .onFailure { publish("Failed", it.message) }
                     }
+                    terminalLinkEvent { terminal.onLinkReady(wire) }
                     recovery.reset()
+                    startLivenessLocked(binding, attemptId)
                     publish("FeatureReady", "LAN is now bootstrap and signaling only")
                     // Android notifications may have arrived while the
                     // feature channel was still gated. Reconcile only after
                     // the same WebRTC transport is installed for plugins.
                     device.getPlugin(NotificationsPlugin::class.java)?.resyncAfterWebRtcReady()
+                    // The person was watching the desktop when the old peer went:
+                    // ask again. Control follows the picture in MousePadActivity,
+                    // and the session password is offered again with the request.
+                    if (resumeScreen.getAndSet(false)) {
+                        device.getPlugin(ScreenControlPlugin::class.java)?.onRemoteScreenRequesting()
+                        requestRemoteView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+                    }
                 }
             }
             WebRtcHandoverControlKind.DEGRADED -> {
                 activeTransport.advanceHandover(WebRtcHandoverMessage.DEGRADED)
+                terminalLinkEvent { terminal.onLinkLost(wire) }
                 device.setWebRtcTransport(null)
                 device.setWebRtcRecoveryPending(true)
                 recoveryInProgress = true
@@ -997,7 +1418,12 @@ class WebRtcSessionCoordinator(
         // direction so an explicit peer stop can also end a local
         // MediaProjection capture that was sending phone pixels to desktop.
         val previousDirection = remoteSession.snapshot().direction
-        remoteSession.accept(message, wire, attemptId)
+        if (!remoteSession.accept(message, wire, attemptId)) {
+            // A late message for a session this side has already left: it
+            // changed nothing, and must not stop a capture or clear a track.
+            Log.d(TAG, "Ignoring stale remote-session message ${message.kind.wireName}")
+            return@synchronized
+        }
         when (message.kind) {
             WebRtcRemoteSessionControlKind.REQUEST_VIEW -> {
                 if (message.direction == WebRtcScreenDirection.DESKTOP_TO_PHONE) {
@@ -1049,9 +1475,22 @@ class WebRtcSessionCoordinator(
                     )
                 }
             }
+            WebRtcRemoteSessionControlKind.VIEW_GRANTED,
+            WebRtcRemoteSessionControlKind.SCREEN_READY -> {
+                if (message.direction == WebRtcScreenDirection.DESKTOP_TO_PHONE) {
+                    val screen = device.getPlugin(ScreenControlPlugin::class.java)
+                    // Install the track from the live peer now. Relying on the
+                    // one-time onAddTrack alone lost it to a plugin reload, and
+                    // the desktop's picture decoded but was never shown.
+                    transport?.remoteVideoTrack()?.let { track -> screen?.onRemoteVideoTrack(track) }
+                    screen?.onRemoteScreenReady(message.screenWidth, message.screenHeight, message.screenCount)
+                }
+            }
+            WebRtcRemoteSessionControlKind.RESUME -> {
+                device.getPlugin(ScreenControlPlugin::class.java)?.onRemoteControlStopped()
+            }
             WebRtcRemoteSessionControlKind.PAUSE_LOCKED,
             WebRtcRemoteSessionControlKind.SCREEN_STOPPED,
-            WebRtcRemoteSessionControlKind.SCREEN_ERROR,
             WebRtcRemoteSessionControlKind.RELEASE -> {
                 if (previousDirection == WebRtcScreenDirection.PHONE_TO_DESKTOP) {
                     device.getPlugin(ScreenControlPlugin::class.java)
@@ -1059,13 +1498,53 @@ class WebRtcSessionCoordinator(
                     stopPhoneScreenCapture()
                     context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
                 }
-                device.getPlugin(ScreenControlPlugin::class.java)?.clearRemoteVideoTrack()
+                val screen = device.getPlugin(ScreenControlPlugin::class.java)
+                if (message.kind == WebRtcRemoteSessionControlKind.PAUSE_LOCKED) {
+                    screen?.onRemotePaused()
+                } else {
+                    screen?.onRemoteSessionEnded()
+                }
+            }
+            WebRtcRemoteSessionControlKind.CONTROL_GRANTED,
+            WebRtcRemoteSessionControlKind.TAKEOVER_GRANTED -> {
+                device.getPlugin(ScreenControlPlugin::class.java)?.onRemoteControlGranted()
+            }
+            WebRtcRemoteSessionControlKind.CONTROL_DENIED -> {
+                val screen = device.getPlugin(ScreenControlPlugin::class.java)
+                passwordDenial(message.reason)?.let { screen?.onPasswordDenied(it, control = true) }
+                    ?: screen?.onRemoteControlDenied(message.reason)
+            }
+            WebRtcRemoteSessionControlKind.INPUT_FOCUS -> {
+                device.getPlugin(ScreenControlPlugin::class.java)
+                    ?.desktopTextFocused = message.editable == true
+            }
+            WebRtcRemoteSessionControlKind.VIEW_DENIED,
+            WebRtcRemoteSessionControlKind.SCREEN_ERROR -> {
+                val screen = device.getPlugin(ScreenControlPlugin::class.java)
+                passwordDenial(message.reason)?.let { screen?.onPasswordDenied(it, control = false) }
+                    ?: screen?.onRemoteViewFailed(message.reason)
             }
             else -> Unit
         }
+        remoteSession.snapshot().let { s ->
+            transport?.setScreenControlled(
+                s.state == WebRtcRemoteSessionState.CONTROLLING && s.direction == WebRtcScreenDirection.PHONE_TO_DESKTOP,
+            )
+        }
         updateRemoteHeartbeatLocked(binding, attemptId)
-        publish("RemoteSession", remoteSession.snapshot().state.name)
+        publish(
+            "RemoteSession",
+            "${message.kind.wireName} → ${remoteSession.snapshot().state.name}" +
+                (message.reason?.let { ": $it" } ?: ""),
+        )
     }
+
+    /** A denial for want of the session password. A password that was refused is never offered
+     * again, since each one counts as a guess. */
+    private fun passwordDenial(reason: String?): SessionPasswordDenial? =
+        SessionPassword.denial(reason)?.also { denial ->
+            if (denial != SessionPasswordDenial.Required) sessionPassword.set(null)
+        }
 
     /** Keeps an otherwise idle locally owned control lease alive. A peer
      * replacement, pause, release, or takeover cancels this single scheduled
@@ -1079,7 +1558,15 @@ class WebRtcSessionCoordinator(
             cancelRemoteHeartbeatLocked()
             return
         }
+        // A heartbeat already running for this attempt is left alone. It was
+        // restarted on every control message, and the first beat comes a full
+        // interval after a start: the desktop's own heartbeat (same 10 s),
+        // screen switches and focus reports kept resetting it before it ever
+        // fired, so the 30 s lease was never renewed and control silently
+        // stopped half a minute in.
+        if (remoteHeartbeat?.isDone == false && remoteHeartbeatFor == binding to attemptId) return
         cancelRemoteHeartbeatLocked()
+        remoteHeartbeatFor = binding to attemptId
         val epoch = remoteHeartbeatEpoch
         remoteHeartbeat = recoveryExecutor.scheduleAtFixedRate({
             synchronized(lock) {
@@ -1092,6 +1579,11 @@ class WebRtcSessionCoordinator(
                 }
                 val heartbeat = remoteSession.makeLocalHeartbeat(attemptId, wire) ?: run {
                     cancelRemoteHeartbeatLocked()
+                    remoteSession.dropExpiredLease()
+                    // The lease is gone (expired or ended): say so, so the
+                    // screen stops claiming control and asks for it again,
+                    // instead of every gesture being refused in silence.
+                    device.getPlugin(ScreenControlPlugin::class.java)?.onRemoteControlStopped()
                     return@synchronized
                 }
                 runCatching { sendRemoteSessionControlLocked(binding, attemptId, heartbeat) }
@@ -1103,10 +1595,117 @@ class WebRtcSessionCoordinator(
         }, REMOTE_HEARTBEAT_SECONDS, REMOTE_HEARTBEAT_SECONDS, TimeUnit.SECONDS)
     }
 
+    /**
+     * Probes the desktop over the data channel after [PEER_PROBE_AFTER_MS] of
+     * inbound silence and declares the peer dead after [PEER_DEAD_AFTER_MS].
+     * A dead peer is usually a restarted desktop process: without this the
+     * phone kept a feature-ready transport to nothing until ICE consent
+     * freshness gave up ~25 s later, and every feature sent meanwhile was lost.
+     */
+    private fun startLivenessLocked(binding: SessionBinding, attemptId: String) {
+        cancelLivenessLocked()
+        lastInboundAt = SystemClock.elapsedRealtime()
+        lastProbeAt = lastInboundAt
+        liveness = recoveryExecutor.scheduleWithFixedDelay({
+            val dead = synchronized(lock) {
+                val active = transport
+                if (closed || activeAttemptId != attemptId || !sessions.isCurrent(binding) ||
+                    active?.isReadyForPackets() != true
+                ) {
+                    return@synchronized false
+                }
+                val now = SystemClock.elapsedRealtime()
+                val silence = now - lastInboundAt
+                if (silence >= PEER_DEAD_AFTER_MS) return@synchronized true
+                if (silence >= PEER_PROBE_AFTER_MS && now - lastProbeAt >= PEER_PROBE_AFTER_MS) {
+                    lastProbeAt = now
+                    active.sendPacket(
+                        NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT),
+                        object : TransportCallback {
+                            override fun onSuccess() = Unit
+                            override fun onFailure(error: TransportError) {
+                                Log.d(TAG, "WebRTC heartbeat failed: ${error.message}")
+                            }
+                        },
+                    )
+                }
+                false
+            }
+            if (dead) {
+                scheduleRecovery(
+                    binding,
+                    attemptId,
+                    "WebRTC peer silent for ${PEER_DEAD_AFTER_MS / 1000}s on every data channel",
+                    notifyPeer = false,
+                )
+            }
+        }, 1, 1, TimeUnit.SECONDS)
+    }
+
+    private fun cancelLivenessLocked() {
+        liveness?.cancel(false)
+        liveness = null
+    }
+
+    /** Which binding and attempt the running heartbeat belongs to. */
+    private var remoteHeartbeatFor: Pair<SessionBinding, String>? = null
+
     private fun cancelRemoteHeartbeatLocked() {
+        remoteHeartbeatFor = null
         remoteHeartbeatEpoch += 1
         remoteHeartbeat?.cancel(false)
         remoteHeartbeat = null
+    }
+
+    /**
+     * Sends one terminal message. Never throws: an unavailable transport is reported through
+     * [callback], which is how the client learns the link is down.
+     */
+    private fun sendTerminalMessage(messageType: String, payload: ByteArray, callback: TransportCallback) {
+        val active = synchronized(lock) { transport?.takeIf { it.isReadyForPackets() } }
+        if (active == null) {
+            callback.onFailure(TransportError(TransportErrorCode.CLOSED, "WebRTC terminal transport is not ready"))
+            return
+        }
+        // Outside `lock`: the send is a native call.
+        active.sendEnvelope(WebRtcChannel.TERMINAL, messageType, payload, System.currentTimeMillis(), callback)
+    }
+
+    /**
+     * Routes one `desklink.terminal.*` envelope to [terminal]. Called on the peer event thread
+     * after the envelope was bound to the wire. Replay protection covers control messages only:
+     * chunks are offset-tracked by the client, so a replayed one is trimmed, and the desktop
+     * skips the cache for them as well.
+     */
+    private fun handleTerminalEnvelope(
+        binding: SessionBinding,
+        attemptId: String,
+        wire: WebRtcWireBinding,
+        envelope: WebRtcEnvelope,
+    ) {
+        require(envelope.channel == WebRtcChannel.TERMINAL.label) {
+            "DeskLink terminal message arrived on the wrong channel"
+        }
+        require(currentTransport(binding, attemptId).handoverState().featuresAllowed) {
+            "DeskLink WebRTC feature handover is incomplete"
+        }
+        val payload = envelope.validate(wire.peerDeviceId, wire.sessionId, wire.generation)
+        when (envelope.messageType) {
+            TerminalProtocol.CONTROL_MESSAGE_TYPE -> {
+                acceptEnvelopeId(attemptId, envelope.messageId)
+                terminal.onControl(wire, payload)
+            }
+            TerminalProtocol.CHUNK_MESSAGE_TYPE -> terminal.onChunk(wire, payload)
+            else -> throw IllegalArgumentException("Unsupported DeskLink terminal message type")
+        }
+    }
+
+    private fun terminalLinkEvent(action: () -> Unit) {
+        try {
+            terminalLink.execute(action)
+        } catch (_: RejectedExecutionException) {
+            // Closed: the client is being shut down with the coordinator.
+        }
     }
 
     private fun sendFileMessage(message: OutboundWebRtcFileMessage) {
@@ -1290,10 +1889,11 @@ class WebRtcSessionCoordinator(
         })
     }
 
-    private fun startInitiatorLocked(binding: SessionBinding) {
+    private fun startInitiatorLocked(binding: SessionBinding, iceServers: List<PeerConnection.IceServer>) {
         require(!closed) { "DeskLink WebRTC coordinator is closed" }
         val attemptId = UUID.randomUUID().toString()
         activeAttemptId = attemptId
+        attemptStartedAt = SystemClock.elapsedRealtime()
         activeBinding = binding
         activeWireBinding = WebRtcWireBinding.fromAttempt(
             DeviceHelper.getDeviceId(context),
@@ -1301,7 +1901,7 @@ class WebRtcSessionCoordinator(
             attemptId,
         )
         handover = HandoverRuntime()
-        transport = createTransport(binding, attemptId, createLocalChannels = true)
+        transport = createTransport(binding, attemptId, createLocalChannels = true, iceServers)
         publish("CreatingOffer", null)
         if (transport?.createOffer() == true) {
             armOfferWatchdogLocked(binding, attemptId)
@@ -1339,6 +1939,19 @@ class WebRtcSessionCoordinator(
                 if (activeAttemptId == attemptId) closeLocked()
             }
             if (DeviceHelper.getDeviceId(context) >= device.deviceId) {
+                // The responder never schedules an initiation, so it has to
+                // release the single-slot claim here -- the initiator's release
+                // lives inside the scheduled block below, which this return
+                // never reaches.
+                //
+                // Returning with the claim still held left `scheduled` true
+                // forever, so every later claimDelayMillis() returned null and
+                // scheduleRecovery bailed at its early return -- *after* having
+                // already cancelled the disconnect grace and the offer
+                // watchdog. The responder became a permanent no-op on failure,
+                // holding a power lease, waiting for an offer that nothing
+                // would ever prompt.
+                recovery.release()
                 publish("WaitingForRecoveryOffer", null)
                 return@execute
             }
@@ -1346,9 +1959,12 @@ class WebRtcSessionCoordinator(
                 val current = sessions.currentBinding(device.deviceId)
                 recovery.release()
                 if (current == null || !sessions.isCurrent(current)) return@schedule
+                if (synchronized(lock) { closed || activeAttemptId != null }) return@schedule
+                // Fetched before the lock: the relay's TURN grant may take 2 s.
+                val iceServers = runCatching { iceServersForPath() }
                 synchronized(lock) {
                     if (closed || activeAttemptId != null) return@synchronized
-                    runCatching { startInitiatorLocked(current) }
+                    runCatching { startInitiatorLocked(current, iceServers.getOrThrow()) }
                         .onFailure { error ->
                             publish("Failed", error.message)
                             scheduleRecovery(current, attemptId, error.message ?: "WebRTC recovery failed", false)
@@ -1378,6 +1994,18 @@ class WebRtcSessionCoordinator(
             }
             disconnectedGraceAttemptId = attemptId
             device.setWebRtcRecoveryPending(true)
+            // A rebuild may still be coming, so the session must be retained
+            // for the whole grace window.
+            //
+            // Without this the window protected nothing. ICE DISCONNECTED has
+            // already forced TransportState.FAILED, so isReadyForPackets() is
+            // false throughout -- and shouldRetainSessionAfterBootstrapLoss()
+            // is `recoveryInProgress || (binding current && transport ready)`.
+            // Both halves false meant that if the LAN socket dropped in the
+            // same Wi-Fi blip, the coordinator and its peer were destroyed 12
+            // seconds before the grace timer this function exists to arm would
+            // ever have fired.
+            recoveryInProgress = true
             disconnectedGrace = recoveryExecutor.schedule({
                 val recover = synchronized(lock) {
                     if (
@@ -1418,32 +2046,42 @@ class WebRtcSessionCoordinator(
             ?.requestBootstrapReconnect()
     }
 
-    private fun configuredIceServers(): List<PeerConnection.IceServer> {
+    /**
+     * See [selectIceServers]. The relay grant is requested only for a peer
+     * bootstrapped through the relay with "Use TURN" on (docs/RELAY.md §5).
+     * Blocks up to 2 s for the grant: never call it under [lock] or on the main thread.
+     */
+    private fun iceServersForPath(): List<PeerConnection.IceServer> {
         val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        val stun = parseServerList(
-            preferences.getString(DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE, "").orEmpty(),
-            setOf("stun", "stuns"),
-        )
-        val turn = parseServerList(
-            preferences.getString(DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE, "").orEmpty(),
-            setOf("turn", "turns"),
-        )
-        return (stun + turn).map { raw ->
+        val useTurn = RelaySettings.useTurn(context)
+        val lan = device.hasLanLink
+        return selectIceServers(
+            hasLanLink = lan,
+            useTurn = useTurn,
+            configuredStun = configuredIceServers(
+                preferences.getString(DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE, "").orEmpty(),
+                setOf("stun", "stuns"),
+            ),
+            configuredTurn = if (!useTurn) emptyList() else configuredIceServers(
+                preferences.getString(DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE, "").orEmpty(),
+                setOf("turn", "turns"),
+            ),
+            granted = if (lan || !useTurn) emptyList()
+                else RelayLinkProvider.instance?.iceServersFor(device.deviceId).orEmpty(),
+        ).map(IceServerSpec::toIceServer)
+    }
+
+    private fun configuredIceServers(value: String, schemes: Set<String>): List<IceServerSpec> =
+        parseServerList(value, schemes).map { raw ->
             val uri = URI(raw)
-            val host = requireNotNull(uri.host) { "ICE server URI has no host: $raw" }
             val endpoint = buildString {
-                append(uri.scheme).append(':').append(host)
+                append(uri.scheme).append(':').append(uri.host)
                 if (uri.port >= 0) append(':').append(uri.port)
                 if (!uri.query.isNullOrEmpty()) append('?').append(uri.query)
             }
-            PeerConnection.IceServer.builder(endpoint).apply {
-                uri.userInfo?.split(':', limit = 2)?.let { credentials ->
-                    setUsername(credentials.first())
-                    if (credentials.size == 2) setPassword(credentials[1])
-                }
-            }.createIceServer()
+            val credentials = uri.userInfo?.split(':', limit = 2)
+            IceServerSpec(listOf(endpoint), credentials?.first(), credentials?.getOrNull(1))
         }
-    }
 
     private fun parseServerList(value: String, schemes: Set<String>): List<String> = value
         .split(',', '\n')
@@ -1466,18 +2104,45 @@ class WebRtcSessionCoordinator(
     }
 
     private fun closeLocked(reloadPlugins: Boolean = true) {
+        cancelLivenessLocked()
+        cancelAnswerWatchdogLocked()
         cancelDisconnectedGraceLocked()
         cancelRemoteHeartbeatLocked()
         cancelOfferWatchdogLocked()
-        fileTransfers.close("WebRTC session closed")
-        device.getPlugin(ScreenControlPlugin::class.java)?.clearRemoteVideoTrack()
-        transport?.close(org.desklink.mobile.transport.DisconnectReason.REPLACED)
+        // The file manager's methods hold the manager's monitor and call back
+        // into this coordinator for `lock`; closing it here, *under* `lock`, is
+        // the other half of that lock-order cycle. The cleanup thread does it.
+        transportCleanup.execute { fileTransfers.close("WebRTC session closed") }
+        // The peer is going away, so its remote session is over: a stale
+        // controller would leave the UI "enabled" and every gesture failing.
+        val remote = remoteSession.snapshot()
+        val hadRemoteSession = remote.remoteSessionId != null
+        if (remote.direction == WebRtcScreenDirection.DESKTOP_TO_PHONE && remote.state in RESUMABLE_REMOTE_STATES) {
+            resumeScreen.set(true)
+        }
+        remoteSession.stop()
+        device.getPlugin(ScreenControlPlugin::class.java)?.let { screen ->
+            screen.clearRemoteVideoTrack()
+            if (transport != null) screen.onCapturePeerClosed()
+            if (hadRemoteSession) {
+                screen.onRemoteSessionEnded(context.getString(R.string.remote_screen_interrupted))
+            }
+        }
+        val previousTransport = transport
+        activeWireBinding?.let { closing -> terminalLinkEvent { terminal.onLinkLost(closing) } }
         transport = null
         activeAttemptId = null
         activeBinding = null
         activeWireBinding = null
         handover = HandoverRuntime()
         device.setWebRtcTransport(null, reloadPlugins)
+        // DataChannel/PeerConnection disposal can wait for native callbacks
+        // that re-enter this coordinator. Never perform it under `lock`.
+        previousTransport?.let { previous ->
+            transportCleanup.execute {
+                previous.close(org.desklink.mobile.transport.DisconnectReason.REPLACED)
+            }
+        }
     }
 
     /** Arms one timeout for the local offer operation. Native WebRTC is
@@ -1513,6 +2178,30 @@ class WebRtcSessionCoordinator(
         }, OFFER_CREATION_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
     }
 
+    /**
+     * Re-offers when the desktop never answers. Nothing else noticed: with no
+     * remote description ICE never starts, so no FAILED callback arrives, and
+     * the phone waited for a heartbeat-driven restart up to 20 s later.
+     */
+    private fun armAnswerWatchdogLocked(binding: SessionBinding, attemptId: String) {
+        cancelAnswerWatchdogLocked()
+        answerWatchdog = recoveryExecutor.schedule({
+            val unanswered = synchronized(lock) {
+                answerWatchdog = null
+                !closed && activeAttemptId == attemptId && sessions.isCurrent(binding) &&
+                    handover.answerSdp == null
+            }
+            if (unanswered) {
+                scheduleRecovery(binding, attemptId, "No answer to the WebRTC offer", notifyPeer = false)
+            }
+        }, ANSWER_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun cancelAnswerWatchdogLocked() {
+        answerWatchdog?.cancel(false)
+        answerWatchdog = null
+    }
+
     private fun cancelOfferWatchdogLocked() {
         offerWatchdog?.cancel(false)
         offerWatchdog = null
@@ -1524,6 +2213,28 @@ class WebRtcSessionCoordinator(
             seenRequestIds.iterator().run { next(); remove() }
         }
     }
+
+    /**
+     * Records a data-channel envelope ID, rejecting a repeat.
+     *
+     * The attempt ID is part of the key rather than a scalar the cache is reset
+     * on. Two transports are briefly alive during a peer replacement — the old
+     * peer's callbacks are not stopped synchronously — so a single "current
+     * attempt" field was flipped back and forth by interleaved envelopes and
+     * cleared the whole set on nearly every message. That defeated replay
+     * protection precisely during the window it exists to cover.
+     *
+     * `LinkedHashSet` eviction is oldest-first, so a recently seen ID is never
+     * dropped ahead of an old one.
+     */
+    private fun acceptEnvelopeId(attemptId: String, messageId: String) =
+        synchronized(seenEnvelopeIds) {
+            require(messageId.isNotEmpty()) { "WebRTC envelope has no message ID" }
+            require(seenEnvelopeIds.add("$attemptId|$messageId")) { "Replayed WebRTC envelope" }
+            while (seenEnvelopeIds.size > MAX_SEEN_REQUESTS) {
+                seenEnvelopeIds.iterator().run { next(); remove() }
+            }
+        }
 
     // Paired features have no LAN fallback. Disabling WebRTC would therefore
     // disable the product while discovery still appeared connected.
@@ -1547,12 +2258,28 @@ class WebRtcSessionCoordinator(
 
     companion object {
         private const val TAG = "DeskLink/WebRTC"
+        private val RESUMABLE_REMOTE_STATES = setOf(
+            WebRtcRemoteSessionState.VIEWING,
+            WebRtcRemoteSessionState.REQUESTING_CONTROL,
+            WebRtcRemoteSessionState.CONTROLLING,
+            WebRtcRemoteSessionState.PAUSED_LOCKED,
+            WebRtcRemoteSessionState.RECONNECTING,
+        )
+        private const val TERMINAL_MESSAGE_PREFIX = "desklink.terminal."
         private const val MAX_SDP_BYTES = 256 * 1024
         private const val MAX_CANDIDATE_BYTES = 16 * 1024
         private const val MAX_SEEN_REQUESTS = 4096
         private const val TRANSIENT_DISCONNECT_GRACE_MILLIS = 12_000L
         private const val OFFER_CREATION_TIMEOUT_MILLIS = 10_000L
         private const val REMOTE_HEARTBEAT_SECONDS = 10L
+        const val PEER_PROBE_AFTER_MS = 5_000L
+        const val PEER_DEAD_AFTER_MS = 15_000L
+        const val ATTEMPT_STALL_MS = 20_000L
+        // The measured LAN offer→answer is ~0.3 s; 5 s leaves room for the
+        // desktop building its first GStreamer pipeline.
+        const val ANSWER_TIMEOUT_MS = 5_000L
+        /** A little longer than the desktop's own two-minute portal timeout. */
+        private const val REMOTE_REQUEST_TIMEOUT_SECONDS = 135L
 
         @JvmStatic
         fun shouldInitiateForRestartRequest(localDeviceId: String, remoteDeviceId: String): Boolean =

@@ -51,6 +51,7 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -200,6 +201,12 @@ public class SharePlugin extends Plugin {
         return true;
     }
 
+    private static void closeUnusedPayload(@NonNull NetworkPacket np) {
+        if (np.getPayload() != null) {
+            np.getPayload().close();
+        }
+    }
+
     @Override
     @WorkerThread
     public boolean onPacketReceived(@NonNull NetworkPacket np) {
@@ -214,15 +221,22 @@ public class SharePlugin extends Plugin {
                 return true;
             }
 
+            // Only receiveFile consumes a payload. The other three branches used
+            // to return with one still open, which over WebRTC leaks a file
+            // descriptor and leaves the backing temp file undeleted, because
+            // Payload.close() is what removes it.
             if (np.has("filename")) {
                 receiveFile(np);
             } else if (np.has("text")) {
                 Log.i("SharePlugin", "hasText");
                 receiveText(np);
+                closeUnusedPayload(np);
             } else if (np.has("url")) {
                 receiveUrl(np);
+                closeUnusedPayload(np);
             } else {
                 Log.e("SharePlugin", "Error: Nothing attached!");
+                closeUnusedPayload(np);
             }
 
         } catch (Exception e) {
@@ -233,12 +247,35 @@ public class SharePlugin extends Plugin {
         return true;
     }
 
+    /**
+     * Schemes a paired peer may ask this phone to open.
+     *
+     * The URL comes off the wire and used to be handed to ACTION_VIEW as-is, so
+     * a paired desktop could drive an arbitrary activity with attacker-chosen
+     * data through {@code content://}, {@code file://} or a vendor deep link.
+     * Sharing a link is the actual feature, so the web schemes are enough.
+     */
+    private static boolean isShareableUrl(@Nullable Uri uri) {
+        if (uri == null || uri.getScheme() == null) {
+            return false;
+        }
+        String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+        return scheme.equals("http") || scheme.equals("https") || scheme.equals("mailto")
+                || scheme.equals("tel") || scheme.equals("geo") || scheme.equals("sms");
+    }
+
     private void receiveUrl(NetworkPacket np) {
         String url = np.getString("url");
 
-        Log.i("SharePlugin", "hasUrl: " + url);
+        Uri uri = Uri.parse(url);
+        if (!isShareableUrl(uri)) {
+            Log.w("SharePlugin", "Refusing to open a shared URL with an unsupported scheme");
+            return;
+        }
 
-        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        Log.i("SharePlugin", "Opening a shared URL");
+
+        Intent browserIntent = new Intent(Intent.ACTION_VIEW, uri);
         browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
         IntentHelper.startActivityFromBackgroundOrCreateNotification(context, browserIntent, url);
@@ -298,6 +335,7 @@ public class SharePlugin extends Plugin {
             NetworkPacket np = FilesHelper.uriToNetworkPacket(context, uri, PACKET_TYPE_SHARE_REQUEST);
 
             if (np != null) {
+                TransferHistory.rememberSource(np, uri);
                 job.addNetworkPacket(np);
             }
         }

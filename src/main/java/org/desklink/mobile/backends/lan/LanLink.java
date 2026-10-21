@@ -6,9 +6,10 @@
 
 package org.desklink.mobile.backends.lan;
 
-import static main.java.org.desklink.mobile.helpers.BoundedLineReaderKt.readLineBounded;
+import static org.desklink.mobile.helpers.BoundedLineReaderKt.readLineBounded;
 
 import android.content.Context;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -25,6 +26,7 @@ import org.desklink.mobile.helpers.ThreadHelper;
 import org.desklink.mobile.NetworkPacket;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -41,11 +43,23 @@ import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLSocket;
 
 import kotlin.text.Charsets;
-import main.java.org.desklink.mobile.helpers.LineTooLongException;
 
 public class LanLink extends BaseLink {
 
     final static int MAX_PACKET_SIZE = 32 * 1024 * 1024;
+    /**
+     * How long the link may hear nothing at all before it is declared dead.
+     *
+     * Tuning knob: long enough that a genuinely quiet link is not churned,
+     * short enough to be worth having. Android's own TCP keepalive would
+     * take about two hours and cannot be configured from Java.
+     *
+     * The desktop probes after 10 s of silence (daemon/mod.rs HEARTBEAT_IDLE),
+     * so a live link is never quiet for long; 35 s is three missed probes.
+     * At 120 s a zombie socket outlived a network switch by two minutes while
+     * this side ignored the desktop's beacons and signaled into the dead link.
+     */
+    final static long IDLE_TIMEOUT_MILLIS = 35_000L;
     final static long MAX_PAYLOAD_SIZE = 4L * 1024L * 1024L * 1024L;
     public enum ConnectionStarted {
         Locally, Remotely
@@ -54,6 +68,9 @@ public class LanLink extends BaseLink {
     private DeviceInfo deviceInfo;
 
     private volatile SSLSocket socket = null;
+
+    /** Guards writes to {@link #socket}, which several threads share. */
+    private final Object writeLock = new Object();
 
     @Override
     public void disconnect() {
@@ -81,13 +98,34 @@ public class LanLink extends BaseLink {
         ThreadHelper.execute(() -> {
             try {
                 BufferedInputStream stream = new BufferedInputStream(newSocket.getInputStream());
+                // Survives read timeouts so a packet split by a stall is not
+                // truncated. See readLineBounded.
+                ByteArrayOutputStream carry = new ByteArrayOutputStream(1024);
+                long lastActivityAt = SystemClock.elapsedRealtime();
                 while (true) {
                     String packet;
                     try {
-                        packet = readLineBounded(stream, MAX_PACKET_SIZE);
-                    } catch (LineTooLongException | SocketTimeoutException e) {
+                        packet = readLineBounded(stream, MAX_PACKET_SIZE, carry);
+                    } catch (SocketTimeoutException e) {
+                        // SslHelper sets a 10s soTimeout, and this used to
+                        // `continue` unconditionally. A peer that vanished
+                        // without a FIN — laptop lid closed, AP rebooted — left
+                        // this thread spinning for the ~2h07m it takes Android's
+                        // untunable tcp_keepalive_time to notice, during which
+                        // the device reported itself reachable, every send
+                        // succeeded into a dead socket, and the service held an
+                        // untimed PARTIAL_WAKE_LOCK.
+                        //
+                        // Java cannot set a keepalive interval, so silence is
+                        // the only signal available here. Discovery re-dials
+                        // immediately after, so a link dropped while merely idle
+                        // costs a reconnect, not a disconnection.
+                        if (SystemClock.elapsedRealtime() - lastActivityAt > IDLE_TIMEOUT_MILLIS) {
+                            throw new IOException("No data from the peer in " + IDLE_TIMEOUT_MILLIS + "ms");
+                        }
                         continue;
                     }
+                    lastActivityAt = SystemClock.elapsedRealtime();
                     if (packet.isEmpty()) {
                         continue;
                     }
@@ -149,9 +187,18 @@ public class LanLink extends BaseLink {
 
             //Log.e("LanLink/sendPacket", np.getType());
 
-            OutputStream writer = socket.getOutputStream();
-            writer.write(np.serialize().getBytes(Charsets.UTF_8));
-            writer.flush();
+            // Serialize writes. Signed SDP/ICE is written from the WebRTC
+            // callback and recovery threads while feature packets are written
+            // from the outbound coroutine, and an unsynchronized write/flush
+            // pair let those interleave — splicing two newline-delimited
+            // packets into one line that the peer then discards. Losing an
+            // offer that way stalls the whole handover.
+            byte[] bytes = np.serialize().getBytes(Charsets.UTF_8);
+            synchronized (writeLock) {
+                OutputStream writer = socket.getOutputStream();
+                writer.write(bytes);
+                writer.flush();
+            }
             if (!np.isCanceled()) {
                 callback.onSuccess();
             } else {

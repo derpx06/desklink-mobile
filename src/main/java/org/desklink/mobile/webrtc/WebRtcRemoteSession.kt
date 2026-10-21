@@ -49,6 +49,11 @@ enum class WebRtcRemoteSessionControlKind(val wireName: String) {
     SCREEN_ERROR("screen-error"),
     PAUSE_LOCKED("pause-locked"),
     RESUME("resume"),
+    /** Desktop → phone report: a text input on the desktop gained or lost
+     * focus, so the phone raises or drops its keyboard. */
+    INPUT_FOCUS("input-focus"),
+    /** Phone → desktop: show the next shared screen. */
+    SWITCH_SCREEN("switch-screen"),
     ;
 
     companion object {
@@ -79,6 +84,13 @@ data class WebRtcRemoteSessionControlMessage(
     val screenWidth: Int? = null,
     val screenHeight: Int? = null,
     val screenRotation: Int? = null,
+    /** `input-focus`: whether the focused desktop element takes typing. */
+    val editable: Boolean? = null,
+    /** `screen-ready`: how many screens the desktop shares. */
+    val screenCount: Int? = null,
+    /** `request-view` / `request-control`: the desktop's session password, when one is known
+     * (see [SessionPassword]). Omitted, never empty. */
+    val password: String? = null,
 ) {
     fun validate(wire: WebRtcWireBinding, attemptId: String, now: Long) {
         require(remoteSessionVersion == VERSION) { "Unsupported DeskLink remote-session version" }
@@ -130,6 +142,9 @@ data class WebRtcRemoteSessionControlMessage(
             screenWidth?.let { value.put("screenWidth", it) }
             screenHeight?.let { value.put("screenHeight", it) }
             screenRotation?.let { value.put("screenRotation", it) }
+            editable?.let { value.put("editable", it) }
+            screenCount?.let { value.put("screenCount", it) }
+            password?.takeIf(String::isNotEmpty)?.let { value.put("password", it) }
         }
 
     companion object {
@@ -157,6 +172,9 @@ data class WebRtcRemoteSessionControlMessage(
                 screenWidth = value.takeIf { it.has("screenWidth") }?.getInt("screenWidth"),
                 screenHeight = value.takeIf { it.has("screenHeight") }?.getInt("screenHeight"),
                 screenRotation = value.takeIf { it.has("screenRotation") }?.getInt("screenRotation"),
+                editable = value.takeIf { it.has("editable") }?.getBoolean("editable"),
+                screenCount = value.takeIf { it.has("screenCount") }?.getInt("screenCount")?.coerceIn(0, 16),
+                password = value.optString("password").takeIf(String::isNotEmpty),
             )
     }
 }
@@ -174,28 +192,60 @@ class WebRtcRemoteSessionController(
     private var direction: WebRtcScreenDirection? = null
     private var lease: Lease? = null
     private var nextSequence = 1L
+    private var screenWidth: Int? = null
+    private var screenHeight: Int? = null
 
     private data class Lease(
         val id: String,
         val ownerDeviceId: String,
         val generation: Long,
         var expiresAt: Long,
-        var lastSequence: Long = 0,
+        val sequenceWindow: InputSequenceWindow = InputSequenceWindow(),
     )
+
+    /** Bounded replay protection that tolerates delivery reordering between
+     * the realtime pointer and reliable discrete-input WebRTC channels. */
+    private class InputSequenceWindow {
+        private var highest = 0L
+        private val seen = hashSetOf<Long>()
+
+        fun accept(sequence: Long): Boolean {
+            if (sequence <= 0) return false
+            if (sequence > highest) {
+                highest = sequence
+                seen += sequence
+                val oldest = highest - WIDTH + 1
+                seen.removeAll { it < oldest }
+                return true
+            }
+            if (highest - sequence >= WIDTH) return false
+            return seen.add(sequence)
+        }
+
+        private companion object {
+            const val WIDTH = 128L
+        }
+    }
 
     data class Snapshot(
         val state: WebRtcRemoteSessionState,
         val remoteSessionId: String?,
         val direction: WebRtcScreenDirection?,
         val hasControlLease: Boolean,
+        /** The desktop's own coordinate space, from its `screen-ready`. Input
+         * must be mapped into this, not into the (downscaled) decoded frame. */
+        val screenWidth: Int? = null,
+        val screenHeight: Int? = null,
     )
 
     @Synchronized
-    fun snapshot(): Snapshot = Snapshot(state, sessionId, direction, lease != null)
+    fun snapshot(): Snapshot =
+        Snapshot(state, sessionId, direction, lease != null, screenWidth, screenHeight)
 
     @Synchronized
     fun beginView(direction: WebRtcScreenDirection): String {
         clearLease()
+        clearGeometry()
         val id = UUID.randomUUID().toString()
         sessionId = id
         this.direction = direction
@@ -243,6 +293,7 @@ class WebRtcRemoteSessionController(
         screenWidth: Int? = null,
         screenHeight: Int? = null,
         screenRotation: Int? = null,
+        password: String? = null,
     ): WebRtcRemoteSessionControlMessage = WebRtcRemoteSessionControlMessage(
         remoteSessionVersion = WebRtcRemoteSessionControlMessage.VERSION,
         kind = kind,
@@ -261,21 +312,27 @@ class WebRtcRemoteSessionController(
         screenWidth = screenWidth,
         screenHeight = screenHeight,
         screenRotation = screenRotation,
+        password = password,
     )
 
     /** Applies a validated peer control message and returns the automatic
      * paired-device acknowledgement, if a policy-free acknowledgement exists.
-     * Permission-dependent grants are made by the platform coordinator. */
+     * Permission-dependent grants are made by the platform coordinator.
+     *
+     * Returns false when the message belongs to a session this controller has
+     * already left (a delayed release, denial or error for a previous view). It
+     * changed nothing and the caller must not act on it either. */
     @Synchronized
     fun accept(
         message: WebRtcRemoteSessionControlMessage,
         wire: WebRtcWireBinding,
         attemptId: String,
-    ) {
+    ): Boolean {
         message.validate(wire, attemptId, System.currentTimeMillis())
         when (message.kind) {
             WebRtcRemoteSessionControlKind.REQUEST_VIEW -> {
                 clearLease()
+                clearGeometry()
                 sessionId = message.remoteSessionId
                 direction = requireNotNull(message.direction) { "DeskLink remote view has no direction" }
                 state = WebRtcRemoteSessionState.REQUESTING_VIEW
@@ -284,7 +341,17 @@ class WebRtcRemoteSessionController(
             WebRtcRemoteSessionControlKind.SCREEN_READY -> {
                 requireSession(message.remoteSessionId)
                 direction = requireNotNull(message.direction) { "DeskLink remote view has no direction" }
-                state = WebRtcRemoteSessionState.VIEWING
+                if (message.screenWidth != null && message.screenHeight != null) {
+                    screenWidth = message.screenWidth
+                    screenHeight = message.screenHeight
+                }
+                // A screen-ready for a session already under control is the
+                // desktop announcing another screen (Switch screen): only the
+                // geometry changes. Dropping to VIEWING here lost the control
+                // lease, and every tap after a switch went nowhere.
+                if (state != WebRtcRemoteSessionState.CONTROLLING) {
+                    state = WebRtcRemoteSessionState.VIEWING
+                }
             }
             WebRtcRemoteSessionControlKind.REQUEST_CONTROL,
             WebRtcRemoteSessionControlKind.TAKEOVER_REQUEST -> {
@@ -305,12 +372,13 @@ class WebRtcRemoteSessionController(
                 state = WebRtcRemoteSessionState.CONTROLLING
             }
             WebRtcRemoteSessionControlKind.HEARTBEAT -> {
-                val current = lease ?: return
+                val current = lease ?: return false
                 require(current.id == message.leaseId && current.ownerDeviceId == message.deviceId) {
                     "DeskLink remote-control heartbeat does not own the lease"
                 }
-                require(message.sequence > current.lastSequence) { "Replayed DeskLink remote-control heartbeat" }
-                current.lastSequence = message.sequence
+                require(current.sequenceWindow.accept(message.sequence)) {
+                    "Replayed DeskLink remote-control heartbeat"
+                }
                 current.expiresAt = System.currentTimeMillis() + LEASE_MILLIS
             }
             WebRtcRemoteSessionControlKind.PAUSE_LOCKED -> {
@@ -322,13 +390,41 @@ class WebRtcRemoteSessionController(
                 requireSession(message.remoteSessionId)
                 state = WebRtcRemoteSessionState.VIEWING
             }
+            // A report about the desktop's focus; it changes no session state,
+            // and only counts for the session in progress.
+            WebRtcRemoteSessionControlKind.INPUT_FOCUS -> {
+                if (!isCurrent(message)) return false
+            }
+            // Sent by this phone, never received.
+            WebRtcRemoteSessionControlKind.SWITCH_SCREEN ->
+                throw IllegalArgumentException("switch-screen is a request to the desktop")
             WebRtcRemoteSessionControlKind.RELEASE,
-            WebRtcRemoteSessionControlKind.SCREEN_STOPPED -> stopInternal(WebRtcRemoteSessionState.STOPPED)
-            WebRtcRemoteSessionControlKind.VIEW_DENIED,
-            WebRtcRemoteSessionControlKind.CONTROL_DENIED -> stopInternal(WebRtcRemoteSessionState.DENIED)
-            WebRtcRemoteSessionControlKind.SCREEN_ERROR -> stopInternal(WebRtcRemoteSessionState.FAILED)
+            WebRtcRemoteSessionControlKind.SCREEN_STOPPED -> {
+                if (!isCurrent(message)) return false
+                stopInternal(WebRtcRemoteSessionState.STOPPED)
+            }
+            WebRtcRemoteSessionControlKind.CONTROL_DENIED -> {
+                if (!isCurrent(message)) return false
+                // Failure to grant input must not tear down a working screen
+                // view. Retain its identity so the user can retry after
+                // changing the desktop's input-permission decision.
+                clearLease()
+                state = WebRtcRemoteSessionState.VIEWING
+            }
+            WebRtcRemoteSessionControlKind.VIEW_DENIED -> {
+                if (!isCurrent(message)) return false
+                stopInternal(WebRtcRemoteSessionState.DENIED)
+            }
+            WebRtcRemoteSessionControlKind.SCREEN_ERROR -> {
+                if (!isCurrent(message)) return false
+                stopInternal(WebRtcRemoteSessionState.FAILED)
+            }
         }
+        return true
     }
+
+    private fun isCurrent(message: WebRtcRemoteSessionControlMessage) =
+        sessionId == message.remoteSessionId
 
     /** Adds required lease metadata to a local input packet. */
     @Synchronized
@@ -343,6 +439,17 @@ class WebRtcRemoteSessionController(
         packet[LEASE_ID_FIELD] = current.id
         packet[INPUT_SEQUENCE_FIELD] = nextSequence()
         return packet
+    }
+
+    /** A lease that ran out leaves the session viewing, so control can be
+     * asked for again. True when one was dropped. */
+    @Synchronized
+    fun dropExpiredLease(now: Long = System.currentTimeMillis()): Boolean {
+        val current = lease ?: return false
+        if (current.expiresAt > now) return false
+        lease = null
+        if (state == WebRtcRemoteSessionState.CONTROLLING) state = WebRtcRemoteSessionState.VIEWING
+        return true
     }
 
     /** Returns a control heartbeat only when this endpoint owns the active
@@ -361,6 +468,11 @@ class WebRtcRemoteSessionController(
         ) {
             return null
         }
+        // The desktop extends its copy of the lease when this heartbeat arrives.
+        // The owner never receives its own, so it must extend its own here, or
+        // its copy expires at the desktop's initial grant and the phone starts
+        // refusing every gesture while the UI still shows control as enabled.
+        current.expiresAt = System.currentTimeMillis() + LEASE_MILLIS
         return makeMessage(
             WebRtcRemoteSessionControlKind.HEARTBEAT,
             attemptId,
@@ -398,8 +510,7 @@ class WebRtcRemoteSessionController(
             "DeskLink remote input session or lease mismatch"
         }
         val sequence = packet.getLong(INPUT_SEQUENCE_FIELD, 0)
-        require(sequence > current.lastSequence) { "Replayed DeskLink remote input" }
-        current.lastSequence = sequence
+        require(current.sequenceWindow.accept(sequence)) { "Replayed DeskLink remote input" }
         current.expiresAt = System.currentTimeMillis() + LEASE_MILLIS
     }
 
@@ -414,6 +525,31 @@ class WebRtcRemoteSessionController(
         )
         lease = newLease
         state = WebRtcRemoteSessionState.CONTROLLING
+    }
+
+    /**
+     * The desktop never answered a view request. Ends it, but only if that exact
+     * request is still the pending one — a grant that landed in the meantime, or
+     * a newer request, must not be torn down by a stale timer.
+     */
+    @Synchronized
+    fun viewRequestTimedOut(remoteSessionId: String): Boolean {
+        if (sessionId != remoteSessionId || state != WebRtcRemoteSessionState.REQUESTING_VIEW) {
+            return false
+        }
+        stopInternal(WebRtcRemoteSessionState.FAILED)
+        return true
+    }
+
+    /** The desktop never answered a control request: fall back to the view, so
+     * the user can simply ask again. */
+    @Synchronized
+    fun controlRequestTimedOut(remoteSessionId: String): Boolean {
+        if (sessionId != remoteSessionId || state != WebRtcRemoteSessionState.REQUESTING_CONTROL) {
+            return false
+        }
+        state = WebRtcRemoteSessionState.VIEWING
+        return true
     }
 
     @Synchronized
@@ -433,8 +569,14 @@ class WebRtcRemoteSessionController(
         lease = null
     }
 
+    private fun clearGeometry() {
+        screenWidth = null
+        screenHeight = null
+    }
+
     private fun stopInternal(newState: WebRtcRemoteSessionState) {
         clearLease()
+        clearGeometry()
         sessionId = null
         direction = null
         state = newState

@@ -26,6 +26,12 @@ class DeskLinkBroadcastReceiver : BroadcastReceiver() {
 
             Intent.ACTION_BOOT_COMPLETED -> {
                 Log.i("DeskLink", "DeskLinkBroadcastReceiver")
+                // Settings → Connect on startup; on unless the person turned it off.
+                if (!androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+                        .getBoolean(org.desklink.mobile.ui.compose.screen.settings.KEY_CONNECT_ON_STARTUP, true)
+                ) {
+                    return
+                }
                 try {
                     BackgroundService.Start(context)
                 } catch (e: IllegalStateException) { // To catch ForegroundServiceStartNotAllowedException

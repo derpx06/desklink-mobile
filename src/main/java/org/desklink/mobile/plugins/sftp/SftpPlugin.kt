@@ -89,7 +89,14 @@ class SftpPlugin : Plugin(), OnSharedPreferenceChangeListener {
         }
 
     override fun onDestroy() {
-        server.stop()
+        synchronized(serverLock) {
+            // Only the owning device may stop the shared server; otherwise one
+            // device disconnecting ended another device's live session.
+            if (activeDeviceId == device.deviceId) {
+                server.stop()
+                activeDeviceId = null
+            }
+        }
         preferences?.unregisterOnSharedPreferenceChangeListener(this)
     }
 
@@ -106,8 +113,22 @@ class SftpPlugin : Plugin(), OnSharedPreferenceChangeListener {
             return true
         }
 
-        if (!server.isInitialized || server.isClosed) {
-            server.initialize(context, device)
+        synchronized(serverLock) {
+            val owner = activeDeviceId
+            if (owner != null && owner != device.deviceId && !server.isClosed) {
+                device.sendPacket(NetworkPacket(PACKET_TYPE_SFTP).apply {
+                    this["errorMessage"] =
+                        context.getString(R.string.sftp_busy_with_another_device)
+                })
+                return true
+            }
+            // Re-initialize on an ownership change as well as a cold start.
+            // Skipping it left the server's key material bound to whichever
+            // device connected first.
+            if (!server.isInitialized || server.isClosed || owner != device.deviceId) {
+                server.initialize(context, device)
+            }
+            activeDeviceId = device.deviceId
         }
 
         val paths = mutableListOf<String>()
@@ -277,6 +298,23 @@ class SftpPlugin : Plugin(), OnSharedPreferenceChangeListener {
         @JvmField
         val PREFERENCE_KEY_STORAGE_INFO_LIST: Int = R.string.sftp_preference_key_storage_info_list
 
+        /**
+         * One SFTP server for the whole process, shared by every device's
+         * plugin instance — but storage roots are a *per-device* setting.
+         *
+         * Nothing used to arbitrate that. A second device asking to browse
+         * called `setSafRoots` and re-pointed the first device's already
+         * authenticated session at folders it had never been granted, its
+         * `onDestroy` called `server.stop()` and killed the first device's
+         * transfer mid-flight, and because `initialize` is skipped when the
+         * server is already up, the key stayed pinned to whichever device
+         * happened to be first. [activeDeviceId] makes ownership explicit:
+         * one device at a time, and only the owner can stop or reconfigure it.
+         */
         private val server = SimpleSftpServer()
+
+        private val serverLock = Any()
+
+        private var activeDeviceId: String? = null
     }
 }

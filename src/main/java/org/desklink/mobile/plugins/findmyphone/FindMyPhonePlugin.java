@@ -18,6 +18,8 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -37,8 +39,6 @@ import org.desklink.mobile.ui.PluginSettingsFragment;
 import org.desklink.mobile.R;
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol;
 
-import java.io.IOException;
-
 @PluginFactory.LoadablePlugin
 public class FindMyPhonePlugin extends Plugin {
     public final static String PACKET_TYPE_FINDMYPHONE_REQUEST = DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST;
@@ -48,8 +48,11 @@ public class FindMyPhonePlugin extends Plugin {
     private AudioManager audioManager;
     private MediaPlayer mediaPlayer;
     private int previousVolume = -1;
-    private PowerManager powerManager;
     private FlashlightManager flashlightManager;
+    private Vibrator vibrator;
+    /** The ringtone could not be played on the last ring: vibrate and flash instead. */
+    private boolean silent;
+    private boolean audioFailureLogged;
 
     @Override
     public @NonNull String getDisplayName() {
@@ -74,47 +77,19 @@ public class FindMyPhonePlugin extends Plugin {
         notificationManager = ContextCompat.getSystemService(context, NotificationManager.class);
         notificationId = (int) System.currentTimeMillis();
         audioManager = ContextCompat.getSystemService(context, AudioManager.class);
-        powerManager = ContextCompat.getSystemService(context, PowerManager.class);
         flashlightManager = new FlashlightManager(context);
 
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        Uri ringtone;
-        String ringtoneString = prefs.getString(context.getString(R.string.findmyphone_preference_key_ringtone), "");
-        if (ringtoneString.isEmpty()) {
-            ringtone = Settings.System.DEFAULT_RINGTONE_URI;
-        } else {
-            ringtone = Uri.parse(ringtoneString);
-        }
-
-        try {
-            mediaPlayer = new MediaPlayer();
-            mediaPlayer.setDataSource(context, ringtone);
-            AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_UNKNOWN)
-                .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
-                .build();
-            mediaPlayer.setWakeMode(context, PowerManager.SCREEN_DIM_WAKE_LOCK); // Prevent screen turning off, requires WAKE_LOCK permission
-            mediaPlayer.setAudioAttributes(audioAttributes);
-            mediaPlayer.setLooping(true);
-            mediaPlayer.prepare();
-        } catch (Exception e) {
-            Log.e("FindMyPhoneActivity", "Exception", e);
-            return false;
-        }
-
+        vibrator = ContextCompat.getSystemService(context, Vibrator.class);
+        // The player is built when the phone rings, never here: a ringtone that cannot be prepared
+        // (no audio device, a missing or not-yet-unlocked file) must not unload the plugin.
         return true;
     }
 
     @Override
     public void onDestroy() {
-        if (mediaPlayer.isPlaying()) {
-            stopPlaying();
-        }
+        stopPlaying();
+        stopFlashing();
         audioManager = null;
-        mediaPlayer.release();
-        mediaPlayer = null;
-
         flashlightManager = null;
     }
 
@@ -126,13 +101,11 @@ public class FindMyPhonePlugin extends Plugin {
             intent.putExtra(FindMyPhoneActivity.EXTRA_DEVICE_ID, getDevice().getDeviceId());
             context.startActivity(intent);
         } else {
-            if (powerManager.isInteractive()) {
-                startPlaying();
-                startFlashing();
-                showBroadcastNotification();
-            } else {
-                showActivityNotification();
-            }
+            // Ring from here, screen on or off: a full-screen intent would need
+            // USE_FULL_SCREEN_INTENT, which Play grants only to calling and alarm apps.
+            startPlaying();
+            startFlashing();
+            showBroadcastNotification();
         }
         return true;
     }
@@ -148,20 +121,12 @@ public class FindMyPhonePlugin extends Plugin {
         createNotification(pendingIntent);
     }
 
-    private void showActivityNotification() {
-        Intent intent = new Intent(context, FindMyPhoneActivity.class);
-        intent.putExtra(FindMyPhoneActivity.EXTRA_DEVICE_ID, getDevice().getDeviceId());
-
-        PendingIntent pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        createNotification(pi);
-    }
-
     private void createNotification(PendingIntent pendingIntent) {
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY);
         notification
                 .setSmallIcon(R.drawable.ic_notification)
                 .setOngoing(false)
-                .setFullScreenIntent(pendingIntent, true)
+                .setContentIntent(pendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setOngoing(true)
@@ -172,17 +137,65 @@ public class FindMyPhonePlugin extends Plugin {
     }
 
     void startPlaying() {
-        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
-            // Make sure we are heard even when the phone is silent, restore original volume later
-            previousVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
+        if (audioManager == null || mediaPlayer != null || silent) {
+            return; // destroyed, or already ringing
+        }
+        mediaPlayer = preparePlayer();
+        if (mediaPlayer == null) {
+            silent = true;
+            startVibrating();
+            return;
+        }
+        // Make sure we are heard even when the phone is silent, restore original volume later
+        previousVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
+        mediaPlayer.start();
+    }
 
-            mediaPlayer.start();
+    private MediaPlayer preparePlayer() {
+        MediaPlayer player = new MediaPlayer();
+        try {
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+            String ringtoneString = prefs.getString(context.getString(R.string.findmyphone_preference_key_ringtone), "");
+            Uri ringtone = ringtoneString.isEmpty() ? Settings.System.DEFAULT_RINGTONE_URI : Uri.parse(ringtoneString);
+            player.setDataSource(context, ringtone);
+            AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_UNKNOWN)
+                .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
+                .build();
+            player.setWakeMode(context, PowerManager.SCREEN_DIM_WAKE_LOCK); // Prevent screen turning off, requires WAKE_LOCK permission
+            player.setAudioAttributes(audioAttributes);
+            player.setLooping(true);
+            player.prepare();
+            return player;
+        } catch (Exception e) {
+            player.release();
+            if (!audioFailureLogged) {
+                audioFailureLogged = true;
+                Log.e("FindMyPhonePlugin", "Ringtone cannot be played; vibrating and flashing instead", e);
+            }
+            return null;
+        }
+    }
+
+    @SuppressWarnings("deprecation") // vibrate(long[], int) is the only option below API 26
+    private void startVibrating() {
+        if (vibrator == null || !vibrator.hasVibrator()) {
+            return;
+        }
+        long[] pattern = {0, 800, 400};
+        AudioAttributes alarm = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).build();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0), alarm);
+        } else {
+            vibrator.vibrate(pattern, 0, alarm);
         }
     }
 
     void startFlashing() {
-        if (isFlashlightEnabledInSettings() && isPermissionGranted(Manifest.permission.CAMERA)) {
+        // Without sound the flashlight is how the phone is found, so it flashes even when not opted in.
+        if ((silent || isFlashlightEnabledInSettings()) && isPermissionGranted(Manifest.permission.CAMERA)) {
             flashlightManager.startFlashing();
         }
     }
@@ -196,24 +209,28 @@ public class FindMyPhonePlugin extends Plugin {
             // The Plugin was destroyed (probably the device disconnected)
             return;
         }
-
+        if (silent) {
+            silent = false;
+            if (vibrator != null) {
+                vibrator.cancel();
+            }
+        }
+        if (mediaPlayer == null) {
+            return;
+        }
         if (previousVolume != -1) {
             audioManager.setStreamVolume(AudioManager.STREAM_ALARM, previousVolume, 0);
+            previousVolume = -1;
         }
         mediaPlayer.stop();
-        try {
-            mediaPlayer.prepare();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        mediaPlayer.release();
+        mediaPlayer = null;
     }
 
     void stopFlashing() {
-        flashlightManager.stopFlashing();
-    }
-
-    boolean isPlaying() {
-        return mediaPlayer.isPlaying();
+        if (flashlightManager != null) {
+            flashlightManager.stopFlashing();
+        }
     }
 
     @Override

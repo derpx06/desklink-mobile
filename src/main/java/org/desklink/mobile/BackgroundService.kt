@@ -13,6 +13,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.ConnectivityManager.NetworkCallback
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -27,12 +28,17 @@ import androidx.annotation.MainThread
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.MutableLiveData
 import org.desklink.mobile.backends.BaseLinkProvider
 import org.desklink.mobile.backends.BaseLinkProvider.ConnectionReceiver
 import org.desklink.mobile.backends.bluetooth.BluetoothLinkProvider
 import org.desklink.mobile.backends.lan.LanLinkProvider
+import org.desklink.mobile.backends.relay.RelayLinkProvider
+import org.desklink.mobile.backends.relay.RelaySettings
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.plugins.clipboard.ClipboardFloatingActivity
 import org.desklink.mobile.plugins.clipboard.ClipboardPlugin
@@ -56,9 +62,11 @@ import java.util.concurrent.Executors
 class BackgroundService : Service() {
     private lateinit var applicationInstance: DeskLinkApplication
     private var networkCallback: NetworkCallback? = null
+    private var defaultNetworkCallback: NetworkCallback? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private var connectionWakeLock: PowerManager.WakeLock? = null
     private val availableNetworks = Collections.newSetFromMap(ConcurrentHashMap<Network, Boolean>())
+    private val linkAddresses = ConcurrentHashMap<Network, Set<java.net.InetAddress>>()
     /**
      * Link-provider network changes close sockets and restart discovery.  That
      * work is allowed to touch TLS/network objects, so it must never run from
@@ -85,9 +93,48 @@ class BackgroundService : Service() {
     }
 
     private fun registerLinkProviders() {
-        linkProviders.add(LanLinkProvider(this))
-        //linkProviders.add(LoopbackLinkProvider(this))
-        linkProviders.add(BluetoothLinkProvider(this))
+        // Debug "Force relay": no LAN or Bluetooth links at all, so every
+        // paired device is reached through the relay. Read at service start.
+        if (!RelaySettings.forceRelay(this)) {
+            linkProviders.add(LanLinkProvider(this))
+            //linkProviders.add(LoopbackLinkProvider(this))
+            linkProviders.add(BluetoothLinkProvider(this))
+        }
+        linkProviders.add(RelayLinkProvider(this))
+    }
+
+    private fun relayProvider(): RelayLinkProvider? = linkProviders.filterIsInstance<RelayLinkProvider>().firstOrNull()
+
+    /** The relay settings changed: reconnect with them, the ladder starting over. */
+    fun onRelaySettingsChanged() {
+        if (!initialized) return
+        runCatching { networkChangeExecutor.execute { relayProvider()?.reset(reconnect = true) } }
+    }
+
+    /**
+     * The default network (the one the relay socket and media use) became a
+     * different network. Reconnect the relay at once, ladder reset, and let the
+     * existing recovery rebuild WebRTC once for peers that have no LAN link.
+     * Debounced like [onLocalNetworkMoved]: a switch reports lost and available
+     * moments apart.
+     */
+    private fun onDefaultNetworkChanged() {
+        networkMovedDebounce.removeCallbacks(defaultNetworkTask)
+        networkMovedDebounce.postDelayed(defaultNetworkTask, 1_000L)
+    }
+
+    private val defaultNetworkTask = Runnable {
+        if (!initialized) return@Runnable
+        runCatching { networkChangeExecutor.execute { relayProvider()?.reset(reconnect = true) } }
+        applicationInstance.onDefaultNetworkMoved()
+    }
+
+    /** The app came to the foreground: a relay that gave up gets a fresh ladder. */
+    private val foregroundObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) {
+            if (!initialized) return
+            runCatching { networkChangeExecutor.execute { relayProvider()?.reset(reconnect = false) } }
+        }
     }
 
     fun onNetworkChange(network: Network?) {
@@ -112,6 +159,47 @@ class BackgroundService : Service() {
             // surfacing RejectedExecutionException to Android.
             Log.d(LOG_TAG, "Ignoring network refresh during service shutdown", error)
         }
+    }
+
+    /** Unicasts this device's identity to one address (QR pairing's host hint). */
+    fun sendIdentityTo(address: java.net.InetAddress) {
+        networkChangeExecutor.execute {
+            linkProviders.filterIsInstance<org.desklink.mobile.backends.lan.LanLinkProvider>()
+                .forEach { it.sendUdpIdentityPacket(listOf(address), null) }
+        }
+    }
+
+    /** Re-announces on every provider without dropping any link. */
+    fun refreshDiscovery() {
+        if (!initialized) return
+        runCatching {
+            networkChangeExecutor.execute {
+                if (!initialized) return@execute
+                for (linkProvider in linkProviders) {
+                    runCatching { linkProvider.refreshDiscovery() }
+                        .onFailure { Log.w(LOG_TAG, "Link-provider discovery refresh failed", it) }
+                }
+            }
+        }.onFailure { Log.d(LOG_TAG, "Ignoring discovery refresh during service shutdown", it) }
+    }
+
+    /**
+     * The interface the links and WebRTC candidates were bound to is gone or
+     * re-addressed: drop the LAN links, re-announce, and rebuild WebRTC now
+     * rather than waiting out its 15 s silence budget.
+     */
+    private fun onLocalNetworkMoved(network: Network?) {
+        // Debounced: a make-before-break switch reports onAvailable(new) then
+        // onLost(old) moments apart, and acting on each rebuilt everything twice.
+        networkMovedDebounce.removeCallbacks(networkMovedTask)
+        networkMovedDebounce.postDelayed(networkMovedTask, 1_000L)
+    }
+
+    private val networkMovedDebounce = android.os.Handler(android.os.Looper.getMainLooper())
+    private val networkMovedTask = Runnable {
+        if (!initialized) return@Runnable
+        onNetworkChange(null)
+        applicationInstance.onLocalNetworkMoved()
     }
 
     fun addConnectionListener(connectionReceiver: ConnectionReceiver) {
@@ -155,35 +243,77 @@ class BackgroundService : Service() {
 
             // All callbacks runs on a dedicated thread that isn't the main thread
 
+            // VPNs are ignored: they come and go without moving the LAN
+            // interface, and reacting to them tore down healthy sessions.
+            private fun isVpn(network: Network) = connectivityManager
+                ?.getNetworkCapabilities(network)
+                ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+
             override fun onAvailable(network: Network) {
                 Log.i("BackgroundService", "Valid network available")
-                val firstAvailableNetwork = availableNetworks.add(network) && availableNetworks.size == 1
+                availableNetworks.add(network)
                 connectedToNonCellularNetwork.postValue(availableNetworks.isNotEmpty())
                 if (wifiLock == null) acquireWifiLock()
-                // Android reports each matching network independently. Do not
-                // tear down all LAN bootstrap links merely because a VPN or a
-                // second interface appeared while the active WebRTC session is
-                // healthy. A real recovery explicitly requests discovery.
-                if (firstAvailableNetwork) {
-                    onNetworkChange(network)
-                }
+                // A new network next to the current one (make-before-break
+                // Wi-Fi, ethernet) moves nothing that exists: announce on it,
+                // drop nothing. Previously only the *first* network did
+                // anything, so a switch never triggered discovery at all.
+                if (!isVpn(network)) refreshDiscovery()
             }
 
             override fun onLost(network: Network) {
                 Log.i("BackgroundService", "Valid network lost")
                 availableNetworks.remove(network)
-                val hasReplacement = availableNetworks.isNotEmpty()
-                connectedToNonCellularNetwork.postValue(hasReplacement)
-                // Only reset LAN discovery after the last eligible network is
-                // gone. `onLost` is per-network, not a guarantee that Android
-                // has no usable path left.
-                if (!hasReplacement) {
-                    onNetworkChange(null)
+                connectedToNonCellularNetwork.postValue(availableNetworks.isNotEmpty())
+                // Any lost LAN network may have carried the links. Capabilities
+                // can't be read for a lost network, so the address map decides:
+                // VPNs never get an entry (see onLinkPropertiesChanged).
+                if (linkAddresses.remove(network) != null) onLocalNetworkMoved(null)
+            }
+
+            override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) {
+                if (isVpn(network)) return
+                // IPv4 only: the LAN path is IPv4, while IPv6 privacy addresses
+                // rotate and router advertisements add some late — counting
+                // those tore down healthy links for nothing.
+                val addresses = properties.linkAddresses
+                    .map { it.address }
+                    .filterIsInstance<java.net.Inet4Address>()
+                    .toSet()
+                val previous = linkAddresses.put(network, addresses)
+                // The first report just records the baseline. A later change
+                // is a DHCP renewal or roam that re-addressed the interface.
+                if (previous != null && previous != addresses) {
+                    Log.i("BackgroundService", "Local address changed")
+                    onLocalNetworkMoved(network)
                 }
             }
         }
         networkCallback = callback
         connectivityManager?.registerNetworkCallback(networkRequestBuilder.build(), callback)
+
+        val defaultCallback = object : NetworkCallback() {
+            // Registration reports the current default first: that is the baseline, not a change.
+            private var current: Network? = null
+
+            override fun onAvailable(network: Network) {
+                val previous = current
+                current = network
+                if (previous != null && previous != network) onDefaultNetworkChanged()
+            }
+
+            override fun onLost(network: Network) {
+                if (network == current) {
+                    current = null
+                    onDefaultNetworkChanged()
+                }
+            }
+        }
+        defaultNetworkCallback = defaultCallback
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            connectivityManager?.registerDefaultNetworkCallback(defaultCallback)
+        }
+        ProcessLifecycleOwner.get().lifecycle.addObserver(foregroundObserver)
 
         registerLinkProviders()
         addConnectionListener(applicationInstance.connectionListener) // Link Providers need to be already registered
@@ -217,10 +347,18 @@ class BackgroundService : Service() {
         }
         if (needsLease) {
             acquireConnectionWakeLock()
+            // The lease can lapse with no event to notice it (a recovery that
+            // outlives RECOVERY_POWER_LEASE_MS), so look again just after.
+            leaseRecheck.removeCallbacks(leaseRecheckTask)
+            leaseRecheck.postDelayed(leaseRecheckTask, RECOVERY_POWER_LEASE_MS + 1_000L)
         } else {
+            leaseRecheck.removeCallbacks(leaseRecheckTask)
             releaseConnectionWakeLock()
         }
     }
+
+    private val leaseRecheck = android.os.Handler(android.os.Looper.getMainLooper())
+    private val leaseRecheckTask = Runnable { updateConnectionPowerLease() }
 
     private fun acquireConnectionWakeLock() {
         val powerManager = getSystemService<PowerManager>() ?: return
@@ -374,10 +512,18 @@ class BackgroundService : Service() {
     override fun onDestroy() {
         Log.d("DeskLink/BgService", "onDestroy")
         initialized = false
+        leaseRecheck.removeCallbacks(leaseRecheckTask)
+        networkMovedDebounce.removeCallbacks(networkMovedTask)
         networkCallback?.let { callback ->
             getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(callback)
         }
         networkCallback = null
+        defaultNetworkCallback?.let { callback ->
+            runCatching { getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(callback) }
+        }
+        defaultNetworkCallback = null
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(foregroundObserver)
+        networkMovedDebounce.removeCallbacks(defaultNetworkTask)
         availableNetworks.clear()
         // Provider shutdown closes sockets and TLS streams. Keep it off the
         // service main thread as well; stopping a foreground service can race
@@ -422,8 +568,11 @@ class BackgroundService : Service() {
         else {
             startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
         }
+        // Screen-on and connectivity broadcasts only re-announce. They used to
+        // drop every LAN link on each unlock, killing in-flight negotiations
+        // while the desktop ignored our beacon for up to 15 s.
         if (intent != null && intent.getBooleanExtra("refresh", false)) {
-            onNetworkChange(null)
+            refreshDiscovery()
         }
         updateConnectionPowerLease()
         return START_STICKY

@@ -66,6 +66,10 @@ object SslHelper {
         val deviceId = getDeviceId(context)
 
         var needsToGenerateCertificate = false
+        // Set only when this device's *identity* changed, which is the one case
+        // where the peers it trusts no longer know it and its trust store is
+        // meaningless. Certificate renewal on its own is not that case.
+        var identityChanged = false
         val settings = PreferenceManager.getDefaultSharedPreferences(context)
 
         if (settings.contains("certificate")) {
@@ -78,6 +82,7 @@ object SslHelper {
                 if (certDeviceId != deviceId) {
                     Log.e(LOG_TAG,"The certificate stored is from a different device id! (found: $certDeviceId expected:$deviceId)")
                     needsToGenerateCertificate = true
+                    identityChanged = true
                 } else if (cert.notAfter.time < currDate.time) {
                     Log.e(LOG_TAG, "The certificate expired: " + cert.notAfter)
                     needsToGenerateCertificate = true
@@ -93,21 +98,53 @@ object SslHelper {
             }
         } else {
             needsToGenerateCertificate = true
+            // No stored certificate at all, yet a populated trust store. The
+            // two live in different SharedPreferences files, so a restore or
+            // partial data loss can keep one and drop the other. The device ID
+            // is minted fresh alongside the certificate, so those trusted peers
+            // know this device under an identity it no longer has — the same
+            // stale-trust case as a changed common name, one branch over.
+            identityChanged = TrustedDevices.getAllTrustedDevices(context).isNotEmpty()
         }
 
         if (needsToGenerateCertificate) {
-            TrustedDevices.removeAllTrustedDevices(context)
-            Log.i(LOG_TAG, "Generating a certificate")
+            // Regenerating this device's own certificate does not invalidate the
+            // certificates of the devices it trusts, and those records are the
+            // only way a paired peer is recognised. Wiping them here silently
+            // unpaired every device the moment this certificate lapsed — with no
+            // prompt and no way to tell what had happened.
+            //
+            // The peer will refuse the new certificate under its own pinning
+            // rules and prompt to pair again, which is the correct place for the
+            // user to make that decision.
+            //
+            // A changed device ID is different: the peers in the trust store
+            // know this device under the old ID and will never recognise it
+            // again, so those records are stale rather than merely re-keyed.
+            // Leaving them would show every one of them as paired forever with
+            // no re-pair prompt ever raised.
+            if (identityChanged) {
+                Log.i(LOG_TAG, "Device identity changed; clearing the stale trust store")
+                TrustedDevices.removeAllTrustedDevices(context)
+            } else {
+                Log.i(LOG_TAG, "Generating a certificate; existing pairings are preserved")
+            }
             //Fix for https://issuetracker.google.com/issues/37095309
             val initialLocale = Locale.getDefault()
             setLocale(Locale.ENGLISH, context)
 
             val nameBuilder = X500NameBuilder(BCStyle.INSTANCE)
+            // Only the common name is a compatibility-bound value: both
+            // applications validate the certificate against the device ID and
+            // read nothing else from the subject.
+            //
+            // The organisation was previously "KDE" on every newly generated
+            // certificate. That is not preserved legacy material — it is minted
+            // fresh on first run — and docs/BRANDING.md is explicit that
+            // DeskLink is not presented as an official KDE product.
             nameBuilder.addRDN(BCStyle.CN, deviceId)
-            // Retain the established certificate subject for existing pairing
-            // compatibility. It is not user-visible product branding.
             nameBuilder.addRDN(BCStyle.OU, "DeskLink Mobile")
-            nameBuilder.addRDN(BCStyle.O, "KDE")
+            nameBuilder.addRDN(BCStyle.O, "DeskLink")
             val localDate = LocalDate.now()
             val notBefore = localDate.minusYears(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
             val notAfter = localDate.plusYears(10).atStartOfDay(ZoneId.systemDefault()).toInstant()

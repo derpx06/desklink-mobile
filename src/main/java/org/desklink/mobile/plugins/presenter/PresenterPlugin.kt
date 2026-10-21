@@ -75,16 +75,10 @@ class PresenterPlugin : Plugin() {
         device.sendPacket(np)
     }
 
-    fun sendPointer(xDelta: Float, yDelta: Float) {
-        val np = NetworkPacket(PACKET_TYPE_PRESENTER)
-        np["dx"] = xDelta.toDouble()
-        np["dy"] = yDelta.toDouble()
-        device.sendPacket(np)
-    }
-
-    fun stopPointer() {
-        val np = NetworkPacket(PACKET_TYPE_PRESENTER)
-        np["stop"] = true
+    /** "b": blank the screen in LibreOffice Impress, PowerPoint and most slide viewers. */
+    fun sendBlank() {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["key"] = "b"
         device.sendPacket(np)
     }
 

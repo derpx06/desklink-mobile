@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 DeskLink contributors
+
+SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+-->
+<resources>
+    <color name="brand_primary">#A9B8FF</color>
+    <color name="brand_on_primary">#14204F</color>
+    <color name="brand_primary_container">#262D52</color>
+    <color name="brand_on_primary_container">#DFE5FF</color>
+    <color name="brand_secondary">#A1A1AA</color>
+    <color name="brand_on_secondary">#111113</color>
+    <color name="brand_secondary_container">#262D52</color>
+    <color name="brand_on_secondary_container">#DFE5FF</color>
+    <color name="brand_tertiary">#3FD1A2</color>
+    <color name="brand_on_tertiary">#111113</color>
+    <color name="brand_tertiary_container">#173A30</color>
+    <color name="brand_on_tertiary_container">#3FD1A2</color>
+    <color name="brand_background">#111113</color>
+    <color name="brand_on_background">#F2F2F3</color>
+    <color name="brand_surface_variant">#1E1E21</color>
+    <color name="brand_on_surface_variant">#A1A1AA</color>
+    <color name="brand_outline">#38383D</color>
+    <color name="brand_outline_variant">#232326</color>
+    <color name="brand_surface_container_lowest">#1A1A1D</color>
+    <color name="brand_surface_container_low">#1A1A1D</color>
+    <color name="brand_surface_container">#1A1A1D</color>
+    <color name="brand_surface_container_high">#1E1E21</color>
+    <color name="brand_surface_container_highest">#1E1E21</color>
+</resources>

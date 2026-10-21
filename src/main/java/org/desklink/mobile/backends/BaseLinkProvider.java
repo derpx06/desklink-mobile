@@ -87,6 +87,13 @@ public abstract class BaseLinkProvider {
     public abstract void onStart();
     public abstract void onStop();
     public abstract void onNetworkChange(@Nullable Network network);
+
+    /**
+     * Re-announce this device without dropping any link. For events that say
+     * nothing about the interface the links are bound to (screen on, a
+     * recovery request, a new network appearing next to the current one).
+     */
+    public void refreshDiscovery() { }
     public abstract String getName();
 
     public abstract int getPriority();

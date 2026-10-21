@@ -8,6 +8,9 @@ package org.desklink.mobile.plugins.mousepad
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.view.Choreographer
 import android.view.KeyEvent
 import androidx.preference.PreferenceManager
 import org.desklink.mobile.DeviceType
@@ -75,19 +78,16 @@ class MousePadPlugin : Plugin() {
         }
     }
 
-    fun sendMouseDelta(dx: Float, dy: Float) {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["dx"] = dx.toDouble()
-        np["dy"] = dy.toDouble()
-        sendPacket(np)
-    }
+    /** Replaced by tests; the app sends motion on the next vsync. */
+    internal var frameScheduler: (Runnable) -> Unit = ::onNextFrame
 
-    fun sendMousePosition(x: Int, y: Int) {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["x"] = x
-        np["y"] = y
-        sendPacket(np)
-    }
+    /** A drag produced one packet per touch event; motion now leaves at most
+     * once per display frame, and everything else flushes it first. */
+    private val motion = PointerMotionCoalescer({ frameScheduler(it) }, { device.sendPacket(it) })
+
+    fun sendMouseDelta(dx: Float, dy: Float) = motion.addDelta(dx.toDouble(), dy.toDouble())
+
+    fun sendMousePosition(x: Int, y: Int) = motion.moveTo(x, y)
 
     /**
      * Screen-mode taps must carry their absolute position with the click. The
@@ -108,6 +108,16 @@ class MousePadPlugin : Plugin() {
         np["x"] = x
         np["y"] = y
         np["singlehold"] = true
+        sendPacket(np)
+    }
+
+    /** A double-click at the tapped position. Without the position it lands
+     * wherever the pointer last was, which is not where the user tapped. */
+    fun sendScreenDoubleClick(x: Int, y: Int) {
+        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
+        np["x"] = x
+        np["y"] = y
+        np["doubleclick"] = true
         sendPacket(np)
     }
 
@@ -193,13 +203,13 @@ class MousePadPlugin : Plugin() {
         val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
         np["alt"] = true
         np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_F4)
-        device.sendPacket(np)
+        sendPacket(np)
     }
 
     fun sendBack() {
         val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
         np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_ESCAPE)
-        device.sendPacket(np)
+        sendPacket(np)
     }
 
     fun sendText(content: String) {
@@ -208,8 +218,12 @@ class MousePadPlugin : Plugin() {
         sendPacket(np)
     }
 
-    fun sendPacket(np: NetworkPacket) {
-        device.sendPacket(np)
+    /** Any non-motion packet: pending pointer motion goes out ahead of it. */
+    fun sendPacket(np: NetworkPacket) = motion.sendAfterMotion(np)
+
+    private fun onNextFrame(task: Runnable) {
+        val post = Runnable { Choreographer.getInstance().postFrameCallback { task.run() } }
+        if (Looper.myLooper() == Looper.getMainLooper()) post.run() else Handler(Looper.getMainLooper()).post(post)
     }
 
     override val supportedPacketTypes = arrayOf(PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE)

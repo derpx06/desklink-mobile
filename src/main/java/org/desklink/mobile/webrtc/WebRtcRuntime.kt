@@ -4,6 +4,7 @@
 package org.desklink.mobile.webrtc
 
 import android.content.Context
+import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.EglBase
 import org.webrtc.PeerConnectionFactory
 import java.util.concurrent.atomic.AtomicBoolean
@@ -24,11 +25,54 @@ object WebRtcRuntime {
                     .createInitializationOptions(),
             )
         }
-        if (eglBase == null) eglBase = EglBase.create()
+        val egl = eglBase ?: EglBase.create().also { eglBase = it }
+        // Without these the factory has **no video codecs at all**. The Android
+        // JNI maps a null Java encoder factory to a null *native* factory with
+        // no builtin fallback (`sdk/android/src/jni/pc/video.cc`), so attaching
+        // a video track to a factory built without them yields either a
+        // codec-less video m-line or a native crash.
+        //
+        // That is the real cause of the "malformed, codec-less video answer"
+        // that `includeScreenTrackInInitialOffer` was disabled to avoid. It was
+        // read as a peer-interop problem; it is local configuration, and it was
+        // harmless only for as long as nothing ever attached a video track.
+        //
+        // The `EglBase.Context` is not optional either: it is what enables
+        // surface-texture encoding, so MediaProjection frames go GPU-to-GPU
+        // instead of being read back to CPU memory and re-uploaded. At
+        // 1080x2400x30 that is the difference between working and not. If the
+        // context is rejected the factory silently disables texture support and
+        // only says so in logcat.
         return PeerConnectionFactory.builder()
-            .setOptions(PeerConnectionFactory.Options())
+            .setOptions(iceNetworkOptions())
+            .setVideoEncoderFactory(
+                // libwebrtc's encoders, with hardware ones in low-latency mode.
+                org.webrtc.DeskLinkVideoEncoderFactories.create(
+                    egl.eglBaseContext,
+                    /* enableH264HighProfile = */ true,
+                ),
+            )
+            .setVideoDecoderFactory(DefaultVideoDecoderFactory(egl.eglBaseContext))
             .createPeerConnectionFactory()
             .also { factory = it }
+    }
+
+    /**
+     * Gather ICE candidates on every interface the kernel has, not only the
+     * networks Android reports.
+     *
+     * libwebrtc's Android network monitor lists `ConnectivityManager` networks
+     * that have internet capability. A laptop on this phone's hotspot reaches
+     * it through the tethering interface, which is not such a network, so the
+     * phone offered only loopback and mobile-data candidates and the direct
+     * link failed every time while the LAN bootstrap kept working. Without the
+     * monitor libwebrtc enumerates interfaces itself (refreshed every 2 s), the
+     * hotspot included. Loopback candidates never reach the desk, so they are
+     * dropped.
+     */
+    internal fun iceNetworkOptions() = PeerConnectionFactory.Options().apply {
+        disableNetworkMonitor = true
+        networkIgnoreMask = PeerConnectionFactory.Options.ADAPTER_TYPE_LOOPBACK
     }
 
     @Synchronized

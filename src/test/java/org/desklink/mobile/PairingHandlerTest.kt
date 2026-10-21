@@ -33,15 +33,22 @@ class PairingHandlerTest {
     fun getVerificationKey() {
         val timestampA = 1737228658L
         val timestampB = 2737228658L
-        Assert.assertEquals("54DC916E", PairingHandler.getVerificationKey(certA, certB, timestampA))
-        Assert.assertEquals("54DC916E", PairingHandler.getVerificationKey(certB, certA, timestampA))
-        Assert.assertEquals("8C07153A", PairingHandler.getVerificationKey(certA, certB, timestampB))
+        Assert.assertEquals("741294", PairingHandler.getVerificationKey(certA, certB, timestampA))
+        Assert.assertEquals("741294", PairingHandler.getVerificationKey(certB, certA, timestampA))
+        Assert.assertEquals("274426", PairingHandler.getVerificationKey(certA, certB, timestampB))
+    }
+
+    @Test
+    fun verificationCodeMatchesTheDesktopVector() {
+        // Same vector as pairing.rs `verification_key_is_order_independent`.
+        Assert.assertEquals("087037", PairingHandler.verificationCode("aaa".toByteArray(), "bbb".toByteArray(), 42))
+        Assert.assertEquals("087037", PairingHandler.verificationCode("bbb".toByteArray(), "aaa".toByteArray(), 42))
     }
 
     @Test
     fun getVerificationKeyV7() {
-        Assert.assertEquals("F3900DB5", PairingHandler.getVerificationKeyV7(certA, certB))
-        Assert.assertEquals("F3900DB5", PairingHandler.getVerificationKeyV7(certB, certA))
-        Assert.assertEquals("97A75917", PairingHandler.getVerificationKeyV7(certA, certA))
+        Assert.assertEquals("304181", PairingHandler.getVerificationKeyV7(certA, certB))
+        Assert.assertEquals("304181", PairingHandler.getVerificationKeyV7(certB, certA))
+        Assert.assertEquals("326935", PairingHandler.getVerificationKeyV7(certA, certA))
     }
 }

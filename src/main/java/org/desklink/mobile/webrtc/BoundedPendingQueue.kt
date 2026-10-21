@@ -23,6 +23,9 @@ internal class BoundedPendingQueue<T>(private val maximumSize: Int) {
     }
 
     @Synchronized
+    fun isEmpty(): Boolean = items.isEmpty()
+
+    @Synchronized
     fun drain(): List<T> = buildList(items.size) {
         while (items.isNotEmpty()) add(items.removeFirst())
     }

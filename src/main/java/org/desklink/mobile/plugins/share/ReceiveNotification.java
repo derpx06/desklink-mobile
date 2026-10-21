@@ -60,6 +60,7 @@ class ReceiveNotification {
     }
 
     public void cancel() {
+        TransferProgress.cancel(jobId);
         notificationManager.cancel(notificationId);
     }
 
@@ -88,6 +89,7 @@ class ReceiveNotification {
 
 
     public void setFinished(String message) {
+        TransferProgress.finish(jobId, message, false);
         builder = new NotificationCompat.Builder(device.getContext(), NotificationHelper.Channels.FILETRANSFER_COMPLETE);
         builder.setContentTitle(message)
                 .setTicker(message)
@@ -103,6 +105,7 @@ class ReceiveNotification {
 
     public void setFailed(String message) {
         setFinished(message);
+        TransferProgress.finish(jobId, message, true);
         builder.setSmallIcon(android.R.drawable.stat_notify_error)
                 .setChannelId(NotificationHelper.Channels.FILETRANSFER_ERROR);
 

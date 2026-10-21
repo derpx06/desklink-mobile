@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 DeskLink contributors
+
+SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+-->
+<!-- Strings of the redesigned screens. The device states, paths and feature names are the shared
+     vocabulary of both apps (desktop in Title Case, Android in sentence case). -->
+<resources>
+    <!-- Device states and paths -->
+    <string name="connection_connected">Connected</string>
+    <string name="connection_connecting">Connecting…</string>
+    <string name="connection_offline">Offline</string>
+    <string name="connection_wants_to_pair">Wants to pair</string>
+    <string name="connection_local">Local network</string>
+    <string name="remote_path_direct">Over the internet</string>
+    <string name="remote_path_turn">Through a relay server</string>
+    <string name="remote_path_with_rtt">%1$s · %2$d ms</string>
+
+    <string name="battery_percent">%1$d%%</string>
+    <string name="battery_percent_charging">%1$d%% charging</string>
+
+    <!-- Home -->
+    <string name="home_your_computers">Your computers</string>
+    <string name="home_pair">Pair</string>
+    <string name="navigate_up">Back</string>
+
+    <!-- Device -->
+    <string name="feature_run_command">Run command</string>
+    <string name="feature_desc_run_command">Saved commands</string>
+    <string name="feature_desc_digitizer">Draw with a stylus</string>
+    <string name="feature_desc_tv">TV remote</string>
+    <string name="device_features">Features</string>
+    <string name="device_encryption">Encryption</string>
+    <string name="device_tap_permission">Tap to grant</string>
+    <string name="device_unpair_title">Unpair %1$s?</string>
+    <string name="device_unpair_message">Both devices will stop trusting each other until you pair them again.</string>
+    <string name="device_try_again">Try again</string>
+    <string name="active_session_end">End</string>
+
+    <!-- Pairing -->
+    <string name="pair_request_hint">Only pair computers you own.</string>
+    <string name="pair_code_description">Verification code %1$s</string>
+    <string name="pair_paired_with">Paired with %1$s</string>
+    <string name="qr_close">Close</string>
+
+    <!-- Terminal -->
+    <string name="terminal_session_size">%1$d×%2$d</string>
+    <string name="terminal_section">Terminals</string>
+    <string name="terminal_preview_open">Open to see its output</string>
+    <string name="terminal_empty_hint">Start Claude Code, Codex or a shell</string>
+    <string name="terminal_session_options">Options for %1$s</string>
+    <string name="terminal_restart">Restart</string>
+
+    <!-- Remote screen -->
+    <string name="remote_connecting_to">Connecting to %1$s…</string>
+
+    <!-- Settings -->
+    <string name="settings_category_general">General</string>
+    <string name="settings_category_connection">Connection</string>
+    <string name="settings_category_away">Away from home</string>
+    <string name="settings_category_notifications">Notifications</string>
+    <string name="settings_category_help">Help and privacy</string>
+    <string name="settings_category_debug">Debug</string>
+    <string name="setting_dynamic_colors">Use wallpaper colours</string>
+    <string name="setting_bluetooth">Bluetooth (beta)</string>
+    <string name="setting_relay_connected">Connected via relay</string>
+    <string name="setting_advanced_network">Advanced network</string>
+    <string name="setting_advanced_network_summary">Relay server, TURN and STUN</string>
+    <!-- UI v4: Home -->
+    <string name="home_unavailable_connecting">Still connecting to %1$s</string>
+    <string name="home_unavailable_offline">%1$s is offline</string>
+    <string name="home_switch_computer">%1$s, %2$s. Switch computer</string>
+    <string name="home_open_on">Open on %1$s</string>
+    <string name="home_quick_actions">Quick actions</string>
+    <string name="home_connected_wifi">Connected over Wi‑Fi</string>
+    <string name="home_connected_relay">Connected through the relay</string>
+    <string name="home_connected_turn">Connected through a relay server</string>
+    <string name="home_connected_internet">Connected over the internet</string>
+    <string name="home_short_wifi">Connected · Wi‑Fi</string>
+    <string name="home_short_relay">Connected · Relay</string>
+    <string name="home_meta_connecting">lan → relay</string>
+    <string name="home_meta_rtt">%1$d ms</string>
+    <string name="home_meta_relay">%1$d ms · encrypted</string>
+    <string name="home_meta_encrypted">encrypted</string>
+    <string name="home_offline_body">%1$s may be asleep or off the network. Your terminals keep running there.</string>
+    <string name="home_trying_paths">Trying Wi‑Fi, then the relay</string>
+    <string name="home_looking_on_wifi">Looking for %1$s on this Wi‑Fi</string>
+    <string name="home_meta_connecting_lan">lan</string>
+    <string name="home_live_screen">you\'re viewing the desk screen</string>
+    <plurals name="home_live_terminals">
+        <item quantity="one">%1$d terminal open</item>
+        <item quantity="other">%1$d terminals open</item>
+    </plurals>
+    <string name="home_live_phone_screen">the desk sees your screen</string>
+    <plurals name="home_terminals_tile">
+        <item quantity="one">Terminals, %1$d open</item>
+        <item quantity="other">Terminals, %1$d open</item>
+    </plurals>
+    <string name="home_desk_screen">Desk screen</string>
+    <string name="home_desk_screen_sub">View or control</string>
+    <string name="home_send_files">Send files</string>
+    <string name="home_send_link">Send a link</string>
+    <string name="home_lock_desk">Lock desk</string>
+    <string name="home_share_screen">Share screen</string>
+    <string name="home_stop_sharing">Stop sharing</string>
+    <string name="home_presenter">Presenter</string>
+    <string name="home_ping_desk">Ping desk</string>
+    <string name="home_ring_desk">Ring desk</string>
+    <string name="home_rang">Ringing %1$s</string>
+    <string name="home_send_clipboard">Send clipboard to %1$s</string>
+    <string name="home_clipboard_sent">Clipboard sent to %1$s</string>
+    <string name="home_clipboard_sync">Clipboard sync</string>
+    <string name="home_clipboard_on">In sync both ways</string>
+    <string name="home_clipboard_on_q">Automatic from computer; from phone via tile or share</string>
+    <string name="home_clipboard_off">Off · nothing is shared</string>
+    <string name="home_pair_another">Pair another computer</string>
+    <string name="home_send_link_title">Send a link</string>
+    <string name="home_send">Send</string>
+    <string name="home_media_playing_on">playing on %1$s</string>
+    <string name="home_media_paused_on">paused on %1$s</string>
+    <string name="home_transfer_sending">Sending</string>
+    <string name="home_transfer_receiving">Receiving</string>
+    <string name="home_transfer_sent">Sent</string>
+    <string name="home_transfer_received">Received</string>
+    <string name="home_transfer_failed">Failed</string>
+    <string name="home_share_screen_title">Share your screen with %1$s</string>
+    <string name="home_share_screen_body">Start it on %1$s: choose Show Phone Screen in DeskLink there. This phone then asks you to allow it, and Stop is always in the notification.</string>
+    <string name="home_feature_off">That feature is turned off for this computer</string>
+    <string name="home_looking_for">Looking for %1$s…</string>
+    <string name="home_link_sent">Link sent to %1$s</string>
+    <string name="home_locked">Locked %1$s</string>
+    <string name="home_pinged">Pinged %1$s</string>
+
+    <!-- UI v4: pairing -->
+    <string name="welcome_title">Your computer,\nin your pocket.</string>
+    <string name="welcome_body">Pair once with your Linux desktop. Then pick up its terminals, screen and files from anywhere.</string>
+    <string name="welcome_terminals">Terminals that follow you</string>
+    <string name="welcome_screens">Screens in both directions</string>
+    <string name="welcome_encrypted">No account, encrypted end to end</string>
+    <string name="welcome_pair">Pair with a Computer</string>
+    <string name="scan_title">Scan the code</string>
+    <string name="scan_hint">Point your camera at the code on your computer</string>
+    <string name="scan_camera_needed">The camera reads the code DeskLink shows on your computer</string>
+    <string name="scan_allow_camera">Allow camera</string>
+    <string name="scan_camera_denied">Without the camera, pair with a computer on this network below</string>
+    <string name="scan_on_this_network">On this network</string>
+    <string name="scan_pair_named">Pair with %1$s</string>
+    <string name="pair_code_title">Does your computer\nshow this code?</string>
+    <string name="pair_code_waiting_title">Confirm on your computer</string>
+    <string name="pair_code_idle_title">Pair with this computer?</string>
+    <string name="pair_code_with">Pairing with\u0020</string>
+    <string name="pair_code_mismatch">If the codes don\'t match, cancel.</string>
+    <string name="pair_code_waiting">Waiting for %1$s to accept…</string>
+    <string name="pair_codes_match">Codes match</string>
+
+    <!-- UI v4: settings -->
+    <string name="settings_phone_name">Phone name</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_dynamic_colors_summary">Off keeps DeskLink\'s own colours</string>
+    <string name="settings_connect_on_startup">Connect on startup</string>
+    <string name="settings_connect_on_startup_summary">After the phone restarts</string>
+    <string name="settings_permissions">Permissions</string>
+    <plurals name="settings_permissions_waiting">
+        <item quantity="one">%1$d needs your OK</item>
+        <item quantity="other">%1$d need your OK</item>
+    </plurals>
+    <string name="settings_allowed">Allowed</string>
+    <string name="settings_allow">Allow</string>
+    <string name="settings_your_computer">your computer</string>
+    <string name="settings_perm_notifications">Notifications</string>
+    <string name="settings_perm_notifications_summary">Transfers, pairing and live sessions</string>
+    <string name="settings_perm_notification_access">Notification access</string>
+    <string name="settings_perm_notification_access_summary">Mirror and reply from %1$s</string>
+    <string name="settings_perm_nearby">Nearby devices</string>
+    <string name="settings_perm_nearby_summary">Find %1$s over Bluetooth</string>
+    <string name="settings_perm_files">Photos and files</string>
+    <string name="settings_perm_files_summary">Save what %1$s sends</string>
+    <string name="settings_perm_battery">Unrestricted battery</string>
+    <string name="settings_perm_battery_summary">Stay reachable in the background</string>
+    <string name="settings_perm_accessibility">Accessibility</string>
+    <string name="settings_perm_accessibility_summary">Let %1$s control this phone</string>
+    <string name="settings_desk_notifications">Show notifications on desk</string>
+    <string name="settings_desk_notifications_summary">Reply from the computer</string>
+    <string name="settings_reach_anywhere">Reach from anywhere</string>
+    <string name="settings_relay_not_set_up">No relay server set up. Enter one in More → Advanced network</string>
+    <string name="settings_reach_anywhere_summary">Encrypted relay when off Wi‑Fi</string>
+    <string name="settings_quick_commands">Quick commands</string>
+    <string name="settings_quick_commands_none">None</string>
+    <string name="settings_quick_commands_subtitle">Chips under the terminal on %1$s. A tap types the command and Enter.</string>
+    <string name="settings_quick_commands_remove">Remove %1$s</string>
+    <string name="settings_quick_commands_hint">Command</string>
+    <string name="settings_quick_commands_add">Add</string>
+    <string name="settings_quick_commands_reset">Restore defaults</string>
+    <string name="settings_more">More</string>
+    <string name="settings_more_summary">Desk controls this phone, run command, drawing pad, network</string>
+    <string name="settings_more_extras">Extras</string>
+    <string name="settings_more_turn_on">Off for this computer. Turn it on in Features</string>
+    <string name="settings_paired_key">Paired · key %1$s</string>
+    <string name="settings_clipboard_tile">Clipboard tile</string>
+    <string name="settings_clipboard_tile_summary">Send the clipboard from Quick Settings</string>
+    <string name="settings_clipboard_tile_manual">Edit Quick Settings and drag in the Send clipboard tile</string>
+    <string name="settings_features_summary">Turn features on or off for this computer</string>
+    <string name="more_desk_controls">Desk controls this phone</string>
+    <string name="more_desk_controls_summary">Pointer and taps, through Accessibility</string>
+    <string name="more_desk_types">Desk types on this phone</string>
+    <string name="more_desk_types_summary">The DeskLink keyboard</string>
+    <string name="more_drawing_pad">Drawing pad</string>
+    <string name="more_tv_remote">TV remote</string>
+
+    <!-- UI v4: live sessions -->
+    <string name="screen_share_live_title">%1$s sees your screen</string>
+    <string name="screen_share_live_text">Stop sharing at any time</string>
+    <string name="screen_share_stop">Stop</string>
+    <string name="screen_share_stopped">Screen sharing stopped</string>
+    <string name="session_live_title">Using %1$s</string>
+    <string name="session_live_screen">Viewing the desk screen</string>
+    <plurals name="session_live_terminals">
+        <item quantity="one">%1$d terminal open</item>
+        <item quantity="other">%1$d terminals open</item>
+    </plurals>
+    <!-- UI v4: terminals -->
+    <plurals name="terminal_count_on">
+        <item quantity="one">%1$d terminal on %2$s</item>
+        <item quantity="other">%1$d terminals on %2$s</item>
+    </plurals>
+    <string name="terminal_search">Search terminals</string>
+    <string name="terminal_search_hint">Name</string>
+    <string name="terminal_new_terminal">New terminal</string>
+    <string name="terminal_new_runs_on">Runs on %1$s. Open it from either device.</string>
+    <string name="terminal_new_start">Start</string>
+    <string name="terminal_open_session">open</string>
+    <string name="terminal_new_start_button">Start terminal</string>
+    <string name="terminal_you_are_here">You\'re here</string>
+    <string name="terminal_running_on">Running on %1$s</string>
+    <string name="terminal_show_system_bars">Show the status bar</string>
+    <string name="terminal_run_command">Run %1$s</string>
+    <string name="terminal_compose_hint">Type a command</string>
+    <string name="terminal_compose_send">Send with Enter</string>
+    <string name="terminal_compose_show">Compose a command</string>
+    <string name="terminal_compose_hide">Type straight into the terminal</string>
+    <!-- UI v4: desk screen -->
+    <string name="remote_mode_view">View</string>
+    <string name="remote_allow_control_first">Allow Control on %1$s first</string>
+    <string name="remote_left_click">Left</string>
+    <string name="remote_right_click">Right</string>
+    <string name="remote_left_click_description">Left click</string>
+    <string name="remote_right_click_description">Right click</string>
+    <string name="remote_key_super">Super key</string>
+    <string name="remote_zoom_reset">Reset zoom</string>
+    <!-- UI v4: presenter -->
+    <string name="presenter_controlling">Controlling slides on %1$s</string>
+    <string name="presenter_elapsed">Elapsed</string>
+    <string name="presenter_back">Back</string>
+    <string name="presenter_blank">Blank</string>
+    <string name="presenter_set_total">Number of slides</string>
+    <string name="presenter_total_hint">Leave empty if you don\'t know</string>
+    <string name="presenter_restart">Start over</string>
+    <string name="presenter_slide">Slide %1$d</string>
+    <string name="presenter_slide_of">Slide %1$d of %2$d</string>
+    <!-- UI v4: transfers -->
+    <string name="transfers_title">Transfers</string>
+    <string name="transfers_subtitle">Files with %1$s, last 30 days</string>
+    <string name="transfers_speed">%1$s/s</string>
+    <string name="transfers_empty_title">No files yet</string>
+    <string name="transfers_empty_body">Files you send or receive show up here.</string>
+    <string name="transfers_item_received">%1$s, %2$s, received from %3$s %4$s</string>
+    <string name="transfers_item_sent">%1$s, %2$s, sent to %3$s %4$s</string>
+    <string name="transfers_missing">File moved or deleted</string>
+    <string name="transfers_more">More options for %1$s</string>
+    <string name="transfers_share">Share</string>
+    <string name="transfers_open_with">Open with</string>
+    <string name="transfers_remove">Remove from list</string>
+    <string name="transfers_today">Today</string>
+    <string name="transfers_yesterday">Yesterday</string>
+    <string name="transfers_cancelled">Transfer cancelled</string>
+    <string name="transfers_no_app">No app here opens this file</string>
+    <plurals name="home_transfers_count">
+        <item quantity="one">%1$d file in the last 30 days</item>
+        <item quantity="other">%1$d files in the last 30 days</item>
+    </plurals>
+</resources>

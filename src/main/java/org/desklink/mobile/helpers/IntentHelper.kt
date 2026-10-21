@@ -29,7 +29,6 @@ object IntentHelper {
             val pendingIntent = PendingIntent.getActivity(context, 0, intent, flags)
             val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
                 .setContentIntent(pendingIntent)
-                .setFullScreenIntent(pendingIntent, true)
                 .setContentTitle(title)
                 .setContentText(context.getString(R.string.tap_to_open))
                 .setSmallIcon(R.drawable.ic_notification)
