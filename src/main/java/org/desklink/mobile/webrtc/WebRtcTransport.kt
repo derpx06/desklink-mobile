@@ -628,8 +628,14 @@ class WebRtcTransport(
         }
         runCatching {
             peer.getStats { report ->
+                // libwebrtc's signalling thread: never take this transport's monitor here. The
+                // monitor is held across proxy calls that wait on this very thread (senders,
+                // parameters, setBitrate), so doing so could hang every peer in the process.
                 val stats = connectionStatsFrom(report.statsMap, bootstrapViaRelay)
-                stats?.let { onPath(it.path == WebRtcConnectionPath.LAN) }
+                stats?.let { s ->
+                    val lan = s.path == WebRtcConnectionPath.LAN
+                    if (lan != onLan) runCatching { pathExecutor.execute { onPath(lan) } }
+                }
                 callback.onStats(stats)
             }
         }.onFailure { callback.onStats(null) }
@@ -741,6 +747,11 @@ class WebRtcTransport(
     /** Whether the selected ICE pair is on the LAN, as the last stats read said. */
     @Volatile private var onLan = false
 
+    /** Where path changes are applied: off libwebrtc's threads, one at a time, in order. */
+    private val pathExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "DeskLink-screen-path").apply { isDaemon = true }
+    }
+
     /** The path moved on or off the LAN: a live capture takes the matching ceiling and preference. */
     @Synchronized
     private fun onPath(lan: Boolean) {
@@ -813,6 +824,7 @@ class WebRtcTransport(
         val previous = stateRef.getAndSet(TransportState.CLOSING)
         if (previous == TransportState.CLOSED || previous == TransportState.CLOSING) return
         stopScreenCapture()
+        pathExecutor.shutdownNow()
         inboundStatsTimer?.cancel()
         videoTrack.dispose()
         videoSource.dispose()

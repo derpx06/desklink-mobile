@@ -63,17 +63,33 @@ object QrPairing {
         Code(id, fp, secret, host, parseAddresses(uri.getQueryParameter("a")), parsePort(uri.getQueryParameter("p")))
     }.getOrNull()
 
-    /** `a`: comma-separated private IPv4 literals, at most 8; anything else is dropped (no DNS). */
+    /**
+     * `a`: comma-separated IPv4 addresses in the private LAN ranges (10/8, 172.16/12, 192.168/16),
+     * at most 8. Parsed here octet by octet and built with getByAddress, so no text can ever reach
+     * a DNS lookup; link-local, CGNAT, loopback and public addresses are dropped.
+     */
     @JvmStatic
     fun parseAddresses(value: String?): List<InetAddress> =
         value.orEmpty().split(',').asSequence()
-            .map(String::trim)
-            .filter { it.matches(Regex("""\d{1,3}(\.\d{1,3}){3}""")) }
-            .mapNotNull { runCatching { InetAddress.getByName(it) }.getOrNull() }
-            .filter { org.desklink.mobile.helpers.isPrivateAddress(it) && !it.isLoopbackAddress }
+            .mapNotNull { lanIpv4(it.trim()) }
             .distinct()
             .take(8)
+            .map { InetAddress.getByAddress(it.toByteArray()) }
             .toList()
+
+    /** The four octets of a private-LAN IPv4 literal, or null. Leading zeros are refused (010 is octal elsewhere). */
+    @JvmStatic
+    fun lanIpv4(text: String): List<Byte>? {
+        val parts = text.split('.')
+        if (parts.size != 4) return null
+        val octets = parts.map { part ->
+            if (part.isEmpty() || part.length > 3 || !part.all(Char::isDigit) || (part.length > 1 && part[0] == '0')) return null
+            part.toInt().takeIf { it in 0..255 } ?: return null
+        }
+        val (a, b) = octets
+        val lan = a == 10 || (a == 172 && b in 16..31) || (a == 192 && b == 168)
+        return if (lan) octets.map(Int::toByte) else null
+    }
 
     /** `p`: DeskLink's TCP port range only. */
     @JvmStatic

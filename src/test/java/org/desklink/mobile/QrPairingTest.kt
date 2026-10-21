@@ -43,4 +43,16 @@ class QrPairingTest {
         assertEquals(null, QrPairing.parsePort("x"))
         assertEquals(null, QrPairing.parsePort(null))
     }
+
+    @Test
+    fun `qr v2 addresses are parsed by octet and only private lan ranges pass`() {
+        assertEquals(listOf(10, 0, 0, 5).map(Int::toByte), QrPairing.lanIpv4("10.0.0.5"))
+        assertEquals(listOf(172, 16, 4, 1).map(Int::toByte), QrPairing.lanIpv4("172.16.4.1"))
+        assertEquals(listOf(172, 31, 255, 255).map(Int::toByte), QrPairing.lanIpv4("172.31.255.255"))
+        for (bad in listOf("999.1.1.1", "010.0.0.1", "192.168.1", "192.168.1.1.1", "192.168.01.1", "172.32.0.1", "172.15.0.1",
+            "169.254.1.1", "100.64.0.1", "127.0.0.1", "8.8.8.8", "evil.example", "", "1e1.0.0.1", "+10.0.0.1")) {
+            assertEquals(bad, null, QrPairing.lanIpv4(bad))
+        }
+        assertEquals(listOf("192.168.1.20"), QrPairing.parseAddresses("999.1.1.1,192.168.1.20,010.0.0.1").map { it.hostAddress })
+    }
 }
