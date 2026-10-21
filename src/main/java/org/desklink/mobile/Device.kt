@@ -1470,7 +1470,7 @@ internal fun heartbeatPacket(reply: Boolean, interactive: Boolean): NetworkPacke
 
 /**
  * The empty snapshots for phone-owned features that are turned off or lack their permission:
- * battery, notifications, this phone's media. A loaded plugin sends its own instead.
+ * battery, notifications, this phone's media, calls. A loaded plugin sends its own instead.
  */
 internal fun emptyStatesFor(device: Device): List<NetworkPacket> {
     fun silent(cls: Class<out org.desklink.mobile.plugins.Plugin>): Boolean {
@@ -1481,6 +1481,7 @@ internal fun emptyStatesFor(device: Device): List<NetworkPacket> {
         if (silent(org.desklink.mobile.plugins.battery.BatteryPlugin::class.java)) add(org.desklink.mobile.plugins.battery.BatteryPlugin.turnedOffPacket())
         if (silent(org.desklink.mobile.plugins.notifications.NotificationsPlugin::class.java)) add(org.desklink.mobile.plugins.notifications.NotificationsPlugin.snapshotPacket(emptyList()))
         if (silent(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin::class.java)) add(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin.emptyStatePacket())
+        if (silent(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)) add(org.desklink.mobile.plugins.telephony.CallTracker.emptySnapshot())
     }
 }
 

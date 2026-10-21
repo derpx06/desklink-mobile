@@ -43,6 +43,9 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_SETTINGS,
         DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,
+        // Calls (contract T): the phone's call state, and the desk's answer/decline/dial.
+        DeskLinkProtocol.PACKET_TYPE_TELEPHONY,
+        DeskLinkProtocol.PACKET_TYPE_TELEPHONY_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST,
     )
 

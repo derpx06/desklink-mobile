@@ -417,4 +417,14 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="one">%1$d command finished</item>
         <item quantity="other">%1$d commands finished</item>
     </plurals>
+
+    <!-- Phase 3: calls -->
+    <string name="pref_plugin_calls">Calls on the computer</string>
+    <string name="pref_plugin_calls_desc">See, answer and place this phone\'s calls from the computer</string>
+    <string name="telephony_answered_on">Answered on %1$s</string>
+    <string name="settings_calls">Calls</string>
+    <string name="settings_calls_on">Calls on %1$s</string>
+    <string name="settings_calls_on_summary">Ringing, answer, decline and dial from %1$s</string>
+    <string name="settings_show_caller">Show caller on %1$s</string>
+    <string name="settings_show_caller_summary">Names and numbers; off shows \"Incoming call\"</string>
 </resources>

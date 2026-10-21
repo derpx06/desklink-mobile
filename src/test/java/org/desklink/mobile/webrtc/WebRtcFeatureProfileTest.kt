@@ -40,6 +40,8 @@ class WebRtcFeatureProfileTest {
                 "desklink.settings",
                 "desklink.settings.request",
                 "desklink.share.request",
+                "desklink.telephony",
+                "desklink.telephony.request",
                 "desklink.unlock.request",
             ),
             WebRtcFeatureProfile.capabilities(ALL_PACKET_TYPES),
@@ -157,6 +159,7 @@ class WebRtcFeatureProfileTest {
             DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME,
             DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME_REQUEST,
+            DeskLinkProtocol.PACKET_TYPE_TELEPHONY,
             DeskLinkProtocol.PACKET_TYPE_TELEPHONY_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1,
         )

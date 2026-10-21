@@ -438,6 +438,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         tick++
     }
 
+    private fun requestMissing(permissions: List<String>) {
+        val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), RESULT_CALL_PERMISSIONS)
+    }
+
     /** Written at once, applied off the main thread: reloading plugins is blocking. */
     private fun setPluginEnabled(device: Device, key: String, on: Boolean) {
         CoroutineScope(Dispatchers.IO).launch { device.setPluginEnabled(key, on) }
@@ -726,6 +731,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 remote = it.getPlugin(DeskSettingsPlugin::class.java)?.settings,
                 phoneMediaOn = it.isPluginEnabled(Plugin.getPluginKey(MprisReceiverPlugin::class.java)),
                 pending = it.getPlugin(DeskSettingsPlugin::class.java)?.pending.orEmpty(),
+                callsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)),
+                showCaller = org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(this, it.deviceId),
                 ready = it.hasActiveWebRtcFeatureTransport,
             )
         }
@@ -745,6 +752,24 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     if (on && !org.desklink.mobile.plugins.notifications.NotificationReceiver.hasReadNotificationsPermission(this)) {
                         runCatching { startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                     }
+                },
+                onCalls = { on ->
+                    device?.let { setPluginEnabled(it, Plugin.getPluginKey(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java), on) }
+                    // Asked only now, when the person turns calls on; the rows under Permissions stay until granted.
+                    if (on) requestMissing(buildList {
+                        add(Manifest.permission.READ_PHONE_STATE)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) add(Manifest.permission.ANSWER_PHONE_CALLS)
+                        add(Manifest.permission.CALL_PHONE)
+                    })
+                },
+                onShowCaller = { on ->
+                    device?.let { d ->
+                        org.desklink.mobile.plugins.telephony.TelephonyPlugin.setShowCaller(this, d.deviceId, on)
+                        // Names from contacts are optional: without it the dialer's own title is used.
+                        if (on) requestMissing(listOf(Manifest.permission.READ_CONTACTS))
+                        d.launchBackgroundReloadPluginsFromSettings()
+                    }
+                    tick++
                 },
                 onQuickCommands = { push(QUICK) },
                 onMore = { push(MORE) },
@@ -905,6 +930,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         const val PAIRING_PENDING = "pending"
         const val RESULT_NEEDS_RELOAD = RESULT_FIRST_USER
         const val RESULT_NOTIFICATIONS_ENABLED = RESULT_FIRST_USER + 1
+        const val RESULT_CALL_PERMISSIONS = RESULT_FIRST_USER + 2
         const val FLAG_FORCE_OVERVIEW = "forceOverview"
 
         private const val HOME = "home"

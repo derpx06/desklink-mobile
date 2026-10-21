@@ -138,6 +138,9 @@ data class DeskSettings(
     val pending: Map<String, Boolean> = emptyMap(),
     /** The feature link is up: only then are desk-owned rows live. */
     val ready: Boolean = true,
+    /** "Calls on <desk>" (phone-owned, off by default) and "Show caller on <desk>". */
+    val callsOn: Boolean = false,
+    val showCaller: Boolean = false,
 )
 
 class SettingsActions(
@@ -148,6 +151,8 @@ class SettingsActions(
     /** A desk-side switch (`desklink.settings.request {set: {key: value}}`). */
     val onDeskSetting: (String, Boolean) -> Unit,
     val onPhoneMedia: (Boolean) -> Unit,
+    val onCalls: (Boolean) -> Unit = {},
+    val onShowCaller: (Boolean) -> Unit = {},
     val onQuickCommands: () -> Unit,
     val onMore: () -> Unit,
     val onUnpair: () -> Unit,
@@ -294,6 +299,22 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                         revision++
                     },
                 )
+                GroupRow(
+                    stringResource(R.string.settings_calls_on, desk.name),
+                    icon = R.drawable.sym_call,
+                    subtitle = stringResource(R.string.settings_calls_on_summary, desk.name),
+                    checked = desk.callsOn,
+                    onClick = { actions.onCalls(!desk.callsOn) },
+                )
+                if (desk.callsOn) {
+                    GroupRow(
+                        stringResource(R.string.settings_show_caller, desk.name),
+                        icon = R.drawable.sym_person,
+                        subtitle = stringResource(R.string.settings_show_caller_summary),
+                        checked = desk.showCaller,
+                        onClick = { actions.onShowCaller(!desk.showCaller) },
+                    )
+                }
                 val commands = QuickCommands.load(QuickCommands.prefs(context), desk.id)
                 GroupRow(
                     stringResource(R.string.settings_quick_commands),
