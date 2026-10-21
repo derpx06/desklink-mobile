@@ -82,6 +82,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,13 +92,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -118,6 +124,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -207,7 +215,7 @@ internal fun MediaCard(media: HomeMedia, actions: HomeActions, artBounds: Mutabl
             .clip(RoundedCornerShape(24.dp))
             .background(Brush.verticalGradient(listOf(palette.cardTop, t.surface)))
             .border(1.dp, t.hairline, RoundedCornerShape(24.dp))
-            .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 6.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp),
     ) {
         Row(
             Modifier
@@ -242,19 +250,51 @@ internal fun MediaCard(media: HomeMedia, actions: HomeActions, artBounds: Mutabl
                     alpha = 1f - (abs(swipe.value) / (threshold * 3)).coerceAtMost(0.5f)
                 },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(CARD_GAP),
         ) {
             // Where the player's artwork grows from, and shrinks back to.
-            Box(Modifier.size(56.dp).onGloballyPositioned { artBounds.value = it.boundsInRoot() }) { Artwork(media, 12.dp, reduced) }
-            // Fixed height: a longer title or a new track never moves anything.
-            Column(Modifier.weight(1f).height(44.dp)) {
+            Box(
+                Modifier
+                    .size(CARD_ART)
+                    .shadow(6.dp, RoundedCornerShape(16.dp), clip = false, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
+                    .onGloballyPositioned { artBounds.value = it.boundsInRoot() },
+            ) { Artwork(media, 16.dp, reduced) }
+            // One line each, sized by the text itself (never a fixed height that a large font or a
+            // tall script clips): the card keeps its height across tracks because both are one line.
+            Column(Modifier.weight(1f)) {
                 Titles(media, reduced, titleSize = 16, subtitleSize = 13, alignCenter = false)
             }
         }
-        SeekBar(media, palette, actions.onSeek, compact = true)
+        // The seek bar and its times line up with the title, not the artwork.
+        Column(Modifier.fillMaxWidth().padding(start = CARD_ART + CARD_GAP, top = 4.dp)) {
+            SeekBar(media, palette, actions.onSeek, compact = true)
+        }
         Controls(media, actions, palette, playSize = 52.dp, reduced)
     }
 }
+
+private val CARD_ART = 64.dp
+private val CARD_GAP = 14.dp
+
+/** Fades the end (and, while it scrolls, the start) of a one-line text instead of a hard cut. */
+private fun Modifier.fadeEdges(start: Boolean, width: Dp = 20.dp) = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val fade = width.toPx().coerceAtMost(size.width / 3)
+        val ltr = layoutDirection == LayoutDirection.Ltr
+        fun edge(atLeft: Boolean) = drawRect(
+            Brush.horizontalGradient(
+                if (atLeft) listOf(Color.Transparent, Color.Black) else listOf(Color.Black, Color.Transparent),
+                startX = if (atLeft) 0f else size.width - fade,
+                endX = if (atLeft) fade else size.width,
+            ),
+            topLeft = Offset(if (atLeft) 0f else size.width - fade, 0f),
+            size = androidx.compose.ui.geometry.Size(fade, size.height),
+            blendMode = BlendMode.DstIn,
+        )
+        edge(atLeft = !ltr)
+        if (start) edge(atLeft = ltr)
+    }
 
 /** The cover, crossfading and settling in from a slight scale when the track changes. */
 @Composable
@@ -273,12 +313,18 @@ private fun BoxScope.Artwork(media: HomeMedia, corner: Dp, reduced: Boolean) {
         if (art != null) {
             Image(art, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(shape))
         } else {
-            val hue = (title.hashCode().toLong() and 0xffff).toFloat() % 360f
+            // No cover: a quiet tile in the theme's own tones, the note in the card's accent.
+            val t = tokens
+            val accent = media.vibrant?.let(::Color) ?: t.text
             Box(
-                Modifier.fillMaxSize().clip(shape).background(Brush.linearGradient(listOf(Color.hsv(hue, 0.45f, 0.62f), Color.hsv((hue + 48f) % 360f, 0.6f, 0.32f)))),
+                Modifier
+                    .fillMaxSize()
+                    .clip(shape)
+                    .background(Brush.linearGradient(listOf(accent.copy(alpha = 0.22f).compositeOver(t.surface), t.surface)))
+                    .border(1.dp, t.hairline, shape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(painterResource(R.drawable.sym_music_note), contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.fillMaxSize(0.42f))
+                Icon(painterResource(R.drawable.sym_music_note), contentDescription = null, tint = accent.copy(alpha = 0.8f), modifier = Modifier.fillMaxSize(0.4f))
             }
         }
     }
@@ -302,13 +348,48 @@ private fun Titles(media: HomeMedia, reduced: Boolean, titleSize: Int, subtitleS
             horizontalAlignment = if (alignCenter) Alignment.CenterHorizontally else Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(title, fontSize = titleSize.sp, fontWeight = FontWeight.Medium, maxLines = 1, modifier = Modifier.basicMarquee())
+            // Scrolls only while the desk plays (and motion is allowed); otherwise a soft fade, not a cut.
+            val scroll = media.reportedPlaying && !reduced
+            OneLine(
+                title,
+                titleSize,
+                FontWeight.Medium,
+                t.text,
+                scroll,
+                if (alignCenter) Modifier else Modifier.fillMaxWidth(),
+            )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Equalizer(media.reportedPlaying && !reduced, t.textDim)
-                Text(subtitle, fontSize = subtitleSize.sp, color = t.textDim, maxLines = 1, modifier = Modifier.basicMarquee())
+                OneLine(subtitle, subtitleSize, FontWeight.Normal, t.textDim, scroll = false, Modifier.weight(1f, fill = !alignCenter))
             }
         }
     }
+}
+
+/**
+ * One line of text that never wraps or clips hard: when it is too long its end fades out, and with
+ * [scroll] it marquees (both edges fading). Its height is the font's own line height.
+ */
+@Composable
+private fun OneLine(text: String, size: Int, weight: FontWeight, color: Color, scroll: Boolean, modifier: Modifier) {
+    var box by remember { mutableIntStateOf(0) }
+    var full by remember(text, size) { mutableFloatStateOf(0f) }
+    val overflow = box > 0 && full > box + 0.5f
+    Text(
+        text,
+        fontSize = size.sp,
+        lineHeight = (size * 1.3f).sp,
+        fontWeight = weight,
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        onTextLayout = { full = it.multiParagraph.intrinsics.maxIntrinsicWidth },
+        modifier = modifier
+            .onSizeChanged { box = it.width }
+            .then(if (overflow) Modifier.fadeEdges(start = scroll) else Modifier)
+            .then(if (overflow && scroll) Modifier.basicMarquee(initialDelayMillis = 1_500) else Modifier),
+    )
 }
 
 /** Three bars that move while the desk plays, still otherwise. Drawn, not recomposed, per frame. */
@@ -454,7 +535,9 @@ private fun Controls(media: HomeMedia, actions: HomeActions, palette: MediaPalet
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
     ) {
-        PressButton(stringResource(R.string.mpris_previous), media.canPrevious, 48.dp, Color.Transparent, reduced, tap(actions.onPrevious)) {
+        // A player that cannot skip shows no skip buttons (play centres); while the link is down
+        // they stay, disabled, so the card does not reshuffle for a moment's outage.
+        if (media.canPrevious || media.stale) PressButton(stringResource(R.string.mpris_previous), media.canPrevious, 48.dp, Color.Transparent, reduced, tap(actions.onPrevious)) {
             Icon(painterResource(R.drawable.sym_skip_previous), contentDescription = null, tint = if (media.canPrevious) t.text else t.hairlineStrong, modifier = Modifier.size(28.dp))
         }
         val playLabel = stringResource(if (media.playing) R.string.mpris_pause else R.string.mpris_play)
@@ -463,7 +546,7 @@ private fun Controls(media: HomeMedia, actions: HomeActions, palette: MediaPalet
         PressButton(playLabel, media.canPlayPause, playSize, if (media.canPlayPause) palette.accent else t.hairlineStrong, reduced, tap(actions.onPlayPause), Modifier.graphicsLayer { alpha = pendingAlpha }) {
             PlayPauseIcon(media.playing, palette.onAccent, playSize * 0.42f, reduced)
         }
-        PressButton(stringResource(R.string.mpris_next), media.canNext, 48.dp, Color.Transparent, reduced, tap(actions.onNext)) {
+        if (media.canNext || media.stale) PressButton(stringResource(R.string.mpris_next), media.canNext, 48.dp, Color.Transparent, reduced, tap(actions.onNext)) {
             Icon(painterResource(R.drawable.sym_skip_next), contentDescription = null, tint = if (media.canNext) t.text else t.hairlineStrong, modifier = Modifier.size(28.dp))
         }
     }
