@@ -61,6 +61,9 @@ class MprisPlugin : Plugin() {
         var album: String = ""
             internal set
         internal var albumArtUrl: String = ""
+        /** The desk's inline cover ([MprisArt]), by its `albumArtId`. */
+        var artId: String? = null
+            internal set
         internal var url: String = ""
         var loopStatus: String = ""
             internal set
@@ -372,6 +375,7 @@ class MprisPlugin : Plugin() {
             val playerStatus = players[np.getString("player")]
             if (playerStatus != null) {
                 val wasPlaying = playerStatus.isPlaying
+                val previousTitle = playerStatus.title
                 //Note: title, artist and album will not be available for all desktop clients
                 playerStatus.title = np.getString("title", playerStatus.title)
                 playerStatus.artist = np.getString("artist", playerStatus.artist)
@@ -409,6 +413,22 @@ class MprisPlugin : Plugin() {
                 } else {
                     Log.w("MprisControl", "Invalid album art URL: $newAlbumArtUrlString")
                     playerStatus.albumArtUrl = ""
+                }
+
+                // The desk's inline cover: its id on every state, its data when the track changes.
+                // A new track without an id has no cover.
+                val artId = np.getStringOrNull("albumArtId")?.takeIf(MprisArt::validId)
+                if (artId != null) {
+                    playerStatus.artId = artId
+                    val data = np.getStringOrNull("albumArtData")
+                    if (data != null && MprisArt.get(artId) == null) {
+                        ThreadHelper.execute {
+                            MprisArt.decode(data)?.let { MprisArt.put(artId, it) } ?: Log.w("MprisControl", "Refused the desk's album art")
+                            notifyPlayerStatusUpdated()
+                        }
+                    }
+                } else if (playerStatus.title != previousTitle) {
+                    playerStatus.artId = null
                 }
 
                 notifyPlayerStatusUpdated()

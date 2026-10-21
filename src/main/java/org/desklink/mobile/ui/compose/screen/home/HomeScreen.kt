@@ -54,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -173,34 +174,40 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
     val notReady = notReadyMessage(state)
     val gate = { action: () -> Unit -> if (state.ready) action() else actions.onUnavailable(notReady) }
 
-    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(60.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            DeviceChip(state.name, state.connection) { sheet = true }
-            Spacer(Modifier.weight(1f))
-            IconButton(onClick = actions.onSettings, modifier = Modifier.size(48.dp)) {
-                Icon(painterResource(R.drawable.sym_settings), contentDescription = stringResource(R.string.settings), tint = t.text)
+    var playerOpen by rememberSaveable { mutableStateOf(false) }
+    // Where the card's artwork is, for the player to grow from.
+    val cardArt = remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
+            Row(Modifier.fillMaxWidth().height(60.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                DeviceChip(state.name, state.connection) { sheet = true }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = actions.onSettings, modifier = Modifier.size(48.dp)) {
+                    Icon(painterResource(R.drawable.sym_settings), contentDescription = stringResource(R.string.settings), tint = t.text)
+                }
+            }
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                StatusCard(state, actions)
+                // One place, playing or paused: directly under the status card.
+                state.media?.let { MediaCard(it, actions, cardArt) { playerOpen = true } }
+                SectionLabel(stringResource(R.string.home_open_on, state.name))
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TerminalsTile(state, Modifier.weight(1f)) { gate(actions.onTerminals) }
+                    DeskTile(state.ready, Modifier.weight(1f)) { gate(actions.onDeskScreen) }
+                }
+                SectionLabel(stringResource(R.string.home_quick_actions))
+                QuickActions(state, gate, actions) { linkDialog = true }
+                TransferAndClipboard(state, actions)
+                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars).padding(bottom = 6.dp))
             }
         }
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            StatusCard(state, actions)
-            // One place, playing or paused: directly under the status card.
-            state.media?.let { MediaCard(it, actions) }
-            SectionLabel(stringResource(R.string.home_open_on, state.name))
-            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TerminalsTile(state, Modifier.weight(1f)) { gate(actions.onTerminals) }
-                DeskTile(state.ready, Modifier.weight(1f)) { gate(actions.onDeskScreen) }
-            }
-            SectionLabel(stringResource(R.string.home_quick_actions))
-            QuickActions(state, gate, actions) { linkDialog = true }
-            TransferAndClipboard(state, actions)
-            Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars).padding(bottom = 6.dp))
-        }
+        NowPlayingOverlay(state.media, actions, cardArt, playerOpen && state.media != null) { playerOpen = false }
     }
 
     if (sheet) ComputersSheet(state, onDismiss = { sheet = false }, actions)

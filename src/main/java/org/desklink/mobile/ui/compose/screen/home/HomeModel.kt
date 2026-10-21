@@ -14,7 +14,7 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.clipboard.ClipboardPlugin
 import org.desklink.mobile.plugins.mpris.MprisPlugin
 import org.desklink.mobile.plugins.mpris.MediaControl as MprisControlState
-import androidx.compose.ui.graphics.asImageBitmap
+import org.desklink.mobile.plugins.mpris.MprisArt
 import org.desklink.mobile.plugins.screen.PhoneScreenCaptureService
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.share.TransferProgress
@@ -85,7 +85,10 @@ object HomeModel {
         val player = plugin.getPlayerStatus(name)
         val now = android.os.SystemClock.elapsedRealtime()
         val reported = player?.isPlaying == true
-        val art = player?.takeIf { it.albumArtUrl.startsWith("http://") || it.albumArtUrl.startsWith("https://") }?.getAlbumArt()
+        // The desk's inline cover first, then an http(s) one; otherwise the card draws a gradient.
+        val art = MprisArt.get(player?.artId)
+            ?: player?.takeIf { it.albumArtUrl.startsWith("http://") || it.albumArtUrl.startsWith("https://") }
+                ?.let { p -> p.getAlbumArt()?.let { MprisArt.forUrl(p.albumArtUrl, it) } }
         return HomeMedia(
             player = name,
             players = plugin.playerList,
@@ -103,7 +106,9 @@ object HomeModel {
             positionAt = player?.lastPositionTime ?: System.currentTimeMillis(),
             reportedPlaying = reported,
             volume = player?.volume?.takeIf { it in 0..100 },
-            art = art?.asImageBitmap(),
+            art = art?.image,
+            vibrant = art?.vibrant,
+            artKey = player?.artId ?: player?.albumArtUrl?.takeIf { art != null } ?: "title:" + (player?.title ?: name),
             desk = device.name,
             subtitleFallback = context.getString(R.string.home_media_on, device.name),
         )
