@@ -16,9 +16,18 @@ enum class WebRtcChannel(
     FILE_CONTROL("desklink-file-control-v1", true, null),
     FILE_DATA("desklink-file-data-v1", true, null),
     TERMINAL("desklink-terminal-v1", true, null),
+
+    /** W2: only `desklink.heartbeat` (probes, replies, doze reports), so a feature burst cannot delay them. */
+    LIVENESS("desklink-liveness-v1", true, null),
     ;
 
     companion object {
+        /** An inbound liveness message above this is dropped and logged; the channel stays. */
+        const val MAX_LIVENESS_ENVELOPE_BYTES = 2048
+
+        /** A liveness send while this much is buffered is skipped: the next heartbeat supersedes it. */
+        const val LIVENESS_MAX_BUFFERED_BYTES = 8192L
+
         fun fromLabel(label: String): WebRtcChannel? = entries.firstOrNull { it.label == label }
 
         fun validate(label: String, ordered: Boolean, maxRetransmits: Int?): WebRtcChannel {

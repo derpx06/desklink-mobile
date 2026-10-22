@@ -274,6 +274,12 @@ class WebRtcTransport(
     override val transportType: TransportType = TransportType.WEBRTC
     override val state: TransportState get() = stateRef.get()
 
+    /** The `events` channel holds messages above its high-water mark and resumes under the low one. */
+    private val eventsSender = FlowControlledSender(
+        bufferedAmount = { channels[WebRtcChannel.EVENTS.label]?.bufferedAmount() ?: 0L },
+        rawSend = { bytes -> channels[WebRtcChannel.EVENTS.label]?.send(DataChannel.Buffer(ByteBuffer.wrap(bytes), false)) == true },
+    )
+
     private fun installChannel(channel: DataChannel) {
         // Refused, not thrown. This runs inside onDataChannel on libwebrtc's
         // native callback thread, where an exception takes the process down
@@ -286,8 +292,13 @@ class WebRtcTransport(
         }
         channels[channel.label()] = channel
         channel.registerObserver(object : DataChannel.Observer {
-            override fun onBufferedAmountChange(previousAmount: Long) = Unit
+            override fun onBufferedAmountChange(previousAmount: Long) {
+                if (channel.label() == WebRtcChannel.EVENTS.label) eventsSender.onBufferedAmountChange()
+            }
             override fun onStateChange() {
+                if (channel.state() == DataChannel.State.CLOSED && channel.label() == WebRtcChannel.EVENTS.label) {
+                    eventsSender.failAll("The events channel closed")
+                }
                 if (channel.state() == DataChannel.State.OPEN) {
                     stateRef.compareAndSet(TransportState.CONNECTING, TransportState.CONNECTED)
                     if (channel.label() == WebRtcChannel.CONTROL.label) observer.onControlChannelOpen()
@@ -302,6 +313,10 @@ class WebRtcTransport(
                 // peer replacement was enough to trigger it, which is exactly
                 // when it is most likely to happen.
                 runCatching {
+                    if (channel.label() == WebRtcChannel.LIVENESS.label && buffer.data.remaining() > WebRtcChannel.MAX_LIVENESS_ENVELOPE_BYTES) {
+                        Log.w("DeskLink/WebRTC", "Dropped an oversized liveness message")
+                        return
+                    }
                     val bytes = ByteArray(buffer.data.remaining()).also { buffer.data.get(it) }
                     val envelope = WebRtcEnvelope.fromJson(String(bytes, Charsets.UTF_8))
                     require(envelope.channel == channel.label()) {
@@ -343,6 +358,21 @@ class WebRtcTransport(
             callback.onFailure(TransportError(TransportErrorCode.INVALID_PACKET, reason))
             return
         }
+        when (webRtcChannel) {
+            WebRtcChannel.EVENTS -> eventsSender.send(payload, callback)
+            WebRtcChannel.LIVENESS -> {
+                // A heartbeat is idempotent and the next one supersedes it: skip, never queue.
+                if (dataChannel.bufferedAmount() > WebRtcChannel.LIVENESS_MAX_BUFFERED_BYTES) {
+                    callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "The liveness channel is backed up"))
+                    return
+                }
+                writeNow(dataChannel, payload, callback)
+            }
+            else -> writeNow(dataChannel, payload, callback)
+        }
+    }
+
+    private fun writeNow(dataChannel: DataChannel, payload: ByteArray, callback: TransportCallback) {
         if (!dataChannel.send(DataChannel.Buffer(ByteBuffer.wrap(payload), false))) {
             callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "WebRTC data channel rejected message"))
             return
@@ -397,17 +427,16 @@ class WebRtcTransport(
             )
             return
         }
+        // A heartbeat goes on the liveness channel; a peer without one (a mixed build) gets it on `events`.
+        var target = WebRtcPacketBridge.channelFor(packet)
+        if (target == WebRtcChannel.LIVENESS && channels[target.label]?.state() != DataChannel.State.OPEN) target = WebRtcChannel.EVENTS
         val envelope = try {
-            WebRtcPacketBridge.encode(wireBinding, packet, System.currentTimeMillis())
+            WebRtcPacketBridge.encode(wireBinding, packet, System.currentTimeMillis(), target)
         } catch (error: Throwable) {
             callback.onFailure(TransportError(TransportErrorCode.INVALID_PACKET, error.message ?: "Invalid WebRTC packet", error))
             return
         }
-        sendOn(
-            WebRtcChannel.fromLabel(envelope.channel) ?: error("Unknown DeskLink WebRTC channel"),
-            envelope.toJson().toString().toByteArray(Charsets.UTF_8),
-            callback,
-        )
+        sendOn(target, envelope.toJson().toString().toByteArray(Charsets.UTF_8), callback)
     }
 
     fun createOffer(): Boolean {

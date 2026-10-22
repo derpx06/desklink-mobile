@@ -15,9 +15,9 @@ import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 object WebRtcPacketBridge {
     const val NETWORK_PACKET_MESSAGE_TYPE = "desklink.packet.v1"
 
-    fun encode(wire: WebRtcWireBinding, packet: NetworkPacket, timestamp: Long): WebRtcEnvelope {
+    fun encode(wire: WebRtcWireBinding, packet: NetworkPacket, timestamp: Long, channelOverride: WebRtcChannel? = null): WebRtcEnvelope {
         ensureFeaturePacket(packet)
-        val channel = channelFor(packet)
+        val channel = channelOverride ?: channelFor(packet)
         return WebRtcEnvelope.create(
             wire.senderDeviceId,
             wire.sessionId,
@@ -36,13 +36,21 @@ object WebRtcPacketBridge {
         }
         val packet = NetworkPacket.unserialize(String(payload, Charsets.UTF_8))
         ensureFeaturePacket(packet)
-        require(envelope.channel == channelFor(packet).label) {
+        require(envelope.channel == channelFor(packet).label || isHeartbeatOnEvents(packet, envelope.channel)) {
             "DeskLink packet arrived on the wrong WebRTC channel"
         }
         return packet
     }
 
+    /**
+     * A heartbeat from a peer that has no liveness channel (a mixed build) still counts; senders
+     * use the liveness channel whenever it is open. Nothing else may use that channel.
+     */
+    private fun isHeartbeatOnEvents(packet: NetworkPacket, channel: String) =
+        packet.type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT && channel == WebRtcChannel.EVENTS.label
+
     fun channelFor(packet: NetworkPacket): WebRtcChannel = when {
+        packet.type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT -> WebRtcChannel.LIVENESS
         isReplaceablePointerMotion(packet) -> WebRtcChannel.INPUT_REALTIME
         packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST -> WebRtcChannel.INPUT_RELIABLE
         else -> WebRtcChannel.EVENTS
