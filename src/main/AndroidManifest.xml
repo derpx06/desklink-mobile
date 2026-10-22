@@ -412,6 +412,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <receiver
             android:name="org.desklink.mobile.plugins.terminal.TerminalAttentionReceiver"
             android:exported="false" />
+        <!-- F8: synced folders. -->
+        <activity
+            android:name="org.desklink.mobile.plugins.folders.SyncedFoldersActivity"
+            android:label="@string/folders_title"
+            android:exported="false" />
         <!-- F7: automations. -->
         <activity
             android:name="org.desklink.mobile.plugins.automations.AutomationsActivity"

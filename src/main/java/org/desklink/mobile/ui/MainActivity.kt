@@ -912,6 +912,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 add(MoreExtra(R.drawable.sym_bolt, getString(R.string.feature_run_command), getString(R.string.feature_desc_run_command),
                     button(R.drawable.run_command_plugin_icon_24dp)?.let { b -> { b.onClick(this@MainActivity) } }
                         ?: open(RunCommandActivity::class.java, org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)))
+                add(MoreExtra(R.drawable.sym_folder_zip, getString(R.string.more_folders), getString(R.string.more_folders_summary)) {
+                    startActivity(Intent(this@MainActivity, org.desklink.mobile.plugins.folders.SyncedFoldersActivity::class.java).putExtra("deviceId", device.deviceId))
+                })
                 add(MoreExtra(R.drawable.sym_draw, getString(R.string.more_drawing_pad), getString(R.string.feature_desc_digitizer),
                     open(DigitizerActivity::class.java, org.desklink.mobile.plugins.digitizer.DigitizerPlugin::class.java)))
                 add(MoreExtra(R.drawable.sym_settings_remote, getString(R.string.more_tv_remote), getString(R.string.feature_desc_tv),
