@@ -7,21 +7,36 @@ package org.desklink.mobile.plugins.folders
 
 import android.content.ContentResolver
 import android.net.Uri
+import android.os.Build
 import android.provider.DocumentsContract
 import android.provider.DocumentsContract.Document
 import java.io.File
+import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
 
 /**
- * A synced folder through the Storage Access Framework: listing, hashing and writing under the
- * picked tree only. Every path comes from [FolderSync.validRelpath]; documents are found by name
- * segment by segment from the tree's root, so nothing outside it is ever reached.
+ * A Bucket folder through the Storage Access Framework: listing, hashing and writing under the
+ * picked tree only. When [folder] is set (one Bucket per computer), everything lives in that child of
+ * the picked folder, created on first use. Documents are found by name segment by segment from the
+ * root, so nothing outside it is ever reached.
  */
-class SafTree(private val resolver: ContentResolver, val tree: Uri) {
-    private val rootId = DocumentsContract.getTreeDocumentId(tree)
-
+class SafTree(private val resolver: ContentResolver, val tree: Uri, private val folder: String? = null) {
     data class Item(val documentId: String, val dir: Boolean, val size: Long, val mtime: Long)
+
+    /** A scan: what may sync (files and folders), and what may not, with why. */
+    data class Scan(val found: Map<String, Item>, val skipped: List<Pair<String, Skip>>)
+
+    private val treeRoot = DocumentsContract.getTreeDocumentId(tree)
+
+    /** The Bucket's root document: the computer's folder inside the picked one (made if missing). */
+    private val rootId: String by lazy {
+        val name = folder ?: return@lazy treeRoot
+        children(treeRoot)[name]?.takeIf { it.dir }?.documentId
+            ?: DocumentsContract.createDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, treeRoot), Document.MIME_TYPE_DIR, name)
+                ?.let(DocumentsContract::getDocumentId)
+            ?: error("Could not create the Bucket folder")
+    }
 
     private val projection = arrayOf(
         Document.COLUMN_DOCUMENT_ID, Document.COLUMN_DISPLAY_NAME, Document.COLUMN_MIME_TYPE,
@@ -39,22 +54,57 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri) {
         return out
     }
 
-    /** F8b: the files at the top of the folder, and the names of the subfolders (not synced for now). */
-    fun scanTop(): Pair<Map<String, Item>, List<String>> {
-        val files = HashMap<String, Item>()
-        val folders = mutableListOf<String>()
-        for ((name, item) in children(rootId)) {
-            when {
-                item.dir -> if (folders.size < 100) folders += name
-                !FolderSync.validSegment(name) || item.size > FolderSync.MAX_FILE_BYTES -> Unit
-                files.size < FolderSync.MAX_BUCKET_ITEMS -> files[name] = item
+    /**
+     * F8c: files and folders up to [FolderSync.MAX_BUCKET_DEPTH] folders deep. Deeper folders,
+     * over-long or unusable names and files over 1 GB are listed in `skipped`, never synced.
+     * Providers list only folders and documents (no symlinks or special files reach here).
+     */
+    fun scan(maxItems: Int = FolderSync.MAX_BUCKET_ITEMS): Scan {
+        val found = HashMap<String, Item>()
+        val skipped = mutableListOf<Pair<String, Skip>>()
+        val queue = ArrayDeque<Pair<String, String>>()
+        queue += rootId to ""
+        while (queue.isNotEmpty()) {
+            val (docId, prefix) = queue.removeFirst()
+            for ((name, item) in children(docId).toSortedMap()) {
+                val path = prefix + name
+                if (FolderSync.ignored(path, includeHidden = false)) continue
+                val reason = FolderSync.skipReason(path, item.dir) ?: if (!item.dir && item.size > FolderSync.MAX_BUCKET_FILE_BYTES) Skip.TOO_LARGE else null
+                when {
+                    reason != null -> if (skipped.size < MAX_SKIPPED) skipped += path to reason
+                    found.size >= maxItems -> Unit
+                    else -> {
+                        found[path] = item
+                        if (item.dir) queue += item.documentId to "$path/"
+                    }
+                }
             }
         }
-        return files to folders.sorted()
+        return Scan(found, skipped)
     }
 
-    /** The document at [path], or null. */
+    /** Every file and folder below this tree's root, keyed by path (capped, so a huge tree cannot exhaust memory). */
+    fun walk(cap: Int = WALK_CAP): Map<String, Item> {
+        val out = HashMap<String, Item>()
+        val queue = ArrayDeque<Pair<String, String>>()
+        queue += rootId to ""
+        while (queue.isNotEmpty() && out.size < cap) {
+            val (id, prefix) = queue.removeFirst()
+            for ((name, item) in children(id).toSortedMap()) {
+                if (out.size >= cap) break
+                out[prefix + name] = item
+                if (item.dir) queue += item.documentId to "$prefix$name/"
+            }
+        }
+        return out
+    }
+
+    /** The names in a folder. */
+    fun names(item: Item): Set<String> = children(item.documentId).keys
+
+    /** The document at [path] ("" is the root itself), or null. */
     fun find(path: String): Item? {
+        if (path.isEmpty()) return Item(rootId, true, 0, 0)
         var id = rootId
         var item: Item? = null
         for (segment in path.split('/')) {
@@ -66,9 +116,11 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri) {
 
     fun uri(item: Item): Uri = DocumentsContract.buildDocumentUriUsingTree(tree, item.documentId)
 
+    fun open(item: Item): InputStream? = resolver.openInputStream(uri(item))
+
     fun sha256(item: Item): String? = runCatching {
         val digest = MessageDigest.getInstance("SHA-256")
-        resolver.openInputStream(uri(item))?.use { input ->
+        open(item)?.use { input ->
             val buffer = ByteArray(64 * 1024)
             while (true) {
                 val n = input.read(buffer)
@@ -79,32 +131,36 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri) {
         digest.digest().joinToString("") { "%02x".format(it) }
     }.getOrNull()
 
-    /** The directory holding [path], created as needed (each existing one must be a directory). */
-    private fun parentOf(path: String): String? {
+    /** The folder at [path], created (with its parents) as needed; each existing one must be a folder. */
+    fun mkdirs(path: String): Item? {
         var id = rootId
-        for (segment in path.split('/').dropLast(1)) {
+        var item: Item? = Item(rootId, true, 0, 0)
+        if (path.isEmpty()) return item
+        for (segment in path.split('/')) {
             val existing = children(id)[segment]
-            id = when {
+            item = when {
                 existing == null -> DocumentsContract.createDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, id), Document.MIME_TYPE_DIR, segment)
-                    ?.let(DocumentsContract::getDocumentId) ?: return null
-                existing.dir -> existing.documentId
+                    ?.let { Item(DocumentsContract.getDocumentId(it), true, 0, System.currentTimeMillis()) } ?: return null
+                existing.dir -> existing
                 else -> return null
             }
+            id = item.documentId
         }
-        return id
+        return item
     }
 
     /** Writes [source] at [path]: a temporary document beside it, then renamed into place. The new stat, or null. */
-    fun place(path: String, source: File, replace: Item?): Item? {
-        val parent = parentOf(path) ?: return null
+    fun place(path: String, source: File, replace: Item?): Item? = source.inputStream().use { place(path, it, replace) }
+
+    fun place(path: String, source: InputStream, replace: Item?): Item? {
+        val parent = mkdirs(path.substringBeforeLast('/', "")) ?: return null
         val name = path.substringAfterLast('/')
-        val parentUri = DocumentsContract.buildDocumentUriUsingTree(tree, parent)
+        val parentUri = DocumentsContract.buildDocumentUriUsingTree(tree, parent.documentId)
         val temp = DocumentsContract.createDocument(resolver, parentUri, "application/octet-stream", ".desklink-${UUID.randomUUID()}.tmp") ?: return null
         val ok = runCatching {
-            resolver.openOutputStream(temp, "wt")?.use { out -> source.inputStream().use { it.copyTo(out) } } ?: error("no stream")
+            resolver.openOutputStream(temp, "wt")?.use { out -> source.copyTo(out) } ?: error("no stream")
             replace?.let { DocumentsContract.deleteDocument(resolver, uri(it)) }
-            val renamed = DocumentsContract.renameDocument(resolver, temp, name) ?: error("not renamed")
-            renamed
+            DocumentsContract.renameDocument(resolver, temp, name) ?: error("not renamed")
         }.getOrNull()
         if (ok == null) {
             runCatching { DocumentsContract.deleteDocument(resolver, temp) }
@@ -113,15 +169,55 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri) {
         return find(path)
     }
 
+    /** Deletes a file, or a folder with everything in it (one call: one item). */
     fun delete(item: Item): Boolean = runCatching { DocumentsContract.deleteDocument(resolver, uri(item)) }.getOrDefault(false)
 
-    /** Renames [item] within its directory (a conflict copy goes beside the original). */
+    fun isEmptyFolder(item: Item) = item.dir && children(item.documentId).isEmpty()
+
+    /** Renames [item] within its folder. */
     fun rename(item: Item, newName: String): Boolean = runCatching { DocumentsContract.renameDocument(resolver, uri(item), newName) != null }.getOrDefault(false)
 
-    /** Old temporaries a crash left behind (top level: the Bucket holds files only). */
+    /**
+     * Moves the item at [from] to [to] (another folder, maybe another name), without copying when the
+     * provider can move (Android 7+). False when it could not; the caller then copies.
+     */
+    fun move(from: String, to: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+        val item = find(from) ?: return false
+        val fromParent = find(from.substringBeforeLast('/', "")) ?: return false
+        val toParent = mkdirs(to.substringBeforeLast('/', "")) ?: return false
+        return runCatching {
+            val moved = if (fromParent.documentId == toParent.documentId) uri(item) else
+                DocumentsContract.moveDocument(resolver, uri(item), uri(fromParent), uri(toParent)) ?: return false
+            val name = to.substringAfterLast('/')
+            if (name != from.substringAfterLast('/')) DocumentsContract.renameDocument(resolver, moved, name) ?: return false
+            true
+        }.getOrDefault(false)
+    }
+
+    /** Old temporaries a crash left behind. */
     fun cleanTemps() {
-        for ((name, item) in children(rootId)) {
-            if (!item.dir && name.startsWith(".desklink-") && name.endsWith(".tmp") && System.currentTimeMillis() - item.mtime > 3_600_000) delete(item)
+        val queue = ArrayDeque<Pair<String, Int>>()
+        queue += rootId to 0
+        while (queue.isNotEmpty()) {
+            val (id, depth) = queue.removeFirst()
+            for ((name, item) in children(id)) {
+                if (item.dir && depth < FolderSync.MAX_BUCKET_DEPTH) queue += item.documentId to depth + 1
+                else if (!item.dir && name.startsWith(".desklink-") && name.endsWith(".tmp") && System.currentTimeMillis() - item.mtime > 3_600_000) delete(item)
+            }
+        }
+    }
+
+    companion object {
+        /** Not-synced items listed (the count beyond is still shown). */
+        const val MAX_SKIPPED = 200
+        const val WALK_CAP = 5_000
+
+        /** A computer's name as a folder name (one Bucket per computer). */
+        fun folderName(desk: String): String {
+            var name = desk.filter { it != '/' && it != '\\' && it != ':' && !it.isISOControl() }.trim().trimEnd('.').trimStart('.')
+            while (name.toByteArray().size > FolderSync.MAX_SEGMENT_BYTES) name = name.dropLast(1)
+            return name.ifBlank { "Computer" }
         }
     }
 }

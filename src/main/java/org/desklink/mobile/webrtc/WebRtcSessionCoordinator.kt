@@ -1631,6 +1631,9 @@ class WebRtcSessionCoordinator(
      * This phone stops sending (Stop, the desk, a replacement). Idempotent. With [onlySessionId] only
      * that session: a service ending late must not stop the session that replaced its own.
      */
+    /** W0: a Bucket item removed mid-transfer: the incoming file is cancelled on both sides. */
+    fun cancelBucketReceive(relpath: String) = runCatching { fileTransfers.cancelFolderReceive(relpath) }
+
     fun stopAudioSending(reason: String, notifyPeer: Boolean, onlySessionId: String? = null) = synchronized(lock) {
         audioSessions.sending
             ?.takeIf { onlySessionId == null || it.remoteSessionId == onlySessionId }

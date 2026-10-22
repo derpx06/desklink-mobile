@@ -19,11 +19,14 @@ data class Vv(val desk: Long = 0, val phone: Long = 0) {
     fun bumped(side: Side) = if (side == Side.DESK) copy(desk = desk + 1) else copy(phone = phone + 1)
 }
 
-/** P2: one path's state. A tombstone has `deleted`, size 0 and no hash. */
-data class Entry(val size: Long, val mtime: Long, val sha256: String, val deleted: Boolean = false, val vv: Vv = Vv())
+/** P2: one path's state. A tombstone has `deleted`, size 0 and no hash; a folder (F8c `dir`) has no size or hash. */
+data class Entry(val size: Long, val mtime: Long, val sha256: String, val deleted: Boolean = false, val vv: Vv = Vv(), val dir: Boolean = false)
 
-/** A local file's size and time, from a scan. */
-data class Stat(val size: Long, val mtime: Long)
+/** A local file's (or folder's) size and time, from a scan. */
+data class Stat(val size: Long, val mtime: Long, val dir: Boolean = false)
+
+/** Why something in the Bucket folder is not synced (listed as "Not synced (N)"). */
+enum class Skip { TOO_DEEP, NAME_TOO_LONG, INVALID_NAME, CASE_CLASH, TOO_LARGE }
 
 /** One step of a plan, for the side that made it (P3). */
 sealed interface Step {
@@ -50,15 +53,12 @@ sealed interface Step {
  * phone acts (renames its own version, takes the desk's).
  */
 object FolderSync {
-    /** P1: pairs per phone. */
-    const val MAX_PAIRS = 8
-    /** P2: entries per pair. */
+    /** P2: manifest entries per pair (live items and tombstones). */
     const val MAX_FILES = 20_000
+    /** P2: segments any wire path may have (the Bucket itself allows fewer, [MAX_BUCKET_DEPTH]). */
     const val MAX_DEPTH = 32
     const val MAX_SEGMENT_BYTES = 255
     const val MAX_RELPATH_BYTES = 1024
-    /** P5: larger files are skipped. */
-    const val MAX_FILE_BYTES = 4L * 1024 * 1024 * 1024
     const val MAX_NAME_CHARS = 80
     /** P2: one manifest packet, and parts per manifest. */
     const val PACKET_BUDGET = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET
@@ -141,14 +141,26 @@ object FolderSync {
                 }
             }
         }
-        return renamesByHash(local, steps)
+        return ordered(renamesByHash(local, steps), local)
+    }
+
+    /**
+     * F8c order: folders are created first (shallowest first), files move, and a folder's tombstone
+     * comes last (deepest first), applied only if the folder ends up empty.
+     */
+    private fun ordered(steps: List<Step>, local: Map<String, Entry>): List<Step> {
+        fun depth(path: String) = path.count { it == '/' }
+        val makeDirs = steps.filter { it is Step.Download && it.entry.dir }.sortedBy { depth((it as Step.Download).path) }
+        val removeDirs = steps.filter { it is Step.Delete && local[it.path]?.dir == true }.sortedByDescending { depth((it as Step.Delete).path) }
+        return makeDirs + steps.filter { it !in makeDirs && it !in removeDirs } + removeDirs
     }
 
     /** A download whose content a deleted (or kept) local file already has becomes a move (or a copy). */
     private fun renamesByHash(local: Map<String, Entry>, steps: List<Step>): List<Step> {
         val deletes = LinkedHashMap<String, Pair<String, Entry>>()
+        // Folders have no hash: they are never matched (a folder rename is its files' moves).
         steps.filterIsInstance<Step.Delete>().forEach { d ->
-            local[d.path]?.takeIf { !it.deleted }?.let { deletes.putIfAbsent(it.sha256, d.path to d.entry) }
+            local[d.path]?.takeIf { !it.deleted && !it.dir }?.let { deletes.putIfAbsent(it.sha256, d.path to d.entry) }
         }
         val changing = steps.mapNotNull {
             when (it) {
@@ -159,11 +171,11 @@ object FolderSync {
             }
         }.toSet()
         val kept = HashMap<String, String>()
-        local.toSortedMap().forEach { (path, e) -> if (!e.deleted && path !in changing) kept[e.sha256] = path }
+        local.toSortedMap().forEach { (path, e) -> if (!e.deleted && !e.dir && path !in changing) kept[e.sha256] = path }
         val moved = HashSet<String>()
         val out = mutableListOf<Step>()
         for (step in steps) {
-            if (step is Step.Download) {
+            if (step is Step.Download && !step.entry.dir) {
                 val delete = deletes.remove(step.entry.sha256)
                 val from = kept[step.entry.sha256]
                 out += when {
@@ -190,10 +202,18 @@ object FolderSync {
         var changed = false
         for ((path, stat) in found.toSortedMap()) {
             val existing = manifest[path]
-            if (existing != null && !existing.deleted && existing.size == stat.size && existing.mtime == stat.mtime) continue
+            if (stat.dir) {
+                // A folder is there or not: its time moves with every child.
+                if (existing != null && !existing.deleted && existing.dir) continue
+                if (existing == null && manifest.size >= MAX_FILES) continue
+                manifest[path] = Entry(0, stat.mtime, "", false, (existing?.vv ?: Vv()).bumped(side), dir = true)
+                changed = true
+                continue
+            }
+            if (existing != null && !existing.deleted && !existing.dir && existing.size == stat.size && existing.mtime == stat.mtime) continue
             val sha = hash(path) ?: continue
             when {
-                existing != null && !existing.deleted && existing.sha256 == sha -> manifest[path] = existing.copy(size = stat.size, mtime = stat.mtime)
+                existing != null && !existing.deleted && !existing.dir && existing.sha256 == sha -> manifest[path] = existing.copy(size = stat.size, mtime = stat.mtime)
                 existing != null -> manifest[path] = Entry(stat.size, stat.mtime, sha, false, existing.vv.bumped(side))
                 manifest.size >= MAX_FILES -> continue
                 else -> manifest[path] = Entry(stat.size, stat.mtime, sha, false, Vv().bumped(side))
@@ -202,7 +222,7 @@ object FolderSync {
         }
         for ((path, entry) in manifest.entries.toList()) {
             if (!entry.deleted && path !in found && path !in keep) {
-                manifest[path] = Entry(0, now, "", true, entry.vv.bumped(side))
+                manifest[path] = Entry(0, now, "", true, entry.vv.bumped(side), dir = entry.dir)
                 changed = true
             }
         }
@@ -211,32 +231,105 @@ object FolderSync {
         return changed
     }
 
-    // ---- F8b the Bucket ----------------------------------------------------------------------------------------
+    // ---- F8b/F8c the Bucket -----------------------------------------------------------------------------------
 
     /** F8b: a phone's Bucket is the pair with this id; it is the only pair. */
     const val BUCKET_ID = "bucket"
-    /** F8b: items per Bucket. */
+    /** F8c: folder levels (`A/B/file`; folders `A` and `A/B`). */
+    const val MAX_BUCKET_DEPTH = 2
+    /** F8c: items per Bucket, files and folders together. */
     const val MAX_BUCKET_ITEMS = 10_000
+    /** F8c: one file ("Files over 1 GB can't go in the Bucket"). */
+    const val MAX_BUCKET_FILE_BYTES = 1L shl 30
+    /** 1.3 decision 3: a warning from 8 GB, new additions refused at 10 GB. */
+    const val WARN_BUCKET_BYTES = 8L shl 30
+    const val MAX_BUCKET_BYTES = 10L shl 30
+    /** F8c: one add (a share, a pick, a folder): at most this many items and bytes; the rest are left out. */
+    const val MAX_ADD_ITEMS = 500
+    const val MAX_ADD_BYTES = 5L shl 30
+    /** F8c: transfers in flight per direction; the rest wait. */
+    const val MAX_IN_FLIGHT = 2
     /** F8b: a pasted text or link saved as a file. */
     const val MAX_TEXT_BYTES = 1024 * 1024
     /** F8b: free space kept on the phone beyond an incoming file. */
     const val MIN_FREE_BYTES = 500L * 1024 * 1024
-    /** F8b: the Bucket shows a warning past this. */
-    const val WARN_BUCKET_BYTES = 10L * 1024 * 1024 * 1024
+    /** W0: a file another app is still writing is sent once its size and time hold this long. */
+    const val WRITE_SETTLE_MS = 2_000L
 
     /**
-     * An entry from the desk's manifest the phone will take: a top-level file name (F8b: files only,
-     * no `/`, no folders) that the phone's own ignore rules would not skip (P6).
+     * Why [path] cannot be in the Bucket, or null. Depth (at most [MAX_BUCKET_DEPTH] folders), 255-byte
+     * names, and names the other side cannot hold (`:`, `\`, control characters, a trailing dot or space).
      */
-    fun takesIncoming(path: String, dir: Boolean): Boolean = !dir && '/' !in path && validSegment(path) && !ignored(path, includeHidden = false)
+    fun skipReason(path: String, dir: Boolean): Skip? {
+        if (path.isEmpty() || path.toByteArray().size > MAX_RELPATH_BYTES) return Skip.NAME_TOO_LONG
+        val segments = path.split('/')
+        if (segments.any { it.toByteArray().size > MAX_SEGMENT_BYTES }) return Skip.NAME_TOO_LONG
+        if (segments.any { s -> !validSegment(s) || s.any { it == ':' || it == '\\' || it.isISOControl() } || s.endsWith('.') || s.endsWith(' ') }) return Skip.INVALID_NAME
+        val folders = if (dir) segments.size else segments.size - 1
+        return if (folders > MAX_BUCKET_DEPTH) Skip.TOO_DEEP else null
+    }
+
+    /**
+     * An entry from the desk's manifest the phone will take: a path the Bucket allows (F8c) that the
+     * phone's own ignore rules would not skip (P6).
+     */
+    fun takesIncoming(path: String, dir: Boolean): Boolean = skipReason(path, dir) == null && !ignored(path, includeHidden = false)
+
+    /** Live paths that differ only in case from an earlier one (the earlier keeps its name; these are not synced). */
+    fun caseClashes(paths: Collection<String>): Set<String> =
+        paths.sorted().groupBy { it.lowercase() }.values.flatMap { it.drop(1) }.toSet()
 
     /** F8b: an incoming file of [size] fits when [free] keeps [MIN_FREE_BYTES] after it. */
-    fun enoughSpace(free: Long, size: Long): Boolean = size in 0..MAX_FILE_BYTES && free - size >= MIN_FREE_BYTES
+    fun enoughSpace(free: Long, size: Long): Boolean = size in 0..MAX_BUCKET_FILE_BYTES && free - size >= MIN_FREE_BYTES
+
+    /** What one add may take: the files in, and how many were left out, by reason. */
+    data class Admitted(val accepted: List<Int>, val tooLarge: Int, val bucketFull: Int, val overAddLimit: Int)
+
+    /** F8c limits for one add of files with [sizes] into a Bucket holding [bytes] in [items] items. */
+    fun admit(sizes: List<Long>, bytes: Long, items: Int): Admitted {
+        val accepted = mutableListOf<Int>()
+        var tooLarge = 0
+        var full = 0
+        var over = 0
+        var addBytes = 0L
+        var total = bytes
+        var count = items
+        for ((index, size) in sizes.withIndex()) {
+            when {
+                size > MAX_BUCKET_FILE_BYTES -> tooLarge++
+                accepted.size >= MAX_ADD_ITEMS || addBytes + size > MAX_ADD_BYTES -> over++
+                total + size > MAX_BUCKET_BYTES || count >= MAX_BUCKET_ITEMS -> full++
+                else -> {
+                    accepted += index
+                    addBytes += size
+                    total += size
+                    count++
+                }
+            }
+        }
+        return Admitted(accepted, tooLarge, full, over)
+    }
+
+    /** W0: a new or changed file is taken once it has held still for [WRITE_SETTLE_MS] (another app may still be writing it). */
+    fun settled(previous: Pair<Stat, Long>?, stat: Stat, now: Long): Boolean =
+        stat.dir || (previous != null && previous.first == stat && now - previous.second >= WRITE_SETTLE_MS)
+
+    /** The next paths to request: at most [MAX_IN_FLIGHT] outstanding at once. */
+    fun nextBatch(waiting: List<String>, outstanding: Int): List<String> = waiting.take((MAX_IN_FLIGHT - outstanding).coerceAtLeast(0))
 
     /**
-     * P6 empty-folder hold: a folder that had files and now scans empty (grant lost, card removed)
-     * is held, never tombstoned, until the person confirms.
+     * F8c "Move to folder": [items] (path, is folder, and each folder's descendants) moved into
+     * [target] ("" is the top). Each item's new path, or null when it would pass the depth limit.
      */
+    fun moveInto(target: String, path: String, dir: Boolean, descendants: List<Pair<String, Boolean>>): String? {
+        val name = path.substringAfterLast('/')
+        val to = if (target.isEmpty()) name else "$target/$name"
+        if (to == path || (dir && (target == path || target.startsWith("$path/")))) return null
+        if (skipReason(to, dir) != null) return null
+        return to.takeIf { descendants.all { (child, childDir) -> skipReason(to + child.removePrefix(path), childDir) == null } }
+    }
+
+    /** P6/W0: a Bucket that had files and suddenly scans empty (grant lost, folder deleted, card removed) is held, never tombstoned. */
     fun holdEmpty(manifest: Map<String, Entry>, found: Map<String, Stat>, confirmed: Boolean): Boolean =
         !confirmed && found.isEmpty() && manifest.values.any { !it.deleted }
 

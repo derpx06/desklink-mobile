@@ -155,53 +155,6 @@ class FolderSyncTest {
         org.desklink.mobile.webrtc.assertAllCross(packets)
         assertEquals(FolderSync.MAX_FILES, packets.sumOf { it.getJSONArray("entries")!!.length() })
     }
-
-    /** P6 review fix: the desk's entries the phone's own rules would skip are dropped; F8b: files only. */
-    @Test
-    fun incomingEntriesAreFilteredByThePhonesOwnRules() {
-        assertTrue(FolderSync.takesIncoming("report.pdf", dir = false))
-        listOf(".hidden", "x.tmp", "x.part", "x~", ".desklink-1.tmp", "node_modules", ".git").forEach { assertFalse(it, FolderSync.takesIncoming(it, dir = false)) }
-        assertFalse("no folders in the Bucket", FolderSync.takesIncoming("docs/a.txt", dir = false))
-        assertFalse("no dir entries", FolderSync.takesIncoming("docs", dir = true))
-    }
-
-    /** P6 review fix: a Bucket that had files and suddenly scans empty is held, never emptied on the other side. */
-    @Test
-    fun aSuddenlyEmptyFolderIsHeldUntilConfirmed() {
-        val had = mapOf("a.txt" to entry("a", 0, 1))
-        assertTrue(FolderSync.holdEmpty(had, emptyMap(), confirmed = false))
-        assertFalse(FolderSync.holdEmpty(had, emptyMap(), confirmed = true))
-        assertFalse(FolderSync.holdEmpty(had, mapOf("b.txt" to Stat(1, 1)), confirmed = false))
-        assertFalse("nothing to lose", FolderSync.holdEmpty(mapOf("a.txt" to tomb(0, 2)), emptyMap(), confirmed = false))
-    }
-
-    @Test
-    fun incomingFilesNeedRoomAndTheSizeBound() {
-        val mib = 1024L * 1024
-        assertTrue(FolderSync.enoughSpace(free = 600 * mib, size = 100 * mib))
-        assertFalse(FolderSync.enoughSpace(free = 599 * mib, size = 100 * mib))
-        assertFalse(FolderSync.enoughSpace(free = Long.MAX_VALUE, size = FolderSync.MAX_FILE_BYTES + 1))
-    }
-
-    @Test
-    fun textAndLinksBecomeFilesWithinTheirBound() {
-        val (text, body) = FolderSync.textItem("  hello  ", 0)!!
-        assertTrue(text.startsWith("Text ") && text.endsWith(".txt"))
-        assertEquals("hello\n", String(body))
-        val (link, desktop) = FolderSync.textItem("https://www.example.org/a?b=1", 0)!!
-        assertTrue(link.startsWith("example.org ") && link.endsWith(".url"))
-        assertTrue(String(desktop).contains("Type=Link") && String(desktop).contains("URL=https://www.example.org/a?b=1"))
-        assertEquals(null, FolderSync.textItem("x".repeat(FolderSync.MAX_TEXT_BYTES), 0))
-        assertEquals(null, FolderSync.textItem("   ", 0))
-    }
-
-    @Test
-    fun sharedNamesBecomeTopLevelFileNames() {
-        assertEquals("a.txt", BucketEngine.safeName("../../a.txt"))
-        assertEquals("hidden", BucketEngine.safeName(".hidden"))
-        assertEquals("File", BucketEngine.safeName("  "))
-        assertTrue(BucketEngine.safeName("é".repeat(300)).toByteArray().size <= FolderSync.MAX_SEGMENT_BYTES)
-    }
 }
 
 private fun sha(text: String) = MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }

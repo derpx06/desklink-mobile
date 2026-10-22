@@ -347,6 +347,13 @@ class WebRtcFileTransferManager(
     }
 
     /** Ends an incoming transfer that cannot go on, and tells the sender why. */
+    /** W0: a Bucket item removed while it arrives: its transfer ends on both sides. */
+    @Synchronized
+    fun cancelFolderReceive(relpath: String) {
+        val id = folderOffers.entries.firstOrNull { it.value.relpath == relpath }?.key ?: return
+        (active[id] as? ActiveTransfer.Receiver)?.let { failReceive(it, "cancelled") } ?: discardReceive(id)
+    }
+
     private fun failReceive(receiver: ActiveTransfer.Receiver, reason: String) {
         val id = receiver.checkpoint.transferId
         if (!active.remove(id, receiver)) return

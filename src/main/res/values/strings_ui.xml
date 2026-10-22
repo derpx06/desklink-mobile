@@ -727,6 +727,54 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_header_syncing_many" formatted="false">Syncing %d files</string>
     <string name="bucket_up_to_date" formatted="false">Up to date · Last synced %1$s</string>
     <string name="bucket_paused_by_you" formatted="false">Sync paused</string>
+    <string name="bucket_add_folder" formatted="false">Folder</string>
+    <string name="bucket_new_folder" formatted="false">New folder</string>
+    <string name="bucket_create" formatted="false">Create</string>
+    <string name="bucket_new_folder_failed" formatted="false">That folder can\'t be made here: the name is taken, or folders only go two levels deep</string>
+    <string name="bucket_select" formatted="false">Select</string>
+    <string name="bucket_select_all" formatted="false">Select all</string>
+    <string name="bucket_selection_done" formatted="false">Done selecting</string>
+    <string name="bucket_save_copy" formatted="false">Save a copy</string>
+    <string name="bucket_move_to" formatted="false">Move to folder…</string>
+    <string name="bucket_move_nowhere" formatted="false">There is no other folder these can go in.</string>
+    <string name="bucket_share_files_only" formatted="false">Only files can be shared. Pick files, or use Save a copy.</string>
+    <string name="bucket_too_large" formatted="false">Files over 1 GB can\'t go in the Bucket</string>
+    <string name="bucket_full" formatted="false">The Bucket is full (10 GB)</string>
+    <string name="bucket_over_add_limit" formatted="false">%1$d left out: one add takes 500 items or 5 GB at most</string>
+    <string name="bucket_too_deep_left_out" formatted="false">Some items were more than 2 folders deep and were left out (%1$d)</string>
+    <string name="bucket_add_cancelled" formatted="false">Stopped</string>
+    <string name="bucket_nothing_added" formatted="false">Nothing was added</string>
+    <string name="bucket_not_synced" formatted="false">Not synced (%1$d)</string>
+    <string name="bucket_skip_too_deep" formatted="false">%1$d more than 2 folders deep</string>
+    <string name="bucket_skip_name_long" formatted="false">%1$d with names over 255 bytes</string>
+    <string name="bucket_skip_invalid" formatted="false">%1$d with names the computer cannot hold</string>
+    <string name="bucket_skip_case" formatted="false">%1$d differing only in capital letters</string>
+    <string name="bucket_skip_large" formatted="false">%1$d over 1 GB</string>
+    <string name="bucket_changed_sending_again" formatted="false">changed, sending again</string>
+    <plurals name="bucket_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="bucket_folder_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <plurals name="bucket_saved">
+        <item quantity="one">Saved %1$d file</item>
+        <item quantity="other">Saved %1$d files</item>
+    </plurals>
+    <plurals name="bucket_moved">
+        <item quantity="one">Moved %1$d item</item>
+        <item quantity="other">Moved %1$d items</item>
+    </plurals>
+    <plurals name="bucket_move_refused">
+        <item quantity="one">%1$d item could not move: it would go past two folders, or the name is taken</item>
+        <item quantity="other">%1$d items could not move: they would go past two folders, or a name is taken</item>
+    </plurals>
+    <plurals name="bucket_remove_many_title">
+        <item quantity="one">Remove %1$d item from both?</item>
+        <item quantity="other">Remove %1$d items from both?</item>
+    </plurals>
     <!-- F8b: the Bucket -->
     <string name="bucket_title">Bucket</string>
     <string name="bucket_subtitle">Anything you put here shows up on %1$s too</string>
@@ -740,7 +788,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_hero_title">One place for anything you want on %1$s</string>
     <string name="bucket_offered_title">%1$s turned on the Bucket</string>
     <string name="bucket_hero_body">Photos, PDFs, notes and links you put in the Bucket appear on %1$s, and what it puts in appears here. Removing an item removes it on both.</string>
-    <string name="bucket_pick_hint">Android asks once for a folder: choose or create a folder named DeskLink Bucket in Documents.</string>
+    <string name="bucket_pick_hint">Android asks once for a folder: choose or create Documents/DeskLink Bucket. This computer gets its own folder inside it.</string>
     <string name="bucket_asking">Waiting for %1$s to set up its side…</string>
     <string name="bucket_folder_failed">Android did not let DeskLink keep access to that folder</string>
     <string name="bucket_add">Add</string>
@@ -762,7 +810,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_not_on_desk">The Bucket is not set up on %1$s: paused</string>
     <string name="bucket_storage_full">Phone storage is full: files from the computer wait until there is room</string>
     <string name="bucket_too_many">The Bucket holds 10,000 items at most</string>
-    <string name="bucket_large">The Bucket is %1$s: consider removing what you no longer need</string>
+    <string name="bucket_large" formatted="false">The Bucket is %1$s of 10 GB: new items stop at 10 GB</string>
     <string name="bucket_empty_title">Drop anything here</string>
     <string name="bucket_empty_body">It shows up on %1$s too.</string>
     <string name="bucket_ways_in">Share from any app to “DeskLink Bucket”, or tap Add for files, a photo or what you copied.</string>

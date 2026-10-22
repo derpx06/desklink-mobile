@@ -54,7 +54,7 @@ fun BucketHomeCard(deviceId: String, desk: String, onOpen: () -> Unit) {
     val views by BucketEngine.views.collectAsState()
     val view = views[deviceId]
     val on = view?.treeUri != null && view.phase != Phase.ASKING
-    val items = view?.items.orEmpty().take(3)
+    val items = view?.items.orEmpty().filter { !it.dir }.take(3)
     val shape = RoundedCornerShape(24.dp)
     Column(Modifier.fillMaxWidth().clip(shape).background(t.surface).border(1.dp, t.hairline, shape).clickable(role = Role.Button, onClick = onOpen)) {
         Row(

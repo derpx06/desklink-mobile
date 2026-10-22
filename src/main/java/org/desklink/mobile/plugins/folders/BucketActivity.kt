@@ -24,6 +24,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.horizontalScroll
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -166,25 +174,39 @@ class BucketActivity : AppCompatActivity() {
         var plusMenu by remember { mutableStateOf(false) }
         var overflow by remember { mutableStateOf(false) }
         var photo by rememberSaveable { mutableStateOf<String?>(null) }
+        // Where we are in the Bucket ("" = the top), and what is selected (long-press starts selecting).
+        var path by rememberSaveable { mutableStateOf("") }
+        var selected by remember { mutableStateOf(setOf<String>()) }
+        var newFolder by remember { mutableStateOf(false) }
+        var moving by remember { mutableStateOf(false) }
+        var confirmRemove by remember { mutableStateOf(false) }
+        val selecting = selected.isNotEmpty()
+        BackHandler(selecting || path.isNotEmpty()) { if (selecting) selected = emptySet() else path = BucketLevel.parent(path) }
 
-        fun added(added: Int, skipped: Int) = runOnUiThread {
-            if (skipped > 0) toast(getString(R.string.bucket_skipped, skipped))
-            else if (added > 0) toast(resources.getQuantityString(R.plurals.bucket_added, added, added))
-        }
+        fun report(result: BucketEngine.AddResult) = runOnUiThread { toast(addMessage(result)) }
 
         val pickFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
             tree ?: return@rememberLauncherForActivityResult
             if (!BucketEngine.turnOn(this, deviceId, tree)) toast(getString(R.string.bucket_folder_failed))
         }
         val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            if (uris.isNotEmpty()) BucketEngine.add(deviceId, uris.take(MAX_SHARED), ::added)
+            if (uris.isNotEmpty()) BucketEngine.add(deviceId, uris.take(MAX_SHARED), path, ::report)
+        }
+        val pickSource = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+            tree ?: return@rememberLauncherForActivityResult
+            BucketEngine.addTree(deviceId, tree, path, ::report)
+        }
+        val pickDestination = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+            tree ?: return@rememberLauncherForActivityResult
+            BucketEngine.saveCopy(deviceId, selected, tree) { n -> runOnUiThread { toast(resources.getQuantityString(R.plurals.bucket_saved, n, n)) } }
+            selected = emptySet()
         }
         val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
             val path = photo ?: return@rememberLauncherForActivityResult
             photo = null
             val file = File(path)
             if (ok && file.length() > 0) {
-                BucketEngine.add(deviceId, listOf(Uri.fromFile(file))) { a, s -> file.delete(); added(a, s) }
+                BucketEngine.add(deviceId, listOf(Uri.fromFile(file)), path) { r -> file.delete(); report(r) }
             } else {
                 file.delete()
             }
@@ -193,15 +215,75 @@ class BucketActivity : AppCompatActivity() {
         // Shared in: added as soon as the Bucket is on.
         LaunchedEffect(on, pendingUris.value, pendingText.value) {
             if (!on) return@LaunchedEffect
-            pendingUris.value.takeIf { it.isNotEmpty() }?.let { BucketEngine.add(deviceId, it, ::added); pendingUris.value = emptyList() }
+            pendingUris.value.takeIf { it.isNotEmpty() }?.let { BucketEngine.add(deviceId, it, path, ::report); pendingUris.value = emptyList() }
             pendingText.value?.let { text ->
-                BucketEngine.addText(deviceId, text) { ok -> runOnUiThread { toast(getString(if (ok) R.string.bucket_text_added else R.string.bucket_text_failed)) } }
+                BucketEngine.addText(deviceId, text, path) { ok -> runOnUiThread { toast(getString(if (ok) R.string.bucket_text_added else R.string.bucket_text_failed)) } }
                 pendingText.value = null
             }
         }
 
+        if (newFolder) {
+            var name by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { newFolder = false },
+                title = { Text(stringResource(R.string.bucket_new_folder)) },
+                text = { OutlinedTextField(name, { name = it.replace("/", "").take(100) }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
+                confirmButton = {
+                    TextButton(enabled = name.isNotBlank(), onClick = {
+                        newFolder = false
+                        BucketEngine.newFolder(deviceId, path, name) { ok -> if (!ok) runOnUiThread { toast(getString(R.string.bucket_new_folder_failed)) } }
+                    }) { Text(stringResource(R.string.bucket_create)) }
+                },
+                dismissButton = { TextButton(onClick = { newFolder = false }) { Text(stringResource(R.string.cancel)) } },
+            )
+        }
+        if (confirmRemove) {
+            AlertDialog(
+                onDismissRequest = { confirmRemove = false },
+                title = { Text(resources.getQuantityString(R.plurals.bucket_remove_many_title, selected.size, selected.size)) },
+                text = { Text(stringResource(R.string.bucket_remove_body, desk)) },
+                confirmButton = {
+                    TextButton(onClick = { confirmRemove = false; BucketEngine.remove(deviceId, selected); selected = emptySet() }) { Text(stringResource(R.string.bucket_remove)) }
+                },
+                dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.cancel)) } },
+            )
+        }
+        if (moving) {
+            val targets = BucketLevel.targets(view?.items.orEmpty(), selected)
+            AlertDialog(
+                onDismissRequest = { moving = false },
+                title = { Text(stringResource(R.string.bucket_move_to)) },
+                text = {
+                    Column {
+                        if (targets.isEmpty()) Text(stringResource(R.string.bucket_move_nowhere), fontSize = 14.sp)
+                        targets.forEach { target ->
+                            Text(
+                                if (target.isEmpty()) stringResource(R.string.bucket_title) else target.replace("/", " › "),
+                                fontSize = 16.sp,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) {
+                                    moving = false
+                                    BucketEngine.move(deviceId, selected, target) { moved, refused ->
+                                        runOnUiThread { toast(if (refused > 0) resources.getQuantityString(R.plurals.bucket_move_refused, refused, refused) else resources.getQuantityString(R.plurals.bucket_moved, moved, moved)) }
+                                    }
+                                    selected = emptySet()
+                                }.padding(vertical = 12.dp),
+                            )
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { moving = false }) { Text(stringResource(R.string.cancel)) } },
+            )
+        }
         Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-            ScreenHeader(::finish) {
+            if (selecting) SelectionBar(
+                count = selected.size,
+                onClose = { selected = emptySet() },
+                onAll = { selected = view?.items?.filter { BucketLevel.parent(it.path) == path }?.map { it.path }?.toSet().orEmpty() },
+                onShare = { shareMany(view, selected); selected = emptySet() },
+                onSave = { pickDestination.launch(null) },
+                onMove = { moving = true },
+                onRemove = { confirmRemove = true },
+            ) else ScreenHeader(::finish) {
                 if (on) {
                     Box {
                         IconButton(onClick = { overflow = true }, modifier = Modifier.size(48.dp)) {
@@ -218,7 +300,8 @@ class BucketActivity : AppCompatActivity() {
                     }
                 }
             }
-            LargeTitle(stringResource(R.string.bucket_title), subtitle = if (on && view!!.summary == null) status(view, desk) else if (!on) stringResource(R.string.bucket_subtitle, desk) else null)
+            if (on && !selecting) Breadcrumb(path) { path = it }
+            if (!on || path.isEmpty()) LargeTitle(stringResource(R.string.bucket_title), subtitle = if (on && view!!.summary == null) status(view, desk) else if (!on) stringResource(R.string.bucket_subtitle, desk) else null)
             view?.summary?.takeIf { on }?.let { SyncHeader(it, view.userPaused, desk) }
             Box(Modifier.weight(1f)) {
                 when {
@@ -230,9 +313,9 @@ class BucketActivity : AppCompatActivity() {
                         onTurnOn = { pickFolder.launch(documentsUri()) },
                         onDecline = { BucketEngine.decline(deviceId) },
                     )
-                    else -> Content(view!!, desk, deviceId)
+                    else -> Content(view!!, desk, deviceId, path, selected, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p })
                 }
-                if (on) {
+                if (on && !selecting) {
                     Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) {
                         PillButton(stringResource(R.string.bucket_add), { plusMenu = true }, icon = R.drawable.sym_add)
                         DropdownMenu(expanded = plusMenu, onDismissRequest = { plusMenu = false }) {
@@ -240,6 +323,16 @@ class BucketActivity : AppCompatActivity() {
                                 text = { Text(stringResource(R.string.bucket_add_files)) },
                                 leadingIcon = { Icon(painterResource(R.drawable.sym_upload_file), contentDescription = null) },
                                 onClick = { plusMenu = false; pickFiles.launch(arrayOf("*/*")) },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.bucket_add_folder)) },
+                                leadingIcon = { Icon(painterResource(R.drawable.sym_folder_zip), contentDescription = null) },
+                                onClick = { plusMenu = false; pickSource.launch(null) },
+                            )
+                            if (BucketLevel.canMakeFolder(path)) DropdownMenuItem(
+                                text = { Text(stringResource(R.string.bucket_new_folder)) },
+                                leadingIcon = { Icon(painterResource(R.drawable.sym_add), contentDescription = null) },
+                                onClick = { plusMenu = false; newFolder = true },
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.bucket_add_photo)) },
@@ -262,6 +355,79 @@ class BucketActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    /** Selection mode: the count, Select all, and the bulk actions. */
+    @Composable
+    private fun SelectionBar(count: Int, onClose: () -> Unit, onAll: () -> Unit, onShare: () -> Unit, onSave: () -> Unit, onMove: () -> Unit, onRemove: () -> Unit) {
+        val t = tokens
+        var more by remember { mutableStateOf(false) }
+        Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
+                Icon(painterResource(R.drawable.sym_close), contentDescription = stringResource(R.string.bucket_selection_done), tint = t.text)
+            }
+            Text(
+                resources.getQuantityString(R.plurals.bucket_selected, count, count),
+                fontSize = 18.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            TextButton(onClick = onAll, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.bucket_select_all)) }
+            IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
+                Icon(painterResource(R.drawable.sym_delete), contentDescription = stringResource(R.string.bucket_remove), tint = t.text)
+            }
+            Box {
+                IconButton(onClick = { more = true }, modifier = Modifier.size(48.dp)) {
+                    Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.bucket_more), tint = t.text)
+                }
+                DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.bucket_move_to)) }, onClick = { more = false; onMove() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.bucket_share)) }, onClick = { more = false; onShare() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.bucket_save_copy)) }, onClick = { more = false; onSave() })
+                }
+            }
+        }
+    }
+
+    /** "Bucket › Holidays › 2026": each part opens that level (48 dp tall). */
+    @Composable
+    private fun Breadcrumb(path: String, onOpen: (String) -> Unit) {
+        val t = tokens
+        val root = stringResource(R.string.bucket_title)
+        val crumbs = BucketLevel.crumbs(path, root)
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            crumbs.forEachIndexed { i, (label, target) ->
+                val last = i == crumbs.lastIndex
+                if (i > 0) Text("›", color = t.textFaint, fontSize = 16.sp)
+                Text(
+                    label,
+                    fontSize = if (path.isEmpty()) 0.sp else 16.sp,
+                    fontWeight = if (last) FontWeight.Medium else FontWeight.Normal,
+                    color = if (last) t.text else t.accentText,
+                    maxLines = 1,
+                    modifier = Modifier.heightIn(min = 48.dp).wrapContentHeight(Alignment.CenterVertically)
+                        .clickable(enabled = !last, role = Role.Button, onClickLabel = label) { onOpen(target) }.padding(horizontal = 8.dp),
+                )
+            }
+        }
+    }
+
+    /** One clear sentence for what an add did, and what was left out. */
+    private fun addMessage(r: BucketEngine.AddResult): String {
+        val parts = mutableListOf<String>()
+        if (r.added > 0) parts += resources.getQuantityString(R.plurals.bucket_added, r.added, r.added)
+        if (r.tooLarge > 0) parts += getString(R.string.bucket_too_large)
+        if (r.bucketFull > 0) parts += getString(R.string.bucket_full)
+        if (r.overAddLimit > 0) parts += getString(R.string.bucket_over_add_limit, r.overAddLimit)
+        if (r.tooDeep > 0) parts += getString(R.string.bucket_too_deep_left_out, r.tooDeep)
+        if (r.failed > 0) parts += getString(R.string.bucket_skipped, r.failed)
+        if (r.cancelled) parts += getString(R.string.bucket_add_cancelled)
+        return parts.joinToString(". ").ifEmpty { getString(R.string.bucket_nothing_added) }
+    }
+
+    private fun shareMany(view: BucketView?, paths: Set<String>) {
+        val uris = ArrayList(view?.items.orEmpty().filter { !it.dir && it.path in paths }.mapNotNull { it.uri })
+        if (uris.isEmpty()) return toast(getString(R.string.bucket_share_files_only))
+        val send = Intent(Intent.ACTION_SEND_MULTIPLE).setType("*/*").putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        runCatching { startActivity(Intent.createChooser(send, null)) }
     }
 
     /** "realme-desk · Last synced 2 min ago · 1.2 GB". */
@@ -349,7 +515,7 @@ class BucketActivity : AppCompatActivity() {
     }
 
     @Composable
-    private fun Content(view: BucketView, desk: String, deviceId: String) {
+    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onOpen: (String) -> Unit, onSelect: (String) -> Unit) {
         val t = tokens
         var menuFor by remember { mutableStateOf<BucketItem?>(null) }
         var renaming by remember { mutableStateOf<BucketItem?>(null) }
@@ -385,9 +551,10 @@ class BucketActivity : AppCompatActivity() {
                 item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_too_many), warn = true) }
             }
             if (view.bytes > FolderSync.WARN_BUCKET_BYTES) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_large, Formatter.formatShortFileSize(this@BucketActivity, view.bytes))) }
+                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(if (view.bytes >= FolderSync.MAX_BUCKET_BYTES) R.string.bucket_full else R.string.bucket_large, Formatter.formatShortFileSize(this@BucketActivity, view.bytes)), warn = view.bytes >= FolderSync.MAX_BUCKET_BYTES) }
             }
-            if (view.items.isEmpty()) {
+            val tiles = BucketLevel.tiles(view.items, path)
+            if (tiles.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     DropZone(Modifier.fillMaxWidth().heightIn(min = 300.dp)) {
                         IconCircle(R.drawable.sym_inventory, 64.dp, 32.dp, background = t.accentContainer, tint = t.onAccentContainer)
@@ -400,13 +567,20 @@ class BucketActivity : AppCompatActivity() {
                     }
                 }
             }
-            items(view.items, key = { it.name }) { item ->
-                Tile(item, desk, deviceId, onMenu = { menuFor = item }, onResolve = { resolving = item })
+            items(tiles, key = { it.item.path }) { tile ->
+                Tile(
+                    tile, desk, deviceId, selected = tile.item.path in selected, selecting = selected.isNotEmpty(),
+                    onMenu = { menuFor = tile.item }, onResolve = { resolving = tile.item },
+                    onOpenFolder = { onOpen(tile.item.path) }, onToggle = { onSelect(tile.item.path) },
+                )
             }
             if (view.notSynced.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
+                    val reasons = view.notSynced.groupBy { it.second }.map { (why, list) ->
+                        stringResource(skipText(why), list.size) + ": " + list.take(3).joinToString(", ") { it.first.substringAfterLast('/') } + if (list.size > 3) "…" else ""
+                    }
                     Text(
-                        stringResource(R.string.bucket_not_synced_folders, view.notSynced.joinToString(", ")),
+                        stringResource(R.string.bucket_not_synced, view.notSynced.size) + "\n" + reasons.joinToString("\n"),
                         fontSize = 12.sp, lineHeight = 17.sp, color = t.textFaint, modifier = Modifier.padding(top = 8.dp),
                     )
                 }
@@ -424,7 +598,7 @@ class BucketActivity : AppCompatActivity() {
                 confirmButton = {
                     TextButton(onClick = {
                         renaming = null
-                        BucketEngine.rename(deviceId, item.name, name) { ok -> if (!ok) runOnUiThread { toast(getString(R.string.bucket_rename_failed)) } }
+                        BucketEngine.rename(deviceId, item.path, name) { ok -> if (!ok) runOnUiThread { toast(getString(R.string.bucket_rename_failed)) } }
                     }) { Text(stringResource(R.string.bucket_rename)) }
                 },
                 dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(R.string.cancel)) } },
@@ -435,7 +609,7 @@ class BucketActivity : AppCompatActivity() {
                 onDismissRequest = { removing = null },
                 title = { Text(stringResource(R.string.bucket_remove_title, item.name)) },
                 text = { Text(stringResource(R.string.bucket_remove_body, desk)) },
-                confirmButton = { TextButton(onClick = { removing = null; BucketEngine.remove(deviceId, item.name) }) { Text(stringResource(R.string.bucket_remove)) } },
+                confirmButton = { TextButton(onClick = { removing = null; BucketEngine.remove(deviceId, listOf(item.path)) }) { Text(stringResource(R.string.bucket_remove)) } },
                 dismissButton = { TextButton(onClick = { removing = null }) { Text(stringResource(R.string.cancel)) } },
             )
         }
@@ -451,7 +625,7 @@ class BucketActivity : AppCompatActivity() {
                             BucketEngine.Resolve.PHONE to R.string.bucket_keep_phone,
                             BucketEngine.Resolve.DESK to R.string.bucket_keep_desk,
                         ).forEach { (how, label) ->
-                            TextButton(onClick = { resolving = null; BucketEngine.resolve(deviceId, item.name, how) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            TextButton(onClick = { resolving = null; BucketEngine.resolve(deviceId, item.path, how) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                                 Text(stringResource(label, desk))
                             }
                         }
@@ -479,44 +653,53 @@ class BucketActivity : AppCompatActivity() {
 
     @OptIn(ExperimentalFoundationApi::class)
     @Composable
-    private fun Tile(item: BucketItem, desk: String, deviceId: String, onMenu: () -> Unit, onResolve: () -> Unit) {
+    private fun Tile(tile: BucketTile, desk: String, deviceId: String, selected: Boolean, selecting: Boolean, onMenu: () -> Unit, onResolve: () -> Unit, onOpenFolder: () -> Unit, onToggle: () -> Unit) {
+        val item = tile.item
         val t = tokens
         val context = LocalContext.current
         val sizePx = with(LocalDensity.current) { 180.dp.roundToPx() }
-        val size = Formatter.formatShortFileSize(context, item.size)
-        val origin = when (item.from) {
+        val size = if (item.dir) resources.getQuantityString(R.plurals.bucket_folder_count, tile.count, tile.count) + " · " + Formatter.formatShortFileSize(context, tile.bytes) else Formatter.formatShortFileSize(context, item.size)
+        val origin = if (item.dir) null else when (item.from) {
             Side.DESK -> stringResource(R.string.bucket_from, desk)
             Side.PHONE -> stringResource(R.string.bucket_from_this_phone)
             null -> null
         }
-        val state = when (item.state) {
+        val state = when (tile.state) {
             BucketItem.State.SYNCED -> stringResource(R.string.bucket_state_synced)
             BucketItem.State.SENDING -> stringResource(R.string.bucket_state_sending, desk)
             BucketItem.State.RECEIVING -> stringResource(R.string.bucket_state_receiving, desk)
             BucketItem.State.WAITING -> stringResource(R.string.bucket_waiting_for, desk)
             BucketItem.State.CONFLICT -> stringResource(R.string.bucket_state_conflict)
         }
-        val progressLine = item.progress?.let { BucketProgress.line(it, { b -> Formatter.formatShortFileSize(context, b) }, BucketSyncNotification.words(context)) }
+        val progressLine = (item.progress ?: tile.progress?.let { Progress(it.done, it.total, it.etaSeconds, it.bytesPerSecond, it.paused) })
+            ?.let { BucketProgress.line(it, { b -> Formatter.formatShortFileSize(context, b) }, BucketSyncNotification.words(context)) }
         val description = listOfNotNull(item.name, size, origin, state, progressLine).joinToString(", ")
         val moreLabel = stringResource(R.string.bucket_item_menu, item.name)
         Column(
             Modifier
                 .clip(RoundedCornerShape(20.dp))
                 .background(t.surface)
-                .border(1.dp, if (item.state == BucketItem.State.CONFLICT) t.coral else t.hairline, RoundedCornerShape(20.dp))
-                .combinedClickable(role = Role.Button, onLongClick = onMenu, onLongClickLabel = moreLabel) {
+                .border(if (selected) 2.dp else 1.dp, if (selected) t.accent else if (tile.state == BucketItem.State.CONFLICT) t.coral else t.hairline, RoundedCornerShape(20.dp))
+                .combinedClickable(role = Role.Button, onLongClick = onToggle, onLongClickLabel = stringResource(R.string.bucket_select)) {
                     when {
-                        item.state == BucketItem.State.CONFLICT -> onResolve()
+                        selecting -> onToggle()
+                        item.dir -> onOpenFolder()
+                        tile.state == BucketItem.State.CONFLICT -> onResolve()
                         item.uri != null -> open(item)
                         else -> onMenu()
                     }
                 }
-                .semantics(mergeDescendants = true) { contentDescription = description },
+                .semantics(mergeDescendants = true) {
+                    contentDescription = description
+                    this.selected = selected
+                },
         ) {
             Box(Modifier.padding(6.dp).fillMaxWidth().height(120.dp).clip(RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
                 val kind = previewKind(null, item.name)
                 val uri = item.uri
-                if (uri == null) {
+                if (item.dir) {
+                    TypeIcon(R.drawable.sym_folder)
+                } else if (uri == null) {
                     Box(Modifier.fillMaxSize().shimmer())
                 } else {
                     val record = TransferRecord(uri.toString() + item.mtime, deviceId, desk, item.name, item.size, false, item.mtime, uri.toString(), null)
@@ -528,7 +711,12 @@ class BucketActivity : AppCompatActivity() {
                         else -> TypeIcon(iconFor(kind))
                     }
                 }
-                Badge(item.state, item.progress, Modifier.align(Alignment.TopEnd).padding(6.dp))
+                Badge(tile.state, item.progress ?: tile.progress?.let { Progress(it.done, it.total, it.etaSeconds, it.bytesPerSecond, it.paused) }, Modifier.align(Alignment.TopEnd).padding(6.dp))
+                if (selected) {
+                    Box(Modifier.align(Alignment.TopStart).padding(6.dp).size(26.dp).background(t.accent, CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = t.onAccent, modifier = Modifier.size(18.dp))
+                    }
+                }
             }
             Row(Modifier.padding(start = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
@@ -539,8 +727,8 @@ class BucketActivity : AppCompatActivity() {
                     )
                     if (progressLine != null) {
                         Text(progressLine, fontSize = 11.sp, color = t.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    } else if (item.state == BucketItem.State.WAITING || item.state == BucketItem.State.CONFLICT) {
-                        Text(state, fontSize = 11.sp, color = if (item.state == BucketItem.State.CONFLICT) t.coralText else t.textFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    } else if (tile.state == BucketItem.State.WAITING || tile.state == BucketItem.State.CONFLICT) {
+                        Text(state, fontSize = 11.sp, color = if (tile.state == BucketItem.State.CONFLICT) t.coralText else t.textFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 IconButton(onClick = onMenu, modifier = Modifier.size(48.dp)) {
@@ -635,8 +823,8 @@ class BucketActivity : AppCompatActivity() {
         val uri = clip?.uri
         val text = clip?.coerceToText(this)?.toString()
         when {
-            uri != null -> BucketEngine.add(deviceId, listOf(uri)) { a, s -> runOnUiThread { toast(if (a > 0) resources.getQuantityString(R.plurals.bucket_added, a, a) else getString(R.string.bucket_skipped, s)) } }
-            !text.isNullOrBlank() -> BucketEngine.addText(deviceId, text) { ok -> runOnUiThread { toast(getString(if (ok) R.string.bucket_text_added else R.string.bucket_text_failed)) } }
+            uri != null -> BucketEngine.add(deviceId, listOf(uri), "") { r -> runOnUiThread { toast(addMessage(r)) } }
+            !text.isNullOrBlank() -> BucketEngine.addText(deviceId, text, "") { ok -> runOnUiThread { toast(getString(if (ok) R.string.bucket_text_added else R.string.bucket_text_failed)) } }
             else -> toast(getString(R.string.snippets_clipboard_empty))
         }
     }
@@ -651,6 +839,16 @@ class BucketActivity : AppCompatActivity() {
         const val MAX_SHARED = 500
 
         fun intent(context: Context, deviceId: String?): Intent = Intent(context, BucketActivity::class.java).apply { deviceId?.let { putExtra(EXTRA_DEVICE, it) } }
+
+        /** The reason a thing is not synced, as a plural-free format with the count first. */
+        @androidx.annotation.StringRes
+        fun skipText(why: Skip): Int = when (why) {
+            Skip.TOO_DEEP -> R.string.bucket_skip_too_deep
+            Skip.NAME_TOO_LONG -> R.string.bucket_skip_name_long
+            Skip.INVALID_NAME -> R.string.bucket_skip_invalid
+            Skip.CASE_CLASH -> R.string.bucket_skip_case
+            Skip.TOO_LARGE -> R.string.bucket_skip_large
+        }
 
         /** "Syncing 3 files · 1.1 GB of 2.4 GB · about 4 min left" (Paused while the link or the person pauses it). */
         fun summaryText(context: Context, summary: ProgressSummary, userPaused: Boolean, desk: String): String {

@@ -37,6 +37,7 @@ data class FolderRef(val folder: String, val relpath: String, val mtime: Long?)
 
 /** What the Bucket screen shows for one item. */
 data class BucketItem(
+    /** The last segment of [path]. */
     val name: String,
     val size: Long,
     val mtime: Long,
@@ -47,6 +48,9 @@ data class BucketItem(
     val uri: Uri?,
     /** While it is sending or receiving: how far, and the time left. */
     val progress: Progress? = null,
+    /** Where it is in the Bucket ("A/B/file"); a folder's items are its children. */
+    val path: String = name,
+    val dir: Boolean = false,
 ) {
     enum class State { SYNCED, SENDING, RECEIVING, WAITING, CONFLICT }
 }
@@ -58,15 +62,15 @@ data class BucketView(
     val treeUri: String?,
     val phase: Phase,
     val items: List<BucketItem>,
-    /** Subfolders someone put in the folder: not synced (F8b scope). */
-    val notSynced: List<String>,
+    /** Things in the folder that cannot sync, with why ("Not synced (N)"). */
+    val notSynced: List<Pair<String, Skip>>,
     val lastSync: Long?,
     val bytes: Long,
     /** The desk wants to turn the Bucket on: the phone picks its folder. */
     val offered: Boolean,
     /** An incoming file was refused for lack of space. */
     val storageFull: Boolean,
-    /** Files being copied in: done / total, or null. */
+    /** Items being copied in: done / total, or null. */
     val adding: Pair<Int, Int>?,
     /** Everything in flight together (header, Home card, notification); null when nothing moves. */
     val summary: ProgressSummary? = null,
@@ -101,7 +105,12 @@ object BucketEngine {
     private val limiter = RateLimiter(MAX_PACKETS_PER_MINUTE, 60_000, TAG)
     private lateinit var app: Context
 
-    private class Live(val deviceId: String, var treeUri: String) {
+    private class Live(val deviceId: String, var treeUri: String, var computer: String? = null) {
+        /** Files another app may still be writing: path → (stat, first seen with it). */
+        val seen = HashMap<String, Pair<Stat, Long>>()
+        /** Files the desk asked for, waiting for one of the [FolderSync.MAX_IN_FLIGHT] slots. */
+        val sendQueue = ArrayDeque<String>()
+        val sendActive = HashSet<String>()
         var manifest = HashMap<String, Entry>()
         /** Who put each item in (local knowledge, for "From <device>"). */
         val from = HashMap<String, Side>()
@@ -114,7 +123,7 @@ object BucketEngine {
         var scannedAt: Long? = null
         var onDesk = true
         var confirmedEmpty = false
-        var notSynced = emptyList<String>()
+        var notSynced = emptyList<Pair<String, Skip>>()
         var storageFull = false
         val incoming = sortedMapOf<Int, List<Pair<String, Entry>>>()
         val toRequest = ArrayDeque<String>()
@@ -129,6 +138,8 @@ object BucketEngine {
         /** Files moved since the Bucket was last up to date, for "3 files synced". */
         val burst = HashSet<String>()
         var userPaused = false
+        /** Folders the desk holds. */
+        var remoteDirs = emptySet<String>()
     }
 
     private class Track(val total: Long, val sending: Boolean, startedAt: Long) {
@@ -185,7 +196,7 @@ object BucketEngine {
             it.phase = Phase.WAITING
             // Shown "Paused": each resumes from its checkpoint on the next connection.
             it.tracks.values.forEach { track -> track.paused = true }
-            it.incoming.clear(); it.toRequest.clear(); it.outstanding.clear(); it.sending.clear()
+            it.incoming.clear(); it.toRequest.clear(); it.outstanding.clear(); it.sending.clear(); it.sendQueue.clear(); it.sendActive.clear()
         }
         synchronized(wanted) { wanted.keys.removeAll { it.first == deviceId } }
     }
@@ -195,9 +206,10 @@ object BucketEngine {
     /** "Turn on": keeps the grant; answers the desk's offer, or asks the desk (P1, `bucket: true`). */
     fun turnOn(context: Context, deviceId: String, tree: Uri): Boolean {
         if (!keepGrant(context, tree)) return false
+        val computer = DeskLinkApplication.getInstance().getDevice(deviceId)?.name
         worker.execute {
             if (offers.remove(deviceId) != null) {
-                buckets[deviceId] = Live(deviceId, tree.toString()).also { it.dirtyAt = 0; watch(it) }
+                buckets[deviceId] = Live(deviceId, tree.toString(), computer).also { it.dirtyAt = 0; watch(it) }
                 save()
                 send(deviceId, packet("accept").apply { this["id"] = FolderSync.BUCKET_ID })
             } else {
@@ -237,101 +249,220 @@ object BucketEngine {
 
     fun syncNow(deviceId: String) = worker.execute { buckets[deviceId]?.let { it.dirtyAt = 0; it.scannedAt = null } }
 
-    /** Copies [uris] into the Bucket (files only), with progress; [cancelAdd] stops between files. */
-    fun add(deviceId: String, uris: List<Uri>, onDone: (added: Int, skipped: Int) -> Unit) {
+    /** What an add did, for one clear message. */
+    data class AddResult(val added: Int = 0, val tooLarge: Int = 0, val bucketFull: Int = 0, val overAddLimit: Int = 0, val tooDeep: Int = 0, val failed: Int = 0, val cancelled: Boolean = false) {
+        val leftOut get() = tooLarge + bucketFull + overAddLimit + tooDeep + failed
+    }
+
+    private fun bucketBytes(live: Live) = live.manifest.values.filter { !it.deleted && !it.dir }.sumOf { it.size }
+    private fun bucketItems(live: Live) = live.manifest.values.count { !it.deleted }
+
+    private class Source(val uri: Uri, val path: String, val dir: Boolean, val size: Long)
+
+    /** Copies [uris] into [into] ("" = the top), with progress; [cancelAdd] stops between files. */
+    fun add(deviceId: String, uris: List<Uri>, into: String = "", onDone: (AddResult) -> Unit) {
         cancelAdding.set(false)
         worker.execute {
-            val live = buckets[deviceId] ?: return@execute onDone(0, uris.size)
-            val tree = tree(live) ?: return@execute onDone(0, uris.size)
-            var added = 0
-            var skipped = 0
-            for ((index, uri) in uris.withIndex()) {
-                if (cancelAdding.get()) break
-                live.adding = index to uris.size
-                publish()
-                val ok = runCatching { copyIn(tree, live, uri) }.onFailure { Log.w(TAG, "Could not add a file: ${it.javaClass.simpleName}") }.getOrDefault(false)
-                if (ok) added++ else skipped++
+            val live = buckets[deviceId] ?: return@execute onDone(AddResult(failed = uris.size))
+            val tree = tree(live) ?: return@execute onDone(AddResult(failed = uris.size))
+            val sources = uris.map { uri ->
+                val (rawName, size) = app.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) (c.getString(0) ?: "File") to (if (c.isNull(1)) -1L else c.getLong(1)) else null
+                } ?: ((uri.lastPathSegment ?: "File") to -1L)
+                Source(uri, join(into, safeName(rawName)), false, size)
             }
-            live.adding = null
-            live.dirtyAt = SystemClock.elapsedRealtime()
-            publish()
-            onDone(added, skipped)
+            onDone(copyAll(live, tree, sources, extraTooDeep = 0))
         }
+    }
+
+    /** Copies a whole picked folder (and its subfolders, empty ones too) into [into], within the depth limit. */
+    fun addTree(deviceId: String, source: Uri, into: String = "", onDone: (AddResult) -> Unit) {
+        cancelAdding.set(false)
+        worker.execute {
+            val live = buckets[deviceId] ?: return@execute onDone(AddResult(failed = 1))
+            val tree = tree(live) ?: return@execute onDone(AddResult(failed = 1))
+            val from = SafTree(app.contentResolver, source)
+            val rootName = safeName(runCatching { DocumentsContract.getTreeDocumentId(source).substringAfterLast(':').substringAfterLast('/') }.getOrNull().orEmpty().ifBlank { "Folder" })
+            val top = uniquePath(tree, join(into, rootName))
+            val walked = runCatching { from.walk() }.getOrNull() ?: return@execute onDone(AddResult(failed = 1))
+            val sources = mutableListOf(Source(source, top, true, 0))
+            var tooDeep = 0
+            for ((rel, item) in walked.entries.sortedBy { it.key }) {
+                val path = "$top/$rel"
+                if (FolderSync.skipReason(path, item.dir) == Skip.TOO_DEEP) { tooDeep++; continue }
+                sources += Source(from.uri(item), path, item.dir, if (item.dir) 0 else item.size)
+            }
+            onDone(copyAll(live, tree, sources, tooDeep, from))
+        }
+    }
+
+    private fun copyAll(live: Live, tree: SafTree, sources: List<Source>, extraTooDeep: Int, from: SafTree? = null): AddResult {
+        val files = sources.filter { !it.dir }
+        val dirs = sources.filter { it.dir }
+        val admitted = FolderSync.admit(files.map { it.size.coerceAtLeast(0) }, bucketBytes(live), bucketItems(live) + dirs.size)
+        val wanted = admitted.accepted.map { files[it] }
+        var added = 0
+        var failed = 0
+        val total = dirs.size + wanted.size
+        var done = 0
+        var cancelled = false
+        fun step() { live.adding = done to total; publish() }
+        for (d in dirs) {
+            if (cancelAdding.get()) { cancelled = true; break }
+            if (FolderSync.skipReason(d.path, true) == null) tree.mkdirs(d.path)
+            done++
+            step()
+        }
+        for (f in wanted) {
+            if (cancelled || cancelAdding.get()) { cancelled = true; break }
+            step()
+            val target = uniquePath(tree, f.path)
+            val ok = runCatching {
+                app.contentResolver.openInputStream(f.uri)?.use { input -> tree.place(target, input, null) != null } ?: false
+            }.onFailure { Log.w(TAG, "Could not add a file: ${it.javaClass.simpleName}") }.getOrDefault(false)
+            if (ok) added++ else failed++
+            done++
+        }
+        live.adding = null
+        live.dirtyAt = SystemClock.elapsedRealtime()
+        publish()
+        return AddResult(added, admitted.tooLarge, admitted.bucketFull, admitted.overAddLimit, extraTooDeep, failed, cancelled)
     }
 
     fun cancelAdd() = cancelAdding.set(true)
 
+    private fun join(dir: String, name: String) = if (dir.isEmpty()) name else "$dir/$name"
+
     /** A pasted or shared text or link, saved as a file (F8b, ≤ 1 MiB). */
-    fun addText(deviceId: String, text: String, onDone: (Boolean) -> Unit) = worker.execute {
+    fun addText(deviceId: String, text: String, into: String = "", onDone: (Boolean) -> Unit) = worker.execute {
         val live = buckets[deviceId]
         val tree = live?.let(::tree)
         val (name, bytes) = FolderSync.textItem(text, System.currentTimeMillis()) ?: return@execute onDone(false)
-        if (tree == null) return@execute onDone(false)
-        val staged = File(stash(), UUID.randomUUID().toString())
-        try {
-            staged.writeBytes(bytes)
-            val placed = tree.place(unique(tree, name), staged, null)
-            if (placed != null) live.dirtyAt = SystemClock.elapsedRealtime()
-            onDone(placed != null)
-        } finally {
-            staged.delete()
-        }
+        if (tree == null || FolderSync.admit(listOf(bytes.size.toLong()), bucketBytes(live), bucketItems(live)).accepted.isEmpty()) return@execute onDone(false)
+        val placed = tree.place(uniquePath(tree, join(into, name)), bytes.inputStream(), null)
+        if (placed != null) live.dirtyAt = SystemClock.elapsedRealtime()
+        onDone(placed != null)
     }
 
-    private fun copyIn(tree: SafTree, live: Live, uri: Uri): Boolean {
-        val resolver = app.contentResolver
-        val (rawName, size) = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
-            if (c.moveToFirst()) (c.getString(0) ?: "File") to (if (c.isNull(1)) -1L else c.getLong(1)) else null
-        } ?: ((uri.lastPathSegment ?: "File") to -1L)
-        if (size > FolderSync.MAX_FILE_BYTES) return false
-        if (live.manifest.values.count { !it.deleted } >= FolderSync.MAX_BUCKET_ITEMS) return false
-        val name = safeName(rawName)
-        val staged = File(stash(), UUID.randomUUID().toString())
-        try {
-            resolver.openInputStream(uri)?.use { input -> staged.outputStream().use { input.copyTo(it) } } ?: return false
-            if (staged.length() > FolderSync.MAX_FILE_BYTES) return false
-            return tree.place(unique(tree, name), staged, null) != null
-        } finally {
-            staged.delete()
-        }
-    }
-
-    /** A shared file's name, made a valid top-level name (no folders in the Bucket). */
+    /** A shared file's name, made a valid single name (folders come from the picker, never from a name). */
     fun safeName(raw: String): String {
-        val cleaned = raw.substringAfterLast('/').filter { it != '\\' && it != '\u0000' && !it.isISOControl() }.trim().trimStart('.')
+        val cleaned = raw.substringAfterLast('/').filter { it != '\\' && it != ':' && !it.isISOControl() }.trim().trimStart('.').trimEnd('.', ' ')
         var name = cleaned.ifBlank { "File" }
         while (name.toByteArray().size > FolderSync.MAX_SEGMENT_BYTES) name = name.dropLast(1)
         return name
     }
 
-    private fun unique(tree: SafTree, name: String): String {
-        if (tree.find(name) == null) return name
+    /** [path], or "name (2).ext" beside it when taken (also when only the case differs). */
+    private fun uniquePath(tree: SafTree, path: String): String {
+        val dir = path.substringBeforeLast('/', "")
+        val name = path.substringAfterLast('/')
+        val taken = tree.find(dir)?.let { tree.names(it) }.orEmpty().map { it.lowercase() }.toSet()
+        return join(dir, uniqueName(name, taken))
+    }
+
+    /** Pure: [name], or "stem (2).ext" until it is not in [taken] (lower-case names). */
+    fun uniqueName(name: String, taken: Set<String>): String {
+        if (name.lowercase() !in taken) return name
         val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
         for (n in 2..999) {
             val candidate = name.substring(0, dot) + " ($n)" + name.substring(dot)
-            if (FolderSync.validSegment(candidate) && tree.find(candidate) == null) return candidate
+            if (candidate.lowercase() !in taken && candidate.toByteArray().size <= FolderSync.MAX_SEGMENT_BYTES) return candidate
         }
         return name.substring(0, dot) + " " + UUID.randomUUID().toString().take(8) + name.substring(dot)
     }
 
-    /** "Rename": the old name is removed and the new one added on both sides (renames are found by hash). */
-    fun rename(deviceId: String, name: String, newName: String, onDone: (Boolean) -> Unit) = worker.execute {
+    /** "Rename" a file or folder in place: the old path goes and the new one appears on both sides (found by hash). */
+    fun rename(deviceId: String, path: String, newName: String, onDone: (Boolean) -> Unit) = worker.execute {
         val live = buckets[deviceId]
         val tree = live?.let(::tree)
         val target = safeName(newName)
-        val item = tree?.find(name)
-        val ok = item != null && FolderSync.validSegment(target) && !FolderSync.ignored(target, false) && tree.find(target) == null && tree.rename(item, target)
+        val item = tree?.find(path)
+        val to = join(path.substringBeforeLast('/', ""), target)
+        val ok = item != null && FolderSync.skipReason(to, item.dir) == null && !FolderSync.ignored(to, false) &&
+            tree.find(to) == null && tree.rename(item, target)
         if (ok) live?.dirtyAt = SystemClock.elapsedRealtime()
         onDone(ok)
     }
 
-    /** "Remove from both": deleted here, and the tombstone removes it on the desk (to its trash). */
-    fun remove(deviceId: String, name: String) = worker.execute {
-        val live = buckets[deviceId] ?: return@execute
-        tree(live)?.find(name)?.let { tree(live)?.delete(it) }
-        live.conflicts -= name
+    /** "New folder" at the top or inside a level-1 folder (hidden at level 2). */
+    fun newFolder(deviceId: String, parent: String, name: String, onDone: (Boolean) -> Unit) = worker.execute {
+        val live = buckets[deviceId]
+        val tree = live?.let(::tree)
+        val clean = safeName(name)
+        val path = join(parent, clean)
+        val ok = tree != null && FolderSync.skipReason(path, true) == null && tree.find(path) == null && bucketItems(live) < FolderSync.MAX_BUCKET_ITEMS && tree.mkdirs(path) != null
+        if (ok) live?.dirtyAt = SystemClock.elapsedRealtime()
+        onDone(ok)
+    }
+
+    /** W0: removing something that is arriving or queued cancels its transfer first. */
+    private fun cancelTransfers(live: Live, path: String) {
+        val prefix = "$path/"
+        fun hit(p: String) = p == path || p.startsWith(prefix)
+        live.toRequest.removeAll(::hit)
+        live.sendQueue.removeAll(::hit)
+        val arriving = live.outstanding.filter(::hit)
+        live.outstanding.removeAll(arriving.toSet())
+        arriving.forEach { p ->
+            synchronized(wanted) { wanted.remove(live.deviceId to p) }
+            DeskLinkApplication.getInstance().webRtcCoordinator(live.deviceId)?.cancelBucketReceive(p)
+        }
+        live.tracks.keys.removeAll(::hit)
+        live.sending.keys.removeAll(::hit)
+        live.sendActive.removeAll(::hit)
+    }
+
+    /** "Remove from both" for one or many items: transfers cancelled, deleted here (a folder as one item), tombstones follow. */
+    fun remove(deviceId: String, paths: Collection<String>, onDone: (Int) -> Unit = {}) = worker.execute {
+        val live = buckets[deviceId] ?: return@execute onDone(0)
+        val tree = tree(live) ?: return@execute onDone(0)
+        var removed = 0
+        // A folder takes its children with it: only the topmost paths are deleted.
+        val tops = paths.filter { p -> paths.none { it != p && p.startsWith("$it/") } }
+        for (path in tops) {
+            cancelTransfers(live, path)
+            if (tree.find(path)?.let(tree::delete) != false) removed++
+            live.conflicts.removeAll { it == path || it.startsWith("$path/") }
+        }
         live.dirtyAt = SystemClock.elapsedRealtime()
         publish()
+        onDone(removed)
+    }
+
+    /** "Move to folder…": each item into [target] ("" = top). Items that would pass the depth limit or clash are refused (counted). */
+    fun move(deviceId: String, paths: Collection<String>, target: String, onDone: (moved: Int, refused: Int) -> Unit) = worker.execute {
+        val live = buckets[deviceId] ?: return@execute onDone(0, paths.size)
+        val tree = tree(live) ?: return@execute onDone(0, paths.size)
+        var moved = 0
+        var refused = 0
+        val tops = paths.filter { p -> paths.none { it != p && p.startsWith("$it/") } }
+        for (path in tops) {
+            val entry = live.manifest[path]
+            val dir = entry?.dir == true
+            val descendants = live.manifest.filter { (p, e) -> !e.deleted && p.startsWith("$path/") }.map { it.key to it.value.dir }
+            val to = FolderSync.moveInto(target, path, dir, descendants)
+            if (to == null || tree.find(to) != null || !tree.move(path, to)) refused++ else moved++
+        }
+        live.dirtyAt = SystemClock.elapsedRealtime()
+        onDone(moved, refused)
+    }
+
+    /** "Save a copy": the items are copied to a folder the person picks (files and folders, recursively). */
+    fun saveCopy(deviceId: String, paths: Collection<String>, destination: Uri, onDone: (Int) -> Unit) = worker.execute {
+        val live = buckets[deviceId] ?: return@execute onDone(0)
+        val tree = tree(live) ?: return@execute onDone(0)
+        val out = SafTree(app.contentResolver, destination)
+        var copied = 0
+        for (top in paths.filter { p -> paths.none { it != p && p.startsWith("$it/") } }) {
+            val prefix = "$top/"
+            val all = listOf(top) + live.manifest.filter { (p, e) -> !e.deleted && p.startsWith(prefix) }.keys.sorted()
+            for (p in all) {
+                val item = tree.find(p) ?: continue
+                val rel = p.substringAfterLast('/', p).let { if (p == top) it else top.substringAfterLast('/') + "/" + p.removePrefix(prefix) }
+                if (item.dir) out.mkdirs(rel) else if (tree.open(item)?.use { out.place(rel, it, null) } != null) copied++
+            }
+        }
+        onDone(copied)
     }
 
     /** A conflict copy: keep both, keep this phone's (it replaces the desk's), or keep the desk's (the copy goes). */
@@ -356,6 +487,8 @@ object BucketEngine {
         live.dirtyAt = SystemClock.elapsedRealtime()
         publish()
     }
+
+    private fun computerOf(deviceId: String) = DeskLinkApplication.getInstance().getDevice(deviceId)?.name
 
     private fun keepGrant(context: Context, tree: Uri) = runCatching {
         context.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
@@ -392,7 +525,7 @@ object BucketEngine {
                 // Both turned it on at once: the phone's own ask already holds a folder.
                 deviceId in asked -> {
                     val (tree, _) = asked.remove(deviceId)!!
-                    buckets[deviceId] = Live(deviceId, tree).also { it.dirtyAt = 0; watch(it) }
+                    buckets[deviceId] = Live(deviceId, tree, computerOf(deviceId)).also { it.dirtyAt = 0; watch(it) }
                     save()
                     send(deviceId, packet("accept").apply { this["id"] = FolderSync.BUCKET_ID })
                 }
@@ -402,7 +535,7 @@ object BucketEngine {
                 }
             }
             "accept" -> if (bucket) asked.remove(deviceId)?.let { (tree, _) ->
-                buckets[deviceId] = Live(deviceId, tree).also { it.dirtyAt = 0; watch(it) }
+                buckets[deviceId] = Live(deviceId, tree, computerOf(deviceId)).also { it.dirtyAt = 0; watch(it) }
                 save()
             }
             "decline" -> if (bucket) asked.remove(deviceId)?.let { (tree, _) -> release(tree) }
@@ -431,7 +564,8 @@ object BucketEngine {
         val remote = live.incoming.values.flatten().take(FolderSync.MAX_BUCKET_ITEMS).toMap()
         live.incoming.clear()
         if (live.phase == Phase.HELD_EMPTY) return
-        live.remote = HashMap(remote.filterValues { !it.deleted }.mapValues { it.value.sha256 })
+        live.remote = HashMap(remote.filterValues { !it.deleted && !it.dir }.mapValues { it.value.sha256 })
+        live.remoteDirs = remote.filterValues { !it.deleted && it.dir }.keys
         live.sending.entries.removeAll { (path, sha) -> live.remote[path] == sha }
         applyPlan(live, remote)
     }
@@ -445,10 +579,11 @@ object BucketEngine {
         val size = (o.opt("size") as? Number)?.toLong() ?: return@mapNotNull null
         val mtime = (o.opt("mtime") as? Number)?.toLong() ?: return@mapNotNull null
         val vv = o.optJSONObject("vv") ?: return@mapNotNull null
-        if (fromDesk && !FolderSync.takesIncoming(path, o.opt("dir") == true)) return@mapNotNull null
-        val sane = FolderSync.validRelpath(path) && (deleted || (FolderSync.validSha(sha) && size in 0..FolderSync.MAX_FILE_BYTES))
+        val dir = o.opt("dir") == true
+        if (fromDesk && !FolderSync.takesIncoming(path, dir)) return@mapNotNull null
+        val sane = FolderSync.validRelpath(path) && (deleted || dir || (FolderSync.validSha(sha) && size in 0..FolderSync.MAX_BUCKET_FILE_BYTES))
         if (!sane) return@mapNotNull null
-        path to Entry(size, mtime, sha, deleted, Vv(vv.optLong("desk"), vv.optLong("phone")))
+        path to Entry(if (dir) 0 else size, mtime, if (dir) "" else sha, deleted, Vv(vv.optLong("desk"), vv.optLong("phone")), dir)
     }
 
     private fun applyPlan(live: Live, remote: Map<String, Entry>) {
@@ -459,12 +594,24 @@ object BucketEngine {
         for (step in steps) when (step) {
             is Step.Take -> live.manifest[step.path] = step.entry
             is Step.Bump -> live.manifest[step.path]?.let { live.manifest[step.path] = it.copy(vv = step.vv) }
-            is Step.Delete -> if (delete(tree, live, step.path)) live.manifest[step.path] = step.entry else rescan = true
-            is Step.Download -> downloads += step.path to step.entry
+            is Step.Delete -> {
+                val old = live.manifest[step.path]
+                if (old?.dir == true) {
+                    // A folder goes only when empty once its files are gone; otherwise it stays and wins back.
+                    val item = tree.find(step.path)
+                    when {
+                        item == null || (tree.isEmptyFolder(item) && tree.delete(item)) -> live.manifest[step.path] = step.entry
+                        else -> live.manifest[step.path] = old.copy(vv = old.vv.max(step.entry.vv).bumped(Side.PHONE))
+                    }
+                } else if (delete(tree, live, step.path)) live.manifest[step.path] = step.entry else rescan = true
+            }
+            is Step.Download -> if (step.entry.dir) {
+                if (tree.mkdirs(step.path) != null) live.manifest[step.path] = step.entry else rescan = true
+            } else downloads += step.path to step.entry
             // A move within the Bucket (a rename on the desk): renamed here, no transfer.
             is Step.Move -> {
                 val item = tree.find(step.from)
-                if (item != null && unchanged(item, live.manifest[step.from]) && tree.find(step.to) == null && tree.rename(item, step.to)) {
+                if (item != null && unchanged(item, live.manifest[step.from]) && tree.find(step.to) == null && tree.move(step.from, step.to)) {
                     live.manifest[step.from] = step.tombstone
                     tree.find(step.to)?.let { placed -> live.manifest[step.to] = step.entry.copy(size = placed.size, mtime = placed.mtime) }
                     live.from[step.to] = live.from.remove(step.from) ?: Side.DESK
@@ -512,6 +659,7 @@ object BucketEngine {
 
     private fun unchanged(item: SafTree.Item?, entry: Entry?) = when {
         entry == null || entry.deleted -> item == null
+        entry.dir -> item != null && item.dir
         else -> item != null && item.size == entry.size && item.mtime == entry.mtime
     }
 
@@ -522,12 +670,9 @@ object BucketEngine {
 
     private fun requestMore(live: Live) {
         if (live.userPaused) return
-        val batch = mutableListOf<String>()
-        while (live.outstanding.size < FolderSync.MAX_OUTSTANDING && batch.size < FolderSync.REQUEST_PATHS) {
-            val path = live.toRequest.removeFirstOrNull() ?: break
-            live.outstanding += path
-            batch += path
-        }
+        // F8c: two files in flight at a time; the rest wait their turn.
+        val batch = FolderSync.nextBatch(live.toRequest.toList(), live.outstanding.size)
+        batch.forEach { live.toRequest.remove(it); live.outstanding += it }
         if (batch.isNotEmpty()) send(live.deviceId, packet("request").apply { this["id"] = FolderSync.BUCKET_ID; this["paths"] = batch })
     }
 
@@ -540,20 +685,36 @@ object BucketEngine {
         }
     }
 
-    /** P4: the desk asks for files; each is sent unless it changed or vanished meanwhile. */
+    /** P4: the desk asks for files; each is queued and sent two at a time unless it changed or vanished meanwhile. */
     private fun onRequest(deviceId: String, packet: NetworkPacket) {
         val live = buckets[deviceId]?.takeIf { !it.userPaused } ?: return
-        val device = DeskLinkApplication.getInstance().getDevice(deviceId) ?: return
         val tree = tree(live) ?: return
         for (path in packet.getStringList("paths").orEmpty().take(FolderSync.REQUEST_PATHS)) {
-            val entry = live.manifest[path]?.takeIf { !it.deleted } ?: continue
+            val entry = live.manifest[path]?.takeIf { !it.deleted && !it.dir } ?: continue
+            if (path in live.sendQueue || path in live.sendActive) continue
             val item = tree.find(path)
             if (item == null || !unchanged(item, entry)) {
                 live.dirtyAt = SystemClock.elapsedRealtime()
                 continue
             }
-            val input = runCatching { app.contentResolver.openInputStream(tree.uri(item)) }.getOrNull() ?: continue
             if (live.sending.size < FolderSync.MAX_OUTSTANDING) live.sending[path] = entry.sha256
+            live.sendQueue += path
+        }
+        pumpSends(live)
+    }
+
+    private fun pumpSends(live: Live) {
+        val device = DeskLinkApplication.getInstance().getDevice(live.deviceId) ?: return
+        val tree = tree(live) ?: return
+        val deviceId = live.deviceId
+        while (live.sendActive.size < FolderSync.MAX_IN_FLIGHT && live.sendQueue.isNotEmpty() && !live.userPaused) {
+            val path = live.sendQueue.removeFirst()
+            val entry = live.manifest[path]?.takeIf { !it.deleted && !it.dir } ?: continue
+            val item = tree.find(path)
+            // A file that changed while queued restarts through the next scan ("changed, sending again").
+            if (item == null || !unchanged(item, entry)) { live.sending.remove(path); live.dirtyAt = SystemClock.elapsedRealtime(); continue }
+            val input = runCatching { tree.open(item) }.getOrNull() ?: continue
+            live.sendActive += path
             device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
                 this["filename"] = path.substringAfterLast('/')
                 this["folder"] = FolderSync.BUCKET_ID
@@ -563,14 +724,16 @@ object BucketEngine {
             }, object : Device.SendPacketStatusCallback() {
                 override fun onPayloadProgressChanged(percent: Int) = progress(deviceId, path, entry.size * percent.coerceIn(0, 100) / 100, entry.size, sending = true)
 
-                override fun onSuccess() = worker.execute { finished(live, path); publish() }
+                override fun onSuccess() = worker.execute { live.sendActive.remove(path); finished(live, path); pumpSends(live); publish() }
 
                 override fun onFailure(e: Throwable) {
                     Log.w(TAG, "A Bucket file was not sent: ${e.javaClass.simpleName}")
                     // A dropped link pauses it (it resumes from the checkpoint); anything else ends it.
                     val resuming = e is org.desklink.mobile.webrtc.TransferResumingException
                     worker.execute {
+                        live.sendActive.remove(path)
                         if (resuming) live.tracks[path]?.paused = true else { live.sending.remove(path); live.tracks.remove(path) }
+                        pumpSends(live)
                         publish()
                     }
                 }
@@ -628,6 +791,7 @@ object BucketEngine {
         if (!paused) {
             live.dirtyAt = 0
             requestMore(live)
+            pumpSends(live)
         }
         publish()
     }
@@ -709,29 +873,50 @@ object BucketEngine {
     private fun rescan(live: Live) {
         val first = live.scannedAt == null
         live.dirtyAt = null
-        live.scannedAt = SystemClock.elapsedRealtime()
+        val now0 = SystemClock.elapsedRealtime()
+        live.scannedAt = now0
         val tree = tree(live) ?: return
         live.phase = Phase.SCANNING
-        val (found, folders) = runCatching { tree.scanTop() }.getOrElse {
+        val scan = runCatching { tree.scan() }.getOrElse {
             live.phase = Phase.NO_ACCESS
             return
         }
-        live.notSynced = folders
+        // Case clashes (two live names differing only in case): the later ones are not synced.
+        val clashes = FolderSync.caseClashes(scan.found.keys)
+        live.notSynced = scan.skipped + clashes.sorted().map { it to Skip.CASE_CLASH }
+        val found = scan.found.filterKeys { it !in clashes }
         live.documents = found.mapValues { it.value.documentId }
-        val files = found.filterKeys { !FolderSync.ignored(it, false) }
-        val stats = files.mapValues { Stat(it.value.size, it.value.mtime) }
-        // P6: a Bucket that had files and now scans empty is held, never emptied on the desk.
-        if (FolderSync.holdEmpty(live.manifest, stats, live.confirmedEmpty)) {
+        val settling = mutableSetOf<String>()
+        val stats = HashMap<String, Stat>()
+        for ((path, item) in found) {
+            val stat = Stat(item.size, item.mtime, item.dir)
+            val known = live.manifest[path]
+            // A new or changed file is taken once its size and time hold for two seconds (another app may be writing it).
+            if (!item.dir && (known == null || known.deleted || known.dir || known.size != item.size || known.mtime != item.mtime)) {
+                val before = live.seen[path]
+                if (before?.first != stat) {
+                    live.seen[path] = stat to now0
+                    settling += path
+                    continue
+                }
+                if (!FolderSync.settled(before, stat, now0)) { settling += path; continue }
+            }
+            stats[path] = stat
+        }
+        live.seen.keys.retainAll(found.keys)
+        if (settling.isNotEmpty()) live.dirtyAt = now0 + FolderSync.WRITE_SETTLE_MS - BucketEngine.SETTLE_MS
+        // W0: a Bucket that had files and now scans empty (folder deleted, card out, grant revoked) is held, never tombstoned.
+        if (FolderSync.holdEmpty(live.manifest, stats, live.confirmedEmpty) && settling.isEmpty()) {
             live.phase = Phase.HELD_EMPTY
             return
         }
         live.confirmedEmpty = false
-        val keep = live.toRequest.toSet() + live.outstanding
+        val keep = live.toRequest.toSet() + live.outstanding + settling.filter { live.manifest[it]?.deleted == false }
         val before = live.manifest.filterValues { !it.deleted }.keys
-        val changed = FolderSync.applyScan(Side.PHONE, live.manifest, stats, { path -> files[path]?.let(tree::sha256) }, System.currentTimeMillis(), keep)
+        val changed = FolderSync.applyScan(Side.PHONE, live.manifest, stats, { path -> found[path]?.let(tree::sha256) }, System.currentTimeMillis(), keep)
         live.manifest.filterValues { !it.deleted }.keys.filter { it !in before && it !in live.from }.forEach { live.from[it] = Side.PHONE }
         live.from.keys.retainAll(live.manifest.keys)
-        live.conflicts.retainAll(files.keys)
+        live.conflicts.retainAll(found.keys)
         live.phase = when {
             live.manifest.values.count { !it.deleted } >= FolderSync.MAX_BUCKET_ITEMS -> Phase.TOO_MANY
             live.toRequest.isEmpty() && live.outstanding.isEmpty() -> Phase.UP_TO_DATE.also { live.lastSync = live.lastSync ?: System.currentTimeMillis() }
@@ -748,7 +933,8 @@ object BucketEngine {
             live.phase = Phase.NO_ACCESS
             return null
         }
-        return SafTree(app.contentResolver, uri)
+        // One Bucket per computer: its own folder inside the picked one (a state saved before that keeps the root).
+        return SafTree(app.contentResolver, uri, live.computer?.let(SafTree::folderName))
     }
 
     private fun watch(live: Live) {
@@ -809,7 +995,7 @@ object BucketEngine {
     }
 
     private fun entryJson(path: String, e: Entry) = JSONObject().put("path", path).put("size", e.size).put("mtime", e.mtime).put("sha256", e.sha256)
-        .put("vv", JSONObject().put("desk", e.vv.desk).put("phone", e.vv.phone)).apply { if (e.deleted) put("deleted", true) }
+        .put("vv", JSONObject().put("desk", e.vv.desk).put("phone", e.vv.phone)).apply { if (e.deleted) put("deleted", true); if (e.dir) put("dir", true) }
 
     // ---- storage (atomic, versioned, unreadable file kept aside) ---------------------------------------------
 
@@ -827,7 +1013,7 @@ object BucketEngine {
         for (i in 0 until minOf(array.length(), 16)) {
             val o = array.optJSONObject(i) ?: continue
             val deviceId = o.optString("deviceId").takeIf(String::isNotEmpty) ?: continue
-            val live = Live(deviceId, o.optString("treeUri").takeIf(String::isNotEmpty) ?: continue)
+            val live = Live(deviceId, o.optString("treeUri").takeIf(String::isNotEmpty) ?: continue, o.optString("computer").takeIf(String::isNotEmpty))
             live.lastSync = o.optLong("lastSync").takeIf { it > 0 }
             live.manifest = HashMap(entries(o.optJSONArray("entries") ?: JSONArray(), fromDesk = false).toMap())
             o.optJSONObject("from")?.let { f -> f.keys().forEach { k -> if (k in live.manifest) live.from[k] = if (f.optString(k) == "desk") Side.DESK else Side.PHONE } }
@@ -840,7 +1026,7 @@ object BucketEngine {
     private fun save() {
         val json = JSONObject().put("version", STORED_VERSION).put("buckets", JSONArray().apply {
             buckets.values.forEach { l ->
-                put(JSONObject().put("deviceId", l.deviceId).put("treeUri", l.treeUri).put("lastSync", l.lastSync ?: 0)
+                put(JSONObject().put("deviceId", l.deviceId).put("treeUri", l.treeUri).put("computer", l.computer ?: "").put("lastSync", l.lastSync ?: 0)
                     .put("entries", JSONArray().apply { l.manifest.forEach { (p, e) -> put(entryJson(p, e)) } })
                     .put("from", JSONObject().apply { l.from.forEach { (p, s) -> put(p, if (s == Side.DESK) "desk" else "phone") } })
                     .put("conflicts", JSONArray(l.conflicts.toList())))
@@ -869,28 +1055,31 @@ object BucketEngine {
             } else {
                 val tree = Uri.parse(live.treeUri)
                 val local = live.manifest.filterValues { !it.deleted }
-                val items = local.map { (name, e) ->
+                val items = local.map { (path, e) ->
+                    val name = path
                     val state = when {
                         name in live.conflicts -> BucketItem.State.CONFLICT
                         name in live.outstanding || name in live.toRequest -> BucketItem.State.RECEIVING
                         name in live.sending -> BucketItem.State.SENDING
+                        e.dir -> if (live.remote[name] != null || live.remoteDirs.contains(name)) BucketItem.State.SYNCED else BucketItem.State.WAITING
                         live.remote[name] == e.sha256 -> BucketItem.State.SYNCED
                         else -> BucketItem.State.WAITING
                     }
                     BucketItem(
-                        name, e.size, e.mtime, live.from[name], state,
-                        live.documents[name]?.let { DocumentsContract.buildDocumentUriUsingTree(tree, it) },
-                        live.tracks[name]?.progress(lastPublishAt) ?: waiting(live, name, state, e.size),
+                        path.substringAfterLast('/'), e.size, e.mtime, live.from[path], state,
+                        live.documents[path]?.let { DocumentsContract.buildDocumentUriUsingTree(tree, it) },
+                        if (e.dir) null else live.tracks[path]?.progress(lastPublishAt) ?: waiting(live, path, state, e.size),
+                        path, e.dir,
                     )
                 } + (live.toRequest + live.outstanding + live.tracks.filterValues { !it.sending }.keys).distinct().filter { it !in local }.map { name ->
                     val size = synchronized(wanted) { wanted[deviceId to name]?.size } ?: 0
-                    BucketItem(name, size, System.currentTimeMillis(), Side.DESK, BucketItem.State.RECEIVING, null, live.tracks[name]?.progress(lastPublishAt) ?: Progress(0, size, null, 0, deviceId !in ready))
+                    BucketItem(name.substringAfterLast('/'), size, System.currentTimeMillis(), Side.DESK, BucketItem.State.RECEIVING, null, live.tracks[name]?.progress(lastPublishAt) ?: Progress(0, size, null, 0, deviceId !in ready), name, false)
                 }
                 BucketView(
                     deviceId, tree.toString(), live.phase,
-                    items.sortedByDescending { it.mtime }, live.notSynced, live.lastSync, local.values.sumOf { it.size },
+                    items.sortedByDescending { it.mtime }, live.notSynced, live.lastSync, bucketBytes(live),
                     false, live.storageFull, live.adding,
-                    BucketProgress.summary(items.mapNotNull { it.progress }),
+                    BucketProgress.summary(items.filter { !it.dir }.mapNotNull { it.progress }),
                     live.userPaused,
                 )
             }
