@@ -54,6 +54,8 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_SCREEN_ERROR = "desklink.screen.error"
     const val PACKET_TYPE_CONTACTS_REQUEST = "desklink.contacts.request"
     const val PACKET_TYPE_TELEPHONY_REQUEST = "desklink.telephony.request"
+    /** W2: what this side already holds of the peer's snapshots (revs), sent first on every feature-ready. */
+    const val PACKET_TYPE_SYNC_HAVE = "desklink.sync.have"
     const val PACKET_TYPE_WEBRTC_SIGNAL_V1 = "desklink.webrtc.signal.v1"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES = "desklink.shareinputdevices"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST = "desklink.shareinputdevices.request"

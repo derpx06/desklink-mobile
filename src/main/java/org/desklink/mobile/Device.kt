@@ -142,6 +142,22 @@ class Device : PacketReceiver {
     /** The peer's last seen restart epoch; see [DeviceInfo.instanceId]. */
     @Volatile
     var peerInstanceId: String? = null
+
+    /** Delta resync: which snapshots the peer already holds (and which of its this side holds). */
+    val sync = org.desklink.mobile.webrtc.SyncDigest { DeviceInfo.PROCESS_INSTANCE_ID }
+
+    /**
+     * A snapshot of [feature] on a new link: stamped with [rev] and sent, unless the peer has just
+     * said it already holds exactly this one. Returns whether it was sent.
+     */
+    fun sendSnapshot(feature: String, rev: String, packets: List<NetworkPacket>, send: (NetworkPacket) -> Unit = ::sendPacket): Boolean {
+        if (!sync.shouldSend(feature, rev)) {
+            Log.d("DeskLink/Device", "The desk already holds the $feature snapshot")
+            return false
+        }
+        packets.forEach { it["rev"] = rev; send(it) }
+        return true
+    }
     // Feature packets waiting for the WebRTC transport; see sendPacketBlocking.
     private val pendingFeaturePackets = BoundedPendingQueue<QueuedFeature>(256)
 
@@ -535,6 +551,14 @@ class Device : PacketReceiver {
         lifecycle.enqueue("feature-ready snapshots") {
             // B1: the doze state first; the desk keeps its own until the phone says otherwise.
             runCatching { sendDozeState() }
+            // Delta resync: say what this phone already holds of the desk's state, then give the desk
+            // a moment to say the same, so only what differs is sent. A desk that does not take
+            // part in it (not in its handover) is not waited for.
+            sync.beginLink()
+            if (WebRtcFeatureProfile.peerAccepts(deviceId, DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE)) {
+                runCatching { sendPacket(sync.havePacket(peerInstanceId)) }
+                if (WebRtcFeatureProfile.peerSends(deviceId, DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE)) sync.awaitHave()
+            }
             loadedPlugins.values.forEach { plugin ->
                 runCatching { plugin.onFeatureReady() }
                     .onFailure { Log.w("DeskLink/Device", "${plugin.pluginKey} failed its feature-ready snapshot", it) }
@@ -1004,6 +1028,11 @@ class Device : PacketReceiver {
             return
         }
 
+        if (np.type == DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE) {
+            sync.onHave(np)
+            return
+        }
+
         // pluginsByIncomingInterface may not be built yet
         if (pluginsByIncomingInterface.isEmpty) {
             reloadPluginsFromSettings()
@@ -1019,6 +1048,8 @@ class Device : PacketReceiver {
         // It adds support for receiving packets from not trusted devices,
         // but as of March 2023 no plugin implements "onUnpairedDevicePacketReceived".
         notifyPluginPacketReceived(np)
+        // Applied: remember the snapshot's rev so the next link can tell the peer it need not resend it.
+        sync.record(peerInstanceId, np)
     }
 
     /** Per type, under every plugin: a flood is dropped (counted, one log line a window), never dispatched. */

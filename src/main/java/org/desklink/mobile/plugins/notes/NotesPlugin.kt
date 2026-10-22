@@ -12,6 +12,7 @@ import org.desklink.mobile.helpers.ThreadHelper
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.webrtc.SyncDigest
 
 /**
  * Snippets and notes with this desk (F6). Neither side owns them: both send an index on
@@ -31,7 +32,13 @@ class NotesPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = supportedPacketTypes
 
     override fun onFeatureReady() {
-        ThreadHelper.execute { NotesStore.indexes(context).forEach(device::sendPacket) }
+        ThreadHelper.execute {
+            // Per index: on a new link the desk may already hold exactly this one.
+            NotesStore.indexes(context).groupBy { it.type }.forEach { (type, packets) ->
+                val feature = if (type == DeskLinkProtocol.PACKET_TYPE_NOTES) SyncDigest.NOTES else SyncDigest.SNIPPETS
+                device.sendSnapshot(feature, SyncDigest.rev(packets.map { it.serialize() }), packets)
+            }
+        }
     }
 
     /** A desk's index, fetches and pushes: a busy sync is a few packets a second, a flood is dropped. */

@@ -49,6 +49,8 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_PING,
         DeskLinkProtocol.PACKET_TYPE_SETTINGS,
         DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
+        // Delta resync (W2): the revs of the snapshots this side already holds.
+        DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE,
         DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,
         // Glide (F4): the desk's pointer enters, and the phone hands it back.
         DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES,

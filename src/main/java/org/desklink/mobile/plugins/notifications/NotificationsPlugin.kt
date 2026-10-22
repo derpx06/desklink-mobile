@@ -46,6 +46,7 @@ import java.security.MessageDigest
 import java.util.Locale
 import androidx.core.graphics.createBitmap
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.webrtc.SyncDigest
 
 @LoadablePlugin
 class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener {
@@ -133,20 +134,25 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
      */
     override fun onFeatureReady() {
         if (!isDeviceInitialized || !NotificationReceiver.hasReadNotificationsPermission(context)) {
-            sendSnapshot(emptyList())
+            sendSnapshot(emptyList(), resync = true)
             return
         }
         NotificationReceiver.WithService(context) { service ->
             serviceReady = service.isConnected
-            if (serviceReady) sendCurrentNotifications(service)
+            if (serviceReady) sendCurrentNotifications(service, resync = true)
         }
     }
 
     /** Turned off: the desk drops every notification it shows from this phone. */
     override fun onTurnedOff() = sendSnapshot(emptyList())
 
-    private fun sendSnapshot(ids: List<String>) {
-        device.sendPacket(snapshotPacket(ids))
+    /** [resync]: a new link, where the desk may already hold exactly this set. */
+    private fun sendSnapshot(ids: List<String>, resync: Boolean = false) {
+        if (resync) {
+            device.sendSnapshot(SyncDigest.NOTIFICATIONS, snapshotRev(ids.map { it to 0L }), listOf(snapshotPacket(ids)))
+        } else {
+            device.sendPacket(snapshotPacket(ids))
+        }
     }
 
     override fun onNotificationRemoved(statusBarNotification: StatusBarNotification?) {
@@ -570,7 +576,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         return ticker
     }
 
-    private fun sendCurrentNotifications(service: NotificationReceiver) {
+    private fun sendCurrentNotifications(service: NotificationReceiver, resync: Boolean = false) {
         if (!NotificationReceiver.hasReadNotificationsPermission(context)) {
             return
         }
@@ -584,7 +590,15 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
         val mirrored = notifications.filter { runCatching { isMirrored(it) }.getOrDefault(false) }
         // The ids first: the desk drops every other notification it holds from this phone.
-        sendSnapshot(mirrored.map(::getNotificationKeyCompat))
+        val ids = mirrored.map(::getNotificationKeyCompat)
+        if (resync) {
+            // A new link where the desk already holds this exact set (same ids, same post times): nothing to send.
+            val rev = snapshotRev(mirrored.map { getNotificationKeyCompat(it) to it.postTime })
+            if (!device.sync.shouldSend(SyncDigest.NOTIFICATIONS, rev)) return
+            device.sendSnapshot(SyncDigest.NOTIFICATIONS, rev, listOf(snapshotPacket(ids)))
+        } else {
+            sendSnapshot(ids)
+        }
         for (notification in mirrored) {
             // A single malformed third-party notification must not prevent
             // the rest of the active notification set from being mirrored.
@@ -701,6 +715,10 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
             if (!fits()) np["conversation"] = null as org.json.JSONArray?
         }
+
+        /** The snapshot's rev: the ids with their post times (an update re-posts, so it changes the rev). */
+        fun snapshotRev(entries: List<Pair<String, Long>>): String =
+            SyncDigest.rev(entries.sortedBy { it.first }.map { "${it.first}@${it.second}" })
 
         /** S1: every posted id. Ids past [SNAPSHOT_BUDGET] are left out (a packet must cross the data channel). */
         fun snapshotPacket(ids: List<String>) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_NOTIFICATION).apply {

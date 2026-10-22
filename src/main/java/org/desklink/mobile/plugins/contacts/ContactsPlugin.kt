@@ -25,6 +25,7 @@ import org.desklink.mobile.helpers.RateLimiter
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
+import org.desklink.mobile.webrtc.SyncDigest
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -99,7 +100,7 @@ class ContactsPlugin : Plugin() {
     override fun onPacketReceived(np: NetworkPacket): Boolean {
         if (np.type in supportedPacketTypes && !limiter.allow(np.type)) return true
         when (np.type) {
-            DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS -> background { sendSnapshot(force = true) }
+            DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS -> background { sendSnapshot(force = true, refresh = true) }
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS -> {
                 val uids = np.getStringList("uids").orEmpty().filter(::validUid).distinct().take(MAX_UIDS_PER_REQUEST)
                 background { sendVcards(uids) }
@@ -120,14 +121,20 @@ class ContactsPlugin : Plugin() {
         pendingChange = runCatching { worker.schedule({ sendSnapshot(force = false) }, CHANGE_DEBOUNCE_SECONDS, TimeUnit.SECONDS) }.getOrNull()
     }
 
-    private fun sendSnapshot(force: Boolean) {
+    private fun sendSnapshot(force: Boolean, refresh: Boolean = false) {
         if (!force && !device.hasActiveWebRtcFeatureTransport) return // the next feature-ready sends it
         val stamps = runCatching { readStamps(context) }.getOrElse {
             Log.w(TAG, "Could not read contacts", it)
             return
         }
         if (!force && stamps == lastSent) return
-        ContactsBook.snapshotPackets(stamps).forEach(device::sendPacket)
+        // Feature-ready and the desk's own refresh are `force`: the first is a new link, where the
+        // desk may already hold exactly this book; a refresh asks for it, so it is always sent.
+        if (force && !refresh) {
+            device.sendSnapshot(SyncDigest.CONTACTS, contactsRev(stamps), ContactsBook.snapshotPackets(stamps))
+        } else {
+            ContactsBook.snapshotPackets(stamps).forEach(device::sendPacket)
+        }
         lastSent = stamps
     }
 
@@ -142,6 +149,9 @@ class ContactsPlugin : Plugin() {
 
     companion object {
         private const val TAG = "DeskLink/Contacts"
+
+        /** The book's rev: every uid with its stamp. */
+        fun contactsRev(stamps: Map<String, Long>): String = SyncDigest.rev(stamps.entries.sortedBy { it.key }.map { "${it.key}=${it.value}" })
         private const val CHANGE_DEBOUNCE_SECONDS = 5L
         /** K2 asks ≤ 200; 1,000 tolerates a desk that batches more, and bounds one request's reading. */
         const val MAX_UIDS_PER_REQUEST = 1000
