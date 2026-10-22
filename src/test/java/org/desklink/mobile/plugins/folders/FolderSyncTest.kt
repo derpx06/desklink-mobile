@@ -8,134 +8,143 @@ import org.junit.Test
 import java.security.MessageDigest
 import kotlin.random.Random
 
+/** Contract F8 P2–P5 on the phone: the desk's `folders.rs` tests, and both sides converging. */
 class FolderSyncTest {
-    private fun sha(text: String) = MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
+    private fun entry(sha: String, desk: Long, phone: Long) = Entry(sha.length.toLong(), 1_700_000_000_000, sha, false, Vv(desk, phone))
+    private fun tomb(desk: Long, phone: Long) = Entry(0, 1_700_000_000_000, "", true, Vv(desk, phone))
 
-    /** A side's files and when each last changed. */
-    private class Side(val files: MutableMap<String, String> = sortedMapOf(), val times: MutableMap<String, Long> = HashMap())
-
-    private var clock = 1_000L
-
-    private fun manifest(side: Side, base: Map<String, Entry>): Map<String, Entry> {
-        val out = HashMap<String, Entry>()
-        side.files.forEach { (p, c) -> out[p] = Entry(p, c.length.toLong(), side.times[p] ?: 0, sha(c)) }
-        base.forEach { (p, e) -> if (p !in side.files) out[p] = if (e.deleted) e else Entry(p, 0, side.times[p] ?: clock, null, deleted = true) }
-        return out
-    }
-
-    private fun apply(ops: List<Op>, local: Side, remote: Side) {
-        for (op in ops) when (op) {
-            is Op.Upload -> remote.files[op.relpath] = local.files.getValue(op.relpath)
-            is Op.Download -> local.files[op.relpath] = remote.files.getValue(op.relpath)
-            is Op.DeleteHere -> local.files.remove(op.relpath)
-            is Op.DeleteThere -> remote.files.remove(op.relpath)
-            is Op.RenameHere -> local.files[op.relpath] = local.files.remove(op.from)!!
-            is Op.RenameThere -> remote.files[op.relpath] = remote.files.remove(op.from)!!
-            is Op.Conflict -> {
-                val (winner, loser) = if (op.keepLocal) local.files.getValue(op.relpath) to remote.files.getValue(op.relpath)
-                else remote.files.getValue(op.relpath) to local.files.getValue(op.relpath)
-                local.files[op.relpath] = winner; remote.files[op.relpath] = winner
-                local.files[op.copyName] = loser; remote.files[op.copyName] = loser
-            }
-        }
-    }
-
-    private fun sync(local: Side, remote: Side, base: Map<String, Entry>, mode: Mode = Mode.TWO_WAY): Pair<List<Op>, Map<String, Entry>> {
-        val ops = FolderSync.diff(base, manifest(local, base), manifest(remote, base), mode, "desk", "phone")
-        apply(ops, local, remote)
-        return ops to manifest(local, emptyMap())
+    @Test
+    fun dominanceTakesTiesDoNothingAndConcurrentEditsConflict() {
+        val local = mapOf(
+            "same" to entry("a", 1, 1), "older" to entry("a", 1, 0), "newer" to entry("b", 2, 0),
+            "both" to entry("c", 2, 0), "deleted-there" to entry("d", 1, 0), "deleted-here" to tomb(2, 0),
+        )
+        val remote = mapOf(
+            "same" to entry("a", 1, 1), "older" to entry("z", 1, 1), "newer" to entry("b0", 1, 0),
+            "both" to entry("q", 1, 1), "deleted-there" to tomb(1, 1), "deleted-here" to entry("e", 1, 1),
+            "new" to entry("n", 0, 1), "gone" to tomb(0, 2),
+        )
+        val steps = FolderSync.plan(Side.DESK, local, remote, "Pixel")
+        assertTrue(Step.Download("older", entry("z", 1, 1)) in steps)
+        assertTrue(Step.Delete("deleted-there", tomb(1, 1)) in steps)
+        assertTrue(Step.Download("new", entry("n", 0, 1)) in steps)
+        assertTrue(Step.Take("gone", tomb(0, 2)) in steps)
+        assertTrue(Step.Conflict("both", "both (conflict from Pixel 2023-11-14)") in steps)
+        assertTrue(Step.Download("deleted-here", entry("e", 2, 1)) in steps)
+        assertFalse(steps.any { it is Step.Bump && it.path == "both" })
     }
 
     @Test
-    fun randomEditsOnBothSidesConvergeWithoutLosingAnEdit() {
-        val random = Random(42)
-        val names = listOf("a.txt", "b.txt", "dir/c.md", "dir/d.md", "e.bin")
+    fun thePhoneRenamesItsOwnVersionInAConflict() {
+        val steps = FolderSync.plan(Side.PHONE, mapOf("notes.txt" to entry("p", 1, 2)), mapOf("notes.txt" to entry("d", 2, 1)), "Pixel 9")
+        assertEquals(
+            listOf(Step.Rename("notes.txt", "notes (conflict from Pixel 9 2023-11-14).txt"), Step.Download("notes.txt", entry("d", 3, 2))),
+            steps,
+        )
+    }
+
+    @Test
+    fun renamesAndCopiesAreFoundByHash() {
+        val local = mapOf("a/old.jpg" to entry("x", 1, 0), "keep.jpg" to entry("k", 1, 0))
+        val remote = mapOf("a/old.jpg" to tomb(1, 1), "b/new.jpg" to entry("x", 0, 1), "dup.jpg" to entry("k", 0, 1))
+        assertEquals(
+            listOf(Step.Move("a/old.jpg", "b/new.jpg", entry("x", 0, 1), tomb(1, 1)), Step.Copy("keep.jpg", "dup.jpg", entry("k", 0, 1))),
+            FolderSync.plan(Side.DESK, local, remote, "P"),
+        )
+    }
+
+    @Test
+    fun aScanBumpsChangesAndTombstonesWhatVanishedButNotADownloadOnItsWay() {
+        val m = mutableMapOf("a" to entry("a", 0, 1), "b" to entry("b", 0, 1), "c" to entry("c", 0, 1), "coming" to entry("x", 3, 1))
+        val found = mapOf("a" to Stat(1, 1_700_000_000_000), "b" to Stat(9, 5), "new" to Stat(1, 7))
+        val changed = FolderSync.applyScan(Side.PHONE, m, found, { p -> if (p == "b") "b2" else p }, now = 1_700_000_100_000, keep = setOf("coming"))
+        assertTrue(changed)
+        assertEquals(Vv(0, 1), m["a"]!!.vv)
+        assertEquals(Entry(9, 5, "b2", false, Vv(0, 2)), m["b"])
+        assertTrue(m["c"]!!.deleted && m["c"]!!.vv == Vv(0, 2))
+        assertEquals(Vv(0, 1), m["new"]!!.vv)
+        assertFalse(m["coming"]!!.deleted)
+    }
+
+    /** Two folders, random edits on both sides, then plan/apply in both directions until quiet. */
+    @Test
+    fun bothSidesConvergeAndNoEditIsLost() {
+        val random = Random(7)
+        val names = listOf("a.txt", "b.txt", "d/c.md", "d/e.md")
         repeat(300) { round ->
-            val local = Side(); val remote = Side()
-            names.take(3).forEach { local.files[it] = "v0-$it"; remote.files[it] = "v0-$it" }
-            var base = manifest(local, emptyMap())
-            val baseContents = local.files.values.toSet()
-            // Random edits on each side.
-            for (side in listOf(local, remote)) repeat(random.nextInt(4)) {
+            val desk = Folder(Side.DESK); val phone = Folder(Side.PHONE)
+            names.take(2).forEach { desk.files[it] = "v0-$it"; phone.files[it] = "v0-$it" }
+            desk.scan(); phone.scan()
+            sync(desk, phone)
+            val base = desk.files.values.toSet()
+            for (side in listOf(desk, phone)) repeat(random.nextInt(4)) {
                 val name = names.random(random)
-                clock++
-                when (random.nextInt(4)) {
-                    0, 1 -> { val c = "r$round-$clock"; side.files[name] = c; side.times[name] = clock }
-                    2 -> side.files.remove(name)
-                    else -> side.files.remove(name)?.let { c -> val to = "moved/$name"; side.files[to] = c; side.times[to] = clock }
+                when (random.nextInt(3)) {
+                    0, 1 -> side.files[name] = "r$round-${side.side}-${random.nextInt(1000)}"
+                    else -> side.files.remove(name)
                 }
+                side.clock++
             }
-            val edits = (local.files.values + remote.files.values).toSet() - baseContents
-            val (_, agreed) = sync(local, remote, base)
-            assertEquals("round $round converges", local.files, remote.files)
-            // No edit is lost: whatever either side wrote and still had is still somewhere.
-            assertTrue("round $round keeps every edit", local.files.values.containsAll(edits))
-            base = agreed
-            val (again, _) = sync(local, remote, base)
-            assertTrue("round $round: a second sync does nothing, got $again", again.isEmpty())
+            val edits = (desk.files.values + phone.files.values).toSet() - base
+            desk.scan(); phone.scan()
+            repeat(4) { sync(desk, phone) }
+            assertEquals("round $round converges", desk.files, phone.files)
+            assertTrue("round $round keeps every edit", desk.files.values.containsAll(edits))
         }
     }
 
-    @Test
-    fun concurrentEditsKeepBothAndADeleteNeverBeatsAnEdit() {
-        val local = Side(sortedMapOf("n.txt" to "base")); val remote = Side(sortedMapOf("n.txt" to "base"))
-        val base = manifest(local, emptyMap())
-        local.files["n.txt"] = "phone"; local.times["n.txt"] = 10
-        remote.files["n.txt"] = "desk"; remote.times["n.txt"] = 20
-        val (ops, _) = sync(local, remote, base)
-        val conflict = ops.single() as Op.Conflict
-        assertFalse(conflict.keepLocal)
-        assertEquals("desk", local.files["n.txt"])
-        assertTrue(conflict.copyName.startsWith("n (conflict from phone ") && conflict.copyName.endsWith(").txt"))
-        assertEquals("phone", remote.files[conflict.copyName])
+    private class Folder(val side: Side) {
+        val files = sortedMapOf<String, String>()
+        val manifest = mutableMapOf<String, Entry>()
+        var clock = 1_700_000_000_000L
 
-        val l2 = Side(sortedMapOf("k.txt" to "x")); val r2 = Side(sortedMapOf("k.txt" to "x"))
-        val b2 = manifest(l2, emptyMap())
-        l2.files.remove("k.txt")
-        r2.files["k.txt"] = "edited"; r2.times["k.txt"] = 5
-        sync(l2, r2, b2)
-        assertEquals("edited", l2.files["k.txt"])
+        fun scan() {
+            FolderSync.applyScan(side, manifest, files.mapValues { (_, c) -> Stat(c.length.toLong(), c.hashCode().toLong()) }, { sha(files.getValue(it)) }, clock)
+        }
+    }
+
+    private fun sync(desk: Folder, phone: Folder) {
+        // The phone acts on the desk's manifest, then the desk on the phone's (as they would exchange them).
+        apply(phone, desk)
+        phone.scan()
+        apply(desk, phone)
+        desk.scan()
+    }
+
+    private fun apply(here: Folder, there: Folder) {
+        for (step in FolderSync.plan(here.side, here.manifest, there.manifest, "phone")) when (step) {
+            is Step.Take -> here.manifest[step.path] = step.entry
+            is Step.Bump -> here.manifest[step.path] = here.manifest.getValue(step.path).copy(vv = step.vv)
+            is Step.Delete -> { here.files.remove(step.path); here.manifest[step.path] = step.entry }
+            is Step.Download -> place(here, step.path, there.files[step.path] ?: continue, step.entry)
+            is Step.Move -> { here.files.remove(step.from); here.manifest[step.from] = step.tombstone; place(here, step.to, there.files[step.to] ?: continue, step.entry) }
+            is Step.Copy -> place(here, step.to, there.files[step.to] ?: continue, step.entry)
+            is Step.Rename -> here.files.remove(step.from)?.let { here.files[step.to] = it }
+            is Step.Conflict -> Unit
+        }
+    }
+
+    private fun place(here: Folder, path: String, content: String, entry: Entry) {
+        if (sha(content) != entry.sha256) return // changed meanwhile: the next round settles it
+        here.files[path] = content
+        here.manifest[path] = entry.copy(size = content.length.toLong(), mtime = content.hashCode().toLong())
     }
 
     @Test
-    fun aMoveIsARenameNotATransfer() {
-        val local = Side(sortedMapOf("old.jpg" to "pixels")); val remote = Side(sortedMapOf("old.jpg" to "pixels"))
-        val base = manifest(local, emptyMap())
-        local.files["new.jpg"] = local.files.remove("old.jpg")!!
-        val (ops, _) = sync(local, remote, base)
-        assertEquals(listOf(Op.RenameThere("old.jpg", "new.jpg")), ops)
-    }
-
-    @Test
-    fun oneWayMirrorsButNeverDeletesWhatTheSourceNeverHad() {
-        val local = Side(sortedMapOf("mine.txt" to "phone only")); val remote = Side(sortedMapOf("desk.txt" to "d"))
-        sync(local, remote, emptyMap(), Mode.DESK_TO_PHONE)
-        assertEquals("phone only", local.files["mine.txt"])
-        assertEquals("d", local.files["desk.txt"])
-    }
-
-    @Test
-    fun pathsAreBoundedAndSafe() {
+    fun pathsAndIgnoresFollowP2AndP5() {
         assertTrue(FolderSync.validRelpath("Photos/2026/a.jpg"))
         listOf("", "/abs", "a/../b", "a/./b", "a//b", "a\\b", "a/\u0000b", "x".repeat(FolderSync.MAX_SEGMENT_BYTES + 1))
             .forEach { assertFalse(it, FolderSync.validRelpath(it)) }
         assertFalse(FolderSync.validRelpath(List(FolderSync.MAX_DEPTH + 1) { "d" }.joinToString("/")))
-        assertFalse(FolderSync.validRelpath(List(20) { "y".repeat(250) }.joinToString("/")))
-        assertTrue(FolderSync.ignored("project/node_modules/x.js"))
-        assertTrue(FolderSync.ignored(".git/HEAD"))
-        assertTrue(FolderSync.ignored("a/download.crdownload"))
-        assertTrue(FolderSync.ignored("a/.hidden"))
+        assertFalse(FolderSync.validRelpath(List(5) { "y".repeat(250) }.joinToString("/")))
+        listOf("p/node_modules/x.js", ".git/HEAD", "a/b.part", "a/b.tmp", "a/b~", "a/.desklink-1.tmp", "a/.hidden").forEach { assertTrue(it, FolderSync.ignored(it, false)) }
         assertFalse(FolderSync.ignored("a/.hidden", includeHidden = true))
-        assertFalse(FolderSync.ignored("docs/report.pdf"))
-        val long = FolderSync.conflictName("d/" + "s".repeat(250) + ".txt", "desk", 0)
+        assertFalse(FolderSync.ignored("docs/report.pdf", false))
+        val long = FolderSync.conflictName("d/" + "s".repeat(250) + ".txt", "Pixel", 0)
         assertTrue(long.substringAfter('/').toByteArray().size <= FolderSync.MAX_SEGMENT_BYTES)
-        assertTrue(long.endsWith(").txt"))
+        assertTrue(long.endsWith(" (conflict from Pixel 1970-01-01).txt"))
     }
 
-    @Test
-    fun tombstonesExpire() {
-        val day = 24 * 3600 * 1000L
-        val entries = mapOf("a" to Entry("a", 0, 0, null, deleted = true), "b" to Entry("b", 1, 0, "x"))
-        assertEquals(setOf("b"), FolderSync.prune(entries, FolderSync.TOMBSTONE_DAYS * day + 1).keys)
-    }
 }
+
+private fun sha(text: String) = MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }

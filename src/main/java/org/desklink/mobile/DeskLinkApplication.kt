@@ -141,7 +141,7 @@ class DeskLinkApplication : Application() {
         // Automations (F7) and synced folders (F8): read once off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute {
             org.desklink.mobile.plugins.automations.Automations.rules(this)
-            org.desklink.mobile.plugins.folders.FolderPairs.all(this)
+            org.desklink.mobile.plugins.folders.FolderEngine.start(this)
         }
 
         if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

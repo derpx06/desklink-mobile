@@ -368,4 +368,20 @@ class WebRtcFileProtocolTest {
         encoded.fill(0)
         assertTrue(decoded.data.contentEquals("abc".toByteArray()))
     }
+
+    /** F8 P4: a synced file's offer carries its pair, path and mtime; its path must be safe and end in the filename. */
+    @Test
+    fun syncedFileOffersCarryAValidFolderAndPath() {
+        val synced = offer().copy(filename = "a.txt", folder = "pair-1", relpath = "docs/a.txt", mtime = 5)
+        synced.validate(wire)
+        val back = WebRtcFileControl.fromJson(JSONObject(synced.toJson().toString()))
+        assertEquals("pair-1", back.folder)
+        assertEquals("docs/a.txt", back.relpath)
+        assertEquals(5L, back.mtime)
+        assertRejected(synced.copy(relpath = "docs/b.txt"))
+        assertRejected(synced.copy(relpath = "../a.txt"))
+        assertRejected(synced.copy(folder = "bad/id"))
+        assertRejected(synced.copy(folder = null))
+        assertTrue(!offer().toJson().has("relpath"))
+    }
 }

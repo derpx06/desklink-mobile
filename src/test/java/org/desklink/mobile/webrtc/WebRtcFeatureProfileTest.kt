@@ -29,6 +29,7 @@ class WebRtcFeatureProfileTest {
                 "desklink.digitizer",
                 "desklink.digitizer.session",
                 "desklink.findmyphone.request",
+                "desklink.folders",
                 "desklink.handoff",
                 "desklink.lock",
                 "desklink.lock.request",
@@ -137,6 +138,7 @@ class WebRtcFeatureProfileTest {
     private companion object {
         val ALL_PACKET_TYPES = setOf(
             DeskLinkProtocol.PACKET_TYPE_AUTOMATIONS,
+            DeskLinkProtocol.PACKET_TYPE_FOLDERS,
             DeskLinkProtocol.PACKET_TYPE_BATTERY,
             DeskLinkProtocol.PACKET_TYPE_CLIPBOARD,
             DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT,

@@ -52,6 +52,10 @@ data class WebRtcFileControl(
     val mimeType: String? = null,
     /** F3 (I1): the capture this file answers, on its Offer. */
     val captureId: String? = null,
+    /** F8 P4: a synced file on its Offer: the pair id, its path in the pair, and its mtime (ms). */
+    val folder: String? = null,
+    val relpath: String? = null,
+    val mtime: Long? = null,
 ) {
     fun validate(wire: WebRtcWireBinding) {
         require(protocolVersion == VERSION) { "Unsupported DeskLink WebRTC file version" }
@@ -84,6 +88,13 @@ data class WebRtcFileControl(
             require(totalSize != null && sha256 != null && offset == 0L) {
                 "Malformed DeskLink WebRTC file offer"
             }
+            if (folder != null || relpath != null) {
+                require(
+                    folder != null && folder.length in 1..64 && folder.all { it.isLetterOrDigit() && it.code < 128 || it == '-' } &&
+                        relpath != null && org.desklink.mobile.plugins.folders.FolderSync.validRelpath(relpath) &&
+                        relpath.substringAfterLast('/') == filename,
+                ) { "Malformed DeskLink synced file offer" }
+            }
         }
         require(error == null || error.length <= 4096) { "Oversized DeskLink WebRTC file error" }
     }
@@ -107,6 +118,9 @@ data class WebRtcFileControl(
             clipboard?.let { value.put("clipboard", it) }
             mimeType?.let { value.put("mimeType", it) }
             captureId?.let { value.put("captureId", it) }
+            folder?.let { value.put("folder", it) }
+            relpath?.let { value.put("relpath", it) }
+            mtime?.let { value.put("mtime", it) }
         }
 
     companion object {
@@ -138,6 +152,9 @@ data class WebRtcFileControl(
             clipboard = value.optBoolean("clipboard").takeIf { value.has("clipboard") },
             mimeType = value.optString("mimeType").takeIf(String::isNotEmpty)?.take(128),
             captureId = value.optString("captureId").takeIf(String::isNotEmpty)?.take(64),
+            folder = value.optString("folder").takeIf(String::isNotEmpty),
+            relpath = value.optString("relpath").takeIf(String::isNotEmpty),
+            mtime = value.optLong("mtime").takeIf { value.has("mtime") },
         )
     }
 }

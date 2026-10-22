@@ -699,25 +699,34 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <!-- F8: synced folders -->
     <string name="folders_title">Synced folders</string>
     <string name="folders_subtitle">Folders on this phone kept in step with %1$s</string>
-    <string name="folders_pending">Folders you add here are scanned on this phone. They start syncing once %1$s\'s DeskLink supports folder sync.</string>
-    <string name="folders_mode">Direction</string>
-    <string name="folders_mode_two_way">Both ways with %1$s</string>
-    <string name="folders_mode_desk_to_phone">From %1$s to this phone</string>
-    <string name="folders_mode_phone_to_desk">From this phone to %1$s</string>
+    <string name="folders_state">Sync</string>
     <string name="folders_wifi_only">Only on Wi-Fi</string>
     <string name="folders_charging_only">Only while charging</string>
     <string name="folders_hidden">Include hidden files</string>
-    <string name="folders_scan">Scan now</string>
-    <string name="folders_scanning">Scanning…</string>
-    <string name="folders_never_scanned">Not scanned yet</string>
-    <string name="folders_scanned">%1$d files, %2$s · %3$s</string>
-    <string name="folders_scan_failed">Could not read the folder</string>
+    <string name="folders_scanning">Looking for changes…</string>
     <string name="folders_grant_lost">DeskLink can no longer open this folder. Remove it and add it again</string>
     <string name="folders_remove">Stop syncing this folder</string>
     <string name="folders_add">Add a folder</string>
     <string name="folders_add_failed">Android did not let DeskLink keep access to that folder</string>
-    <string name="folders_full">Too many synced folders (20 at most)</string>
-    <string name="folders_blocked">Android doesn\'t let apps pick the whole storage, Download or Android/data: choose a folder inside them, such as Download/Desk or DCIM/Camera.</string>
+    <string name="folders_full">Too many synced folders (8 at most)</string>
+    <string name="folders_blocked">Android doesn\'t let apps pick the whole storage, Download or Android/data: choose a folder inside them, such as Download/Desk or DCIM/Camera. Files stay where they are when you stop syncing.</string>
+    <string name="folders_offers">%1$s wants to sync</string>
+    <string name="folders_offer_pick">Choose a folder on this phone for it</string>
+    <string name="folders_offer_decline">Not “%1$s”</string>
+    <string name="folders_offer_title">%1$s wants to sync “%2$s”</string>
+    <string name="folders_offer_text">Tap to choose a folder on this phone</string>
+    <string name="folders_phase_waiting">Waiting for %1$s</string>
+    <string name="folders_phase_not_on_desk">Not set up on %1$s: paused</string>
+    <string name="folders_phase_offered">Asked %1$s to choose its folder</string>
+    <string name="folders_phase_wifi">Paused until Wi-Fi</string>
+    <string name="folders_phase_charging">Paused until charging</string>
+    <string name="folders_phase_too_many">Too many files: the first 20,000 are synced</string>
+    <string name="folders_phase_up_to_date">Up to date · %1$d files · %2$s</string>
+    <string name="folders_phase_up_to_date_now">Up to date · %1$d files</string>
     <string name="more_folders">Synced folders</string>
     <string name="more_folders_summary">Keep phone folders in step with the computer</string>
+    <plurals name="folders_phase_syncing">
+        <item quantity="one">Syncing %1$d file…</item>
+        <item quantity="other">Syncing %1$d files…</item>
+    </plurals>
 </resources>

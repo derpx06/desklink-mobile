@@ -47,6 +47,9 @@ class WebRtcFileTransferManager(
         check(mkdirs() || isDirectory) { "Could not create DeskLink transfer directory" }
     }
     private val active = ConcurrentHashMap<String, ActiveTransfer>()
+    /** Incoming synced files (F8 P4), by transfer id: never delivered as a share. */
+    private val folderOffers = ConcurrentHashMap<String, org.desklink.mobile.plugins.folders.FolderRef>()
+
     /** Incoming offers flagged as a clipboard image (contract C3), by transfer id. */
     private val clipboardOffers: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
@@ -202,6 +205,10 @@ class WebRtcFileTransferManager(
                         mimeType = packet.getStringOrNull("mimeType")
                             .takeIf { packet.getBoolean("clipboard", false) || packet.has("captureId") },
                         captureId = packet.getStringOrNull("captureId"),
+                        // F8: a synced file says which pair and where.
+                        folder = packet.getStringOrNull("folder"),
+                        relpath = packet.getStringOrNull("relpath"),
+                        mtime = packet.getLong("mtime", 0).takeIf { packet.has("mtime") },
                     ),
                 ),
             )
@@ -518,6 +525,17 @@ class WebRtcFileTransferManager(
                     previous.transferToken == message.transferToken,
             ) { "Incoming file offer does not match its checkpoint" }
         }
+        // F8 P4: a synced file is taken only when this phone asked for it, else refused.
+        if (message.folder != null) {
+            val ref = org.desklink.mobile.plugins.folders.FolderRef(message.folder, requireNotNull(message.relpath), message.mtime)
+            if (!org.desklink.mobile.plugins.folders.FolderEngine.accepts(wire.peerDeviceId, ref, checksum, totalSize)) {
+                runCatching {
+                    send(OutboundWebRtcFileMessage.Control(controlFor(wire, WebRtcFileAction.ERROR, id, message.transferToken, error = "folder-refused")))
+                }
+                throw IllegalArgumentException("folder-refused")
+            }
+            folderOffers[id] = ref
+        }
         val partial = partialFile(id)
         val offset = if (previous != null) {
             verifiedOffset(partial, previous.offset)
@@ -631,6 +649,18 @@ class WebRtcFileTransferManager(
             }
             throw IllegalArgumentException(problem)
         }
+        folderOffers.remove(checkpoint.transferId)?.let { ref ->
+            // F8: placed into the synced folder (the engine takes the file), never a share.
+            checkpointStore.remove(checkpoint.transferId)
+            active.remove(checkpoint.transferId, receiver)
+            org.desklink.mobile.plugins.folders.FolderEngine.arrived(receiver.wire.peerDeviceId, ref, partial, requireNotNull(checkpoint.sha256), checkpoint.totalSize)
+            send(
+                OutboundWebRtcFileMessage.Control(
+                    control(receiver.wire, WebRtcFileAction.COMPLETE, checkpoint.copy(offset = checkpoint.totalSize, state = "completed"), sha256 = checkpoint.sha256, offset = checkpoint.totalSize),
+                ),
+            )
+            return
+        }
         val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
             this["filename"] = requireNotNull(checkpoint.filename)
             this["sha256"] = requireNotNull(checkpoint.sha256)
@@ -679,6 +709,7 @@ class WebRtcFileTransferManager(
 
     private fun discardReceive(transferId: String) {
         clipboardOffers.remove(transferId)
+        folderOffers.remove(transferId)
         partialFile(transferId).delete()
         checkpointStore.remove(transferId)
     }

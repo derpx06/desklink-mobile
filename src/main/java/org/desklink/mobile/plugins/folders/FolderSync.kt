@@ -8,166 +8,208 @@ package org.desklink.mobile.plugins.folders
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
-/** One file in a synced folder's manifest (F8): its path under the pair root and what it holds. */
-data class Entry(
-    val relpath: String,
-    val size: Long,
-    val mtime: Long,
-    /** Lowercase hex SHA-256, or null before it was hashed. */
-    val sha256: String?,
-    /** A tombstone: deleted at [mtime]. */
-    val deleted: Boolean = false,
-) {
-    /** Same contents (or both gone): by hash when both have one, else by size and time. */
-    fun sameAs(other: Entry?): Boolean = when {
-        other == null -> false
-        deleted || other.deleted -> deleted && other.deleted
-        sha256 != null && other.sha256 != null -> sha256 == other.sha256
-        else -> size == other.size && mtime == other.mtime
-    }
+enum class Side { DESK, PHONE }
+
+/** P2 version vector: each side bumps its own counter on a local change. */
+data class Vv(val desk: Long = 0, val phone: Long = 0) {
+    fun dominates(other: Vv) = desk >= other.desk && phone >= other.phone && this != other
+    fun max(other: Vv) = Vv(maxOf(desk, other.desk), maxOf(phone, other.phone))
+    fun bumped(side: Side) = if (side == Side.DESK) copy(desk = desk + 1) else copy(phone = phone + 1)
 }
 
-enum class Mode { TWO_WAY, DESK_TO_PHONE, PHONE_TO_DESK }
+/** P2: one path's state. A tombstone has `deleted`, size 0 and no hash. */
+data class Entry(val size: Long, val mtime: Long, val sha256: String, val deleted: Boolean = false, val vv: Vv = Vv())
 
-/** What one side must do so both folders agree. */
-sealed interface Op {
-    val relpath: String
+/** A local file's size and time, from a scan. */
+data class Stat(val size: Long, val mtime: Long)
 
-    data class Upload(override val relpath: String) : Op
-    data class Download(override val relpath: String) : Op
-    data class DeleteHere(override val relpath: String) : Op
-    data class DeleteThere(override val relpath: String) : Op
-    /** Detected by hash: a delete plus a create of the same contents. */
-    data class RenameHere(val from: String, override val relpath: String) : Op
-    data class RenameThere(val from: String, override val relpath: String) : Op
-    /** Both changed: the newer keeps the name, the other is kept as [copyName] on both sides. */
-    data class Conflict(override val relpath: String, val keepLocal: Boolean, val copyName: String) : Op
+/** One step of a plan, for the side that made it (P3). */
+sealed interface Step {
+    /** Record the other side's entry (a tombstone, or the same content). */
+    data class Take(val path: String, val entry: Entry) : Step
+    /** Remove the local file; record [entry] (a tombstone). */
+    data class Delete(val path: String, val entry: Entry) : Step
+    data class Download(val path: String, val entry: Entry) : Step
+    /** A local file the plan deletes has the content to fetch. */
+    data class Move(val from: String, val to: String, val entry: Entry, val tombstone: Entry) : Step
+    /** Another local file has the content to fetch. */
+    data class Copy(val from: String, val to: String, val entry: Entry) : Step
+    /** Ours wins a concurrent change: our entry gets [vv], so the other side takes it. */
+    data class Bump(val path: String, val vv: Vv) : Step
+    /** The phone's own version moves aside under the conflict name. */
+    data class Rename(val from: String, val to: String) : Step
+    /** The desk lists a conflict (the phone acts). */
+    data class Conflict(val path: String, val copy: String) : Step
 }
 
 /**
- * F8's pure half: path rules, ignore rules and the three-way manifest diff (local, remote, and
- * the last agreed state). Deletes are tombstones kept [TOMBSTONE_DAYS]; a deletion never beats a
- * concurrent edit; renames are found by hash.
+ * F8's pure half, the desk's `folders.rs` rule for rule: paths, ignores, scans folded into the
+ * manifest, and the plan. Both sides compute the same outcome; in a both-edited conflict only the
+ * phone acts (renames its own version, takes the desk's).
  */
 object FolderSync {
-    /** Files in one pair: a manifest stays a few MB, and the first scan bounded. */
+    /** P1: pairs per phone. */
+    const val MAX_PAIRS = 8
+    /** P2: entries per pair. */
     const val MAX_FILES = 20_000
-
-    /** Directory depth under the pair root. */
     const val MAX_DEPTH = 32
-
-    /** One path component, as the file protocol's `validateFilename` counts it. */
     const val MAX_SEGMENT_BYTES = 255
-
-    /** A whole relpath. */
-    const val MAX_RELPATH_BYTES = 4096
-
-    /** One file: larger ones are listed as skipped, never transferred by sync. */
+    const val MAX_RELPATH_BYTES = 1024
+    /** P5: larger files are skipped. */
     const val MAX_FILE_BYTES = 4L * 1024 * 1024 * 1024
-
-    /** Synced pairs per phone. */
-    const val MAX_PAIRS = 20
-
+    const val MAX_NAME_CHARS = 80
+    /** P2: one manifest packet, and parts per manifest. */
+    const val PACKET_BUDGET = 96 * 1024
+    const val MAX_PARTS = 256
+    /** P4. */
+    const val REQUEST_PATHS = 64
+    const val MAX_OUTSTANDING = 256
     const val TOMBSTONE_DAYS = 30L
 
-    /** Never synced: tools' and editors' private files. Hidden files too unless asked for. */
-    private val IGNORED_NAMES = setOf(".git", "node_modules", ".DS_Store", "Thumbs.db", ".thumbnails", ".trashed")
-    private val IGNORED_SUFFIXES = listOf(".tmp", ".part", ".crdownload", ".swp", "~")
+    fun validSegment(s: String) =
+        s.isNotEmpty() && s != "." && s != ".." && s.toByteArray().size <= MAX_SEGMENT_BYTES && '/' !in s && '\\' !in s && '\u0000' !in s
 
-    /** Each segment as `validateFilename` wants it, and bounded depth and length. */
+    /** P2 / file protocol `validate_relpath`. */
     fun validRelpath(relpath: String): Boolean {
-        if (relpath.isEmpty() || relpath.toByteArray().size > MAX_RELPATH_BYTES || relpath.startsWith("/")) return false
+        if (relpath.isEmpty() || relpath.toByteArray().size > MAX_RELPATH_BYTES) return false
         val segments = relpath.split('/')
-        return segments.size <= MAX_DEPTH && segments.all { s ->
-            s.isNotEmpty() && s != "." && s != ".." && s.toByteArray().size <= MAX_SEGMENT_BYTES &&
-                '\\' !in s && s.none { it.isISOControl() }
-        }
+        return segments.size <= MAX_DEPTH && segments.all(::validSegment)
     }
 
-    fun ignored(relpath: String, includeHidden: Boolean = false): Boolean = relpath.split('/').any { s ->
-        s in IGNORED_NAMES || IGNORED_SUFFIXES.any(s::endsWith) || (!includeHidden && s.startsWith("."))
+    /** P5. */
+    fun ignored(path: String, includeHidden: Boolean): Boolean = path.split('/').any { s ->
+        s == ".git" || s == "node_modules" || s.startsWith(".desklink") || s.endsWith(".tmp") || s.endsWith(".part") ||
+            s.endsWith("~") || (!includeHidden && s.startsWith("."))
     }
 
-    /** "name (conflict from realme 2026-10-22).ext", next to the original. */
-    fun conflictName(relpath: String, from: String, at: Long): String {
-        val slash = relpath.lastIndexOf('/')
-        val dir = relpath.substring(0, slash + 1)
-        val name = relpath.substring(slash + 1)
-        val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
-        val day = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(at))
-        val who = from.filter { it.isLetterOrDigit() || it == ' ' || it == '-' }.take(40).ifBlank { "other device" }
-        val suffix = " (conflict from $who $day)"
-        // Keep the segment within its byte bound by shortening the stem.
-        var stem = name.substring(0, dot)
-        val ext = name.substring(dot)
-        while (stem.isNotEmpty() && (stem + suffix + ext).toByteArray().size > MAX_SEGMENT_BYTES) stem = stem.dropLast(1)
-        return dir + stem + suffix + ext
+    /** `<stem> (conflict from <phone> <YYYY-MM-DD>)<.ext>` beside [path]; the date is [mtime]'s, UTC. */
+    fun conflictName(path: String, phone: String, mtime: Long): String {
+        val slash = path.lastIndexOf('/')
+        val dir = path.substring(0, slash + 1)
+        val name = path.substring(slash + 1)
+        val dot = name.lastIndexOf('.')
+        val (stem0, ext) = if (dot > 0 && name.length - dot - 1 <= 16) name.substring(0, dot) to name.substring(dot) else name to ""
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }
+            .format(Date(Math.floorDiv(mtime, 1000L) * 1000L))
+        val who = phone.filter { it != '/' && it != '\\' && it != '\u0000' && !it.isISOControl() }.takeCodePoints(40)
+        val suffix = " (conflict from $who $date)$ext"
+        var stem = stem0
+        while (stem.isNotEmpty() && (stem + suffix).toByteArray().size > MAX_SEGMENT_BYTES) stem = stem.dropLast(1)
+        return dir + stem + suffix
     }
 
-    /**
-     * The three-way diff. [base] is what both sides last agreed on (by relpath); [local] and
-     * [remote] are the current manifests: each side turns a file missing since [base] into a
-     * tombstone. [remoteName]/[localName] name the conflict copies.
-     */
-    fun diff(base: Map<String, Entry>, local: Map<String, Entry>, remote: Map<String, Entry>, mode: Mode, remoteName: String, localName: String): List<Op> {
-        val ops = mutableListOf<Op>()
-        for (path in (base.keys + local.keys + remote.keys).toSortedSet()) {
-            val b = base[path]
-            val l = local[path]
-            val r = remote[path]
-            val lChanged = changed(b, l)
-            val rChanged = changed(b, r)
-            val lLive = l != null && !l.deleted
-            val rLive = r != null && !r.deleted
+    private fun String.takeCodePoints(n: Int) = if (codePointCount(0, length) <= n) this else substring(0, offsetByCodePoints(0, n))
+
+    /** P3: what [localSide] does with the other side's complete manifest. */
+    fun plan(localSide: Side, local: Map<String, Entry>, remote: Map<String, Entry>, phoneName: String): List<Step> {
+        val steps = mutableListOf<Step>()
+        for ((path, theirs) in remote.toSortedMap()) {
+            val ours = local[path]
             when {
-                (l != null && l.sameAs(r)) || (!lLive && !rLive) -> Unit
-                // One way: the source wins, but a file the source never had is never deleted.
-                mode == Mode.DESK_TO_PHONE -> if (rLive) ops += Op.Download(path) else if (r != null || b != null) ops += Op.DeleteHere(path)
-                mode == Mode.PHONE_TO_DESK -> if (lLive) ops += Op.Upload(path) else if (l != null || b != null) ops += Op.DeleteThere(path)
-                lChanged && !rChanged -> ops += if (lLive) Op.Upload(path) else Op.DeleteThere(path)
-                rChanged && !lChanged -> ops += if (rLive) Op.Download(path) else Op.DeleteHere(path)
-                // Both changed. A deletion never beats an edit.
-                !lLive -> ops += Op.Download(path)
-                !rLive -> ops += Op.Upload(path)
+                ours == null -> steps += if (theirs.deleted) Step.Take(path, theirs) else Step.Download(path, theirs)
+                ours.vv == theirs.vv -> Unit
+                theirs.vv.dominates(ours.vv) -> {
+                    val same = ours.sha256 == theirs.sha256 && ours.deleted == theirs.deleted
+                    steps += when {
+                        same || (ours.deleted && theirs.deleted) -> Step.Take(path, theirs)
+                        theirs.deleted -> Step.Delete(path, theirs)
+                        else -> Step.Download(path, theirs)
+                    }
+                }
+                ours.vv.dominates(theirs.vv) -> Unit
                 else -> {
-                    val keepLocal = l!!.mtime > r!!.mtime || (l.mtime == r.mtime && (l.sha256 ?: "") > (r.sha256 ?: ""))
-                    val loserAt = if (keepLocal) r.mtime else l.mtime
-                    ops += Op.Conflict(path, keepLocal, conflictName(path, if (keepLocal) remoteName else localName, loserAt))
+                    val merged = ours.vv.max(theirs.vv)
+                    when {
+                        (ours.deleted && theirs.deleted) || (!ours.deleted && !theirs.deleted && ours.sha256 == theirs.sha256) ->
+                            steps += Step.Take(path, theirs.copy(vv = merged))
+                        // An edit beats a concurrent deletion.
+                        ours.deleted -> steps += Step.Download(path, theirs.copy(vv = merged))
+                        theirs.deleted -> steps += Step.Bump(path, merged.bumped(localSide))
+                        else -> {
+                            val phoneMtime = if (localSide == Side.DESK) theirs.mtime else ours.mtime
+                            val copy = conflictName(path, phoneName, phoneMtime)
+                            if (localSide == Side.DESK) {
+                                steps += Step.Conflict(path, copy)
+                            } else {
+                                steps += Step.Rename(path, copy)
+                                steps += Step.Download(path, theirs.copy(vv = merged.bumped(Side.DESK)))
+                            }
+                        }
+                    }
                 }
             }
         }
-        return renames(ops, base, local, remote)
+        return renamesByHash(local, steps)
     }
 
-    /** An entry differs from the agreed one (absent on both is no change). */
-    private fun changed(base: Entry?, now: Entry?): Boolean = when {
-        base == null -> now != null && !now.deleted
-        now == null -> false
-        else -> !now.sameAs(base)
-    }
-
-    /** A delete and an upload (or download) of the same contents become a rename. */
-    private fun renames(ops: List<Op>, base: Map<String, Entry>, local: Map<String, Entry>, remote: Map<String, Entry>): List<Op> {
-        val result = ops.toMutableList()
-        fun pair(isDelete: (Op) -> Boolean, isCreate: (Op) -> Boolean, contents: (String) -> String?, rename: (String, String) -> Op) {
-            val deletes = result.filter(isDelete).mapNotNull { op -> base[op.relpath]?.sha256?.let { it to op } }.groupBy({ it.first }, { it.second }).mapValues { it.value.toMutableList() }
-            for (create in result.filter(isCreate)) {
-                val sha = contents(create.relpath) ?: continue
-                val delete = deletes[sha]?.removeFirstOrNull() ?: continue
-                val at = result.indexOf(create)
-                result[at] = rename(delete.relpath, create.relpath)
-                result.remove(delete)
+    /** A download whose content a deleted (or kept) local file already has becomes a move (or a copy). */
+    private fun renamesByHash(local: Map<String, Entry>, steps: List<Step>): List<Step> {
+        val deletes = LinkedHashMap<String, Pair<String, Entry>>()
+        steps.filterIsInstance<Step.Delete>().forEach { d ->
+            local[d.path]?.takeIf { !it.deleted }?.let { deletes.putIfAbsent(it.sha256, d.path to d.entry) }
+        }
+        val changing = steps.mapNotNull {
+            when (it) {
+                is Step.Delete -> it.path
+                is Step.Download -> it.path
+                is Step.Rename -> it.from
+                else -> null
+            }
+        }.toSet()
+        val kept = HashMap<String, String>()
+        local.toSortedMap().forEach { (path, e) -> if (!e.deleted && path !in changing) kept[e.sha256] = path }
+        val moved = HashSet<String>()
+        val out = mutableListOf<Step>()
+        for (step in steps) {
+            if (step is Step.Download) {
+                val delete = deletes.remove(step.entry.sha256)
+                val from = kept[step.entry.sha256]
+                out += when {
+                    delete != null -> {
+                        moved += delete.first
+                        Step.Move(delete.first, step.path, step.entry, delete.second)
+                    }
+                    from != null -> Step.Copy(from, step.path, step.entry)
+                    else -> step
+                }
+            } else {
+                out += step
             }
         }
-        pair({ it is Op.DeleteThere }, { it is Op.Upload }, { local[it]?.sha256 }) { from, to -> Op.RenameThere(from, to) }
-        pair({ it is Op.DeleteHere }, { it is Op.Download }, { remote[it]?.sha256 }) { from, to -> Op.RenameHere(from, to) }
-        return result
+        return out.filterNot { it is Step.Delete && it.path in moved }
     }
 
-    /** Tombstones older than [TOMBSTONE_DAYS] are forgotten. */
-    fun prune(entries: Map<String, Entry>, now: Long): Map<String, Entry> {
+    /**
+     * Folds a scan into [manifest] for [side]: new or changed files bump its counter (hashing only
+     * what changed), vanished ones become tombstones, except [keep] (downloads on the way). Whether
+     * anything changed.
+     */
+    fun applyScan(side: Side, manifest: MutableMap<String, Entry>, found: Map<String, Stat>, hash: (String) -> String?, now: Long, keep: Set<String> = emptySet()): Boolean {
+        var changed = false
+        for ((path, stat) in found.toSortedMap()) {
+            val existing = manifest[path]
+            if (existing != null && !existing.deleted && existing.size == stat.size && existing.mtime == stat.mtime) continue
+            val sha = hash(path) ?: continue
+            when {
+                existing != null && !existing.deleted && existing.sha256 == sha -> manifest[path] = existing.copy(size = stat.size, mtime = stat.mtime)
+                existing != null -> manifest[path] = Entry(stat.size, stat.mtime, sha, false, existing.vv.bumped(side))
+                manifest.size >= MAX_FILES -> continue
+                else -> manifest[path] = Entry(stat.size, stat.mtime, sha, false, Vv().bumped(side))
+            }
+            changed = true
+        }
+        for ((path, entry) in manifest.entries.toList()) {
+            if (!entry.deleted && path !in found && path !in keep) {
+                manifest[path] = Entry(0, now, "", true, entry.vv.bumped(side))
+                changed = true
+            }
+        }
         val cutoff = now - TOMBSTONE_DAYS * 24 * 3600 * 1000
-        return entries.filterValues { !it.deleted || it.mtime > cutoff }
+        manifest.entries.removeAll { it.value.deleted && it.value.mtime <= cutoff }
+        return changed
     }
+
+    fun validSha(sha: String) = sha.length == 64 && sha.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
 }

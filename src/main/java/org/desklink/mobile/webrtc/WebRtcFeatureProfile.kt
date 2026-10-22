@@ -21,6 +21,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object WebRtcFeatureProfile {
     private val enabled = setOf(
+        // Folder sync (F8): both ways.
+        DeskLinkProtocol.PACKET_TYPE_FOLDERS,
         // Automations (F7): both ways.
         DeskLinkProtocol.PACKET_TYPE_AUTOMATIONS,
         DeskLinkProtocol.PACKET_TYPE_BATTERY,
