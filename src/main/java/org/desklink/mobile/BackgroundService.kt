@@ -228,9 +228,6 @@ class BackgroundService : Service() {
             this::onDeviceConnectionStateChanged,
         )
 
-        // F7: automation triggers (broadcasts and callbacks only, nothing polled).
-        org.desklink.mobile.plugins.automations.AutomationTriggers.start(this)
-
         // Register screen on listener
         val filter = IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) }
         // See: https://developer.android.com/reference/android/net/ConnectivityManager.html#CONNECTIVITY_ACTION

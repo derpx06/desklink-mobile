@@ -143,9 +143,6 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
         settings.edit { if (live != null) putString(KEY_LIVE_CALL, CallTracker.encode(live)) else remove(KEY_LIVE_CALL) }
         sendSnapshot()
         missed?.let { device.sendPacket(CallTracker.missedPacket(it, System.currentTimeMillis(), showCaller(context, device.deviceId))) }
-        // F7: "incoming call" / "missed call" automations (several desks report one call once).
-        if (line == LineState.RINGING) org.desklink.mobile.plugins.automations.Automations.fire(context, org.desklink.mobile.plugins.automations.Event("call", mapOf("state" to "incoming")))
-        if (missed != null) org.desklink.mobile.plugins.automations.Automations.fire(context, org.desklink.mobile.plugins.automations.Event("call", mapOf("state" to "missed")))
     }
 
     private fun sendSnapshot() {

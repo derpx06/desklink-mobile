@@ -97,10 +97,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Calls: mute the microphone on the desk's request (setMicrophoneMute needs it). -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <!-- F7: an automation's "Do Not Disturb" and silent ringer (granted in Settings), and "Write tag". -->
-    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
-    <uses-permission android:name="android.permission.NFC" />
-    <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <application
         android:icon="@mipmap/ic_launcher"
@@ -433,15 +429,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity-alias>
-        <!-- F7: automations. -->
-        <receiver
-            android:name="org.desklink.mobile.plugins.automations.AutomationAlarms$Receiver"
-            android:exported="false" />
-        <activity
-            android:name="org.desklink.mobile.plugins.automations.AutomationsActivity"
-            android:label="@string/automations_title"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
         <!-- F6: notes and snippets; "Save to DeskLink notes" in the share sheet. -->
         <activity
             android:name="org.desklink.mobile.plugins.notes.NotesActivity"

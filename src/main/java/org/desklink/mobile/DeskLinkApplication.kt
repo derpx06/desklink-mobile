@@ -155,9 +155,8 @@ class DeskLinkApplication : Application() {
         }
         // Snippets and notes (F6): opened and pruned off the main thread, before a screen asks.
         org.desklink.mobile.plugins.notes.NotesStore.preload(this)
-        // Automations (F7) and synced folders (F8): read once off the main thread.
+        // The Bucket's state: read once off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute {
-            org.desklink.mobile.plugins.automations.Automations.rules(this)
             org.desklink.mobile.plugins.folders.BucketEngine.start(this)
         }
 
