@@ -227,6 +227,11 @@ fun DeskLinkTheme(context: Context, content: @Composable () -> Unit) {
     DeskLinkMaterialTheme(deskLinkColorScheme(context, dark), if (dark) DarkTokens else LightTokens, content)
 }
 
+/** The theme with the light or dark palette chosen by the caller (the screenshot harness, previews). */
+@Composable
+fun DeskLinkFixedTheme(context: Context, dark: Boolean, content: @Composable () -> Unit) =
+    DeskLinkMaterialTheme(deskLinkColorScheme(context, dark), if (dark) DarkTokens else LightTokens, content)
+
 /** The always-dark scheme of the remote screen, whatever the phone's theme. */
 @Composable
 fun DeskLinkDarkTheme(context: Context, content: @Composable () -> Unit) =
