@@ -298,8 +298,10 @@ public class LanLinkProvider extends BaseLinkProvider {
      */
     @WorkerThread
     private void dialKnownAddresses() {
+        // Same rule as broadcasting: nothing is announced to, or dialed on, a network that is not trusted.
+        if (!TrustedNetworkHelper.isTrustedNetwork(context)) return;
         long now = android.os.SystemClock.elapsedRealtime();
-        for (LastLanAddress.Dial dial : LastLanAddress.INSTANCE.dialTargets(context, new java.util.HashSet<>(visibleDevices.keySet()), dialBackoff, now)) {
+        for (LastLanAddress.Dial dial : LastLanAddress.INSTANCE.dialTargets(context, new java.util.HashSet<>(visibleDevices.keySet()), dialBackoff, now, true)) {
             final String key = LastLanAddress.INSTANCE.key(dial);
             if (!dialsInFlight.add(key)) continue;
             ThreadHelper.execute(() -> {
@@ -308,7 +310,6 @@ public class LanLinkProvider extends BaseLinkProvider {
                     if (visibleDevices.containsKey(dial.getDeviceId())) return;
                     socket = SocketFactory.getDefault().createSocket();
                     socket.connect(new java.net.InetSocketAddress(dial.getAddress(), dial.getPort()), 3000);
-                    dialBackoff.succeeded(key);
                     configureSocket(socket);
                     NetworkPacket myIdentity = DeviceHelper.getDeviceInfo(context).toIdentityPacket();
                     myIdentity.set("targetDeviceId", dial.getDeviceId());
@@ -318,9 +319,12 @@ public class LanLinkProvider extends BaseLinkProvider {
                     out.flush();
                     identityPacketReceived(qrIdentity(dial.getDeviceId(), dial.getPort()), socket, LanLink.ConnectionStarted.Remotely,
                             TrustedDevices.isTrustedDevice(context, dial.getDeviceId()));
+                    // The pinned handshake finished (it throws otherwise): only now is the address good.
+                    dialBackoff.succeeded(key);
                 } catch (IOException | CertificateException | JSONException e) {
-                    // Not on the dead address's account: only a failed connect backs it off.
-                    if (socket != null && !socket.isConnected()) dialBackoff.failed(key, android.os.SystemClock.elapsedRealtime());
+                    // A host that refuses or times out, and one that accepts TCP but fails the pinned
+                    // handshake (another machine at that address), both wait before the next try.
+                    dialBackoff.failed(key, android.os.SystemClock.elapsedRealtime());
                     Log.i("DeskLink/LanLinkProvider", "Dial to a known address failed: " + e.getClass().getSimpleName());
                     if (socket != null) closeQuietly(socket);
                 } finally {
@@ -432,7 +436,6 @@ public class LanLinkProvider extends BaseLinkProvider {
             socket = SocketFactory.getDefault().createSocket();
             socket.connect(new java.net.InetSocketAddress(address, tcpPort), 3000);
             configureSocket(socket);
-            LastLanAddress.INSTANCE.remember(context, deviceId, address, tcpPort);
 
             DeviceInfo myDeviceInfo = DeviceHelper.getDeviceInfo(context);
             NetworkPacket myIdentity = myDeviceInfo.toIdentityPacket();
@@ -606,7 +609,9 @@ public class LanLinkProvider extends BaseLinkProvider {
             visibleDevices.put(deviceInfo.id, link);
             onConnectionReceived(link);
         }
-        LastLanAddress.INSTANCE.remember(context, deviceInfo.id, socket.getInetAddress());
+        // Remembered only now, after the pinned handshake proved who is at this address. The port is
+        // known when we dialed (it is the desk's listener); an accepted socket's port is not.
+        LastLanAddress.INSTANCE.remember(context, deviceInfo.id, socket.getInetAddress(), weDialed ? socket.getPort() : 0);
     }
 
     public LanLinkProvider(Context context) {
@@ -731,8 +736,10 @@ public class LanLinkProvider extends BaseLinkProvider {
 
             ArrayList<InetAddress> ipList = new ArrayList<>();
             // Paired desks with no link yet: also announce to where each was last reached.
-            for (InetAddress last : LastLanAddress.INSTANCE.targets(context, new java.util.HashSet<>(visibleDevices.keySet()))) {
-                if (!ipList.contains(last)) ipList.add(last);
+            if (TrustedNetworkHelper.isTrustedNetwork(context)) {
+                for (InetAddress last : LastLanAddress.INSTANCE.targets(context, new java.util.HashSet<>(visibleDevices.keySet()), TrustedNetworkHelper.isTrustedNetwork(context))) {
+                    if (!ipList.contains(last)) ipList.add(last);
+                }
             }
             for (DeviceHost host : hostList) {
                 try {

@@ -38,6 +38,12 @@ object LastLanAddress {
         if (after != before) prefs.edit { putString(KEY_LIST, AddressBook.encode(after)) }
     }
 
+    /** The numeric hosts a desk was last seen at (for telling a reinstalled machine from a different one). */
+    fun hostsOf(context: Context, deviceId: String): Set<String> {
+        val prefs = TrustedDevices.getDeviceSettings(context, deviceId)
+        return load(prefs.getString(KEY_LIST, null), prefs.getString(KEY, null)).map { it.host }.toSet()
+    }
+
     private fun load(list: String?, legacy: String?): List<Known> =
         AddressBook.decode(list).ifEmpty { legacy?.let { listOf(Known(it, 0)) } ?: emptyList() }
 
@@ -48,11 +54,12 @@ object LastLanAddress {
         }
 
     /** The paired desks' last addresses (announce targets), except those already linked. */
-    fun targets(context: Context, linked: Set<String>): List<InetAddress> = announceTargets(stored(context), linked)
+    fun targets(context: Context, linked: Set<String>, trustedNetwork: Boolean): List<InetAddress> =
+        if (trustedNetwork) announceTargets(stored(context), linked) else emptyList()
 
     /** The addresses to dial now: known port, not linked, and [backoff] allows it. */
-    fun dialTargets(context: Context, linked: Set<String>, backoff: DialBackoff, now: Long): List<Dial> =
-        dialTargets(stored(context), linked, backoff, now)
+    fun dialTargets(context: Context, linked: Set<String>, backoff: DialBackoff, now: Long, trustedNetwork: Boolean): List<Dial> =
+        if (trustedNetwork) dialTargets(stored(context), linked, backoff, now) else emptyList()
 
     /** Pure: numeric private addresses only (never a name to resolve), one per address. */
     fun announceTargets(stored: Map<String, List<Known>>, linked: Set<String>): List<InetAddress> =

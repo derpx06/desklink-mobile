@@ -156,10 +156,27 @@ object QrPairing {
             application.getDevice(code.desktopId)?.takeIf { it.isPaired && isSamePairing(fingerprint(it.certificate), code.fingerprint) }?.let {
                 error(application.getString(R.string.qr_error_already_paired, it.name))
             }
+            // The old record has to go before the new link can be pinned (its certificate would refuse
+            // the new one), so it is kept restorable: if the link or the proof fails, it comes back.
+            var backup: PairingBackup? = null
             conflictingPairing(application, code)?.let { existing ->
                 if (!replaceExisting) throw ReplacesPairing(existing.name)
+                backup = PairingBackup.capture(application, existing.deviceId)
                 existing.unpair()
             }
+            try {
+                connectAndProve(application, code, onProgress)
+            } catch (error: Throwable) {
+                backup?.let { it.restore(application); application.loadRememberedDevice(it.deviceId) }
+                throw error
+            }
+        } finally {
+            pendingDesktopId = null
+        }
+    }
+
+    private fun connectAndProve(application: DeskLinkApplication, code: Code, onProgress: (Stage) -> Unit) {
+        run {
             onProgress(Stage.CONNECTING)
             // QR v2: dial the desk's addresses ourselves (pinned to the code's fingerprint below),
             // no UDP hop. The announce-then-dial-back of v1 runs too, as the fallback.
@@ -182,8 +199,6 @@ object QrPairing {
             onProgress(Stage.VERIFYING)
             Log.i(TAG, "Sending QR pairing proof to ${code.desktopId}")
             device.pairingHandler.requestPairingWithProof(mac, device.certificate)
-        } finally {
-            pendingDesktopId = null
         }
     }
 

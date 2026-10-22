@@ -69,6 +69,13 @@ public class LanLink extends BaseLink {
 
     private volatile SSLSocket socket = null;
 
+    /** The address of the peer on the current socket, or null when there is none. */
+    @androidx.annotation.Nullable
+    public java.net.InetAddress getRemoteAddress() {
+        SSLSocket current = socket;
+        return current == null ? null : current.getInetAddress();
+    }
+
     /** Guards writes to {@link #socket}, which several threads share. */
     private final Object writeLock = new Object();
 

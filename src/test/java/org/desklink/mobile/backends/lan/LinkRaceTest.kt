@@ -57,4 +57,53 @@ class LinkRaceTest {
         assertTrue(race.arrive("desk-c", phone, weDialed = true, now = 100))
         assertEquals(1_000L, LinkRace.WINDOW_MS)
     }
+
+    /**
+     * The desk's `link_race` (DeskLink/src/device_links/core/session_link.rs), ported line for line:
+     * the phone must give the same answer for every arrival order, or the two sides close each other's socket.
+     */
+    private enum class Verdict { NOT_A_RACE, KEEP_INCUMBENT, REPLACE_INCUMBENT }
+
+    private fun deskLinkRace(incumbentDialedByUs: Boolean, ageMs: Long, newDialedByUs: Boolean, localId: String, peerId: String): Verdict {
+        if (incumbentDialedByUs == newDialedByUs || ageMs >= LinkRace.WINDOW_MS) return Verdict.NOT_A_RACE
+        val lowerDialerIsUs = localId < peerId
+        return if (incumbentDialedByUs == lowerDialerIsUs) Verdict.KEEP_INCUMBENT else Verdict.REPLACE_INCUMBENT
+    }
+
+    @Test
+    fun thePhoneAnswersExactlyLikeTheDeskForEveryArrivalOrderAndTheWindowEdges() {
+        for ((local, peer) in listOf("a" to "b", "b" to "a")) {
+            for (incumbentOurs in listOf(true, false)) for (newOurs in listOf(true, false)) for (age in listOf(0L, 10L, 200L, 999L, 1000L, 1500L)) {
+                // The phone is "local" here; "ours" means the phone dialed.
+                val race = LinkRace()
+                assertTrue(race.arrive(peer, local, weDialed = incumbentOurs, now = 0))
+                val keptNew = race.arrive(peer, local, weDialed = newOurs, now = age)
+                val desk = deskLinkRace(incumbentOurs, age, newOurs, local, peer)
+                assertEquals("local=$local incumbentOurs=$incumbentOurs newOurs=$newOurs age=$age", desk != Verdict.KEEP_INCUMBENT, keptNew)
+            }
+        }
+    }
+
+    @Test
+    fun bothSidesEndWithTheSameDialersLinkInEveryOrder() {
+        // Two links: one dialed by the desk ("a"), one by the phone ("b"). The desk sees them as (ours, theirs), the phone as (theirs, ours).
+        for ((deskId, phoneId) in listOf("a" to "b", "b" to "a")) for (deskDialedFirst in listOf(true, false)) {
+            val phoneRace = LinkRace()
+            val phoneKept = if (deskDialedFirst) {
+                phoneRace.arrive(deskId, phoneId, weDialed = false, now = 0)
+                if (phoneRace.arrive(deskId, phoneId, weDialed = true, now = 300)) "phone" else "desk"
+            } else {
+                phoneRace.arrive(deskId, phoneId, weDialed = true, now = 0)
+                if (phoneRace.arrive(deskId, phoneId, weDialed = false, now = 300)) "desk" else "phone"
+            }
+            // The desk's verdict on the same pair of links, in the same order (it sees the first link as incumbent).
+            val deskSurvivor = if (deskDialedFirst) {
+                if (deskLinkRace(true, 300, false, deskId, phoneId) == Verdict.REPLACE_INCUMBENT) "phone" else "desk"
+            } else {
+                if (deskLinkRace(false, 300, true, deskId, phoneId) == Verdict.REPLACE_INCUMBENT) "desk" else "phone"
+            }
+            assertEquals("desk=$deskId phone=$phoneId deskFirst=$deskDialedFirst", deskSurvivor, phoneKept)
+            assertEquals("the lower id's dial survives", if (deskId < phoneId) "desk" else "phone", phoneKept)
+        }
+    }
 }

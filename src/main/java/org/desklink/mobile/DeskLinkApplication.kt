@@ -375,36 +375,39 @@ class DeskLinkApplication : Application() {
 
     private fun loadRememberedDevicesFromSettings() {
         // Log.e("BackgroundService", "Loading remembered trusted devices")
-        val trustedDevices = TrustedDevices.getAllTrustedDevices(this)
-        trustedDevices.asSequence()
-            .onEach { Log.d("DeskLink", "Loading device $it") }
-            .forEach {
-                try {
-                    val device = Device(applicationContext, it)
-                    val now = Date()
-                    val x509Cert = device.certificate as X509Certificate
-                    if(now < x509Cert.notBefore) {
-                        throw CertificateException("Certificate not effective yet: "+x509Cert.notBefore)
-                    }
-                    else if(now > x509Cert.notAfter) {
-                        throw CertificateException("Certificate already expired: "+x509Cert.notAfter)
-                    }
-                    devices[it] = device
-                    device.addPairingCallback(devicePairingCallback)
-                } catch (e: CertificateException) {
-                    Log.w(
-                        "DeskLink",
-                        "Couldn't load the certificate for a remembered device. Removing from trusted list.", e
-                    )
-                    TrustedDevices.removeTrustedDevice(this, it)
-                }
+        TrustedDevices.getAllTrustedDevices(this).forEach(::loadRememberedDevice)
+    }
+
+    /** Loads the remembered device [it] from its saved settings (also used to put back a pairing a failed replace removed). */
+    fun loadRememberedDevice(it: String) {
+        Log.d("DeskLink", "Loading device $it")
+        try {
+            val device = Device(applicationContext, it)
+            val now = Date()
+            val x509Cert = device.certificate as X509Certificate
+            if (now < x509Cert.notBefore) {
+                throw CertificateException("Certificate not effective yet: " + x509Cert.notBefore)
+            } else if (now > x509Cert.notAfter) {
+                throw CertificateException("Certificate already expired: " + x509Cert.notAfter)
             }
+            devices[it] = device
+            device.addPairingCallback(devicePairingCallback)
+        } catch (e: CertificateException) {
+            Log.w(
+                "DeskLink",
+                "Couldn't load the certificate for a remembered device. Removing from trusted list.", e
+            )
+            TrustedDevices.removeTrustedDevice(this, it)
+        }
     }
 
     /** [fresh] was just paired: its offline twins (same name and model) are unpaired, with no prompt. */
     fun dropSupersededPairings(fresh: Device) {
-        fun entry(d: Device) = PairingReplacement.Entry(d.deviceId, d.name, d.deviceType.toString(), d.isPaired, d.isReachable)
-        PairingReplacement.superseded(entry(fresh), devices.values.map(::entry)).forEach { id ->
+        fun entry(d: Device, fresh: Boolean) = PairingReplacement.Entry(
+            d.deviceId, d.name, d.deviceType.toString(), d.isPaired, d.isReachable,
+            addresses = if (fresh) setOfNotNull(d.lanAddress) else org.desklink.mobile.backends.lan.LastLanAddress.hostsOf(this, d.deviceId),
+        )
+        PairingReplacement.superseded(entry(fresh, true), devices.values.filter { it !== fresh }.map { entry(it, false) }).forEach { id ->
             Log.i("DeskLink", "Replacing the offline pairing of a computer paired again under a new identity")
             devices[id]?.unpair()
         }
