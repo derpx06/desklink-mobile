@@ -22,6 +22,20 @@ internal class BoundedPendingQueue<T>(private val maximumSize: Int) {
         return evicted
     }
 
+    /**
+     * Like [offer], but when full it evicts the oldest item [disposable] allows (a status snapshot
+     * that a newer one replaces) before it evicts anything else, so something the person asked for
+     * is the last to go. Returns the evicted item, if any.
+     */
+    @Synchronized
+    fun offerPreferring(item: T, disposable: (T) -> Boolean): T? {
+        val evicted = if (items.size == maximumSize) {
+            (items.firstOrNull(disposable) ?: items.first).also { items.remove(it) }
+        } else null
+        items.addLast(item)
+        return evicted
+    }
+
     @Synchronized
     fun isEmpty(): Boolean = items.isEmpty()
 

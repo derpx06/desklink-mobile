@@ -24,8 +24,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import org.apache.commons.collections4.MultiValuedMap
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap
 import org.desklink.mobile.backends.BaseLink
@@ -193,7 +193,14 @@ class Device : PacketReceiver {
     private val pairingCallbacks = CopyOnWriteArrayList<PairingCallback>()
     private val pluginsChangedListeners = CopyOnWriteArrayList<PluginsChangedListener>()
 
-    private val sendChannel = Channel<NetworkPacketWithCallback>(64)
+    /** Interactive packets before bulk ones (contacts, file requests, manifests); a full lane is reported. */
+    private val outbound = OutboundQueue<NetworkPacketWithCallback>()
+
+    /** Files in flight (their own threads, [FILE_SENDS_IN_FLIGHT] at a time) and waiting; the rest are refused and reported. */
+    private val fileSendPool = java.util.concurrent.ThreadPoolExecutor(
+        FILE_SENDS_IN_FLIGHT, FILE_SENDS_IN_FLIGHT, 30, java.util.concurrent.TimeUnit.SECONDS,
+        java.util.concurrent.LinkedBlockingQueue(FILE_SENDS_WAITING),
+    ).apply { allowCoreThreadTimeOut(true) }
     private var sendCoroutine : Job? = null
 
     /** Pairing generation used to make local and remote unpair callbacks idempotent. */
@@ -560,7 +567,7 @@ class Device : PacketReceiver {
      * not fire long after the user gave up on it. Mirrors the desktop queue.
      */
     //
-    // Sends synchronously on the calling thread, never through `sendChannel`:
+    // Sends synchronously on the calling thread, never through the outbound queue:
     // a full 256-entry queue would overflow that 64-slot channel. Queued
     // packets never carry a payload, so nothing here blocks on file I/O.
     fun flushPendingFeaturePackets() = synchronized(sendOrderLock) {
@@ -747,11 +754,14 @@ class Device : PacketReceiver {
                     }
             }
 
-        synchronized(sendChannel) {
+        synchronized(outbound) {
             if (sendCoroutine == null) {
                 sendCoroutine = CoroutineScope(Dispatchers.IO).launch {
-                    for ((np, callback) in sendChannel) {
-                        sendPacketBlocking(np, callback)
+                    while (true) {
+                        val (np, callback) = runInterruptible { outbound.take() } ?: break
+                        // A file blocks until the peer has it, however long that takes: it runs on
+                        // its own threads so everything queued behind it keeps flowing.
+                        if (np.payload != null) sendFileAsync(np, callback) else sendPacketBlocking(np, callback)
                     }
                 }
             }
@@ -795,7 +805,7 @@ class Device : PacketReceiver {
         )
         if (links.isEmpty() && !hasActiveWebRtcFeatureTransport) {
             reloadPluginsFromSettings()
-            synchronized(sendChannel) {
+            synchronized(outbound) {
                 sendCoroutine?.cancel(CancellationException("Device disconnected"))
                 sendCoroutine = null
             }
@@ -1084,11 +1094,42 @@ class Device : PacketReceiver {
      * @param callback A callback for success/failure
      */
     @AnyThread
-    fun sendPacket(np: NetworkPacket, callback: SendPacketStatusCallback) {
-        val result = sendChannel.trySend(NetworkPacketWithCallback(np, callback))
-        if (result.isFailure) {
-            callback.onFailure(IllegalStateException("DeskLink outbound queue is full or closed"))
+    fun sendPacket(np: NetworkPacket, callback: SendPacketStatusCallback) = enqueue(np, callback, bulk = false)
+
+    /**
+     * A long batch (contacts, file share requests, manifest parts): served after everything
+     * interactive, in its own lane, so it can never delay a tap or a state change.
+     */
+    @AnyThread
+    fun sendBulk(np: NetworkPacket, callback: SendPacketStatusCallback = defaultCallback) = enqueue(np, callback, bulk = true)
+
+    private fun enqueue(np: NetworkPacket, callback: SendPacketStatusCallback, bulk: Boolean) {
+        if (!outbound.offer(NetworkPacketWithCallback(np, callback), bulk)) reportNotSent(callback, "outbound queue is full")
+    }
+
+    private var lastNotSentToastAt = 0L
+
+    private fun sendFileAsync(np: NetworkPacket, callback: SendPacketStatusCallback) {
+        try {
+            fileSendPool.execute { sendPacketBlocking(np, callback) }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            np.payload?.close()
+            reportNotSent(callback, "too many files are waiting to send")
         }
+    }
+
+    /**
+     * A packet was refused or dropped for lack of room: the sender's callback always hears of it, and
+     * the person is told (at most once every few seconds) when it was something they asked for.
+     */
+    private fun reportNotSent(callback: SendPacketStatusCallback, why: String) {
+        callback.onFailure(IllegalStateException("DeskLink did not send a packet: $why"))
+        if (callback !is UserActionCallback) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastNotSentToastAt < NOT_SENT_TOAST_INTERVAL_MS) return
+        lastNotSentToastAt = now
+        val message = context.getString(R.string.outbound_not_sent, name)
+        expiryHandler.post { android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show() }
     }
 
     @AnyThread
@@ -1213,10 +1254,8 @@ class Device : PacketReceiver {
                 // One check, pushed back by each new packet: at most one toast per outage.
                 expiryHandler.removeCallbacks(expireTask)
                 expiryHandler.postDelayed(expireTask, PENDING_FEATURE_MAX_AGE_MS + 1_000)
-                pendingFeaturePackets.offer(QueuedFeature(np, callback))?.let { dropped ->
-                    dropped.callback.onFailure(
-                        IllegalStateException("DeskLink dropped queued ${dropped.packet.type}: queue full"),
-                    )
+                pendingFeaturePackets.offerPreferring(QueuedFeature(np, callback)) { it.callback !is UserActionCallback }?.let { dropped ->
+                    reportNotSent(dropped.callback, "${dropped.packet.type}: the offline queue is full")
                 }
                 // Close the race with a transport that became ready between the
                 // check above and the offer.
@@ -1241,10 +1280,8 @@ class Device : PacketReceiver {
                 // coordinator lock, which a flush may already hold (deadlock).
                 synchronized(sendOrderLock) {
                     if (!pendingFeaturePackets.isEmpty()) {
-                        pendingFeaturePackets.offer(QueuedFeature(np, callback))?.let { dropped ->
-                            dropped.callback.onFailure(
-                                IllegalStateException("DeskLink dropped queued ${dropped.packet.type}: queue full"),
-                            )
+                        pendingFeaturePackets.offerPreferring(QueuedFeature(np, callback)) { it.callback !is UserActionCallback }?.let { dropped ->
+                            reportNotSent(dropped.callback, "${dropped.packet.type}: the offline queue is full")
                         }
                         flushPendingFeaturePackets()
                         return true
@@ -1515,6 +1552,13 @@ internal fun expiredUserActions(callbacks: Collection<Device.SendPacketStatusCal
 
 /** Queued features older than this are failed, not sent. Matches the desktop. */
 internal const val PENDING_FEATURE_MAX_AGE_MS = 30_000L
+
+/** At most one "not sent" notice this often. */
+internal const val NOT_SENT_TOAST_INTERVAL_MS = 5_000L
+
+/** Files being sent to one desk at once, and files waiting for a free slot. */
+internal const val FILE_SENDS_IN_FLIGHT = 2
+internal const val FILE_SENDS_WAITING = 256
 
 internal fun shouldRejectPairedLanFeaturePacket(
     fromWebRtc: Boolean,

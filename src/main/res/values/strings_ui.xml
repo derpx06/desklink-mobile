@@ -435,6 +435,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="one">%2$s was offline: %1$d action was not sent</item>
         <item quantity="other">%2$s was offline: %1$d actions were not sent</item>
     </plurals>
+    <string name="outbound_not_sent">%1$s is busy: an action was not sent. Try again in a moment.</string>
     <string name="transfer_resuming">%1$s is paused. It continues when %2$s is back.</string>
     <string name="home_transfer_resuming">Resumes when back</string>
     <string name="qr_progress_connecting">Connecting to the computer…</string>

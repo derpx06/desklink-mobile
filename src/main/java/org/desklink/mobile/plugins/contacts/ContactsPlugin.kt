@@ -137,7 +137,7 @@ class ContactsPlugin : Plugin() {
             Log.w(TAG, "Could not read contacts", it)
             return
         }
-        ContactsBook.vcardPackets(cards.associate { it.uid to ContactsBook.vcard(it) }).forEach { device.sendPacket(it) }
+        ContactsBook.vcardPackets(cards.associate { it.uid to ContactsBook.vcard(it) }).forEach { device.sendBulk(it) }
     }
 
     companion object {

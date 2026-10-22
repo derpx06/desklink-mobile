@@ -715,7 +715,7 @@ object BucketEngine {
             if (item == null || !unchanged(item, entry)) { live.sending.remove(path); live.dirtyAt = SystemClock.elapsedRealtime(); continue }
             val input = runCatching { tree.open(item) }.getOrNull() ?: continue
             live.sendActive += path
-            device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
+            device.sendBulk(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
                 this["filename"] = path.substringAfterLast('/')
                 this["folder"] = FolderSync.BUCKET_ID
                 this["relpath"] = path
@@ -966,7 +966,7 @@ object BucketEngine {
 
     private fun sendManifest(live: Live) {
         if (live.deviceId !in ready) return
-        manifestPackets(FolderSync.BUCKET_ID, live.manifest).forEach { send(live.deviceId, it) }
+        manifestPackets(FolderSync.BUCKET_ID, live.manifest).forEach { DeskLinkApplication.getInstance().getDevice(live.deviceId)?.sendBulk(it) }
     }
 
     /** P2: the whole manifest, split so each packet stays under the budget. */
