@@ -33,6 +33,8 @@ object RemovedFeatures {
         "pref_presenter_enable_volume_keys", "remotekeyboard_editing_only",
         "runcommand_category_device_controls", "set_runcommand_name_as_title",
         "pref_sendkeystrokes_enabled", "pref_send_safe_text_immediately", "compose_send_input_cache",
+        // Automatic clipboard sync used to start by itself whenever READ_LOGS was granted; it now starts only when asked for.
+        "clipboard_auto_sync",
     )
 
     /** Per-desk command lists saved by the Run Command screen: `commands_preference_<device id>`. */

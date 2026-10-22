@@ -78,4 +78,15 @@ class ClipboardListenerTest {
         assertTrue(ClipboardListener.deniesPackage(debug, "org.desklink.mobile.debug"))
         assertFalse(ClipboardListener.deniesPackage(debug, "org.desklink.mobile"))
     }
+
+    /** A cold start (or a grant made over adb) must never start logcat: Android 13+ would ask about device logs. */
+    @Test
+    fun theLogWatchStartsOnlyWhenThePersonAsksForIt() {
+        val q = android.os.Build.VERSION_CODES.Q
+        assertFalse("a granted READ_LOGS alone is not a request", ClipboardListener.shouldWatch(34, readLogsGranted = true, requestedByPerson = false))
+        assertTrue(ClipboardListener.shouldWatch(34, readLogsGranted = true, requestedByPerson = true))
+        assertFalse("without the grant nothing runs and nothing is asked", ClipboardListener.shouldWatch(34, readLogsGranted = false, requestedByPerson = true))
+        assertFalse("below Android 10 there is nothing to watch", ClipboardListener.shouldWatch(q - 1, readLogsGranted = true, requestedByPerson = true))
+        assertFalse("a new listener is not watching", listener.watching)
+    }
 }

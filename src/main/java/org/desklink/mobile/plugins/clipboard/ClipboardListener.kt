@@ -75,7 +75,9 @@ class ClipboardListener private constructor(ctx: Context) {
 
     init {
         main.post { cm.addPrimaryClipChangedListener { sync(force = false) } }
-        refreshAutoSync()
+        // Deliberately no automatic-sync start here: running logcat is what makes Android 13+ ask "Allow
+        // DeskLink to access all device logs?", and that question belongs to the person turning the
+        // setting on, never to a cold start.
     }
 
     fun registerObserver(observer: ClipboardObserver) {
@@ -168,10 +170,16 @@ class ClipboardListener private constructor(ctx: Context) {
         cm.setPrimaryClip(ClipData.newPlainText("DeskLink", text))
     }
 
-    /** Starts or stops the logcat watch to match the setting and the READ_LOGS grant. */
+    /** Whether the logcat watch is running now (and so whether the person's phone copies sync by themselves). */
+    val watching: Boolean get() = logcat != null
+
+    /**
+     * "Automatic sync (advanced)", the one place that may start the logcat watch: the person turned it on
+     * (or off) in Settings. Needs the READ_LOGS grant; without it nothing runs and nothing is asked.
+     */
     @Synchronized
-    fun refreshAutoSync() {
-        val want = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && autoSyncActive(context)
+    fun setAutoSync(on: Boolean) {
+        val want = shouldWatch(Build.VERSION.SDK_INT, readLogsGranted(context), requestedByPerson = on)
         if (want == (logcat != null)) return
         if (!want) {
             logcat?.destroy()
@@ -245,6 +253,7 @@ class ClipboardListener private constructor(ctx: Context) {
 
     companion object {
         private const val TAG = "DeskLink/Clipboard"
+        /** The old stored switch: it made a grant alone start the watch at launch. Removed quietly (see RemovedFeatures). */
         const val KEY_AUTO_SYNC = "clipboard_auto_sync"
 
         private var _instance: ClipboardListener? = null
@@ -258,10 +267,16 @@ class ClipboardListener private constructor(ctx: Context) {
         fun readLogsGranted(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
 
-        /** "Automatic sync (advanced)": READ_LOGS granted over adb, and not switched off. */
-        fun autoSyncActive(context: Context): Boolean =
-            readLogsGranted(context) &&
-                PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_AUTO_SYNC, true)
+        /** "Automatic sync (advanced)" is on when the watch is actually running: asked for by the person, this run. */
+        fun autoSyncActive(context: Context): Boolean = _instance?.watching == true
+
+        /**
+         * The logcat watch runs only for Android 10+, with the READ_LOGS grant, when the person asked for it.
+         * Never because the grant exists (a cold start must not trigger the system's log-access question).
+         */
+        @VisibleForTesting
+        fun shouldWatch(sdk: Int, readLogsGranted: Boolean, requestedByPerson: Boolean): Boolean =
+            sdk >= Build.VERSION_CODES.Q && readLogsGranted && requestedByPerson
 
         /** The one-line grant, for the package actually installed (debug builds end in .debug). */
         fun grantCommand(context: Context) = "adb shell pm grant ${context.packageName} android.permission.READ_LOGS"

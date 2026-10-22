@@ -244,8 +244,6 @@ private fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.Share
     val context = LocalContext.current
     val listener = org.desklink.mobile.plugins.clipboard.ClipboardListener
     val resumed = rememberResumeTick()
-    // A grant made over adb while DeskLink runs takes effect on the next visit here.
-    LaunchedEffect(resumed) { listener.instance(context).refreshAutoSync() }
     if (!listener.readLogsGranted(context)) {
         val command = listener.grantCommand(context)
         val copied = stringResource(R.string.settings_clipboard_auto_copied)
@@ -272,8 +270,8 @@ private fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.Share
         subtitle = stringResource(if (on) R.string.settings_clipboard_auto_on else R.string.settings_clipboard_auto_off, deskName),
         checked = on,
         onClick = {
-            prefs.edit { putBoolean(listener.KEY_AUTO_SYNC, !on) }
-            listener.instance(context).refreshAutoSync()
+            // The one place that may start the watch (and so the one place Android may ask about logs).
+            listener.instance(context).setAutoSync(!on)
             changed()
         },
     )
