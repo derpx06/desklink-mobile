@@ -81,6 +81,12 @@ object DeskLinkProtocol {
 
     /** Desk → phone: continue this terminal (`{sessionId, title, path}`) after Lock & Hand Off. */
     const val PACKET_TYPE_HANDOFF = "desklink.handoff"
+
+    /** Both ways (F6): synced snippets, `{op: "index"|"fetch"|"items", ...}`. */
+    const val PACKET_TYPE_SNIPPETS = "desklink.snippets"
+
+    /** Both ways (F6): synced notes, `{op: "index"|"fetch"|"items", ...}`. */
+    const val PACKET_TYPE_NOTES = "desklink.notes"
     const val PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS =
         "desklink.contacts.request_all_uids_timestamps"
     const val PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS =

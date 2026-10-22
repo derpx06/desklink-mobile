@@ -988,6 +988,12 @@ class TerminalActivity : AppCompatActivity() {
                     factory = { ctx -> TerminalView(ctx, host).also { it.attach(screen); viewRef = it } },
                 )
                 if (quick.isNotEmpty()) QuickCommandChips(quick, enabled = connected, onRun = run)
+                if (composing) {
+                    // F6: the synced snippets, one tap into the draft.
+                    val notesRevision by org.desklink.mobile.plugins.notes.NotesStore.revision.collectAsState()
+                    val snippets = remember(notesRevision) { org.desklink.mobile.plugins.notes.NotesStore.snippets(context).take(30) }
+                    if (snippets.isNotEmpty()) SnippetChips(snippets) { draft = (draft + it).take(MAX_PASTE_CHARS) }
+                }
                 if (composing) ComposeBar(draft, { draft = it }, enabled = connected) {
                     if (draft.isNotEmpty()) {
                         run(draft)
@@ -1126,6 +1132,38 @@ class TerminalActivity : AppCompatActivity() {
                         maxLines = 1,
                         modifier = Modifier
                             .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Snippets (F6) above the compose bar: a tap adds one to the draft, which is then read before Send. */
+    @Composable
+    private fun SnippetChips(snippets: List<org.desklink.mobile.plugins.notes.Snippet>, onInsert: (String) -> Unit) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            snippets.forEach { snippet ->
+                Box(
+                    Modifier
+                        .heightIn(min = 48.dp)
+                        .focusProperties { canFocus = false }
+                        .clickable(role = Role.Button, onClickLabel = stringResource(R.string.terminal_insert_snippet, snippet.label)) { onInsert(snippet.text) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        snippet.label,
+                        fontSize = 12.sp,
+                        color = TermText,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .background(TermField, RoundedCornerShape(16.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }

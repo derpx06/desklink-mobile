@@ -149,6 +149,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Long-press on the clipboard tile: the snippets (F6), not the home screen.
+        if (savedInstanceState == null && clipboardTileLongPress(intent)) {
+            startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, snippets = true))
+            finish()
+            return
+        }
         DeviceHelper.initializeDeviceId(this)
 
         // Registered before reading the name: reading it can start a fetch that writes it.
@@ -182,6 +188,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntent(intent)
+    }
+
+    private fun clipboardTileLongPress(intent: Intent): Boolean {
+        if (intent.action != "android.service.quicksettings.action.QS_TILE_PREFERENCES") return false
+        @Suppress("DEPRECATION")
+        val tile = intent.getParcelableExtra<android.content.ComponentName>(Intent.EXTRA_COMPONENT_NAME)
+        return tile?.className == org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java.name
     }
 
     /** Launcher, notifications and shortcuts: which computer, and the pairing screen if one waits. */
@@ -874,6 +887,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             })
             add(MoreExtra(R.drawable.sym_keyboard, getString(R.string.more_desk_types), getString(R.string.more_desk_types_summary)) {
                 startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS))
+            })
+            add(MoreExtra(R.drawable.sym_edit_note, getString(R.string.more_notes), getString(R.string.more_notes_summary)) {
+                startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this@MainActivity))
             })
             // Android 13+ can add a tile without the person digging in the shade's editor.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

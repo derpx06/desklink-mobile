@@ -408,6 +408,24 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <receiver
             android:name="org.desklink.mobile.plugins.terminal.TerminalAttentionReceiver"
             android:exported="false" />
+        <!-- F6: notes and snippets; "Save to DeskLink notes" in the share sheet. -->
+        <activity
+            android:name="org.desklink.mobile.plugins.notes.NotesActivity"
+            android:label="@string/notes_title"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize" />
+        <activity-alias
+            android:name="org.desklink.mobile.plugins.notes.SaveToNotesActivity"
+            android:label="@string/notes_share_label"
+            android:targetActivity="org.desklink.mobile.plugins.notes.NotesActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
         <activity
             android:name="org.desklink.mobile.plugins.mousepad.ComposeSendActivity"
             android:label="@string/compose_send_title"

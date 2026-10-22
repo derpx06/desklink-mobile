@@ -40,6 +40,8 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE,
         DeskLinkProtocol.PACKET_TYPE_MPRIS,
         DeskLinkProtocol.PACKET_TYPE_MPRIS_REQUEST,
+        // Snippets and notes (F6): both ways.
+        DeskLinkProtocol.PACKET_TYPE_NOTES,
         DeskLinkProtocol.PACKET_TYPE_NOTIFICATION,
         DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_ACTION,
         DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REPLY,
@@ -50,6 +52,7 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_SETTINGS,
         DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,
+        DeskLinkProtocol.PACKET_TYPE_SNIPPETS,
         // Calls (contract T): the phone's call state, and the desk's answer/decline/dial.
         DeskLinkProtocol.PACKET_TYPE_TELEPHONY,
         DeskLinkProtocol.PACKET_TYPE_TELEPHONY_REQUEST,

@@ -136,6 +136,8 @@ class DeskLinkApplication : Application() {
         loadRememberedDevicesFromSettings()
         // The transfer history keeps 30 days: prune it once per start, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.plugins.share.TransferHistory.store(this).prune() }
+        // Snippets and notes (F6): opened and pruned off the main thread, before a screen asks.
+        org.desklink.mobile.plugins.notes.NotesStore.preload(this)
 
         if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             StrictMode.setVmPolicy(
