@@ -98,7 +98,7 @@ import org.desklink.mobile.helpers.DeviceHelper.filterInvalidCharactersFromDevic
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.clipboard.ClipboardTileService
-import org.desklink.mobile.plugins.mousereceiver.MouseReceiverService
+import org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity
 import org.desklink.mobile.plugins.terminal.QuickCommands
 import org.desklink.mobile.ui.CustomDevicesActivity
 import org.desklink.mobile.ui.ThemeUtil
@@ -358,7 +358,10 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                         desk.name,
                     ),
                     checked = desk.typeOnPhoneOn,
-                    onClick = { actions.onTypeOnPhone(!desk.typeOnPhoneOn) },
+                    onClick = {
+                        actions.onTypeOnPhone(!desk.typeOnPhoneOn)
+                        if (!desk.typeOnPhoneOn && !desk.accessibilityOn) AccessibilitySetupActivity.open(context)
+                    },
                 )
                 GroupRow(
                     stringResource(R.string.settings_phone_media, desk.name),
@@ -680,8 +683,8 @@ private fun permissionRows(context: Context, desk: String, request: (Array<Strin
         }
         add(PermissionRow(
             R.drawable.sym_accessibility_new, context.getString(R.string.settings_perm_accessibility), context.getString(R.string.settings_perm_accessibility_summary, desk),
-            MouseReceiverService.instance != null,
-            allow = open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
+            AccessibilitySetupActivity.running(),
+            allow = { AccessibilitySetupActivity.open(context) },
         ))
     }
 }
@@ -1013,6 +1016,10 @@ private fun ChoiceDialog(title: String, options: List<String>, selected: Int, on
 
 /** For [FragmentActivity] callers that show a plugin's permission dialog. */
 fun FragmentActivity.showPluginPermission(plugin: Plugin, optional: Boolean) {
+    // Accessibility needs the steps past Android 13's "Restricted setting", not a bare settings link.
+    if (!optional && (plugin is org.desklink.mobile.plugins.mousereceiver.MouseReceiverPlugin ||
+            plugin is org.desklink.mobile.plugins.lockdevice.LockDevicePlugin)
+    ) return AccessibilitySetupActivity.open(this)
     val dialog = if (optional) plugin.optionalPermissionExplanationDialog else plugin.permissionExplanationDialog
     dialog.show(supportFragmentManager, null)
 }

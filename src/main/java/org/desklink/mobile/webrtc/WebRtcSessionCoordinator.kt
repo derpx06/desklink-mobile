@@ -1607,6 +1607,7 @@ class WebRtcSessionCoordinator(
             WebRtcRemoteSessionControlKind.REQUEST_CONTROL,
             WebRtcRemoteSessionControlKind.TAKEOVER_REQUEST -> {
                 if (MouseReceiverService.instance == null) {
+                    org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.ask(context, device.name)
                     sendRemoteSessionControlLocked(
                         binding,
                         attemptId,

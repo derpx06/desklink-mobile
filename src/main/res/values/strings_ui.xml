@@ -211,6 +211,15 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_perm_battery_summary">Stay reachable in the background</string>
     <string name="settings_perm_accessibility">Accessibility</string>
     <string name="settings_perm_accessibility_summary">Let %1$s control this phone</string>
+    <string name="accessibility_setup_title">Turn on DeskLink in Accessibility</string>
+    <string name="accessibility_setup_step">A computer controls this phone, types on it and locks it through DeskLink\'s accessibility service.\n\nOpen Accessibility settings → Installed apps (or Downloaded apps) → DeskLink, and turn it on.</string>
+    <string name="accessibility_setup_restart">Accessibility settings have DeskLink on, but Android has not started it. Open them, turn DeskLink off and on again.</string>
+    <string name="accessibility_setup_restricted">If Android says \"Restricted setting\" and greys DeskLink out: open App info → ⋮ (top right) → Allow restricted settings, confirm, then turn DeskLink on in Accessibility settings.</string>
+    <string name="accessibility_setup_open">Accessibility settings</string>
+    <string name="accessibility_setup_app_info">App info</string>
+    <string name="accessibility_setup_done">DeskLink\'s accessibility service is on</string>
+    <string name="accessibility_setup_ask">%1$s wants to control this phone</string>
+    <string name="accessibility_setup_ask_text">Tap to turn on DeskLink in Accessibility</string>
     <string name="settings_desk_notifications">Show notifications on desk</string>
     <string name="settings_desk_notifications_summary">Reply from the computer</string>
     <string name="settings_reach_anywhere">Reach from anywhere</string>
