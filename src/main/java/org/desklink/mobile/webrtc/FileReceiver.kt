@@ -54,6 +54,12 @@ class FileReceiver(
     private var file: RandomAccessFile? = null
     private var digest: MessageDigest = MessageDigest.getInstance("SHA-256")
     private var expectedPass = 0
+
+    /**
+     * Set after an accept (ours, or the answer to a re-offer) and after our own resume: the next frame at a block
+     * boundary we have verified up to starts the stream, whatever its pass; its pass becomes ours.
+     */
+    private var adoptAny = true
     private var awaitingStart = true
     private var nextOffset = 0L
     private var rewinds = 0
@@ -111,15 +117,29 @@ class FileReceiver(
         }
         awaitingStart = true
         expectedPass = 0
+        adoptAny = true
         lastActivityAt = clock()
         listener.progress(this, bytesDone())
-        send(
-            control(WebRtcFileAction.ACCEPT).copy(
-                resumeBlock = verified,
-                prefixSha256 = FileHashes.prefixHash(hashes, verified),
-                maxFrameBytes = frameMax,
-            ),
-        )
+        sendAccept()
+    }
+
+    private fun sendAccept() = send(
+        control(WebRtcFileAction.ACCEPT).copy(
+            resumeBlock = hashes.size,
+            prefixSha256 = FileHashes.prefixHash(hashes, hashes.size),
+            maxFrameBytes = frameMax,
+        ),
+    )
+
+    /** The same transfer offered again while it is live (the sender lost our accept): answered from where we are. */
+    fun onReoffer() {
+        if (ended || file == null) return
+        pausedFor = null
+        truncateTo(hashes.size)
+        awaitingStart = true
+        adoptAny = true
+        lastActivityAt = clock()
+        sendAccept()
     }
 
     // ------------------------------------------------------------ frames
@@ -127,7 +147,17 @@ class FileReceiver(
     fun onFrame(frame: FileFrame) {
         if (ended || pausedFor != null || file == null) return
         val end = frame.offset + frame.length
-        if (end > totalSize || frame.pass != expectedPass) return // out of range, or from a pass that was abandoned
+        if (end > totalSize) return
+        if (frame.pass != expectedPass) {
+            // A pass we do not expect starts a new one only from a block boundary at or before our verified end,
+            // right after an accept or our own resume (any pass) or as the sender's own rewind (the pass after ours).
+            val aligned = frame.offset % FileV2.BLOCK_BYTES == 0L && frame.blockIndex <= hashes.size
+            if (!aligned || !(adoptAny || frame.pass == ((expectedPass + 1) and 0xff))) return
+            truncateTo(frame.blockIndex)
+            expectedPass = frame.pass
+            awaitingStart = false
+        }
+        if (frame.pass == expectedPass && frame.offset >= nextOffset) adoptAny = false
         if (awaitingStart) {
             // The first frame after an accept, a nack or a resume: a block boundary the receiver has verified up to.
             // A frame of the right pass that starts anywhere else is a sender we cannot follow.
@@ -142,7 +172,11 @@ class FileReceiver(
         val blockEnd = minOf(totalSize, (frame.blockIndex.toLong() + 1) * FileV2.BLOCK_BYTES)
         if (frame.lastOfBlock != (end == blockEnd)) return fail(FileCodes.BAD_FRAME, "The computer sent a damaged part of the file.")
         lastActivityAt = clock()
-        noProgress = false
+        if (noProgress) {
+            // Data is flowing again: the sender is told, with a bare `resume` (no restart point).
+            noProgress = false
+            send(control(WebRtcFileAction.RESUME))
+        }
         try {
             writeFrame(frame, requireNotNull(file))
         } catch (error: IOException) {
@@ -203,10 +237,12 @@ class FileReceiver(
             message.fileHash.equals(derived, ignoreCase = true)
         if (!consistent) {
             if (++restarts > 1 || ++rewinds > FileV2.MAX_REWINDS) return fail(FileCodes.HASH_MISMATCH, "The file got damaged on the way and could not be fixed.")
+            // Start again from nothing under the next pass: one form on the wire, `resume {0, SHA-256(""), pass+1}`.
             truncateTo(0)
             expectedPass = (expectedPass + 1) and 0xff
             awaitingStart = true
-            send(control(WebRtcFileAction.BLOCK_NACK).copy(blockIndex = 0, pass = expectedPass, reason = FileCodes.HASH_MISMATCH))
+            adoptAny = true
+            send(control(WebRtcFileAction.RESUME).copy(resumeBlock = 0, prefixSha256 = FileHashes.prefixHash(hashes, 0), pass = expectedPass))
             return
         }
         val raf = requireNotNull(file)
@@ -260,6 +296,7 @@ class FileReceiver(
         truncateTo(hashes.size)
         expectedPass = (expectedPass + 1) and 0xff
         awaitingStart = true
+        adoptAny = true
         lastActivityAt = clock()
         send(
             control(WebRtcFileAction.RESUME).copy(

@@ -74,8 +74,12 @@ object FileCodes {
     const val BACKLOG = "backlog"
     const val NO_PROGRESS = "no-progress"
     val PAUSE_REASONS = setOf(STORAGE_FULL, BACKLOG, NO_PROGRESS, USER)
+    /** Known codes. Cancel and error ACCEPT any other code (a newer build's) as a generic end; see [pauseReason]. */
     val CANCEL_CODES = setOf(USER, SOURCE_GONE, SOURCE_CHANGED, REMOVED)
     val ERROR_CODES = setOf(REFUSED, BUSY, TOO_LARGE, BAD_FRAME, HASH_MISMATCH, INTERNAL)
+
+    /** An unknown pause reason is a pause by the person: the transfer waits for a `resume`. */
+    fun pauseReason(reason: String?): String = reason?.takeIf { it in PAUSE_REASONS } ?: USER
 }
 
 data class WebRtcFileControl(
@@ -148,12 +152,12 @@ data class WebRtcFileControl(
             WebRtcFileAction.ACCEPT -> require(resumeBlock != null && prefixSha256 != null && maxFrameBytes != null) { "Malformed DeskLink WebRTC accept" }
             WebRtcFileAction.BLOCK_ACK -> require(blockIndex != null && sha256 != null) { "Malformed DeskLink WebRTC block ack" }
             WebRtcFileAction.BLOCK_NACK -> require(blockIndex != null && pass != null) { "Malformed DeskLink WebRTC block nack" }
-            WebRtcFileAction.PAUSE -> require(reason in FileCodes.PAUSE_REASONS) { "Unknown DeskLink WebRTC pause reason" }
+            WebRtcFileAction.PAUSE -> Unit // any reason: an unknown one is treated as `user`
             WebRtcFileAction.RESUME -> require((resumeBlock == null) == (prefixSha256 == null) && (resumeBlock == null) == (pass == null)) { "Malformed DeskLink WebRTC resume" }
             WebRtcFileAction.DONE -> require(fileHash != null && blocks != null && totalSize != null) { "Malformed DeskLink WebRTC done" }
             WebRtcFileAction.COMPLETE -> require(fileHash != null) { "Malformed DeskLink WebRTC complete" }
-            WebRtcFileAction.CANCEL -> require(code in FileCodes.CANCEL_CODES) { "Unknown DeskLink WebRTC cancel code" }
-            WebRtcFileAction.ERROR -> require(code in FileCodes.ERROR_CODES) { "Unknown DeskLink WebRTC error code" }
+            // Any code: an unknown one ends the transfer like any other, and frees its slot and partial file.
+            WebRtcFileAction.CANCEL, WebRtcFileAction.ERROR -> Unit
         }
     }
 

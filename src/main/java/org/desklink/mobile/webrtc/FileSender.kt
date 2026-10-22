@@ -71,6 +71,9 @@ class FileSender(
     val isPaused: String? get() = peerPaused ?: if (noProgress) FileCodes.NO_PROGRESS else null
     val acknowledgedBlocks: Int get() = ackedBlocks
 
+    /** The block hashes read so far: a retry of the same transfer carries them over (the sidecar is never rewritten empty). */
+    fun hashesSnapshot(): List<ByteArray> = hashes.toList()
+
     /** Resume state from a stored checkpoint: the block hashes already acknowledged in an earlier connection. */
     fun restore(acknowledged: List<ByteArray>) {
         hashes.clear()
@@ -98,7 +101,8 @@ class FileSender(
         when (message.action) {
             WebRtcFileAction.ACCEPT -> if (state == State.OFFERED) {
                 frameBytes = minOf(requireNotNull(message.maxFrameBytes), FileV2.FRAME_BYTES_PROVEN)
-                restartAt(requireNotNull(message.resumeBlock), requireNotNull(message.prefixSha256), pass = 0)
+                // Ends the transfer if the source changed while its prefix was being checked.
+                if (!restartAt(requireNotNull(message.resumeBlock), requireNotNull(message.prefixSha256), pass)) return
                 state = State.STREAMING
                 touch()
                 pump()
@@ -106,12 +110,12 @@ class FileSender(
             WebRtcFileAction.BLOCK_ACK -> onAck(requireNotNull(message.blockIndex), requireNotNull(message.sha256))
             WebRtcFileAction.BLOCK_NACK -> onNack(requireNotNull(message.blockIndex), requireNotNull(message.pass))
             // "no-progress" is informational: it never stops the sender.
-            WebRtcFileAction.PAUSE -> if (message.reason != FileCodes.NO_PROGRESS) peerPaused = message.reason
+            WebRtcFileAction.PAUSE -> if (message.reason != FileCodes.NO_PROGRESS) peerPaused = FileCodes.pauseReason(message.reason)
             WebRtcFileAction.RESUME -> {
                 peerPaused = null
                 touch()
                 if (message.resumeBlock != null) {
-                    restartAt(message.resumeBlock, requireNotNull(message.prefixSha256), requireNotNull(message.pass))
+                    if (!restartAt(message.resumeBlock, requireNotNull(message.prefixSha256), requireNotNull(message.pass))) return
                     if (state == State.AWAITING_COMPLETE) state = State.STREAMING
                 }
                 pump()
@@ -135,14 +139,49 @@ class FileSender(
         }
     }
 
-    /** Start (or restart) streaming at the receiver's verified block when our own hashes agree, else at block 0. */
-    private fun restartAt(resumeBlock: Int, prefix: String, pass: Int) {
+    /**
+     * Start (or restart) streaming at the receiver's verified block when our hashes agree with its prefix, else at
+     * block 0 under the next pass (the receiver adopts the new pass). Hashes we do not hold (a retry, a lost
+     * sidecar) are read again from the source, hashing only, exactly as the desk does. False: the source
+     * changed or went while that was done, and the transfer has ended.
+     */
+    private fun restartAt(resumeBlock: Int, prefix: String, pass: Int): Boolean {
+        if (resumeBlock in hashes.size + 1..blocksTotal && !rehashPrefix(resumeBlock)) return false
         val agree = resumeBlock <= hashes.size && resumeBlock <= blocksTotal &&
             FileHashes.prefixHash(hashes, resumeBlock).equals(prefix, ignoreCase = true)
         val start = if (agree) resumeBlock else 0
         rewindTo(start)
         ackedBlocks = start
-        this.pass = pass
+        this.pass = if (agree) pass else (pass + 1) and 0xff
+        return true
+    }
+
+    /** Reads blocks [hashes].size until [upto] from the source and hashes them (nothing is sent). */
+    private fun rehashPrefix(upto: Int): Boolean {
+        if (!sourceUnchanged()) return false
+        try {
+            source.open(hashes.size.toLong() * FileV2.BLOCK_BYTES).use { input ->
+                val buffer = ByteArray(FileV2.BLOCK_BYTES)
+                while (hashes.size < upto) {
+                    val length = minOf(FileV2.BLOCK_BYTES.toLong(), totalSize - hashes.size.toLong() * FileV2.BLOCK_BYTES).toInt()
+                    var read = 0
+                    while (read < length) {
+                        val n = input.read(buffer, read, length - read)
+                        if (n < 0) break
+                        read += n
+                    }
+                    if (read < length) {
+                        sourceChanged()
+                        return false
+                    }
+                    hashes.add(MessageDigest.getInstance("SHA-256").apply { update(buffer, 0, length) }.digest())
+                }
+            }
+        } catch (error: IOException) {
+            fail("The file could not be read.", FileCodes.INTERNAL)
+            return false
+        }
+        return true
     }
 
     private fun rewindTo(index: Int) {
@@ -159,7 +198,15 @@ class FileSender(
     private fun onAck(index: Int, sha: String) {
         if (state == State.OFFERED || index !in 0 until hashes.size || index + 1 <= ackedBlocks) return
         if (!sha.equals(hashes[index].toHex(), ignoreCase = true)) {
-            return finish(Outcome.FAILED, "The file got damaged on the way.", control(WebRtcFileAction.ERROR).copy(code = FileCodes.HASH_MISMATCH, message = "A block did not match."), keep = false)
+            // The receiver verified a block that is not the one we read: read and send it again under the next pass.
+            if (++rewinds > FileV2.MAX_REWINDS) {
+                return finish(Outcome.FAILED, "The file got damaged on the way and could not be fixed.", control(WebRtcFileAction.ERROR).copy(code = FileCodes.HASH_MISMATCH, message = "Too many damaged blocks."), keep = false)
+            }
+            rewindTo(index)
+            pass = (pass + 1) and 0xff
+            if (state == State.AWAITING_COMPLETE) state = State.STREAMING
+            touch()
+            return pump()
         }
         unsavedBlocks += index + 1 - ackedBlocks
         ackedBlocks = index + 1
@@ -316,7 +363,8 @@ class FileSender(
         // Every hash read so far, not only the acknowledged ones: the receiver may have verified blocks whose
         // acknowledgement was still on the wire when the link dropped, and a resume must agree with it.
         val read = hashes.toList()
-        if (store.writeBlocks(transferId, read) &&
+        // Never an empty sidecar over a stored one: a sender that has read nothing yet has nothing to add.
+        if ((read.isEmpty() || store.writeBlocks(transferId, read)) &&
             store.save(
                 FileCheckpoint(
                     transferId, "send", token, wire.peerDeviceId, filename, totalSize, mtime, ackedBlocks,
