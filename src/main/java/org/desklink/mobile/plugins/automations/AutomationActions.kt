@@ -120,6 +120,7 @@ object AutomationActions {
         return notify(context, title, context.getString(R.string.automations_tap_to_open), open)
     }
 
+    @android.annotation.SuppressLint("MissingPermission") // areNotificationsEnabled() covers POST_NOTIFICATIONS; a refusal is caught
     private fun notify(context: Context, title: String, text: String, open: Intent?): Result {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return Result.Failed(GATE)

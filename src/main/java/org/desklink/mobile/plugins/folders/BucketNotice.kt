@@ -14,6 +14,7 @@ import org.desklink.mobile.helpers.NotificationHelper
 object BucketNotice {
     private const val ID = 7480
 
+    @android.annotation.SuppressLint("MissingPermission") // areNotificationsEnabled() covers POST_NOTIFICATIONS; a refusal is caught
     fun show(context: Context, deviceId: String) {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
