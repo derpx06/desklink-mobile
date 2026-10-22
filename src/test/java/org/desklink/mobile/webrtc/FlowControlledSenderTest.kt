@@ -10,7 +10,7 @@ import org.junit.Test
 class FlowControlledSenderTest {
     private var buffered = 0L
     private val wire = mutableListOf<String>()
-    private val results = mutableListOf<String>()
+    private val results = java.util.concurrent.CopyOnWriteArrayList<String>()
     private val sender = FlowControlledSender({ buffered }, { wire += String(it); true }, highWater = 100, lowWater = 20)
 
     private fun cb(name: String) = object : TransportCallback {
@@ -72,6 +72,21 @@ class FlowControlledSenderTest {
         sender.failAll("closed")
         assertEquals(listOf("a CLOSED", "b CLOSED"), results)
         assertTrue(wire.isEmpty())
+    }
+
+    @Test
+    fun aCallbackThatThrowsDoesNotStrandTheMessagesBehindIt() {
+        val bad = object : TransportCallback {
+            override fun onSuccess() = error("boom")
+            override fun onFailure(error: TransportError) = Unit
+        }
+        buffered = 150
+        sender.send("a".toByteArray(), bad)
+        sender.send("b".toByteArray(), cb("b"))
+        buffered = 0
+        sender.onBufferedAmountChange()
+        assertEquals(listOf("a", "b"), wire)
+        assertEquals(0, sender.heldCount())
     }
 
     @Test

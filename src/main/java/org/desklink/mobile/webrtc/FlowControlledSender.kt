@@ -70,8 +70,11 @@ class FlowControlledSender(
                 held.removeFirst().also { heldBytes -= it.bytes.size }
             }
             try {
-                if (rawSend(next.bytes)) next.callback.onSuccess()
-                else next.callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "WebRTC data channel rejected message"))
+                // A callback that throws must not strand the messages behind it.
+                runCatching {
+                    if (rawSend(next.bytes)) next.callback.onSuccess()
+                    else next.callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "WebRTC data channel rejected message"))
+                }
             } finally {
                 synchronized(this) { draining = false }
             }
