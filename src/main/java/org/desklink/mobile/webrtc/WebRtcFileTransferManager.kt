@@ -218,6 +218,10 @@ class WebRtcFileTransferManager(
             val entry = sends[id] ?: return
             if (entry.sender !== sender) return
             sends.remove(id)
+            if (outcome != FileSender.Outcome.SUSPENDED && outcome != FileSender.Outcome.BUSY) {
+                // A slot is free: the next stored send, if any, starts (after this one's own bookkeeping below).
+                runner.post { currentWire?.let(::startStoredSends) }
+            }
             when (outcome) {
                 FileSender.Outcome.COMPLETED -> {
                     cleanupSend(id, sender)
@@ -271,8 +275,9 @@ class WebRtcFileTransferManager(
         }
     }
 
+    /** The same transfer offered again (a busy receiver): the hashes already read go with it, so nothing stored is lost. */
     private fun cloneSender(old: FileSender) = newSender(
-        old.wire, old.transferId, old.token, old.sourceForRestart(), old.filename, old.totalSize, old.mtime, old.metaForRestart(), old.isSpooled(), emptyList(),
+        old.wire, old.transferId, old.token, old.sourceForRestart(), old.filename, old.totalSize, old.mtime, old.metaForRestart(), old.isSpooled(), old.hashesSnapshot(),
     )
 
     private fun cleanupSend(id: String, sender: FileSender, keepSource: Boolean = false) {
@@ -357,17 +362,9 @@ class WebRtcFileTransferManager(
         val id = message.transferId
         val stored = store.load(id)
         require(stored?.direction != "send" && !sends.containsKey(id)) { "Incoming file offer collides with an outgoing transfer" }
-        val existing = receives[id]
-        if (existing != null) {
-            require(existing.offer.transferToken == message.transferToken) { "Incoming file offer does not match its transfer" }
-            return // a replayed offer for a transfer in progress changes nothing
-        }
-        if (receives.size >= FileV2.ACTIVE_PER_DIRECTION) {
-            link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.BUSY, message = "The phone is receiving other files."))
-            return
-        }
         val totalSize = requireNotNull(message.totalSize)
-        // A synced file is taken only when this phone asked for it, else refused.
+        // A synced file is taken only when this phone asked for it, else refused: before anything else, as the desk does,
+        // so an unrequested file is never answered "busy" (which would make its sender offer it again).
         var ref: FolderRef? = null
         if (message.folder != null) {
             ref = FolderRef(message.folder, requireNotNull(message.relpath), message.mtime)
@@ -375,6 +372,19 @@ class WebRtcFileTransferManager(
                 link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.REFUSED, message = "folder-refused"))
                 return // answered once: nothing was requested, nothing is stored
             }
+        }
+        val existing = receives[id]
+        if (existing != null) {
+            if (existing.offer.transferToken != message.transferToken || existing.totalSize != totalSize || existing.filename != message.filename) {
+                link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.REFUSED, message = "That transfer does not match"))
+                return
+            }
+            existing.onReoffer() // the sender did not get our accept: answered again from where we are
+            return
+        }
+        if (receives.size >= FileV2.ACTIVE_PER_DIRECTION) {
+            link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.BUSY, message = "The phone is receiving other files."))
+            return
         }
         val receiver = FileReceiver(wire, store, link, clock, freeSpace, receiverListener, message)
         if (ref != null) folderOffers[id] = ref
@@ -454,7 +464,7 @@ class WebRtcFileTransferManager(
      */
     fun handleFrame(message: ByteArray) {
         val frame = try {
-            FileFrame.decode(message, FileV2.FRAME_BYTES_MAX)
+            FileFrame.decode(message, FileV2.FRAME_BYTES_PROVEN)
         } catch (error: IllegalArgumentException) {
             Log.w(TAG, "Dropped a malformed file frame")
             return
@@ -529,24 +539,33 @@ class WebRtcFileTransferManager(
     fun resumeSends(wire: WebRtcWireBinding) {
         runner.post {
             currentWire = wire
-            store.list().filter { it.direction == "send" && it.deviceId == wire.peerDeviceId }.forEach { stored ->
-                val id = stored.transferId
-                if (sends.containsKey(id)) return@forEach
-                val source = sourceOf(stored)
-                val stat = source?.stat()
-                if (source == null || stat == null || stat.size != stored.totalSize || stat.mtime != stored.mtime) {
-                    // Gone or changed since: nothing to resume. (The person sends it again.)
-                    store.remove(id)
-                    TransferHistory.forgetResumable(appContext, id)
-                    return@forEach
-                }
-                val hashes = store.readBlocks(id)
-                val callback = resumedSendCallback(wire.peerDeviceId, id, stored.filename, stored.totalSize)
-                val sender = newSender(wire, id, stored.token, source, stored.filename, stored.totalSize, stored.mtime, stored.meta, stored.spooled, hashes)
-                val entry = SendEntry(sender, callback, CompletableFuture(), null)
-                sends[id] = entry
-                startSender(entry)
+            startStoredSends(wire)
+        }
+    }
+
+    /**
+     * Starts stored sends in order, never more than [FileV2.ACTIVE_PER_DIRECTION] at once (a third would be told busy);
+     * the rest wait their turn and start as these end.
+     */
+    private fun startStoredSends(wire: WebRtcWireBinding) {
+        store.list().filter { it.direction == "send" && it.deviceId == wire.peerDeviceId }.sortedBy { it.transferId }.forEach { stored ->
+            val id = stored.transferId
+            if (sends.containsKey(id)) return@forEach
+            val source = sourceOf(stored)
+            val stat = source?.stat()
+            if (source == null || stat == null || stat.size != stored.totalSize || stat.mtime != stored.mtime) {
+                // Gone or changed since: nothing to resume. (The person sends it again.)
+                store.remove(id)
+                TransferHistory.forgetResumable(appContext, id)
+                return@forEach
             }
+            if (sends.size >= FileV2.ACTIVE_PER_DIRECTION) return@forEach
+            val hashes = store.readBlocks(id)
+            val callback = resumedSendCallback(wire.peerDeviceId, id, stored.filename, stored.totalSize)
+            val sender = newSender(wire, id, stored.token, source, stored.filename, stored.totalSize, stored.mtime, stored.meta, stored.spooled, hashes)
+            val entry = SendEntry(sender, callback, CompletableFuture(), null)
+            sends[id] = entry
+            startSender(entry)
         }
     }
 
