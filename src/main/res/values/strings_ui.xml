@@ -567,4 +567,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="more_notes">Notes and snippets</string>
     <string name="more_notes_summary">Synced with your computer, encrypted on this phone</string>
     <string name="terminal_insert_snippet">Insert snippet %1$s</string>
+    <!-- F4: glide -->
+    <string name="session_live_glide">Controlled by %1$s</string>
+    <string name="home_live_glide">its pointer is on this phone</string>
+    <string name="settings_glide">Let %1$s control this phone</string>
+    <string name="settings_glide_on">Its pointer and keyboard continue here across the screen edge</string>
+    <string name="settings_glide_off">Off. Move %1$s\'s pointer past its screen edge onto this phone</string>
+    <string name="settings_glide_accessibility">Turn on DeskLink\'s accessibility service so %1$s can point and type here</string>
 </resources>

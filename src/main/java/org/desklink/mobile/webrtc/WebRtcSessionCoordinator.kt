@@ -1048,7 +1048,15 @@ class WebRtcSessionCoordinator(
                     )
                     val focusedField = packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST &&
                         org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.targetsFocusedField(packet)
-                    if (focusedField) {
+                    val glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide
+                    if (
+                        packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST && !focusedField &&
+                        glide.isGliding(device.deviceId) && glide.allowed(context, device.deviceId)
+                    ) {
+                        // F4 glide (G5): the person's per-desk "Let <desk> control this phone" is the
+                        // consent while the desk's pointer is here; no screen lease.
+                        if (!glide.accepts(device.deviceId, packet.getStringOrNull("key"))) return@runCatching
+                    } else if (focusedField) {
                         // "Type on <phone>" (C2): no screen session, so no lease; the person's
                         // per-desk switch is the consent, and only keys may come this way.
                         val typing = org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping

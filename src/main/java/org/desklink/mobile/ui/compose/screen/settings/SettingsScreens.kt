@@ -149,6 +149,8 @@ data class DeskSettings(
     val deskNotificationsOn: Boolean = false,
     /** "Let <desk> type on this phone" (phone-owned, off by default), and whether the service is on. */
     val typeOnPhoneOn: Boolean = false,
+    /** F4: "Let <desk> control this phone" (glide), off by default. */
+    val glideOn: Boolean = false,
     val accessibilityOn: Boolean = false,
     /** F1: "Play <desk>'s sound here" and its volume (phone settings). */
     val deskSoundOn: Boolean = false,
@@ -172,6 +174,7 @@ class SettingsActions(
     val onShowCaller: (Boolean) -> Unit = {},
     val onDeskNotifications: (Boolean) -> Unit = {},
     val onTypeOnPhone: (Boolean) -> Unit = {},
+    val onGlide: (Boolean) -> Unit = {},
     val onDeskSound: (Boolean) -> Unit = {},
     val onDeskSoundVolume: (Int) -> Unit = {},
     val onDeskMayPlay: (Boolean) -> Unit = {},
@@ -418,6 +421,21 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                     onClick = {
                         actions.onTypeOnPhone(!desk.typeOnPhoneOn)
                         if (!desk.typeOnPhoneOn && !desk.accessibilityOn) AccessibilitySetupActivity.open(context)
+                    },
+                )
+                GroupRow(
+                    stringResource(R.string.settings_glide, desk.name),
+                    icon = R.drawable.sym_mouse,
+                    subtitle = when {
+                        !desk.glideOn -> stringResource(R.string.settings_glide_off, desk.name)
+                        !desk.accessibilityOn -> stringResource(R.string.settings_glide_accessibility, desk.name)
+                        else -> stringResource(R.string.settings_glide_on)
+                    },
+                    checked = desk.glideOn,
+                    onClick = {
+                        actions.onGlide(!desk.glideOn)
+                        // The accessibility service is asked for only now, with the steps past "Restricted setting".
+                        if (!desk.glideOn && !desk.accessibilityOn) AccessibilitySetupActivity.open(context)
                     },
                 )
                 GroupRow(

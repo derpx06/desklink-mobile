@@ -32,7 +32,7 @@ object SessionLiveNotification {
     private const val EXTRA_DEVICE_ID = "deviceId"
     private const val BASE_ID = 1710
 
-    private data class Live(val screen: Boolean = false, val terminals: Int = 0)
+    private data class Live(val screen: Boolean = false, val terminals: Int = 0, val glide: Boolean = false)
 
     private val live = ConcurrentHashMap<String, Live>()
 
@@ -54,13 +54,14 @@ object SessionLiveNotification {
         val app = DeskLinkApplication.getInstance()
         val screen = app.getDevice(deviceId)?.getPlugin(ScreenControlPlugin::class.java)?.remoteLive == true
         val terminals = app.terminalClient(deviceId)?.state?.value?.sessions?.count { it.attached && !it.gone } ?: 0
-        update(context, deviceId, screen, terminals)
+        val glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(deviceId)
+        update(context, deviceId, screen, terminals, glide)
     }
 
-    private fun update(context: Context, deviceId: String?, screen: Boolean, terminals: Int) {
+    private fun update(context: Context, deviceId: String?, screen: Boolean, terminals: Int, glide: Boolean = false) {
         deviceId ?: return
         val now = live.compute(deviceId) { _, old ->
-            Live(screen, terminals).takeIf { it.screen || it.terminals > 0 }
+            Live(screen, terminals, glide).takeIf { it.screen || it.terminals > 0 || it.glide }
         }
         val manager = NotificationManagerCompat.from(context)
         val id = BASE_ID + (deviceId.hashCode() and 0xFFF)
@@ -73,6 +74,7 @@ object SessionLiveNotification {
         val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
         val parts = buildList {
             if (now.screen) add(context.getString(R.string.session_live_screen))
+            if (now.glide) add(context.getString(R.string.session_live_glide, desk))
             if (now.terminals > 0) add(context.resources.getQuantityString(R.plurals.session_live_terminals, now.terminals, now.terminals))
         }
         val end = PendingIntent.getBroadcast(
@@ -118,6 +120,9 @@ object SessionLiveNotification {
         // F1: this phone's microphone or sound to that desk ends too, and the desk's sound here.
         app.webRtcCoordinator(deviceId)?.stopAudioSending("stopped", notifyPeer = true)
         app.webRtcCoordinator(deviceId)?.stopDeskSound()
+        // F4: a glide ends and the desk gets its pointer back.
+        app.getDevice(deviceId)?.getPlugin(org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin::class.java)
+            ?.takeIf { org.desklink.mobile.plugins.inputdevicesreceiver.Glide.activeDesk == deviceId }?.stop(release = true)
         update(context, deviceId, screen = false, terminals = 0)
     }
 

@@ -59,6 +59,11 @@ class MouseReceiverPlugin : Plugin() {
             }
         }
 
+        // F4 glide: the desk's keys go to the focused field, as "Type on <phone>" does.
+        if (org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(device.deviceId) && (np.has("key") || np.has("specialKey"))) {
+            return AccessibilityTyping.handle(np)
+        }
+
         if (RemoteKeyboardPlugin.getMousePadPacketType(np) != RemoteKeyboardPlugin.MousePadPacketType.Mouse) {
             return false // This packet will be handled by the remotekeyboard instead, silently ignore
         }

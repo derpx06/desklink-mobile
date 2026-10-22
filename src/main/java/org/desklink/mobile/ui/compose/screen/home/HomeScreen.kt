@@ -112,8 +112,10 @@ data class LiveSessions(
     val audio: String? = null,
     /** F1: the desk's sound is playing on this phone. */
     val hearing: Boolean = false,
+    /** F4: the desk's pointer and keyboard are on this phone. */
+    val glide: Boolean = false,
 ) {
-    val any get() = screen || terminals > 0 || phoneScreen || audio != null || hearing
+    val any get() = screen || terminals > 0 || phoneScreen || audio != null || hearing || glide
 }
 
 @Immutable
@@ -365,6 +367,7 @@ private fun LiveRow(live: LiveSessions, onEnd: () -> Unit) {
         if (live.phoneScreen) add(stringResource(R.string.home_live_phone_screen))
         live.audio?.let { add(stringResource(if (it == "mic") R.string.home_live_mic else R.string.home_live_sound)) }
         if (live.hearing) add(stringResource(R.string.home_live_hearing))
+        if (live.glide) add(stringResource(R.string.home_live_glide))
     }
     Row(
         Modifier

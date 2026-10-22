@@ -46,6 +46,7 @@ object HomeModel {
                 audio = org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource
                     .takeIf { org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo == id },
                 hearing = org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom == id,
+                glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(id),
             ),
             media = media(context, device),
             terminalCount = terminal?.sessions?.count { !it.gone } ?: 0,

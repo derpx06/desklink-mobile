@@ -52,6 +52,9 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_SETTINGS,
         DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,
+        // Glide (F4): the desk's pointer enters, and the phone hands it back.
+        DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES,
+        DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_SNIPPETS,
         // Calls (contract T): the phone's call state, and the desk's answer/decline/dial.
         DeskLinkProtocol.PACKET_TYPE_TELEPHONY,
