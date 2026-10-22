@@ -898,6 +898,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             add(MoreExtra(R.drawable.sym_keyboard, getString(R.string.more_desk_types), getString(R.string.more_desk_types_summary)) {
                 startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS))
             })
+            add(MoreExtra(R.drawable.sym_bolt, getString(R.string.more_automations), getString(R.string.more_automations_summary)) {
+                startActivity(Intent(this@MainActivity, org.desklink.mobile.plugins.automations.AutomationsActivity::class.java))
+            })
             add(MoreExtra(R.drawable.sym_edit_note, getString(R.string.more_notes), getString(R.string.more_notes_summary)) {
                 startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this@MainActivity))
             })

@@ -30,6 +30,12 @@ public class RunCommandUrlActivity extends AppCompatActivity {
             try {
                 Uri uri = getIntent().getData();
                 String deviceId = uri.getPathSegments().get(0);
+                // F7: a tag written by Automations → "Write tag" (kdeconnect://runcommand/automation/<tag>).
+                if (org.desklink.mobile.plugins.automations.AutomationNfc.SEGMENT.equals(deviceId) && uri.getPathSegments().size() == 2) {
+                    org.desklink.mobile.plugins.automations.AutomationNfc.onTag(this, uri.getPathSegments().get(1));
+                    finish();
+                    return;
+                }
 
                 final Device device = DeskLinkApplication.getInstance().getDevice(deviceId);
 
