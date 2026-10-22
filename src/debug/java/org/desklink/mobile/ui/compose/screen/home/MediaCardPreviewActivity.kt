@@ -46,7 +46,7 @@ class MediaCardPreviewActivity : ComponentActivity() {
             canSeek = true, lengthMs = 245_000, positionMs = 61_000, positionAt = System.currentTimeMillis(),
             reportedPlaying = playing, volume = 60, art = null, desk = "Desk", subtitleFallback = "",
         )
-        val noop = HomeActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val noop = HomeActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
         setContent {
             val bounds = remember { mutableStateOf<Rect?>(null) }
             DeskLinkTheme(this) {

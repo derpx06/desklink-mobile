@@ -93,7 +93,6 @@ import org.desklink.mobile.plugins.share.previewKind
 import org.desklink.mobile.ui.compose.screen.transfers.ImageViewer
 import org.desklink.mobile.ui.compose.screen.transfers.LiveTransfer
 import org.desklink.mobile.ui.compose.screen.transfers.TransferActions
-import org.desklink.mobile.ui.compose.screen.transfers.TransfersScreen
 import org.desklink.mobile.ui.compose.screen.transfers.VideoViewer
 import org.desklink.mobile.plugins.share.ShareSettingsFragment
 import org.desklink.mobile.plugins.terminal.TerminalActivity
@@ -115,26 +114,56 @@ import org.desklink.mobile.ui.compose.screen.pairing.ScanScreen
 import org.desklink.mobile.ui.compose.screen.pairing.WelcomeScreen
 import org.desklink.mobile.ui.compose.screen.settings.DeskSettings
 import org.desklink.mobile.ui.compose.screen.settings.KEY_BLUETOOTH_ENABLED
-import org.desklink.mobile.ui.compose.screen.settings.MoreExtra
-import org.desklink.mobile.ui.compose.screen.settings.MoreScreen
-import org.desklink.mobile.ui.compose.screen.settings.NetworkScreen
 import org.desklink.mobile.ui.compose.screen.settings.SettingsActions
-import org.desklink.mobile.ui.compose.screen.settings.SettingsScreen
+import org.desklink.mobile.ui.compose.screen.settings.SettingsPage
+import org.desklink.mobile.ui.compose.screen.settings.SettingsTab
+import org.desklink.mobile.ui.compose.screen.settings.waitingPermissions
+import org.desklink.mobile.ui.compose.screen.tabs.FilesTab
+import org.desklink.mobile.ui.compose.screen.tabs.NotesTab
+import org.desklink.mobile.ui.compose.screen.tabs.TerminalsTab
+import org.desklink.mobile.ui.compose.shell.AppTab
+import org.desklink.mobile.ui.compose.shell.QuickAction
+import org.desklink.mobile.ui.compose.shell.TabBadges
+import org.desklink.mobile.ui.compose.shell.TabBarHeight
+import org.desklink.mobile.ui.compose.shell.TabNav
+import org.desklink.mobile.ui.compose.shell.TabsShell
+import org.desklink.mobile.ui.compose.shell.filesBadge
+import org.desklink.mobile.ui.compose.shell.isWide
+import org.desklink.mobile.ui.compose.extensions.device.toUiModel
+import org.desklink.mobile.plugins.folders.BucketEngine
+import org.desklink.mobile.plugins.folders.BucketUi
+import org.desklink.mobile.plugins.notes.NotesUi
+import org.desklink.mobile.plugins.terminal.TerminalAttentionBadge
+import androidx.compose.runtime.collectAsState
 import org.desklink.mobile.ui.compose.screen.settings.showPluginPermission
 import org.desklink.mobile.ui.compose.tokens
 
 private const val STORAGE_LOCATION_CONFIGURED = 2020
 private const val STATE_STACK = "stack" // Saved only in onSaveInstanceState
+private const val STATE_TABS = "tabs"
+private const val STATE_NOTE = "note"
 private const val STATE_SELECTED_DEVICE = "selected_device" // Saved persistently in preferences
 private const val REFRESH_MS = 1_000L
 
 /**
- * One Compose root. Home (the selected computer) is the root; Settings, pairing and the rest are
- * pushed full screen on a small back stack of route strings, which survives rotation and process
- * death. Terminals and the desk screen are their own activities.
+ * One Compose root. With a paired computer it is the tab shell (Home, Files, Notes, Terminals, Settings: [nav]
+ * keeps a back stack per tab); pairing, the viewer and the like are pushed full screen on a small back stack
+ * of route strings. Both survive rotation and process death. The terminal and the desk screen are their own
+ * activities.
  */
 class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private val stack = mutableStateListOf<String>()
+
+    /** The tabs: which is showing and each one's own back stack. */
+    private var nav = TabNav()
+
+    /** The note being edited in the Notes tab: an id, `NotesActivity.NEW`, or null for the list. */
+    private val notesEditing = mutableStateOf<String?>(null)
+
+    /** Bumped by the Home tab's long-press: opens the computers sheet. */
+    private var computersRequest by mutableIntStateOf(0)
+    private val bucketUi by lazy { BucketUi(this) }
+    private val notesUi by lazy { NotesUi(this, notesEditing) }
     private var selectedId by mutableStateOf<String?>(null)
     private var tick by mutableIntStateOf(0)
     private val snackbar = SnackbarHostState()
@@ -158,6 +187,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
         selectedId = savedInstanceState?.getString(STATE_SELECTED_DEVICE) ?: selection.getString(STATE_SELECTED_DEVICE, null)
         stack.addAll(savedInstanceState?.getStringArrayList(STATE_STACK)?.takeIf { it.isNotEmpty() } ?: listOf(HOME))
+        savedInstanceState?.getStringArrayList(STATE_TABS)?.let { nav = TabNav.restore(it) }
+        notesEditing.value = savedInstanceState?.getString(STATE_NOTE)
         if (savedInstanceState == null) handleIntent(intent)
 
         setContent { DeskLinkTheme(this) { Root() } }
@@ -196,9 +227,21 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private fun handleIntent(intent: Intent) {
         when {
             // Launcher shortcuts (long-press the icon).
-            intent.action == ACTION_NEW_NOTE -> startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, newNote = true))
+            intent.action == ACTION_NEW_NOTE -> {
+                resetTo(HOME)
+                nav.select(AppTab.NOTES)
+                notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW
+            }
             intent.action == ACTION_ADD_TO_BUCKET -> startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this, selectedId))
-            intent.hasExtra(FLAG_FORCE_OVERVIEW) -> resetTo(HOME)
+            intent.hasExtra(FLAG_FORCE_OVERVIEW) -> { resetTo(HOME); nav.select(AppTab.HOME) }
+            // A Settings page asked for from outside (the desk screen's settings button): the tab, on that page.
+            intent.hasExtra(EXTRA_SETTINGS_PAGE) -> {
+                val page = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
+                resetTo(HOME)
+                nav.reset(AppTab.SETTINGS)
+                SettingsPage.of(page)?.let { nav.push(AppTab.SETTINGS, it.route) }
+                nav.select(AppTab.SETTINGS)
+            }
             intent.hasExtra(EXTRA_DEVICE_ID) -> {
                 val id = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
                 // Navigation only. This activity is exported, so it never acts on pairing itself:
@@ -210,6 +253,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 } else if (DeskLinkApplication.getInstance().getDevice(id)?.isPaired == true) {
                     select(id)
                     resetTo(HOME)
+                    nav.select(AppTab.HOME)
                 }
             }
         }
@@ -228,6 +272,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putStringArrayList(STATE_STACK, ArrayList(stack))
+        outState.putStringArrayList(STATE_TABS, ArrayList(nav.snapshot()))
+        notesEditing.value?.let { outState.putString(STATE_NOTE, it) }
         outState.putString(STATE_SELECTED_DEVICE, selectedId)
     }
 
@@ -283,7 +329,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val paired = HomeModel.pairedDevices()
         LaunchedEffect(tick) { reconcile(paired) }
         val holder = rememberSaveableStateHolder()
-        BackHandler(enabled = stack.size > 1) { onBack(stack.last()) }
+        val onTabs = stack.last() == HOME && paired.isNotEmpty()
+        BackHandler(enabled = stack.size > 1 || (onTabs && nav.canGoBack)) {
+            if (stack.size > 1) onBack(stack.last()) else nav.back()
+        }
         Box(Modifier.fillMaxSize().background(tokens.bg)) {
             AnimatedContent(
                 targetState = stack.last(),
@@ -292,7 +341,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             ) { route ->
                 holder.SaveableStateProvider(route) { Screen(route, paired) }
             }
-            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp)) { data ->
+            // Above the tab bar when it is showing.
+            SnackbarHost(
+                snackbar,
+                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (onTabs && !isWide()) 16.dp + TabBarHeight else 16.dp),
+            ) { data ->
                 Snackbar(data, containerColor = tokens.inverse, contentColor = tokens.onInverse, actionColor = tokens.accent)
             }
         }
@@ -309,6 +362,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 device.cancelPairing()
             }
         }
+        // Settings without a computer keep their pages on the Settings tab's stack.
+        if (route == SETTINGS && nav.pop(AppTab.SETTINGS)) return
         pop()
     }
 
@@ -323,14 +378,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         // Before the first reconcile the selection may be stale: never flash Welcome for it.
         val device = paired.firstOrNull { it.deviceId == selectedId } ?: paired.firstOrNull()
         when {
-            route == HOME -> if (device == null) WelcomeScreen(onPair = { push(SCAN) }, onSettings = { push(SETTINGS) }) else HomeRoute(device, paired)
+            route == HOME -> if (device == null) WelcomeScreen(onPair = { push(SCAN) }, onSettings = { push(SETTINGS) }) else TabsRoute(device, paired)
             route == SCAN -> ScanRoute()
             route.startsWith(PAIR_PREFIX) -> PairRoute(route.removePrefix(PAIR_PREFIX))
-            route == SETTINGS -> SettingsRoute(device)
-            route == MORE -> MoreRoute(device)
-            route == NETWORK -> NetworkScreen(onBack = ::pop)
-            route == ABOUT -> AboutRoute()
-            route == TRANSFERS && device != null -> TransfersRoute(device)
+            route == SETTINGS -> SettingsContent(device)
             route.startsWith(VIEWER_PREFIX) -> ViewerRoute(route.removePrefix(VIEWER_PREFIX))
             else -> LaunchedEffect(route) { pop() }
         }
@@ -339,9 +390,59 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     // ---- home ----------------------------------------------------------------------------------------------
 
     @Composable
-    private fun HomeRoute(device: Device, paired: List<Device>) {
+    private fun TabsRoute(device: Device, paired: List<Device>) {
         // Re-read the devices on every refresh tick: they are not observable state.
         @Suppress("UNUSED_VARIABLE") val refresh = tick
+        val id = device.deviceId
+        val bucketViews by BucketEngine.views.collectAsState()
+        val attention by TerminalAttentionBadge.pending.collectAsState()
+        val running = TransferProgress.visibleFor(id)?.takeIf { !it.finished }
+        val bucket = bucketViews[id]?.summary?.takeIf { !it.paused }
+        val (filesBusy, filesProgress) = filesBadge(bucket != null, bucket?.fraction, running != null, running?.percent?.let { it / 100f })
+        val settingsWaiting = androidx.compose.runtime.remember(tick / 5, id, device.name) { waitingPermissions(this, device.name) > 0 }
+        val badges = TabBadges(
+            link = device.toUiModel().connection,
+            filesProgress = filesProgress,
+            filesBusy = filesBusy,
+            terminalsAttention = id in attention,
+            settingsAttention = settingsWaiting,
+        )
+        // Seen: opening the tab clears its dot.
+        LaunchedEffect(nav.selected, id) { if (nav.selected == AppTab.TERMINALS) TerminalAttentionBadge.clear(id) }
+        TabsShell(nav, badges, onQuickAction = { quickAction(it, device) }) { tab ->
+            when (tab) {
+                AppTab.HOME -> HomeTab(device, paired)
+                AppTab.FILES -> FilesContent(device)
+                AppTab.NOTES -> NotesContent(device)
+                AppTab.TERMINALS -> TerminalsTab(
+                    deviceId = id,
+                    deskName = device.name,
+                    onOpenSession = { sessionId -> startActivity(TerminalActivity.intent(this, id).putExtra(TerminalActivity.EXTRA_TERMINAL_ID, sessionId)) },
+                    onOpenTerminals = { startActivity(TerminalActivity.intent(this, id)) },
+                    onNew = { startActivity(TerminalActivity.intent(this, id, newTerminal = true)) },
+                )
+                AppTab.SETTINGS -> SettingsContent(device)
+            }
+        }
+    }
+
+    /** A long-press on a tab. */
+    private fun quickAction(action: QuickAction, device: Device) {
+        when (action) {
+            QuickAction.SWITCH_COMPUTER -> { nav.select(AppTab.HOME); computersRequest++ }
+            QuickAction.SEND_FILES -> sendFiles(device)
+            QuickAction.NEW_NOTE -> { nav.select(AppTab.NOTES); notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW }
+            QuickAction.NEW_TERMINAL -> startActivity(TerminalActivity.intent(this, device.deviceId, newTerminal = true))
+        }
+    }
+
+    private fun sendFiles(device: Device) {
+        device.loadedPlugins.values.flatMap { it.getUiButtons() }.firstOrNull { it.iconRes == R.drawable.share_plugin_action_24dp }
+            ?.onClick?.invoke(this) ?: showMessage(getString(R.string.home_feature_off))
+    }
+
+    @Composable
+    private fun HomeTab(device: Device, paired: List<Device>) {
         val stats = rememberConnectionStats(device.deviceId)
         val state = HomeModel.build(this, device, paired).let { s ->
             if (s.ready && stats != null) s.copy(path = stats.path, rttMs = stats.roundTripTimeMs?.toInt()) else s
@@ -358,6 +459,45 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         }
     }
 
+    @Composable
+    private fun FilesContent(device: Device) {
+        val revision = TransferHistory.revision
+        val records = androidx.compose.runtime.remember(revision, device.deviceId) { TransferHistory.store(this).forDevice(device.deviceId) }
+        val running = TransferProgress.visibleFor(device.deviceId)?.takeIf { !it.finished }
+        FilesTab(
+            bucket = bucketUi,
+            deviceId = device.deviceId,
+            deskName = device.name,
+            live = liveTransfer(running),
+            records = records,
+            revision = revision,
+            actions = transferActions(device, running),
+        )
+    }
+
+    @Composable
+    private fun NotesContent(device: Device) {
+        androidx.activity.compose.BackHandler(enabled = notesEditing.value != null) { notesEditing.value = null }
+        NotesTab(
+            notes = notesUi,
+            host = this,
+            deskName = device.name,
+            clipboardOn = device.isPluginEnabled(HomeModel.clipboardKey),
+            onClipboard = { on -> setPluginEnabled(device, HomeModel.clipboardKey, on) },
+            onSendClipboard = { sendClipboard(device) },
+            onMessage = ::showMessage,
+        )
+    }
+
+    private fun sendClipboard(device: Device) {
+        val clipboard = device.getPlugin(org.desklink.mobile.plugins.clipboard.ClipboardPlugin::class.java)
+        when {
+            clipboard == null -> showMessage(getString(R.string.home_feature_off))
+            clipboard.sendNow() -> showMessage(getString(R.string.home_clipboard_sent, device.name))
+            else -> showMessage(getString(R.string.clipboard_nothing_sent))
+        }
+    }
+
     private fun homeActions(device: Device, onShareInfo: () -> Unit): HomeActions {
         val id = device.deviceId
         fun menu(name: Int) = device.loadedPlugins.values.flatMap { it.getUiMenuEntries() }.firstOrNull { it.name == getString(name) }
@@ -370,7 +510,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         return HomeActions(
             onSelectComputer = ::select,
             onPairAnother = { push(SCAN) },
-            onSettings = { push(SETTINGS) },
             onRetry = {
                 BackgroundService.ForceRefreshConnections(this)
                 showMessage(getString(R.string.home_looking_for, device.name))
@@ -384,15 +523,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onSeek = { ms -> media(device) { it.seekTo(ms) } },
             onVolume = { level -> media(device) { it.setVolume(level) } },
             onSelectPlayer = { name -> media(device) { it.selectedPlayer = name } },
-            onTerminals = { startActivity(TerminalActivity.intent(this, id)) },
             onDeskScreen = {
                 if (device.getPlugin(org.desklink.mobile.plugins.screen.ScreenControlPlugin::class.java) == null) showMessage(getString(R.string.home_feature_off))
                 else startActivity(Intent(this, MousePadActivity::class.java).putExtra("deviceId", id))
             },
-            onSendFiles = {
-                device.loadedPlugins.values.flatMap { it.getUiButtons() }.firstOrNull { it.iconRes == R.drawable.share_plugin_action_24dp }
-                    ?.onClick?.invoke(this) ?: showMessage(getString(R.string.home_feature_off))
-            },
+            onSendFiles = { sendFiles(device) },
             onSendLink = { url ->
                 val share = device.getPlugin(SharePlugin::class.java)
                 if (share == null) showMessage(getString(R.string.home_feature_off)) else {
@@ -411,17 +546,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             },
             onPing = { run(menu(R.string.send_ping), R.string.home_pinged) },
             onRing = { run(menu(R.string.ring), R.string.home_rang) },
-            onTransfers = { push(TRANSFERS) },
-            onSendClipboard = {
-                val clipboard = device.getPlugin(org.desklink.mobile.plugins.clipboard.ClipboardPlugin::class.java)
-                when {
-                    clipboard == null -> showMessage(getString(R.string.home_feature_off))
-                    clipboard.sendNow() -> showMessage(getString(R.string.home_clipboard_sent, device.name))
-                    else -> showMessage(getString(R.string.clipboard_nothing_sent))
-                }
-            },
-            onClipboard = { on -> setPluginEnabled(device, HomeModel.clipboardKey, on) },
-            onDeskSound = { on -> setDeskSound(id, on) },
+            onOpenFiles = { nav.select(AppTab.FILES) },
             onUnlockDesk = {
                 val unlock = device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java)
                 when {
@@ -430,11 +555,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     else -> showMessage(getString(R.string.settings_waiting_for, device.name))
                 }
             },
-            onNotes = { startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this)) },
-            onNote = { noteId -> startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, noteId = noteId)) },
-            onNewNote = { startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, newNote = true)) },
-            onBucket = { startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this, id)) },
+            onNotes = { nav.select(AppTab.NOTES) },
+            onNote = { noteId -> nav.select(AppTab.NOTES); notesEditing.value = noteId },
+            onNewNote = { nav.select(AppTab.NOTES); notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW },
+            onBucket = { nav.select(AppTab.FILES) },
             onUnavailable = ::showMessage,
+            openComputersRequest = computersRequest,
         )
     }
 
@@ -638,48 +764,34 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     // ---- transfers ---------------------------------------------------------------------------------------------
 
-    @Composable
-    private fun TransfersRoute(device: Device) {
-        @Suppress("UNUSED_VARIABLE") val refresh = tick
-        val revision = TransferHistory.revision
-        val history = TransferHistory.store(this)
-        val records = androidx.compose.runtime.remember(revision, device.deviceId) { history.forDevice(device.deviceId) }
-        val running = TransferProgress.visibleFor(device.deviceId)?.takeIf { !it.finished }
-        val speed = running?.bytesPerSecond?.takeIf { it > 0 }?.let { org.desklink.mobile.ui.compose.screen.transfers.speedLabel(it) }
-        TransfersScreen(
-            deskName = device.name,
-            live = running?.let { tr ->
-                LiveTransfer(tr.title, tr.upload, tr.percent?.let { it / 100f }, listOfNotNull(tr.percent?.let { "$it%" }, speed).joinToString(" · "))
-            },
-            records = records,
-            revision = revision,
-            actions = TransferActions(
-                onBack = ::pop,
-                onSendFiles = {
-                    device.loadedPlugins.values.flatMap { it.getUiButtons() }.firstOrNull { it.iconRes == R.drawable.share_plugin_action_24dp }
-                        ?.onClick?.invoke(this) ?: showMessage(getString(R.string.home_feature_off))
-                },
-                onCancelLive = {
-                    running?.let { sendBroadcast(TransferProgress.cancelIntent(this, it)) }
-                    showMessage(getString(R.string.transfers_cancelled))
-                },
-                onOpen = { record ->
-                    when (previewKind(record.mime, record.name)) {
-                        PreviewKind.IMAGE, PreviewKind.VIDEO -> push(VIEWER_PREFIX + record.id)
-                        else -> openWith(record)
-                    }
-                },
-                onShare = { record ->
-                    val share = Intent(Intent.ACTION_SEND).setType(record.mime ?: "*/*")
-                        .putExtra(Intent.EXTRA_STREAM, shareableUri(record))
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    startActivity(Intent.createChooser(share, record.name))
-                },
-                onOpenWith = ::openWith,
-                onRemove = { record -> TransferHistory.remove(this, record.id) },
-            ),
-        )
+    private fun liveTransfer(running: TransferProgress.Transfer?): LiveTransfer? {
+        running ?: return null
+        val speed = running.bytesPerSecond.takeIf { it > 0 }?.let { getString(R.string.transfers_speed, android.text.format.Formatter.formatShortFileSize(this, it)) }
+        return LiveTransfer(running.title, running.upload, running.percent?.let { it / 100f }, listOfNotNull(running.percent?.let { "$it%" }, speed).joinToString(" · "))
     }
+
+    private fun transferActions(device: Device, running: TransferProgress.Transfer?) = TransferActions(
+        onBack = {},
+        onSendFiles = { sendFiles(device) },
+        onCancelLive = {
+            running?.let { sendBroadcast(TransferProgress.cancelIntent(this, it)) }
+            showMessage(getString(R.string.transfers_cancelled))
+        },
+        onOpen = { record ->
+            when (previewKind(record.mime, record.name)) {
+                PreviewKind.IMAGE, PreviewKind.VIDEO -> push(VIEWER_PREFIX + record.id)
+                else -> openWith(record)
+            }
+        },
+        onShare = { record ->
+            val share = Intent(Intent.ACTION_SEND).setType(record.mime ?: "*/*")
+                .putExtra(Intent.EXTRA_STREAM, shareableUri(record))
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(Intent.createChooser(share, record.name))
+        },
+        onOpenWith = ::openWith,
+        onRemove = { record -> TransferHistory.remove(this, record.id) },
+    )
 
     /** Another app opens it, read access granted through our FileProvider for local files. */
     private fun openWith(record: TransferRecord) {
@@ -722,7 +834,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     // ---- settings ---------------------------------------------------------------------------------------------
 
     @Composable
-    private fun SettingsRoute(device: Device?) {
+    private fun SettingsContent(device: Device?) {
         // Re-read the devices on every refresh tick: they are not observable state.
         @Suppress("UNUSED_VARIABLE") val refresh = tick
         val desk = device?.let {
@@ -752,10 +864,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             )
         }
         fun deskSet(key: String, on: Boolean) = device?.getPlugin(DeskSettingsPlugin::class.java)?.set(key, on)
-        SettingsScreen(
-            desk,
-            SettingsActions(
-                onBack = ::pop,
+        SettingsTab(
+            desk = desk,
+            route = nav.top(AppTab.SETTINGS),
+            onOpen = { nav.push(AppTab.SETTINGS, it) },
+            onBack = { nav.pop(AppTab.SETTINGS) },
+            waitingPermissions = waitingPermissions(this, device?.name ?: getString(R.string.settings_your_computer)),
+            about = { AboutRoute { nav.pop(AppTab.SETTINGS) } },
+            actions = SettingsActions(
                 // One writer per setting: these are this phone's plugins, the desk's own
                 // switches go through onDeskSetting only.
                 onPhoneClipboard = { on -> device?.let { setPluginEnabled(it, HomeModel.clipboardKey, on) } },
@@ -825,11 +941,17 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     }
                     tick++
                 },
-                onMore = { push(MORE) },
+                onPairAnother = { push(SCAN) },
+                onSendClipboard = { device?.let(::sendClipboard) },
+                onChooseNotificationApps = { device?.getPlugin(NotificationsPlugin::class.java)?.openAppFilter(this) },
+                onAddTiles = { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) offerTiles() },
+                onOpenBucket = { nav.select(AppTab.FILES); if (stack.last() != HOME) resetTo(HOME) },
                 onUnpair = {
                     device?.unpair()
                     select(null)
                     resetTo(HOME)
+                    nav.reset(AppTab.SETTINGS)
+                    nav.select(AppTab.HOME)
                 },
                 onEncryptionInfo = { device?.let(::showEncryptionInfo) },
                 onRecreate = ::recreate,
@@ -875,41 +997,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             .show()
     }
 
-    @Composable
-    private fun MoreRoute(device: Device?) {
-        // Re-read the devices on every refresh tick: they are not observable state.
-        @Suppress("UNUSED_VARIABLE") val refresh = tick
-        fun button(icon: Int) = device?.loadedPlugins?.values?.flatMap { it.getUiButtons() }?.firstOrNull { it.iconRes == icon }
-        fun open(cls: Class<*>, plugin: Class<out Plugin>) = device?.takeIf { it.getPlugin(plugin) != null }?.let { d ->
-            { startActivity(Intent(this, cls).putExtra("deviceId", d.deviceId)); Unit }
-        }
-        val extras = buildList {
-            add(MoreExtra(R.drawable.sym_mouse, getString(R.string.more_desk_controls), getString(R.string.more_desk_controls_summary)) {
-                startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            })
-            add(MoreExtra(R.drawable.sym_edit_note, getString(R.string.more_notes), getString(R.string.more_notes_summary)) {
-                startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this@MainActivity))
-            })
-            // Android 13+ can add a tile without the person digging in the shade's editor.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(MoreExtra(R.drawable.sym_tune, getString(R.string.surfaces_add_tiles), getString(R.string.surfaces_add_tiles_summary)) { offerTiles() })
-            }
-            if (device != null) {
-                add(MoreExtra(R.drawable.sym_inventory, getString(R.string.more_bucket), getString(R.string.more_bucket_summary)) {
-                    startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this@MainActivity, device.deviceId))
-                })
-            }
-        }
-        MoreScreen(
-            extras = extras,
-            onFeatures = device?.let { d -> { startActivity(Intent(this, PluginSettingsActivity::class.java).putExtra("deviceId", d.deviceId)) } },
-            onNetwork = { push(NETWORK) },
-            onAbout = { push(ABOUT) },
-            onBack = ::pop,
-            onMessage = ::showMessage,
-        )
-    }
-
     /** Picks one of DeskLink's Quick Settings tiles and asks the system to add it (API 33+). */
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun offerTiles() {
@@ -936,11 +1023,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     }
 
     @Composable
-    private fun AboutRoute() {
+    private fun AboutRoute(onBack: () -> Unit) {
         val about = androidx.compose.runtime.remember { getApplicationAboutData(this) }
         fun open(url: String?) = url?.let { runCatching { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(it))) } }
         Column(Modifier.fillMaxSize().background(tokens.bg).statusBarsPadding()) {
-            ScreenHeader(::pop)
+            ScreenHeader(onBack)
             Box(Modifier.weight(1f)) {
                 AboutScreen(
                     aboutData = about,
@@ -1009,14 +1096,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         const val RESULT_NOTIFICATIONS_ENABLED = RESULT_FIRST_USER + 1
         const val RESULT_CALL_PERMISSIONS = RESULT_FIRST_USER + 2
         const val FLAG_FORCE_OVERVIEW = "forceOverview"
+        const val EXTRA_SETTINGS_PAGE = "settingsPage"
 
         private const val HOME = "home"
         private const val SCAN = "scan"
         private const val SETTINGS = "settings"
-        private const val MORE = "more"
-        private const val NETWORK = "network"
-        private const val ABOUT = "about"
-        private const val TRANSFERS = "transfers"
         private const val VIEWER_PREFIX = "viewer/"
         private const val PAIR_PREFIX = "pair/"
         private fun pairRoute(id: String) = PAIR_PREFIX + id

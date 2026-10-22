@@ -693,6 +693,53 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="one">Added %1$d item to the Bucket</item>
         <item quantity="other">Added %1$d items to the Bucket</item>
     </plurals>
+    <string name="files_recent_transfers">Recent transfers</string>
+    <string name="files_show_all">Show all %1$d</string>
+    <string name="home_more_actions">More actions</string>
+    <!-- W5: Settings, grouped by feature in the desk's order -->
+    <string name="sg_connection_summary">This phone\'s name, %1$s, unpairing</string>
+    <string name="sg_notifications_summary">Phone notifications, %1$s\'s here, ring sound</string>
+    <string name="sg_clipboard">Clipboard</string>
+    <string name="sg_clipboard_summary">Share copies with %1$s</string>
+    <string name="sg_calls">Calls</string>
+    <string name="sg_calls_summary">Answer and see calls on %1$s</string>
+    <string name="sg_sound">Sound</string>
+    <string name="sg_sound_summary">%1$s\'s sound here, this phone\'s media there</string>
+    <string name="sg_control">Control</string>
+    <string name="sg_control_summary">Glide, typing, the desk screen</string>
+    <string name="sg_files">Files</string>
+    <string name="sg_files_summary">The Bucket and where received files go</string>
+    <string name="sg_privacy">Privacy and security</string>
+    <string name="sg_privacy_summary">Fingerprint check, unlocking, encryption</string>
+    <string name="sg_appearance">Appearance</string>
+    <string name="sg_appearance_summary">Theme and colours</string>
+    <string name="sg_advanced">Advanced</string>
+    <string name="sg_advanced_summary">Away from home, network, Bluetooth, permissions, logs</string>
+    <string name="sg_needs_computer">Pair a computer to see these settings.</string>
+    <string name="sg_notifications_phone">This phone\'s notifications on %1$s</string>
+    <string name="sg_notifications_desk">%1$s\'s notifications here</string>
+    <string name="sg_choose_apps">Choose apps</string>
+    <string name="sg_choose_apps_summary">Which apps\' notifications are shared</string>
+    <string name="sg_calls_permission">Calls need permission</string>
+    <string name="sg_calls_permission_summary">Allow phone and call access so %1$s can show and answer calls</string>
+    <string name="sg_control_phone">%1$s controlling this phone</string>
+    <string name="sg_control_desk_screen">When you control %1$s</string>
+    <string name="sg_files_default_folder">Use the Downloads folder again</string>
+    <string name="sg_contacts_permission">Contacts permission</string>
+    <string name="sg_permissions_all_set">Everything DeskLink needs is allowed</string>
+    <string name="settings_desk_clipboard">Receive %1$s\'s clipboard</string>
+    <!-- W5: the Files, Notes and Terminals tabs -->
+    <string name="files_title">Files</string>
+    <string name="files_subtitle">The Bucket and what you sent and received</string>
+    <string name="notes_tab_clipboard">Clipboard</string>
+    <string name="notes_clipboard_sync">Clipboard sync</string>
+    <string name="notes_clipboard_history_title">No clipboard history</string>
+    <string name="notes_clipboard_history_body">Android does not let an app read what was copied before, so DeskLink cannot list your clipboard history. What was shared is on the other device as it arrives. Pin a copy as a snippet to keep it.</string>
+    <string name="notes_clipboard_pin">Pin the clipboard as a snippet</string>
+    <string name="terminals_subtitle_none">No terminals on %1$s yet</string>
+    <string name="terminals_unavailable">Terminals are not available right now. Open them to unlock or retry.</string>
+    <string name="terminals_open">Open terminals</string>
+    <string name="terminals_needs_attention">Needs you</string>
     <!-- W5: the tab bar -->
     <string name="tab_home">Home</string>
     <string name="tab_files">Files</string>

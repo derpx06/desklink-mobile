@@ -72,6 +72,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -149,7 +150,6 @@ data class HomeState(
 class HomeActions(
     val onSelectComputer: (String) -> Unit,
     val onPairAnother: () -> Unit,
-    val onSettings: () -> Unit,
     val onRetry: () -> Unit,
     val onEndLive: () -> Unit,
     val onPlayPause: () -> Unit,
@@ -158,7 +158,6 @@ class HomeActions(
     val onSeek: (Long) -> Unit,
     val onVolume: (Int) -> Unit,
     val onSelectPlayer: (String) -> Unit,
-    val onTerminals: () -> Unit,
     val onDeskScreen: () -> Unit,
     val onSendFiles: () -> Unit,
     val onSendLink: (String) -> Unit,
@@ -166,9 +165,8 @@ class HomeActions(
     val onShareScreen: () -> Unit,
     val onPing: () -> Unit,
     val onRing: () -> Unit,
-    val onTransfers: () -> Unit,
-    val onSendClipboard: () -> Unit,
-    val onClipboard: (Boolean) -> Unit,
+    /** The Files tab: the Bucket and the recent transfers. */
+    val onOpenFiles: () -> Unit,
     val onUnlockDesk: () -> Unit,
     /** An action was tapped while the computer cannot take it; the message says why. */
     val onUnavailable: (String) -> Unit,
@@ -176,16 +174,20 @@ class HomeActions(
     val onNote: (String) -> Unit = {},
     val onNewNote: () -> Unit = {},
     val onBucket: () -> Unit = {},
-    val onDeskSound: (Boolean) -> Unit = {},
+    /** Opens the computers sheet from outside (a long-press on the Home tab). */
+    val openComputersRequest: Int = 0,
 )
 
 @Composable
 fun HomeScreen(state: HomeState, actions: HomeActions) {
     val t = tokens
     var sheet by rememberSaveable { mutableStateOf(false) }
+    var moreSheet by rememberSaveable { mutableStateOf(false) }
     var linkDialog by rememberSaveable { mutableStateOf(false) }
     val notReady = notReadyMessage(state)
     val gate = { action: () -> Unit -> if (state.ready) action() else actions.onUnavailable(notReady) }
+    // The Home tab's long-press asks for the computers sheet.
+    androidx.compose.runtime.LaunchedEffect(actions.openComputersRequest) { if (actions.openComputersRequest > 0) sheet = true }
 
     var playerOpen by rememberSaveable { mutableStateOf(false) }
     // Where the card's artwork is, for the player to grow from.
@@ -194,10 +196,6 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
         Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().height(60.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 DeviceChip(state.name, state.connection) { sheet = true }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = actions.onSettings, modifier = Modifier.size(48.dp)) {
-                    Icon(painterResource(R.drawable.sym_settings), contentDescription = stringResource(R.string.settings), tint = t.text)
-                }
             }
             Column(
                 Modifier
@@ -207,26 +205,21 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 StatusCard(state, actions)
-                // One place, playing or paused: directly under the status card.
+                PrimaryActions(state, gate, actions)
+                // One place, playing or paused: directly under the actions.
                 state.media?.let { MediaCard(it, actions, cardArt) { playerOpen = true } }
-                SectionLabel(stringResource(R.string.home_open_on, state.name))
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TerminalsTile(state, Modifier.weight(1f)) { gate(actions.onTerminals) }
-                    DeskTile(state.ready, Modifier.weight(1f)) { gate(actions.onDeskScreen) }
-                }
                 // Local-first: Notes and the Bucket show whether or not the computer is there.
                 org.desklink.mobile.plugins.notes.NotesHomeCard(onOpenList = actions.onNotes, onOpenNote = actions.onNote, onNew = actions.onNewNote)
-                org.desklink.mobile.plugins.folders.BucketHomeCard(state.deviceId, state.name, onOpen = actions.onBucket)
-                SectionLabel(stringResource(R.string.home_quick_actions))
-                QuickActions(state, gate, actions) { linkDialog = true }
-                TransferAndClipboard(state, actions)
-                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars).padding(bottom = 6.dp))
+                FilesCard(state, actions)
+                MoreActionsRow { moreSheet = true }
+                Spacer(Modifier.height(12.dp))
             }
         }
         NowPlayingOverlay(state.media, actions, cardArt, playerOpen && state.media != null) { playerOpen = false }
     }
 
     if (sheet) ComputersSheet(state, onDismiss = { sheet = false }, actions)
+    if (moreSheet) MoreActionsSheet(state, gate, actions, onDismiss = { moreSheet = false }, onSendLink = { moreSheet = false; linkDialog = true })
     if (linkDialog) SendLinkDialog(onDismiss = { linkDialog = false }) { url -> linkDialog = false; actions.onSendLink(url) }
 }
 
@@ -404,137 +397,69 @@ private fun LiveRow(live: LiveSessions, onEnd: () -> Unit) {
 
 // ---- media --------------------------------------------------------------------------------------------
 
-// ---- open on the desk -------------------------------------------------------------------------------
+// ---- primary actions ----------------------------------------------------------------------------------
 
-private val TileBlack = Color(0xFF0E0F11)
-private val TileText = Color(0xFFF2F2F3)
-private val TileDim = Color(0xFF8B9099)
-
+/** The four things people do most: the desk's screen, send files, ring the desk, lock it. */
 @Composable
-private fun TerminalsTile(state: HomeState, modifier: Modifier, onClick: () -> Unit) {
-    val description = pluralStringResource(R.plurals.home_terminals_tile, state.terminalCount, state.terminalCount)
-    Column(
-        modifier
-            .height(156.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(TileBlack)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = description }
-            .padding(16.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconCircle(R.drawable.sym_terminal, 40.dp, 22.dp, background = Color.White.copy(alpha = 0.1f), tint = TileText)
-            Spacer(Modifier.weight(1f))
-            if (state.terminalCount > 0) {
-                Text(
-                    state.terminalCount.toString(),
-                    fontFamily = MonoFamily,
-                    fontSize = 12.sp,
-                    color = TileText,
-                    modifier = Modifier
-                        .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-            }
-        }
-        Column(Modifier.weight(1f).padding(top = 10.dp)) {
-            if (state.terminalLines.isNotEmpty()) {
-                state.terminalLines.take(2).forEach {
-                    Text(it, fontFamily = MonoFamily, fontSize = 10.5.sp, lineHeight = 15.sp, color = TileDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            } else {
-                // No screen open on this phone yet: the newest session and where it runs.
-                state.terminalNewest?.let {
-                    Text(it, fontFamily = MonoFamily, fontSize = 11.sp, lineHeight = 15.sp, color = TileText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(stringResource(R.string.terminal_running_on, state.name), fontSize = 10.5.sp, lineHeight = 15.sp, color = TileDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        }
-        Text(stringResource(R.string.terminal_section), fontSize = 17.sp, fontWeight = FontWeight.Medium, color = TileText)
-    }
-}
-
-@Composable
-private fun DeskTile(ready: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val t = tokens
-    Column(
-        modifier
-            .height(156.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(t.accentContainer)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) {}
-            .padding(16.dp),
-    ) {
-        IconCircle(R.drawable.sym_desktop_windows, 40.dp, 22.dp, background = t.surface, tint = t.onAccentContainer)
-        Spacer(Modifier.weight(1f))
-        Text(stringResource(R.string.home_desk_screen), fontSize = 17.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer)
-        Text(stringResource(R.string.home_desk_screen_sub), fontSize = 12.sp, color = t.onAccentContainer, modifier = Modifier.padding(top = 2.dp))
-    }
-}
-
-// ---- quick actions --------------------------------------------------------------------------------------
-
-@Composable
-private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActions, onSendLink: () -> Unit) {
+private fun PrimaryActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActions) {
     val tiles = listOf(
+        Triple(R.drawable.sym_desktop_windows, R.string.home_desk_screen, actions.onDeskScreen),
         Triple(R.drawable.sym_upload_file, R.string.home_send_files, actions.onSendFiles),
-        Triple(R.drawable.sym_link, R.string.home_send_link, onSendLink),
-        Triple(R.drawable.sym_lock, R.string.home_lock_desk, actions.onLock),
-        Triple(R.drawable.sym_mobile_screen_share, if (state.live.phoneScreen) R.string.home_stop_sharing else R.string.home_share_screen, actions.onShareScreen),
-        Triple(R.drawable.sym_waving_hand, R.string.home_ping_desk, actions.onPing),
         Triple(R.drawable.sym_vibration, R.string.home_ring_desk, actions.onRing),
-        Triple(R.drawable.sym_swap_vert, R.string.transfers_title, actions.onTransfers),
+        Triple(R.drawable.sym_lock, R.string.home_lock_desk, actions.onLock),
     )
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        tiles.chunked(2).forEach { pair ->
-            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                pair.forEach { (icon, label, onClick) ->
-                    // The history is on this phone: it opens whether or not the computer is there.
-                    QuickTile(icon, stringResource(label), state.ready, Modifier.weight(1f).fillMaxHeight()) { if (label == R.string.transfers_title) onClick() else gate(onClick) }
-                }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
-            }
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        tiles.forEachIndexed { index, (icon, label, onClick) ->
+            ActionTile(icon, stringResource(label), index == 0, state.ready, Modifier.weight(1f).fillMaxHeight()) { gate(onClick) }
         }
     }
 }
 
 @Composable
-private fun QuickTile(@DrawableRes icon: Int, label: String, ready: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun ActionTile(@DrawableRes icon: Int, label: String, primary: Boolean, ready: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val t = tokens
-    val shape = RoundedCornerShape(18.dp)
-    Row(
+    val shape = RoundedCornerShape(20.dp)
+    val bg = if (primary) t.accentContainer else t.surface
+    Column(
         modifier
-            .heightIn(min = 56.dp)
+            .heightIn(min = 84.dp)
             .clip(shape)
-            .background(t.surface)
-            .border(1.dp, t.hairline, shape)
+            .background(bg)
+            .then(if (primary) Modifier else Modifier.border(1.dp, t.hairline, shape))
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .semantics(mergeDescendants = true) { if (!ready) stateDescription = "unavailable" }
+            .padding(horizontal = 6.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
-        IconCircle(icon, 32.dp, 19.dp)
-        Text(label, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, maxLines = 2)
+        Icon(painterResource(icon), contentDescription = null, tint = if (primary) t.onAccentContainer else t.text, modifier = Modifier.size(26.dp))
+        Text(
+            label,
+            fontSize = 12.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (primary) t.onAccentContainer else t.text,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 2,
+        )
     }
 }
 
-// ---- transfer and clipboard --------------------------------------------------------------------------------
+// ---- files card ---------------------------------------------------------------------------------------
 
+/** The Bucket's summary, and the file moving now: both open the Files tab. */
 @Composable
-private fun TransferAndClipboard(state: HomeState, actions: HomeActions) {
+private fun FilesCard(state: HomeState, actions: HomeActions) {
     val t = tokens
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(t.surface)
-            .border(1.dp, t.hairline, RoundedCornerShape(24.dp)),
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         state.transfer?.let { transfer ->
             Row(
                 Modifier
-                    .clickable(role = Role.Button, onClick = actions.onTransfers)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(t.surface)
+                    .border(1.dp, t.hairline, RoundedCornerShape(20.dp))
+                    .clickable(role = Role.Button, onClick = actions.onOpenFiles)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .semantics(mergeDescendants = true) {},
                 verticalAlignment = Alignment.CenterVertically,
@@ -553,74 +478,74 @@ private fun TransferAndClipboard(state: HomeState, actions: HomeActions) {
                     }
                 }
             }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(t.hairline))
         }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .clickable(role = Role.Button, onClick = actions.onTransfers)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            IconCircle(R.drawable.sym_swap_vert, 36.dp, 20.dp)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(stringResource(R.string.transfers_title), fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                Text(pluralStringResource(R.plurals.home_transfers_count, state.historyCount, state.historyCount), fontSize = 12.sp, color = t.textDim)
-            }
-            Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = t.textDim, modifier = Modifier.size(20.dp))
-        }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(t.hairline))
-        val clipboard = stringResource(R.string.home_clipboard_sync)
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .toggleable(value = state.clipboardOn, role = Role.Switch, onValueChange = actions.onClipboard)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            IconCircle(R.drawable.sym_content_paste, 36.dp, 20.dp)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(clipboard, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                Text(
-                    if (state.clipboardOn) org.desklink.mobile.ui.compose.screen.settings.clipboardSummary(state.name) else stringResource(R.string.home_clipboard_off),
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    color = t.textDim,
+        org.desklink.mobile.plugins.folders.BucketHomeCard(state.deviceId, state.name, onOpen = actions.onBucket)
+    }
+}
+
+// ---- more actions -------------------------------------------------------------------------------------
+
+@Composable
+private fun MoreActionsRow(onClick: () -> Unit) {
+    val t = tokens
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clip(shape)
+            .border(1.dp, t.hairline, shape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        IconCircle(R.drawable.sym_tune, 32.dp, 19.dp)
+        Text(stringResource(R.string.home_more_actions), fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = t.textDim, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** What is rarer: a link, a ping, this phone's screen (and the unlock, when the computer allows it). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MoreActionsSheet(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActions, onDismiss: () -> Unit, onSendLink: () -> Unit) {
+    val t = tokens
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = t.surface2,
+        dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(width = 32.dp, height = 4.dp, color = t.hairlineStrong) },
+    ) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.home_more_actions), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = t.textDim, modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
+            val rows = buildList {
+                add(Triple(R.drawable.sym_link, stringResource(R.string.home_send_link), { gate(onSendLink) }))
+                add(Triple(R.drawable.sym_waving_hand, stringResource(R.string.home_ping_desk), { onDismiss(); gate(actions.onPing) }))
+                add(
+                    Triple(
+                        R.drawable.sym_mobile_screen_share,
+                        stringResource(if (state.live.phoneScreen) R.string.home_stop_sharing else R.string.home_share_screen),
+                        { onDismiss(); gate(actions.onShareScreen) },
+                    ),
                 )
+                if (state.canUnlock) add(Triple(R.drawable.sym_lock_open, stringResource(R.string.home_unlock_desk, state.name), { onDismiss(); actions.onUnlockDesk() }))
             }
-            Switch(checked = state.clipboardOn, onCheckedChange = null, colors = deskSwitchColors())
-        }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(t.hairline))
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .toggleable(value = state.deskSoundOn, role = Role.Switch, onValueChange = actions.onDeskSound)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            IconCircle(R.drawable.sym_volume_up, 36.dp, 20.dp)
-            Text(stringResource(R.string.settings_desk_sound, state.name), fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            Switch(checked = state.deskSoundOn, onCheckedChange = null, colors = deskSwitchColors())
-        }
-        // Android 10+ lets only the app in front read the clipboard: the phone's side is a tap.
-        if (state.clipboardOn && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            Box(Modifier.fillMaxWidth().height(1.dp).background(t.hairline))
-            val notReady = notReadyMessage(state)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .clickable(role = Role.Button) { if (state.ready) actions.onSendClipboard() else actions.onUnavailable(notReady) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                IconCircle(R.drawable.sym_upload, 36.dp, 20.dp)
-                Text(stringResource(R.string.home_send_clipboard, state.name), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.accentText, modifier = Modifier.weight(1f))
+            rows.forEach { (icon, label, onClick) ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 56.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(t.surface)
+                        .clickable(role = Role.Button, onClick = onClick)
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    IconCircle(icon, 36.dp, 20.dp)
+                    Text(label, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                }
             }
         }
     }
