@@ -79,4 +79,29 @@ class PeerLivenessTest {
         assertTrue(answer.getBoolean("reply", false))
         assertFalse(answer.getBoolean("dozing", true))
     }
+
+    /** A freeze begins at screen off and ends at screen on: neither edge judges the silence between. */
+    @Test
+    fun screenOffAndOnRestartTheSilenceClockButNotWhatWasHeard() {
+        val liveness = PeerLiveness(5_000, 15_000).apply { start(0) }
+        liveness.onInbound(1_000)
+        liveness.restart(2_000) // screen off
+        // Frozen five minutes; the first tick after the thaw is far past the dead threshold, yet fine.
+        liveness.restart(302_000) // screen on, before the first tick
+        assertEquals(Verdict.OK, liveness.tick(302_500))
+        assertEquals(Verdict.OK, liveness.tick(304_000))
+        // Real silence after the wake is judged normally.
+        assertEquals(Verdict.PROBE, liveness.tick(307_000))
+        assertEquals(Verdict.DEAD, liveness.run(308_000, 317_000).first)
+    }
+
+    @Test
+    fun theWakeProbeOnlySeesRealDataNotTheClockRestart() {
+        val liveness = PeerLiveness(5_000, 15_000).apply { start(0) }
+        liveness.onInbound(100)
+        liveness.restart(60_000)
+        assertFalse(liveness.heardSince(60_000))
+        liveness.onInbound(60_500)
+        assertTrue(liveness.heardSince(60_000))
+    }
 }

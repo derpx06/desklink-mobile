@@ -63,7 +63,7 @@ enum class LinkGlyphState {
  * whatever the bootstrap link was, and a direct path is solid even when the relay introduced it.
  */
 fun linkGlyphState(connection: DeviceConnection, path: WebRtcConnectionPath? = null): LinkGlyphState = when (connection) {
-    DeviceConnection.OFFLINE -> LinkGlyphState.OFFLINE
+    DeviceConnection.OFFLINE, DeviceConnection.UNAVAILABLE -> LinkGlyphState.OFFLINE
     DeviceConnection.CONNECTING -> LinkGlyphState.CONNECTING
     else -> when (path) {
         WebRtcConnectionPath.TURN -> LinkGlyphState.RELAY

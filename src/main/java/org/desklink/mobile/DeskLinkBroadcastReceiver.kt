@@ -56,7 +56,10 @@ class DeskLinkBroadcastReceiver : BroadcastReceiver() {
                 }
             }
 
-            Intent.ACTION_SCREEN_OFF -> sendDozeState()
+            Intent.ACTION_SCREEN_OFF -> {
+                sendDozeState()
+                org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { DeskLinkApplication.getInstance().onScreenOff() } }
+            }
 
             else -> Log.i("BroadcastReceiver", "Ignoring broadcast event: ${intent.action}")
         }

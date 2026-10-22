@@ -34,6 +34,18 @@ class PeerLiveness(private val probeAfterMs: Long, private val deadAfterMs: Long
         lastHeardAt = now
     }
 
+    /**
+     * Restarts the silence clocks without touching what was really heard: the screen went off (a
+     * freeze may begin) or on (it just ended). The accumulated silence of a frozen process says
+     * nothing about the peer, so it is never judged; [heardSince] still sees only real data.
+     */
+    @Synchronized
+    fun restart(now: Long) {
+        lastInboundAt = now
+        lastProbeAt = now
+        lastTickAt = now
+    }
+
     /** Whether anything really arrived at or after [since] (the screen-on probe's answer). */
     @Synchronized
     fun heardSince(since: Long): Boolean = lastHeardAt >= since

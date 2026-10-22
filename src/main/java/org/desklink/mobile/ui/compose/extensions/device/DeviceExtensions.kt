@@ -24,7 +24,7 @@ fun Device.toUiModel(): DeviceUiModel {
         summaryRes = if (compareProtocolVersion() > 0) R.string.protocol_version_newer else 0,
         isReachable = isReachable,
         isPaired = isPaired,
-        connection = deviceConnection(isReachable, hasActiveWebRtcFeatureTransport, connectionPath),
+        connection = deviceConnection(isReachable, hasActiveWebRtcFeatureTransport, connectionPath, webRtcUnavailable),
         batteryPercent = battery?.currentCharge,
         charging = battery?.isCharging == true,
         wantsToPair = pairStatus == PairingHandler.PairState.RequestedByPeer,
@@ -36,12 +36,13 @@ fun Device.toUiModel(): DeviceUiModel {
  * only for a LAN pair, AWAY for a direct or relayed one, plain CONNECTED until the path is known.
  * The transport alive means connected even while the bootstrap link is being re-established.
  */
-fun deviceConnection(reachable: Boolean, featuresReady: Boolean, path: WebRtcConnectionPath?): DeviceConnection = when {
+fun deviceConnection(reachable: Boolean, featuresReady: Boolean, path: WebRtcConnectionPath?, unavailable: Boolean = false): DeviceConnection = when {
     featuresReady -> when (path) {
         WebRtcConnectionPath.LAN -> DeviceConnection.LOCAL
         WebRtcConnectionPath.DIRECT, WebRtcConnectionPath.TURN -> DeviceConnection.AWAY
         null -> DeviceConnection.CONNECTED
     }
     !reachable -> DeviceConnection.OFFLINE
+    unavailable -> DeviceConnection.UNAVAILABLE
     else -> DeviceConnection.CONNECTING
 }

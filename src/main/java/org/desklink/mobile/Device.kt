@@ -644,6 +644,14 @@ class Device : PacketReceiver {
         pending.forEach { it.payload?.close() }
     }
 
+    /** Every rung of the recovery ladder failed: shown as "unavailable" until a reset event or feature-ready. */
+    @Volatile var webRtcUnavailable: Boolean = false
+        private set
+
+    fun setWebRtcUnavailable(unavailable: Boolean) {
+        webRtcUnavailable = unavailable
+    }
+
     fun setWebRtcRecoveryPending(pending: Boolean) {
         if (pending && !webRtcRecoveryPending) {
             webRtcRecoveryPendingSince = android.os.SystemClock.elapsedRealtime()

@@ -20,6 +20,9 @@ enum class DeviceConnection {
     /** A link exists but the feature transport has not finished its handover. */
     CONNECTING,
     OFFLINE,
+
+    /** Reachable, but every recovery attempt failed: the connection cannot be set up now. It keeps trying. */
+    UNAVAILABLE,
 }
 
 data class DeviceUiModel(

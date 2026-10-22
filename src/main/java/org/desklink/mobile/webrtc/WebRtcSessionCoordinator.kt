@@ -248,7 +248,7 @@ class WebRtcSessionCoordinator(
                 if (closed || !sessions.isCurrent(binding)) return@synchronized
                 publish("BootstrapReconnected", "Replacing the stale WebRTC peer")
                 closeLocked()
-                recovery.reset()
+                resetLadder("new bootstrap link")
                 recoveryInProgress = false
                 device.setWebRtcRecoveryPending(true)
                 startInitiatorLocked(binding, iceServers)
@@ -281,12 +281,13 @@ class WebRtcSessionCoordinator(
     fun onPeerRestarted() = synchronized(lock) {
         if (closed) return@synchronized
         closeLocked()
-        recovery.reset()
+        resetLadder("peer restarted")
         recoveryInProgress = false
         device.setWebRtcRecoveryPending(false)
     }
 
     fun onLocalNetworkMoved() {
+        resetLadder("network changed")
         val current = synchronized(lock) {
             val binding = activeBinding
             val attemptId = activeAttemptId
@@ -449,12 +450,24 @@ class WebRtcSessionCoordinator(
         }
     }
 
+    /** The screen went off: a freeze may begin, and its silence is never judged afterwards. */
+    fun onScreenOff() = synchronized(lock) { peerLiveness.restart(SystemClock.elapsedRealtime()) }
+
+    /** An event that means "start over": the next failure takes the first rung, and "unavailable" clears. */
+    private fun resetLadder(why: String) {
+        recovery.reset()
+        device.setWebRtcUnavailable(false)
+        Log.d(TAG, "Recovery ladder reset: $why")
+    }
+
     /**
      * The screen came on (contract B2): probe the data channel now, and rebuild if nothing at all
      * arrives within [SCREEN_ON_PROBE_MS]. A thawed phone otherwise waited out the 15 s silence
      * budget on a peer the desk had already given up on.
      */
     fun onScreenOn() {
+        resetLadder("screen on")
+        synchronized(lock) { peerLiveness.restart(SystemClock.elapsedRealtime()) }
         val (binding, attemptId, active) = synchronized(lock) {
             val b = activeBinding ?: return
             val a = activeAttemptId ?: return
@@ -759,6 +772,7 @@ class WebRtcSessionCoordinator(
                     // desktop locked out until ICE consent freshness expired.
                     // Mirrors the desktop's `offer_attempt_disposition`.
                     closeLocked()
+                    resetLadder("inbound offer")
                     activeAttemptId = message.sessionAttemptId
                     lastPeerAttemptId = message.sessionAttemptId
                     activeBinding = binding
@@ -1144,7 +1158,6 @@ class WebRtcSessionCoordinator(
                         synchronized(lock) {
                             if (!closed && activeAttemptId == attemptId && sessions.isCurrent(binding)) {
                                 cancelDisconnectedGraceLocked()
-                                recovery.reset()
                                 // DTLS can be connected before the signed
                                 // handover is complete. Keep the scoped power
                                 // lease through that final control exchange;
@@ -1353,7 +1366,9 @@ class WebRtcSessionCoordinator(
                             .onFailure { publish("Failed", it.message) }
                     }
                     terminalLinkEvent { terminal.onLinkReady(wire) }
-                    recovery.reset()
+                    // Not a reset: only 60 s of healthy feature-ready starts the ladder over.
+                    recovery.markReady()
+                    device.setWebRtcUnavailable(false)
                     startLivenessLocked(binding, attemptId)
                     publish("FeatureReady", "LAN is now bootstrap and signaling only")
                     // Every owner sends its full snapshot (battery, phone media, clipboard,
@@ -2233,6 +2248,7 @@ class WebRtcSessionCoordinator(
             cancelDisconnectedGraceLocked()
             cancelOfferWatchdogLocked()
             val claimed = recovery.claimDelayMillis() ?: return
+            if (recovery.unavailable()) device.setWebRtcUnavailable(true)
             device.setWebRtcTransport(null)
             device.setWebRtcRecoveryPending(true)
             recoveryInProgress = true

@@ -232,7 +232,11 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
 
 @Composable
 private fun notReadyMessage(state: HomeState) = stringResource(
-    if (state.connection == DeviceConnection.CONNECTING) R.string.home_unavailable_connecting else R.string.home_unavailable_offline,
+    when (state.connection) {
+        DeviceConnection.CONNECTING -> R.string.home_unavailable_connecting
+        DeviceConnection.UNAVAILABLE -> R.string.home_unavailable_unreachable
+        else -> R.string.home_unavailable_offline
+    },
     state.name,
 )
 
@@ -289,6 +293,7 @@ fun connectionShort(connection: DeviceConnection): String = stringResource(
         DeviceConnection.CONNECTED -> R.string.connection_connected
         DeviceConnection.CONNECTING -> R.string.connection_connecting
         DeviceConnection.OFFLINE -> R.string.connection_offline
+        DeviceConnection.UNAVAILABLE -> R.string.connection_unavailable
     },
 )
 

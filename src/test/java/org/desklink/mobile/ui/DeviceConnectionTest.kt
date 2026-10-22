@@ -34,4 +34,11 @@ class DeviceTypeGlyphTest {
         // Anything unreported falls back to the generic computer, the monitor.
         assertEquals(org.desklink.mobile.R.drawable.ic_device_desktop_32dp, org.desklink.mobile.DeviceType.fromString("").toDrawableId())
     }
+
+    @Test
+    fun `reachable with every recovery attempt failed is unavailable, never offline or connecting`() {
+        assertEquals(DeviceConnection.UNAVAILABLE, deviceConnection(reachable = true, featuresReady = false, path = null, unavailable = true))
+        assertEquals(DeviceConnection.OFFLINE, deviceConnection(reachable = false, featuresReady = false, path = null, unavailable = true))
+        assertEquals(DeviceConnection.LOCAL, deviceConnection(reachable = true, featuresReady = true, path = WebRtcConnectionPath.LAN, unavailable = true))
+    }
 }

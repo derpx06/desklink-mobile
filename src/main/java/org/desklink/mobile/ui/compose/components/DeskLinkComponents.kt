@@ -152,6 +152,7 @@ fun statusOf(connection: DeviceConnection, wantsToPair: Boolean = false): Pair<S
         wantsToPair -> stringResource(R.string.connection_wants_to_pair) to t.amber
         connection.isConnected() -> stringResource(R.string.connection_connected) to t.mint
         connection == DeviceConnection.CONNECTING -> stringResource(R.string.connection_connecting) to t.accent
+        connection == DeviceConnection.UNAVAILABLE -> stringResource(R.string.connection_unavailable) to t.amber
         else -> stringResource(R.string.connection_offline) to t.textFaint
     }
 }
