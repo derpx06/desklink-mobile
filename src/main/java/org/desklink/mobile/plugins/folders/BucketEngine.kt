@@ -183,12 +183,23 @@ object BucketEngine {
             ready += deviceId
             val ids = if (deviceId in buckets) listOf(FolderSync.BUCKET_ID) else emptyList()
             send(deviceId, packet("pairs").apply { this["ids"] = ids })
+            // The handshake is re-sent on every feature-ready: a link that came up late (after the 30 s
+            // queue expired the first offer) still starts the Bucket, and a link that dropped before the
+            // desk answered asks again.
+            if (askedOffer(deviceId)) send(deviceId, packet("offer").apply {
+                this["id"] = FolderSync.BUCKET_ID
+                this["name"] = "DeskLink Bucket"
+                this["bucket"] = true
+            })
             buckets[deviceId]?.let { it.dirtyAt = 0; it.scannedAt = null; it.onDesk = true }
         } else {
             down(deviceId)
         }
         publish()
     }
+
+    /** Whether this phone asked [deviceId] for a Bucket and has not been answered: the offer goes out again. */
+    private fun askedOffer(deviceId: String) = BucketHandshake.resendOffer(asked.containsKey(deviceId), deviceId in buckets)
 
     private fun down(deviceId: String) {
         ready -= deviceId
@@ -214,7 +225,9 @@ object BucketEngine {
                 send(deviceId, packet("accept").apply { this["id"] = FolderSync.BUCKET_ID })
             } else {
                 asked[deviceId] = tree.toString() to SystemClock.elapsedRealtime()
-                send(deviceId, packet("offer").apply {
+                // Sent now only on a live link; otherwise feature-ready sends it (see link()), instead of
+                // leaving it in a queue that expires after 30 s.
+                if (deviceId in ready) send(deviceId, packet("offer").apply {
                     this["id"] = FolderSync.BUCKET_ID
                     this["name"] = "DeskLink Bucket"
                     this["bucket"] = true
