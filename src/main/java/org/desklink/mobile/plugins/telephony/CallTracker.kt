@@ -17,6 +17,8 @@ data class TrackedCall(
     val startedAt: Long?,
     val contactName: String? = null,
     val number: String? = null,
+    /** F5 K4: the shared contact's uid, sent even with "Show caller" off when contacts are shared. */
+    val contactUid: String? = null,
 )
 
 /** What the phone's own telephony reports: no call, ringing, or off the hook (TelephonyManager). */
@@ -86,9 +88,15 @@ class CallTracker(
     fun hasCall(): Boolean = calls.isNotEmpty()
 
     /** Names the current calls from the dialer notification (or contacts), when the person allows it. */
-    fun annotate(contactName: String?, number: String?) {
-        if (contactName == null && number == null) return
-        calls = calls.map { if (it.state == STATE_RINGING || calls.size == 1) it.copy(contactName = contactName ?: it.contactName, number = number ?: it.number) else it }
+    fun annotate(contactName: String?, number: String?, contactUid: String? = null) {
+        if (contactName == null && number == null && contactUid == null) return
+        calls = calls.map {
+            if (it.state == STATE_RINGING || calls.size == 1) {
+                it.copy(contactName = contactName ?: it.contactName, number = number ?: it.number, contactUid = contactUid ?: it.contactUid)
+            } else {
+                it
+            }
+        }
     }
 
     companion object {
@@ -106,6 +114,7 @@ class CallTracker(
                         put("state", call.state)
                         put("incoming", call.incoming)
                         call.startedAt?.let { put("startedAt", it) }
+                        call.contactUid?.let { put("contactUid", it) }
                         if (showCaller) {
                             call.contactName?.let { put("contactName", it) }
                             call.number?.let { put("number", it) }
@@ -119,11 +128,12 @@ class CallTracker(
         /** `calls: []`: off, or no permission (Phase 1 empty form). */
         fun emptySnapshot() = snapshotPacket(emptyList(), muted = false, silenced = false, showCaller = false)
 
-        /** T1 one-shot `{missed: {callId, contactName?, number?, at}}`. */
+        /** T1 one-shot `{missed: {callId, contactName?, number?, contactUid?, at}}`. */
         fun missedPacket(call: TrackedCall, at: Long, showCaller: Boolean) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_TELEPHONY).apply {
             this["missed"] = JSONObject().apply {
                 put("callId", call.callId)
                 put("at", at)
+                call.contactUid?.let { put("contactUid", it) }
                 if (showCaller) {
                     call.contactName?.let { put("contactName", it) }
                     call.number?.let { put("number", it) }

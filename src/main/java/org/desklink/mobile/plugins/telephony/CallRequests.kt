@@ -15,6 +15,8 @@ interface CallControls {
     fun muteRinger(): Boolean
     fun setMicrophoneMute(mute: Boolean): Boolean
     fun placeCall(number: String): Boolean
+    /** F5 K5: the messaging app's compose screen for [number] (or a heads-up to open it); false when none can. */
+    fun openMessages(number: String): Boolean
 }
 
 /** Flags T1 reports besides the calls. */
@@ -60,6 +62,10 @@ object CallRequests {
                 controls.placeCall(dialable) -> null
                 else -> ERROR_FAILED
             }
+        }
+        "message" -> {
+            val dialable = CallTracker.dialable(number)
+            if (dialable != null && controls.openMessages(dialable)) null else ERROR_FAILED
         }
         else -> ERROR_FAILED
     }

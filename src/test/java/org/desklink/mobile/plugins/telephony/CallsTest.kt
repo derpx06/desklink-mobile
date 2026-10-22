@@ -118,6 +118,7 @@ class CallsTest {
         var endCallWorks: Boolean = true,
         var notificationWorks: Boolean = false,
         var micWorks: Boolean = true,
+        var messagesWork: Boolean = true,
     ) : CallControls {
         val done = mutableListOf<String>()
         override fun canAnswer() = answer
@@ -128,6 +129,38 @@ class CallsTest {
         override fun muteRinger() = true.also { done += "silence" }
         override fun setMicrophoneMute(mute: Boolean) = micWorks.also { if (it) done += "mic:$mute" }
         override fun placeCall(number: String) = true.also { done += "dial:$number" }
+        override fun openMessages(number: String) = messagesWork.also { if (it) done += "message:$number" }
+    }
+
+    @Test
+    fun messageOpensComposeForADialableNumberOnly() {
+        val t = tracker()
+        val controls = FakeControls()
+        // No call needed: it is not about a call.
+        assertNull(CallRequests.handle("message", "\u2066+1 555 0100\u2069", t, controls, CallFlags()))
+        assertEquals(listOf("message:+1 555 0100"), controls.done)
+        assertEquals(CallRequests.ERROR_FAILED, CallRequests.handle("message", "Ada", t, controls, CallFlags()))
+        assertEquals(CallRequests.ERROR_FAILED, CallRequests.handle("message", null, t, controls, CallFlags()))
+        // No messaging app (or no way to show it): failed, as K5 says.
+        assertEquals(CallRequests.ERROR_FAILED, CallRequests.handle("message", "555", t, FakeControls(messagesWork = false), CallFlags()))
+    }
+
+    @Test
+    fun aSharedContactsUidGoesOutEvenWithoutShowCaller() {
+        val t = tracker()
+        t.onLine(LineState.RINGING)
+        t.annotate(null, null, contactUid = "42")
+        val call = CallTracker.snapshotPacket(t.calls, muted = false, silenced = false, showCaller = false).getJSONArray("calls")!!.getJSONObject(0)
+        assertEquals("42", call.getString("contactUid"))
+        assertFalse(call.has("contactName"))
+        assertFalse(call.has("number"))
+        val missed = t.onLine(LineState.IDLE)!!
+        val packet = CallTracker.missedPacket(missed, at = 9, showCaller = false).getJSONObject("missed")!!
+        assertEquals("42", packet.getString("contactUid"))
+        assertFalse(packet.has("number"))
+        // Not shared: no uid at all.
+        assertFalse(CallTracker.snapshotPacket(listOf(TrackedCall("c9", "ringing", true, null)), false, false, true)
+            .getJSONArray("calls")!!.getJSONObject(0).has("contactUid"))
     }
 
     @Test

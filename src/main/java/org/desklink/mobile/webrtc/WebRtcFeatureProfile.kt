@@ -24,6 +24,11 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_BATTERY,
         DeskLinkProtocol.PACKET_TYPE_CLIPBOARD,
         DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT,
+        // Contacts (F5): the desk asks for the snapshot and vCards; the phone answers.
+        DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS,
+        DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS,
+        DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS,
+        DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_VCARDS,
         DeskLinkProtocol.PACKET_TYPE_DIGITIZER,
         DeskLinkProtocol.PACKET_TYPE_DIGITIZER_SESSION,
         DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST,

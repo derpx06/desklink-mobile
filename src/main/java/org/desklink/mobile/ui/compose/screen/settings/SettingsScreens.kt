@@ -155,6 +155,9 @@ data class DeskSettings(
     val deskSoundVolume: Int = 100,
     /** F1: the desk may start its sound here unasked (on by default). */
     val deskMayPlay: Boolean = true,
+    /** F5: "Share contacts with <desk>" (phone-owned, off by default), and whether Android lets DeskLink read them. */
+    val contactsOn: Boolean = false,
+    val contactsReadable: Boolean = true,
 )
 
 class SettingsActions(
@@ -172,6 +175,7 @@ class SettingsActions(
     val onDeskSound: (Boolean) -> Unit = {},
     val onDeskSoundVolume: (Int) -> Unit = {},
     val onDeskMayPlay: (Boolean) -> Unit = {},
+    val onContacts: (Boolean) -> Unit = {},
     val onQuickCommands: () -> Unit,
     val onMore: () -> Unit,
     val onUnpair: () -> Unit,
@@ -458,6 +462,17 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                         onClick = { actions.onShowCaller(!desk.showCaller) },
                     )
                 }
+                GroupRow(
+                    stringResource(R.string.settings_contacts_share, desk.name),
+                    icon = R.drawable.sym_badge,
+                    subtitle = when {
+                        !desk.contactsOn -> stringResource(R.string.settings_contacts_share_off, desk.name)
+                        !desk.contactsReadable -> stringResource(R.string.settings_contacts_share_permission, desk.name)
+                        else -> stringResource(R.string.settings_contacts_share_on, desk.name)
+                    },
+                    checked = desk.contactsOn,
+                    onClick = { actions.onContacts(!desk.contactsOn) },
+                )
                 val commands = QuickCommands.load(QuickCommands.prefs(context), desk.id)
                 GroupRow(
                     stringResource(R.string.settings_quick_commands),

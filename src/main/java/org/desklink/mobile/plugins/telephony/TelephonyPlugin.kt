@@ -9,7 +9,9 @@ package org.desklink.mobile.plugins.telephony
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.Uri
@@ -28,10 +30,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.R
+import org.desklink.mobile.helpers.LifecycleHelper
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.helpers.TrustedDevices
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
+import org.desklink.mobile.plugins.contacts.ContactsPlugin
 import org.desklink.mobile.plugins.notifications.NotificationReceiver
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import java.util.UUID
@@ -133,7 +137,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             flags.silenced = false
         }
         if (line == LineState.IDLE) flags.muted = false
-        caller()?.let { (name, number) -> tracker.annotate(name, number) }
+        identify()
         // Kept while off the hook, so an app restart mid-call keeps its id and timer.
         val live = CallTracker.toSave(tracker.calls).takeIf { line == LineState.OFFHOOK }
         settings.edit { if (live != null) putString(KEY_LIVE_CALL, CallTracker.encode(live)) else remove(KEY_LIVE_CALL) }
@@ -204,6 +208,31 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
         override fun placeCall(number: String): Boolean = runCatching {
             telecom?.placeCall(Uri.fromParts("tel", number, null), Bundle()) != null
         }.getOrDefault(false)
+
+        /**
+         * K5: the messaging app's compose screen. In front it opens at once; from the background
+         * Android may refuse an activity start, so a heads-up opens it on a tap.
+         */
+        @SuppressLint("MissingPermission")
+        override fun openMessages(number: String): Boolean {
+            val compose = Intent(Intent.ACTION_SENDTO, Uri.fromParts("smsto", number, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (compose.resolveActivity(context.packageManager) == null) return false
+            if (LifecycleHelper.isInForeground && runCatching { context.startActivity(compose) }.isSuccess) return true
+            val manager = NotificationManagerCompat.from(context)
+            if (!manager.areNotificationsEnabled()) return false
+            val tap = PendingIntent.getActivity(context, number.hashCode(), compose, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.telephony_message_title, number))
+                .setContentText(context.getString(R.string.telephony_message_text, device.name))
+                .setContentIntent(tap)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setAutoCancel(true)
+                .setTimeoutAfter(120_000)
+                .build()
+            return runCatching { manager.notify("message:${device.deviceId}", 7331, notification) }.isSuccess
+        }
     }
 
     private fun restoreRinger() {
@@ -219,8 +248,8 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
         if (statusBarNotification.packageName.startsWith("org.desklink.mobile")) return
         dialerNotification = statusBarNotification
         // The dialer names the caller after the line changed: send the names once they are known.
-        if (tracker.hasCall() && showCaller(context, device.deviceId)) {
-            caller()?.let { (name, number) -> tracker.annotate(name, number) }
+        if (tracker.hasCall() && (showCaller(context, device.deviceId) || sharesContacts())) {
+            identify()
             sendSnapshot()
         }
     }
@@ -231,15 +260,28 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
 
     override fun onListenerConnected(service: NotificationReceiver) = Unit
 
-    /** (name, number) from the dialer notification's title, looked up in contacts when it is a number. */
-    private fun caller(): Pair<String?, String?>? {
-        if (!showCaller(context, device.deviceId)) return null
+    /**
+     * Who is calling, from the dialer notification's title: a number is looked up in contacts. The
+     * name and number go to the desk only with "Show caller"; the shared contact's uid (F5 K4) goes
+     * whenever this phone shares its contacts with the desk, which then names the call itself.
+     */
+    private fun identify() {
+        val show = showCaller(context, device.deviceId)
+        val share = sharesContacts()
+        if (!show && !share) return
         val title = dialerNotification?.notification?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()
             ?.let(CallTracker::plain)?.trim()
-            ?.takeIf(String::isNotEmpty) ?: return null
+            ?.takeIf(String::isNotEmpty) ?: return
         val number = CallTracker.dialable(title)
-        return if (number != null) contactName(number) to number else title to null
+        val uid = if (share) ContactsPlugin.uidFor(context, number, title.takeIf { number == null }) else null
+        if (show) {
+            tracker.annotate(if (number != null) contactName(number) else title, number, uid)
+        } else {
+            tracker.annotate(null, null, uid)
+        }
     }
+
+    private fun sharesContacts() = ContactsPlugin.sharesWith(context, device)
 
     private fun contactName(number: String): String? {
         if (!granted(Manifest.permission.READ_CONTACTS)) return null

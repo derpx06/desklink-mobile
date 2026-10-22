@@ -737,6 +737,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 deskSoundOn = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this, it.deviceId),
                 deskSoundVolume = org.desklink.mobile.plugins.audio.PhoneAudio.volume(this, it.deviceId),
                 deskMayPlay = org.desklink.mobile.plugins.audio.PhoneAudio.deskMayPlay(this, it.deviceId),
+                contactsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.contacts.ContactsPlugin::class.java)),
+                contactsReadable = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED,
                 accessibilityOn = org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance != null,
                 deskNotificationsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java)),
                 ready = it.hasActiveWebRtcFeatureTransport,
@@ -798,6 +800,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     }
                     tick++
                 },
+                onContacts = { on -> device?.let { setContactsShared(it, on) } },
                 onTypeOnPhone = { on ->
                     device?.let { org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.setAllowed(this, it.deviceId, on) }
                     // The accessibility service is asked for only now, when the person turns this on.
@@ -818,6 +821,24 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 onMessage = ::showMessage,
             ),
         )
+    }
+
+    /**
+     * F5: "Share contacts with <desk>". Turning it on says what is shared first, then Android asks for
+     * the permission; turning it off makes the plugin tell the desk to delete its copy.
+     */
+    private fun setContactsShared(device: Device, on: Boolean) {
+        val key = Plugin.getPluginKey(org.desklink.mobile.plugins.contacts.ContactsPlugin::class.java)
+        if (!on) return setPluginEnabled(device, key, false)
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.contacts_share_title, device.name))
+            .setMessage(getString(R.string.contacts_share_text, device.name))
+            .setPositiveButton(R.string.contacts_share_confirm) { _, _ ->
+                setPluginEnabled(device, key, true)
+                requestMissing(listOf(Manifest.permission.READ_CONTACTS))
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /** F1: "Play <desk>'s sound here" — remembered, and asked for (or stopped) on the live link now. */

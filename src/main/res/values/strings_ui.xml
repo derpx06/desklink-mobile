@@ -522,4 +522,13 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_calls_on_summary">Ringing, answer, decline and dial from %1$s</string>
     <string name="settings_show_caller">Show caller on %1$s</string>
     <string name="settings_show_caller_summary">Names and numbers; off shows \"Incoming call\"</string>
+    <string name="settings_contacts_share">Share contacts with %1$s</string>
+    <string name="settings_contacts_share_on">Names, numbers, emails and photos, kept up to date on %1$s</string>
+    <string name="settings_contacts_share_off">Off. %1$s could search your contacts, call or message them, and name callers</string>
+    <string name="settings_contacts_share_permission">Allow access to contacts so %1$s gets them</string>
+    <string name="contacts_share_title">Share contacts with %1$s?</string>
+    <string name="contacts_share_text">%1$s gets a copy of this phone\'s contacts (names, numbers, email addresses, organisations, notes and small photos) and keeps it up to date while connected. Turning this off deletes the copy there.\n\nAndroid asks next for access to your contacts.</string>
+    <string name="contacts_share_confirm">Share</string>
+    <string name="telephony_message_title">Message %1$s</string>
+    <string name="telephony_message_text">%1$s asked to write to this number. Tap to open your messaging app</string>
 </resources>

@@ -1482,6 +1482,8 @@ internal fun emptyStatesFor(device: Device): List<NetworkPacket> {
         if (silent(org.desklink.mobile.plugins.notifications.NotificationsPlugin::class.java)) add(org.desklink.mobile.plugins.notifications.NotificationsPlugin.snapshotPacket(emptyList()))
         if (silent(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin::class.java)) add(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin.emptyStatePacket())
         if (silent(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)) add(org.desklink.mobile.plugins.telephony.CallTracker.emptySnapshot())
+        // F5: not shared (off, or no permission): the desk deletes its copy of the contacts.
+        if (silent(org.desklink.mobile.plugins.contacts.ContactsPlugin::class.java)) add(org.desklink.mobile.plugins.contacts.ContactsBook.notSharingPacket())
     }
 }
 
