@@ -89,8 +89,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <!-- "Phone as webcam" (C4): the camera service, started only from a visible DeskLink window. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <!-- F1: the phone's microphone for the desk, started only from a visible DeskLink window. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -120,10 +118,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.screen.PhoneScreenCaptureService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
-        <service
-            android:name="org.desklink.mobile.plugins.camera.CameraService"
-            android:exported="false"
-            android:foregroundServiceType="camera|microphone" />
         <!-- F1: this phone's microphone or sound while a desk hears it. -->
         <service
             android:name="org.desklink.mobile.plugins.audio.PhoneAudioService"
@@ -149,7 +143,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTop"
             android:taskAffinity="" />
-        <!-- "<desk> wants to use this phone's camera": asked once per desk, then remembered. -->
         <activity
             android:name="org.desklink.mobile.plugins.camera.CameraConsentActivity"
             android:exported="false"

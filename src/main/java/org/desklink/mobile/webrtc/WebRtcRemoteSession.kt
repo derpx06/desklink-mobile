@@ -60,14 +60,6 @@ enum class WebRtcRemoteSessionControlKind(val wireName: String) {
      * `view-denied` "busy"); the phone treats that request as already consented.
      */
     OFFER_VIEW("offer-view"),
-    /** C4 webcam: desk → phone `{facing, width, height, fps, audio}`. */
-    CAMERA_REQUEST("camera-request"),
-    /** C4: phone → desk `{facing, width, height, audio}` once frames flow on the video track. */
-    CAMERA_READY("camera-ready"),
-    /** C4, both ways: `{action: "flip"|"mic-on"|"mic-off"|"stop"}`. */
-    CAMERA_CONTROL("camera-control"),
-    /** C4, both ways: `{reason}`. */
-    CAMERA_STOPPED("camera-stopped"),
     /** F1 (A2): "start sending this source"; the requester is always the one that hears it. */
     AUDIO_REQUEST("audio-request"),
     AUDIO_READY("audio-ready"),
@@ -127,11 +119,7 @@ data class WebRtcRemoteSessionControlMessage(
      */
     val maxDimension: Int? = null,
     val fps: Int? = null,
-    /** C4 camera fields: "front"/"back", the frame size, whether audio flows, and a control action. */
-    val facing: String? = null,
-    val width: Int? = null,
-    val height: Int? = null,
-    val audio: Boolean? = null,
+    /** An audio control action (mute, unmute, volume). */
     val action: String? = null,
     /** F1 audio fields: "desk-to-phone"/"phone-to-desk" (sent as `direction`), the source, its format, a control value. */
     val audioDirection: String? = null,
@@ -174,8 +162,7 @@ data class WebRtcRemoteSessionControlMessage(
         require(screenRotation == null || screenWidth != null) {
             "DeskLink remote screen rotation has no geometry"
         }
-        require(facing == null || facing in CAMERA_FACINGS) { "Unknown DeskLink camera facing" }
-        require(action == null || action in CAMERA_ACTIONS || action in AUDIO_ACTIONS) { "Unknown DeskLink camera or audio action" }
+        require(action == null || action in AUDIO_ACTIONS) { "Unknown DeskLink audio action" }
         require(audioDirection == null || audioDirection in AUDIO_DIRECTIONS) { "Unknown DeskLink audio direction" }
         require(source == null || source in AUDIO_SOURCES) { "Unknown DeskLink audio source" }
         require(display == null || display in DISPLAY_MODES) { "Unknown DeskLink display mode" }
@@ -184,9 +171,7 @@ data class WebRtcRemoteSessionControlMessage(
         require((sampleRate ?: 8000) in 8000..192000 && (channels ?: 1) in 1..2 && (value ?: 0) in 0..100) {
             "DeskLink audio format is invalid"
         }
-        require((width ?: 1) in 1..8192 && (height ?: 1) in 1..8192 && (fps ?: 1) in 1..240) {
-            "DeskLink camera size is invalid"
-        }
+        require((fps ?: 1) in 1..240) { "DeskLink frame rate is invalid" }
         if (screenWidth != null && screenHeight != null) {
             require(screenWidth in 1..8192 && screenHeight in 1..8192) {
                 "DeskLink remote screen geometry is invalid"
@@ -221,10 +206,6 @@ data class WebRtcRemoteSessionControlMessage(
             password?.takeIf(String::isNotEmpty)?.let { value.put("password", it) }
             maxDimension?.let { value.put("maxDimension", it) }
             fps?.let { value.put("fps", it) }
-            facing?.let { value.put("facing", it) }
-            width?.let { value.put("width", it) }
-            height?.let { value.put("height", it) }
-            audio?.let { value.put("audio", it) }
             action?.let { value.put("action", it) }
             audioDirection?.let { value.put("direction", it) }
             source?.let { value.put("source", it) }
@@ -245,8 +226,6 @@ data class WebRtcRemoteSessionControlMessage(
         const val VERSION = 1
         const val MESSAGE_TYPE = "desklink.remote-session.v1"
         private const val MAX_AGE_MILLIS = 60_000L
-        val CAMERA_FACINGS = setOf("front", "back")
-        val CAMERA_ACTIONS = setOf("flip", "mic-on", "mic-off", "stop")
         val AUDIO_ACTIONS = setOf("mute", "unmute", "volume")
         const val DESK_TO_PHONE = "desk-to-phone"
         const val PHONE_TO_DESK = "phone-to-desk"
@@ -284,10 +263,6 @@ data class WebRtcRemoteSessionControlMessage(
                 password = value.optString("password").takeIf(String::isNotEmpty),
                 maxDimension = value.takeIf { it.has("maxDimension") }?.getInt("maxDimension"),
                 fps = value.takeIf { it.has("fps") }?.getInt("fps"),
-                facing = value.optString("facing").takeIf(String::isNotEmpty),
-                width = value.takeIf { it.has("width") }?.getInt("width"),
-                height = value.takeIf { it.has("height") }?.getInt("height"),
-                audio = value.takeIf { it.has("audio") }?.getBoolean("audio"),
                 action = value.optString("action").takeIf(String::isNotEmpty),
                 audioDirection = if (kind.isAudio) value.optString("direction").takeIf(String::isNotEmpty) else null,
                 source = value.optString("source").takeIf(String::isNotEmpty),
@@ -564,11 +539,7 @@ class WebRtcRemoteSessionController(
                 if (!isCurrent(message)) return false
                 stopInternal(WebRtcRemoteSessionState.FAILED)
             }
-            // The camera (C4) is the coordinator's own session; it never moves this one.
-            WebRtcRemoteSessionControlKind.CAMERA_REQUEST,
-            WebRtcRemoteSessionControlKind.CAMERA_READY,
-            WebRtcRemoteSessionControlKind.CAMERA_CONTROL,
-            WebRtcRemoteSessionControlKind.CAMERA_STOPPED,
+            // Audio is the coordinator's own session; it never moves this one.
             WebRtcRemoteSessionControlKind.AUDIO_REQUEST,
             WebRtcRemoteSessionControlKind.AUDIO_READY,
             WebRtcRemoteSessionControlKind.AUDIO_CONTROL,

@@ -117,7 +117,7 @@ object PhoneAudio {
         val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
-            .setContentText(context.getString(R.string.camera_request_tap_answer))
+            .setContentText(context.getString(R.string.audio_tap_answer))
             .setContentIntent(tap)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_CALL)

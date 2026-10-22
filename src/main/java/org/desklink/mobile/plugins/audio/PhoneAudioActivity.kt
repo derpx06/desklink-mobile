@@ -46,11 +46,11 @@ class PhoneAudioActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle(getString(if (mic) R.string.audio_consent_mic else R.string.audio_consent_sound, desk))
             .setMessage(getString(if (mic) R.string.audio_consent_mic_text else R.string.audio_consent_sound_text, desk))
-            .setPositiveButton(R.string.camera_consent_allow) { _, _ ->
+            .setPositiveButton(R.string.audio_allow) { _, _ ->
                 PhoneAudio.rememberConsent(this, deviceId)
                 allowed()
             }
-            .setNegativeButton(R.string.camera_consent_deny) { _, _ -> deny("declined") }
+            .setNegativeButton(R.string.audio_deny) { _, _ -> deny("declined") }
             .setOnCancelListener { deny("declined") }
             .show()
     }

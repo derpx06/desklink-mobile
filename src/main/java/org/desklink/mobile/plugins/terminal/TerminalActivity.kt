@@ -1064,6 +1064,38 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
+    /** Snippets (F6) above the compose bar: a tap adds one to the draft, which is then read before Send. */
+    @Composable
+    private fun SnippetChips(snippets: List<org.desklink.mobile.plugins.notes.Snippet>, onInsert: (String) -> Unit) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            snippets.forEach { snippet ->
+                Box(
+                    Modifier
+                        .heightIn(min = 48.dp)
+                        .focusProperties { canFocus = false }
+                        .clickable(role = Role.Button, onClickLabel = stringResource(R.string.terminal_insert_snippet, snippet.label)) { onInsert(snippet.text) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        snippet.label,
+                        fontSize = 12.sp,
+                        color = TermText,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .background(TermField, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+
     /**
      * Type a whole command before sending it: a plain multi-line field (never a password type, which
      * blacks out screen capture on ColorOS). Send writes it, then Enter.

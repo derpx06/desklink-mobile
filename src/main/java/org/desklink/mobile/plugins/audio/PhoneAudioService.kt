@@ -83,7 +83,7 @@ class PhoneAudioService : Service() {
             .setColor(SessionLiveNotification.CORAL)
             .setColorized(true)
             .setOngoing(true)
-            .addAction(R.drawable.sym_stop_circle, getString(R.string.camera_stop), stop)
+            .addAction(R.drawable.sym_stop_circle, getString(R.string.audio_stop), stop)
             .build()
     }
 
