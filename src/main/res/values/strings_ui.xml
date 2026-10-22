@@ -27,7 +27,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="navigate_up">Back</string>
 
     <!-- Device -->
-    <string name="feature_desc_tv">TV remote</string>
     <string name="device_features">Features</string>
     <string name="device_encryption">Encryption</string>
     <string name="device_tap_permission">Tap to grant</string>
@@ -272,7 +271,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_relay_not_set_up">No relay server set up. Enter one in More → Advanced network</string>
     <string name="settings_reach_anywhere_summary">Encrypted relay when off Wi‑Fi</string>
     <string name="settings_more">More</string>
-    <string name="settings_more_summary">Desk controls this phone, run command, drawing pad, network</string>
+    <string name="settings_more_summary">Network, quick tiles, help</string>
     <string name="settings_more_extras">Extras</string>
     <string name="settings_more_turn_on">Off for this computer. Turn it on in Features</string>
     <string name="settings_paired_key">Paired · key %1$s</string>

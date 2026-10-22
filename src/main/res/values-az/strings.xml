@@ -58,7 +58,6 @@
     <item>Güclü</item>
     <item>Ən güclü</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Düymə vuruşu kimi göndərmək</string>
   <string name="mouse_receiver_plugin_description">Uzaqdakı siçanın hərəkətini qəbul etmək</string>
   <string name="mouse_receiver_plugin_name">Siçanı qəbul edən</string>
   <string name="mouse_receiver_no_permissions">Cihazı tam idarə edə bilməklə toxunuşları məsafədən ala bilmək üçün \"Xüsusi imkanlar\" funksiyasına icazələri qəbul etməlisiniz</string>

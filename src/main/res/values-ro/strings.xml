@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Clipboard trimis</string>
   <string name="pref_plugin_mousepad">Introducere de la distanță</string>
   <string name="pref_plugin_mousepad_desc_nontv">Folosiți telefonul sau tableta ca zonă tactilă și tastatură</string>
-  <string name="pref_plugin_mousepad_desc_tv">Folosiți telefonul sau tableta ca telecomandă TV</string>
   <string name="pref_plugin_mpris">Controale multimedia</string>
   <string name="pref_plugin_mpris_desc">Furnizează control de la distanță pentru lectorul multimedia</string>
   <string name="pref_plugin_contacts">Sincronizator de contacte</string>
@@ -36,7 +35,6 @@
   <string name="no_permission_mprisreceiver">Pentru a putea controla lectorul multimedia, trebuie să permiteți accesul la notificări</string>
   <string name="send_ping">Trimite ping</string>
   <string name="open_mousepad">Introducere de la distanță</string>
-  <string name="open_mousepad_tv">Telecomandă TV</string>
   <string name="mousepad_sensitivity_settings_title">Stabilește sensibilitatea zonei tactile</string>
   <string name="mousepad_acceleration_profile_settings_title">Stabilește accelerația indicatorului</string>
   <string name="mousepad_scroll_direction_title">Inversează direcția derulării</string>
@@ -62,7 +60,6 @@
     <item>Mai puternică</item>
     <item>Cea mai puternică</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Trimite ca apăsări de taste</string>
   <string name="mouse_receiver_plugin_description">Primește mișcări de maus de la distanță</string>
   <string name="mouse_receiver_plugin_name">Receptor pentru maus</string>
   <string name="mouse_receiver_no_permissions">Pentru a primi atingeri de la distanță, trebuie să acordați permisiunile de accesibilitate ce permit controlul deplin asupra dispozitivului</string>

@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Enviado al portapapeles</string>
   <string name="pref_plugin_mousepad">Entrada remota</string>
   <string name="pref_plugin_mousepad_desc_nontv">Usar su teléfono o tableta como teclado y teclado táctil</string>
-  <string name="pref_plugin_mousepad_desc_tv">Usar su teléfono o tableta como mando de TV</string>
   <string name="pref_plugin_mpris">Controles multimedia</string>
   <string name="pref_plugin_mpris_desc">Mostrar un control remoto para su reproductor de medios</string>
   <string name="pref_plugin_contacts">Sincronizar contactos</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Para poder controlar sus reproductores de medios, necesita dar acceso a las notificaciones</string>
   <string name="send_ping">Enviar ping</string>
   <string name="open_mousepad">Entrada remota</string>
-  <string name="open_mousepad_tv">Control remoto TV</string>
   <string name="mousepad_sensitivity_settings_title">Establecer sensibilidad del panel táctil</string>
   <string name="mousepad_acceleration_profile_settings_title">Establecer la aceleración del puntero</string>
   <string name="mousepad_scroll_direction_title">Invertir dirección de desplazamiento</string>
@@ -64,7 +62,6 @@
     <item>Fuerte</item>
     <item>Más fuerte</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Enviar como teclas</string>
   <string name="mouse_receiver_plugin_description">Permite mover el ratón desde otro dispositivo</string>
   <string name="mouse_receiver_plugin_name">Recibir movimiento del ratón</string>
   <string name="mouse_receiver_no_permissions">Para recibir entradas táctiles de manera remota necesita conceder permisos de accesibilidad para controlar totalmente su dispositivo</string>

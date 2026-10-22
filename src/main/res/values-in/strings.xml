@@ -58,7 +58,6 @@
     <item>Kuat</item>
     <item>Sangat Kuat</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Kirim sebagai penekanan tombol</string>
   <string name="mouse_receiver_plugin_description">Terima penggerakan mouse jarak jauh</string>
   <string name="mouse_receiver_plugin_name">Penerima mouse</string>
   <string name="mouse_receiver_no_permissions">Untuk menerima masukan sentuh secara jarak jauh, Anda perlu memberi izin Aksesibilitas untuk dapat mengendalikan perangkat Anda</string>

@@ -59,7 +59,6 @@
     <item>Pli forta</item>
     <item>Plej forte</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Sendi kiel klavopremojn</string>
   <string name="mouse_receiver_plugin_description">Ricevi foran musan movon</string>
   <string name="mouse_receiver_plugin_name">Musa ricevilo</string>
   <string name="mouse_receiver_no_permissions">Por ricevi tuŝajn enigojn malproksime, vi devas doni permesojn de Alirebleco por plene regi vian aparaton</string>

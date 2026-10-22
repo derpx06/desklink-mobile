@@ -58,7 +58,6 @@
     <item>Stipresnis</item>
     <item>Stipriausias</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Siųsti kaip klavišų paspaudimus</string>
   <string name="mouse_receiver_plugin_description">Gauti nuotolinius pelės judesius</string>
   <string name="mouse_receiver_plugin_name">Pelės gavėjas</string>
   <string name="view_status_title">Būsena</string>

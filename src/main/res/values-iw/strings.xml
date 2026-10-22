@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">לוח הגזירים נשלח</string>
   <string name="pref_plugin_mousepad">שליטה מרחוק</string>
   <string name="pref_plugin_mousepad_desc_nontv">להשתמש בטלפון או במחשב הלוח כמשטח מגע ומקלדת</string>
-  <string name="pref_plugin_mousepad_desc_tv">להשתמש בטלפון או במחשב הלוח כשלט לטלוויזיה</string>
   <string name="pref_plugin_mpris">פקדי מדיה</string>
   <string name="pref_plugin_mpris_desc">אספקת שליטה מרוחקת על נגן המדיה שלך</string>
   <string name="pref_plugin_contacts">מסנכרן אנשי קשר</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">כדי לאפשר לשלוט בנגני המדיה שלך צריך להעניק גישה להתראות</string>
   <string name="send_ping">שליחת פינג</string>
   <string name="open_mousepad">שליטה מרחוק</string>
-  <string name="open_mousepad_tv">שלט לטלוויזיה</string>
   <string name="mousepad_sensitivity_settings_title">הגדרת רגישות משטח המגע</string>
   <string name="mousepad_acceleration_profile_settings_title">הגדרת האצת סמן</string>
   <string name="mousepad_scroll_direction_title">היפוך כיוון הגלילה</string>
@@ -64,7 +62,6 @@
     <item>חזקה</item>
     <item>הכי חזקה</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">שליחה כלחיצות מקשים</string>
   <string name="mouse_receiver_plugin_description">קבלת תנועות עכבר מרוחקות</string>
   <string name="mouse_receiver_plugin_name">מקלט עכבר</string>
   <string name="mouse_receiver_no_permissions">כדי לקבל קלט מגע יש להעניק הרשאות נגישות כדי לשלוט במכשיר שלך באופן מלא</string>

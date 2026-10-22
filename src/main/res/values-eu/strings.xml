@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Arbelekoa bidali da</string>
   <string name="pref_plugin_mousepad">Urrutiko sarrera</string>
   <string name="pref_plugin_mousepad_desc_nontv">Erabili zure telefonoa edo tableta ukimen-sagu eta teklatu gisa</string>
-  <string name="pref_plugin_mousepad_desc_tv">Erabili zure telefonoa edo tableta TBren urruneko aginte gisa</string>
   <string name="pref_plugin_mpris">Multimedia kontrolak</string>
   <string name="pref_plugin_mpris_desc">Zure euskarri-jotzailearen urruneko kontrola ematen dizu</string>
   <string name="pref_plugin_contacts">Kontaktuen sinkronizatzailea</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Zure euskarri-jotzaileak kontrolatu ahal izateko jakinarazpenetara atzipena eman behar diozu</string>
   <string name="send_ping">Bidali ping</string>
   <string name="open_mousepad">Urruneko sarrera</string>
-  <string name="open_mousepad_tv">TBko urrutiko agintea</string>
   <string name="mousepad_sensitivity_settings_title">Ezarri ukimen-saguaren sentikortasuna</string>
   <string name="mousepad_acceleration_profile_settings_title">Ezarri erakuslearen azelerazio</string>
   <string name="mousepad_scroll_direction_title">Alderantzikatu korritzearen norabidea</string>
@@ -64,7 +62,6 @@
     <item>Sendoagoa</item>
     <item>Sendoena</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Bidali tekla-joaldi gisa</string>
   <string name="mouse_receiver_plugin_description">Jaso urrutiko saguaren mugimenduak</string>
   <string name="mouse_receiver_plugin_name">Sagu jasotzailea</string>
   <string name="mouse_receiver_no_permissions">Urrutiko ukipen sarrerak jasotzeko, zure gailua erabat agintzeko Irisgarritasun baimenak eman behar dituzu</string>

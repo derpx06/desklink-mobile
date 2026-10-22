@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Вміст буфера надіслано</string>
   <string name="pref_plugin_mousepad">Дистанційне введення</string>
   <string name="pref_plugin_mousepad_desc_nontv">Скористайтеся телефоном або планшетом як замінником сенсорної панелі і клавіатури</string>
-  <string name="pref_plugin_mousepad_desc_tv">Скористайтеся телефоном або планшетом як пультом керування телевізором</string>
   <string name="pref_plugin_mpris">Керування відтворенням</string>
   <string name="pref_plugin_mpris_desc">Надає можливість віддаленого керування вашим мультимедійним програвачем</string>
   <string name="pref_plugin_contacts">Засіб синхронізації контактів</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Щоб мати змогу керувати вашими програвачами мультимедійних даних, вам слід надати доступ до сповіщень.</string>
   <string name="send_ping">Надіслати сигнал підтримання зв’язку</string>
   <string name="open_mousepad">Дистанційне введення</string>
-  <string name="open_mousepad_tv">Пульт керування телевізором</string>
   <string name="mousepad_sensitivity_settings_title">Встановити чутливість сенсорної панелі</string>
   <string name="mousepad_acceleration_profile_settings_title">Встановити прискорення вказівника</string>
   <string name="mousepad_scroll_direction_title">Зворотний напрямок гортання</string>
@@ -64,7 +62,6 @@
     <item>Сильне</item>
     <item>Найсильніше</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Надсилати як натискання клавіш</string>
   <string name="mouse_receiver_plugin_description">Отримувати віддалені рухи мишею</string>
   <string name="mouse_receiver_plugin_name">Отримання даних миші</string>
   <string name="mouse_receiver_no_permissions">Щоб отримувати сигнали про торкання віддалено, вам слід надати засобам доступності дозвіл на повне керування вашим пристроєм</string>

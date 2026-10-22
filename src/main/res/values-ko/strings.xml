@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">클립보드 보냄</string>
   <string name="pref_plugin_mousepad">원격 입력</string>
   <string name="pref_plugin_mousepad_desc_nontv">내 휴대폰이나 태블릿을 터치패드와 키보드로 사용하기</string>
-  <string name="pref_plugin_mousepad_desc_tv">내 휴대폰이나 태블릿을 TV 리모콘으로 사용하기</string>
   <string name="pref_plugin_mpris">멀티미디어 제어</string>
   <string name="pref_plugin_mpris_desc">내 미디어 재생기 원격 제어</string>
   <string name="pref_plugin_contacts">연락처 동기화 도구</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">미디어 재생기를 제어하려면 알림 접근 권한이 필요합니다</string>
   <string name="send_ping">핑 보내기</string>
   <string name="open_mousepad">원격 입력</string>
-  <string name="open_mousepad_tv">TV 리모콘</string>
   <string name="mousepad_sensitivity_settings_title">터치패드 감도 설정</string>
   <string name="mousepad_acceleration_profile_settings_title">포인터 가속 설정</string>
   <string name="mousepad_scroll_direction_title">스크롤 방향 뒤집기</string>
@@ -64,7 +62,6 @@
     <item>강하게</item>
     <item>매우 강하게</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">키 입력으로 보내기</string>
   <string name="mouse_receiver_plugin_description">원격 마우스 움직임 받기</string>
   <string name="mouse_receiver_plugin_name">마우스 수신기</string>
   <string name="mouse_receiver_no_permissions">원격으로 터치 입력을 받으려면 장치 제어를 위해서 접근성 권한을 허용해야 합니다</string>

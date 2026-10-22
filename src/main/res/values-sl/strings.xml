@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Odložišče je poslano</string>
   <string name="pref_plugin_mousepad">Oddaljeni vhod</string>
   <string name="pref_plugin_mousepad_desc_nontv">Uporabi telefon ali tablični računalnik kot sledilno ploščico in tipkovnico</string>
-  <string name="pref_plugin_mousepad_desc_tv">Uporabi telefon ali tablični računalnik kot oddaljeni TV</string>
   <string name="pref_plugin_mpris">Upravljanje večpredstavnosti</string>
   <string name="pref_plugin_mpris_desc">Omogoča daljinski upravljalnik za predvajalnik medijev</string>
   <string name="pref_plugin_contacts">Usklajevalnik stikov</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Če želite upravljati svoje predvajalnike medijev, morate odobriti dostop do obvestil</string>
   <string name="send_ping">Pošlji ping</string>
   <string name="open_mousepad">Oddaljeni input</string>
-  <string name="open_mousepad_tv">TV daljinec</string>
   <string name="mousepad_sensitivity_settings_title">Nastavi občutljivost drsne ploščice</string>
   <string name="mousepad_acceleration_profile_settings_title">Nastavi pospeške kazalca</string>
   <string name="mousepad_scroll_direction_title">Smer povratnega drsenja</string>
@@ -64,7 +62,6 @@
     <item>Močneje</item>
     <item>Najmočnejše</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Pošlji kot pritiske tipk</string>
   <string name="mouse_receiver_plugin_description">Sprejemaj gibanje oddaljene miške</string>
   <string name="mouse_receiver_plugin_name">Sprejemnik miške</string>
   <string name="mouse_receiver_no_permissions">Če želite prejemati vnose dotikov na daljavo, morate podeliti dovoljenja za dostopnost za popoln nadzor vaše naprave</string>

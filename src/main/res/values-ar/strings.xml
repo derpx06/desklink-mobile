@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">أرسل للحافظة</string>
   <string name="pref_plugin_mousepad">الإدخال البعيد</string>
   <string name="pref_plugin_mousepad_desc_nontv">استخدم الهاتف أو اللوحيّ كفأرة ولوحة مفاتيح</string>
-  <string name="pref_plugin_mousepad_desc_tv">استخدم الهاتف أو اللوحيّ كمتحكم بالتلفاز</string>
   <string name="pref_plugin_mpris">تحكّمات الوسائط المتعدّدة</string>
   <string name="pref_plugin_mpris_desc">توفّر تحكّمًا بعيدًا لمشغّل الوسائط</string>
   <string name="pref_plugin_contacts">مزامن المتراسلين</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">لتكون قادرًا على التحكم في مشغلات الوسائط الخاصة بك، تحتاج إلى منح حق الوصول إلى الإشعارات</string>
   <string name="send_ping">أرسل وخزة ping</string>
   <string name="open_mousepad">الإدخال البعيد</string>
-  <string name="open_mousepad_tv">جهاز التحكم عن بعد للتلفاز</string>
   <string name="mousepad_sensitivity_settings_title">اضبط حساسيّة لوحة اللمس</string>
   <string name="mousepad_acceleration_profile_settings_title">عيّن تسارع المؤشر</string>
   <string name="mousepad_scroll_direction_title">اعكس اتّجاه التّمرير</string>
@@ -64,7 +62,6 @@
     <item>أقوى</item>
     <item>الأقوى</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">أرسل كضغطات مفاتيح</string>
   <string name="mouse_receiver_plugin_description">استقبل حركة الفأرة البعيدة</string>
   <string name="mouse_receiver_plugin_name">مستقبل الفأرة</string>
   <string name="mouse_receiver_no_permissions">لتلقي المدخلات التي تعمل باللمس عن بُعد، تحتاج إلى منح أذونات إمكانية الوصول للتحكم الكامل في جهازك</string>

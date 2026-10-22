@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Leikepöytä lähetetty</string>
   <string name="pref_plugin_mousepad">Kauko-ohjaus</string>
   <string name="pref_plugin_mousepad_desc_nontv">Käytä puhelinta tai tablettia kosketuslevynä ja näppäimistönä</string>
-  <string name="pref_plugin_mousepad_desc_tv">Käytä puhelinta tai tablettia TV-kaukosäätimenä</string>
   <string name="pref_plugin_mpris">Multimedian ohjaus</string>
   <string name="pref_plugin_mpris_desc">Mahdollistaa mediasoittimen etäohjauksen</string>
   <string name="pref_plugin_contacts">Yhteystietosynkronointi</string>
@@ -36,7 +35,6 @@
   <string name="no_permission_mprisreceiver">Hallitaksesi mediasoittimiasi sinun on annettava käyttöoikeudet ilmoituksiin</string>
   <string name="send_ping">Lähetä tiedustelupaketti</string>
   <string name="open_mousepad">Kauko-ohjaus</string>
-  <string name="open_mousepad_tv">TV-kaukosäädin</string>
   <string name="mousepad_sensitivity_settings_title">Aseta kosketuslevyn herkkyys</string>
   <string name="mousepad_acceleration_profile_settings_title">Aseta osoittimen kiihdytys</string>
   <string name="mousepad_scroll_direction_title">Käänteinen vierityssuunta</string>
@@ -62,7 +60,6 @@
     <item>Vahvempi</item>
     <item>Vahvin</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Lähetä näppäinpainalluksina</string>
   <string name="mouse_receiver_plugin_description">Vastaanota etähiiren liike</string>
   <string name="mouse_receiver_plugin_name">Hiirivastaanotin</string>
   <string name="mouse_receiver_no_permissions">Etäkosketussyötteen vastaanottaminen vaatii saavutettavuuskäyttöoikeudet, jotta laitetta voi hallita</string>

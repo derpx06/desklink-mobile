@@ -58,7 +58,6 @@
     <item>Erősebb</item>
     <item>Legerősebb</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Küldés billentyűleütésként</string>
   <string name="mouse_receiver_plugin_description">Távoli egérmozgások fogadása</string>
   <string name="mouse_receiver_plugin_name">Egérvevő</string>
   <string name="view_status_title">Állapot</string>

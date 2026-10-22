@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Изпратено съдържание на клипборда</string>
   <string name="pref_plugin_mousepad">Отдалечено входно устройство</string>
   <string name="pref_plugin_mousepad_desc_nontv">Използване на телефона като тъчпад и клавиатура</string>
-  <string name="pref_plugin_mousepad_desc_tv">Използване на телефона като таблет и дистанционно за TV</string>
   <string name="pref_plugin_mpris">Мултимедиен контрол</string>
   <string name="pref_plugin_mpris_desc">Осигурява отдалечен контрол за вашия медиен плеър</string>
   <string name="pref_plugin_contacts">Синхронизиране на контакти</string>
@@ -61,7 +60,6 @@
     <item>По-силно</item>
     <item>Най-силно</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Изпращане като клавишни комбинации</string>
   <string name="mouse_receiver_plugin_description">Получаване на дистанционно движение на мишката</string>
   <string name="mouse_receiver_plugin_name">Приемане на движение на мишката</string>
   <string name="mouse_receiver_no_permissions">"За отдалечено  управление с  тъчскрийн, трябва да предоставите разрешения за достъп за пълен контрол на устройството."</string>

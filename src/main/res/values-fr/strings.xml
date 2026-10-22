@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Presse-papiers envoyé</string>
   <string name="pref_plugin_mousepad">Contrôle distant</string>
   <string name="pref_plugin_mousepad_desc_nontv">Utilisez votre téléphone ou votre tablette comme un pavé tactile et clavier</string>
-  <string name="pref_plugin_mousepad_desc_tv">Utilisez votre téléphone ou votre tablette comme une télécommande de télévision</string>
   <string name="pref_plugin_mpris">Contrôles multimédia</string>
   <string name="pref_plugin_mpris_desc">Fournit une télécommande pour votre lecteur multimédia</string>
   <string name="pref_plugin_contacts">Synchronisation de contacts</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Pour pouvoir contrôler vos lecteurs multimédia, veuillez permettre l\'accès aux notifications</string>
   <string name="send_ping">Envoyer un « Ping »</string>
   <string name="open_mousepad">Contrôle distant</string>
-  <string name="open_mousepad_tv">Télécommande de téléviseur</string>
   <string name="mousepad_sensitivity_settings_title">Définir la sensibilité du pavé tactile</string>
   <string name="mousepad_acceleration_profile_settings_title">Définir l\'accélération du pointeur</string>
   <string name="mousepad_scroll_direction_title">Inverser la direction du défilement</string>
@@ -64,7 +62,6 @@
     <item>Relativement forte</item>
     <item>Très forte</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Envoyez comme appuis de touches</string>
   <string name="mouse_receiver_plugin_description">Recevoir les mouvements de la souri distante</string>
   <string name="mouse_receiver_plugin_name">Récepteur de souris</string>
   <string name="mouse_receiver_no_permissions">Pour recevoir des entrées tactiles à distance, vous devez accorder des autorisations d\'accessibilité pour contrôler entièrement votre périphérique</string>

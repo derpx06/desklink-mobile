@@ -59,7 +59,6 @@
     <item>Stronger</item>
     <item>Strongest</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Send as keystrokes</string>
   <string name="mouse_receiver_plugin_description">Receive remote mouse movement</string>
   <string name="mouse_receiver_plugin_name">Mouse receiver</string>
   <string name="mouse_receiver_no_permissions">To receive touch inputs remotely you need to grant Accessibility permissions to fully control your device</string>

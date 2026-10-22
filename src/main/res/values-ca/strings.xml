@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">S\'ha enviat al porta-retalls</string>
   <string name="pref_plugin_mousepad">Entrada remota</string>
   <string name="pref_plugin_mousepad_desc_nontv">Useu el vostre telèfon o tauleta com un ratolí tàctil i un teclat</string>
-  <string name="pref_plugin_mousepad_desc_tv">Useu el vostre telèfon o tauleta com un comandament a distància de TV</string>
   <string name="pref_plugin_mpris">Controls multimèdia</string>
   <string name="pref_plugin_mpris_desc">Proporciona un comandament a distància per al reproductor multimèdia</string>
   <string name="pref_plugin_contacts">Sincronitzador dels contactes</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Per a poder controlar els reproductors multimèdia cal atorgar accés a les notificacions</string>
   <string name="send_ping">Envia un ping</string>
   <string name="open_mousepad">Entrada remota</string>
-  <string name="open_mousepad_tv">Comandament a distància de TV</string>
   <string name="mousepad_sensitivity_settings_title">Estableix la sensibilitat del ratolí tàctil</string>
   <string name="mousepad_acceleration_profile_settings_title">Estableix l\'acceleració de l\'apuntador</string>
   <string name="mousepad_scroll_direction_title">Inverteix la direcció del desplaçament</string>
@@ -64,7 +62,6 @@
     <item>Forta</item>
     <item>La més forta</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Envia com a pulsacions de tecla</string>
   <string name="mouse_receiver_plugin_description">Rep el moviment del ratolí remot</string>
   <string name="mouse_receiver_plugin_name">Receptor del ratolí</string>
   <string name="mouse_receiver_no_permissions">Per a rebre entrades tàctils remotament cal atorgar el permís d\'Accessibilitat a control complet del vostre dispositiu</string>

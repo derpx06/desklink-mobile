@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Zwischenablage versendet</string>
   <string name="pref_plugin_mousepad">Ferneingabe</string>
   <string name="pref_plugin_mousepad_desc_nontv">Verwenden Sie Ihr Telefon oder Tablet als Touchpad und Tastatur</string>
-  <string name="pref_plugin_mousepad_desc_tv">Verwenden Sie Ihr Telefon oder Tablet als TV-Fernbedienung</string>
   <string name="pref_plugin_mpris">Medienkontrolle</string>
   <string name="pref_plugin_mpris_desc">Die Medienwiedergabe verbundener Geräte steuern</string>
   <string name="pref_plugin_contacts">Synchronisierung der Kontakte</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Um die Medienwiedergabe steuern zu können, müssen Sie Zugriff auf die Benachrichtigungen gewähren</string>
   <string name="send_ping">Ping senden</string>
   <string name="open_mousepad">Ferneingabe</string>
-  <string name="open_mousepad_tv">TV-Fernbedienung</string>
   <string name="mousepad_sensitivity_settings_title">Empfindlichkeit des Touchpads festlegen</string>
   <string name="mousepad_acceleration_profile_settings_title">Zeigerbeschleunigung festlegen</string>
   <string name="mousepad_scroll_direction_title">Bildlaufrichtung umkehren</string>
@@ -64,7 +62,6 @@
     <item>Stärker</item>
     <item>Stärkste</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Als Tasteneingaben senden</string>
   <string name="mouse_receiver_plugin_description">Entfernte Mausbewegungen empfangen</string>
   <string name="mouse_receiver_plugin_name">Maus-Empfänger</string>
   <string name="mouse_receiver_no_permissions">Um entfernte Touch-Eingaben zu empfangen, müssen Sie Bedienungshilfen-Berechtigungen gewähren. Diese ermöglichen die vollständige Kontrolle über das Gerät</string>

@@ -59,7 +59,6 @@
     <item>Máis forte</item>
     <item>A máis forte</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Enviar como pulsacións de tecla</string>
   <string name="mouse_receiver_plugin_description">Recibir movementos de rato remotos</string>
   <string name="mouse_receiver_plugin_name">Receptor de rato</string>
   <string name="mouse_receiver_no_permissions">Para recibir entrada táctil remota ten que garantir permisos de accesibilidade para controlar completamente o dispositivo.</string>

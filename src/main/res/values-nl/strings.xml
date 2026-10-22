@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Klembord verzonden</string>
   <string name="pref_plugin_mousepad">Invoer op afstand</string>
   <string name="pref_plugin_mousepad_desc_nontv">Uw telefoon of tablet gebruiken als een touchpad en toetsenbord</string>
-  <string name="pref_plugin_mousepad_desc_tv">Uw telefoon of tablet gebruiken als afstandsbediening voor de TV</string>
   <string name="pref_plugin_mpris">Bediening van multimedia</string>
   <string name="pref_plugin_mpris_desc">Biedt een afstandsbediening voor uw mediaspeler</string>
   <string name="pref_plugin_contacts">Synchronisator van contactpersonen</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Om in staat te zijn uw mediaspelers te besturen moet u toegan geven tot de meldingen</string>
   <string name="send_ping">Ping verzenden</string>
   <string name="open_mousepad">Invoer op afstand</string>
-  <string name="open_mousepad_tv">TV op afstand</string>
   <string name="mousepad_sensitivity_settings_title">Gevoeligheid van touchpad instellen</string>
   <string name="mousepad_acceleration_profile_settings_title">Aanwijzerversnelling instellen</string>
   <string name="mousepad_scroll_direction_title">Schuifrichting omdraaien</string>
@@ -64,7 +62,6 @@
     <item>Sterker</item>
     <item>Sterkst</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Als toetsaanslagen verzenden</string>
   <string name="mouse_receiver_plugin_description">Muisbewegingen van afstand ontvangen</string>
   <string name="mouse_receiver_plugin_name">Muisontvanger</string>
   <string name="mouse_receiver_no_permissions">Om aanraakinvoer op afstand te ontvangen moet u toegangsrechten toekennen om uw apparaat volledig te besturen</string>

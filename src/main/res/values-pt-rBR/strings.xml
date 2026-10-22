@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Área de transferência enviada</string>
   <string name="pref_plugin_mousepad">Introdução de dados remota</string>
   <string name="pref_plugin_mousepad_desc_nontv">Use seu celular ou tablet como mouse e teclado</string>
-  <string name="pref_plugin_mousepad_desc_tv">Use seu celular ou tablet como controle remoto de TV</string>
   <string name="pref_plugin_mpris">Controle multimídia</string>
   <string name="pref_plugin_mpris_desc">Fornece um controle remoto de seu reprodutor de mídia</string>
   <string name="pref_plugin_contacts">Sincronização de contatos</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Para ser possível controlar os seus leitores multimídia é necessário conceder acesso às notificações</string>
   <string name="send_ping">Enviar ping</string>
   <string name="open_mousepad">Introdução de dados remota</string>
-  <string name="open_mousepad_tv">Controle remoto da TV</string>
   <string name="mousepad_sensitivity_settings_title">Definir sensibilidade do touchpad</string>
   <string name="mousepad_acceleration_profile_settings_title">Definir aceleração do ponteiro</string>
   <string name="mousepad_scroll_direction_title">Direção de rolagem inversa</string>
@@ -64,7 +62,6 @@
     <item>Forte</item>
     <item>Muito forte</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Enviar como pressionamento de teclas</string>
   <string name="mouse_receiver_plugin_description">Receber movimento de mouse remoto</string>
   <string name="mouse_receiver_plugin_name">Receptor de mouse</string>
   <string name="mouse_receiver_no_permissions">Para receber entradas de toque remotas você precisa conceder permissões de acessibilidade para controlar totalmente seu dispositivo</string>

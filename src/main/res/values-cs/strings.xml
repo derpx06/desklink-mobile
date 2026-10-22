@@ -14,7 +14,6 @@
   <string name="pref_plugin_clipboard_sent">Schránka poslána</string>
   <string name="pref_plugin_mousepad">Vzdálený vstup</string>
   <string name="pref_plugin_mousepad_desc_nontv">Používejte svůj telefon nebo tablet jako touchpad a klávesnici</string>
-  <string name="pref_plugin_mousepad_desc_tv">Používejte svůj telefon nebo tablet jako ovladač TV</string>
   <string name="pref_plugin_mpris">Ovládání multimédií</string>
   <string name="pref_plugin_mpris_desc">Poskytuje dálkové ovládání přehrávačů médií</string>
   <string name="pref_plugin_contacts">Synchronizace kontaktů</string>
@@ -38,7 +37,6 @@
   <string name="no_permission_mprisreceiver">Abyste byli schopni ovládat vaše přehrávače médií, musíte udělit přístup k oznámením</string>
   <string name="send_ping">Poslat ping</string>
   <string name="open_mousepad">Vzdálený vstup</string>
-  <string name="open_mousepad_tv">Ovladač TV</string>
   <string name="mousepad_sensitivity_settings_title">Nastavit citlivost touchpadu</string>
   <string name="mousepad_acceleration_profile_settings_title">Nastavit akceleraci ukazatele</string>
   <string name="mousepad_scroll_direction_title">Obrácený směr posunu</string>
@@ -64,7 +62,6 @@
     <item>Silná</item>
     <item>Nejsilnější</item>
   </string-array>
-  <string name="pref_plugin_mousepad_send_keystrokes">Posílat jako úhozy kláves</string>
   <string name="mouse_receiver_plugin_description">Přijímat vzdálený pohyb myši</string>
   <string name="mouse_receiver_plugin_name">Příjemce myši</string>
   <string name="mouse_receiver_no_permissions">Pro příjem dotykového vstupu musíte nejdřív udělit oprávnění přístupnosti aby zařízení šlo ovládat</string>
