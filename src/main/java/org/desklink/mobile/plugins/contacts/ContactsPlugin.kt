@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import org.desklink.mobile.Device
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.R
+import org.desklink.mobile.helpers.RateLimiter
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
@@ -92,7 +93,11 @@ class ContactsPlugin : Plugin() {
         device.sendPacket(ContactsBook.notSharingPacket())
     }
 
+    /** Each request reads the contacts database: a desk's Refresh and its fetches, never a flood. */
+    private val limiter = RateLimiter(MAX_REQUESTS_PER_MINUTE, 60_000, TAG)
+
     override fun onPacketReceived(np: NetworkPacket): Boolean {
+        if (np.type in supportedPacketTypes && !limiter.allow(np.type)) return true
         when (np.type) {
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS -> background { sendSnapshot(force = true) }
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS -> {
@@ -138,7 +143,14 @@ class ContactsPlugin : Plugin() {
     companion object {
         private const val TAG = "DeskLink/Contacts"
         private const val CHANGE_DEBOUNCE_SECONDS = 5L
-        private const val MAX_UIDS_PER_REQUEST = 1000
+        /** K2 asks ≤ 200; 1,000 tolerates a desk that batches more, and bounds one request's reading. */
+        const val MAX_UIDS_PER_REQUEST = 1000
+
+        /** Per type per desk: a 3,000-contact first sync is 15 fetches of 200. */
+        const val MAX_REQUESTS_PER_MINUTE = 60
+
+        /** A contact's photo as stored is read only up to this; thumbnails are a few KiB. */
+        const val MAX_PHOTO_SOURCE_BYTES = 1024 * 1024
         /** SQLite's bound-argument limit is 999. */
         private const val QUERY_CHUNK = 200
 
@@ -210,7 +222,7 @@ class ContactsPlugin : Plugin() {
                             CommonDataKinds.Email.CONTENT_ITEM_TYPE -> s(4).takeIf(String::isNotEmpty)?.let { b.emails += it }
                             // DATA1 company, DATA5 department.
                             CommonDataKinds.Organization.CONTENT_ITEM_TYPE -> b.org = listOf(s(4), s(8)).filter(String::isNotEmpty)
-                            CommonDataKinds.Note.CONTENT_ITEM_TYPE -> b.note = s(4).take(2000)
+                            CommonDataKinds.Note.CONTENT_ITEM_TYPE -> b.note = s(4).take(ContactsBook.MAX_NOTE_CHARS)
                         }
                     }
                 }
@@ -236,9 +248,22 @@ class ContactsPlugin : Plugin() {
         /** The contact's thumbnail as a JPEG at most 96 px on its long side, or null. */
         private fun photo(context: Context, id: Long): ByteArray? = runCatching {
             val uri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, id)
-            val bytes = ContactsContract.Contacts.openContactPhotoInputStream(context.contentResolver, uri, false)?.use { it.readBytes() }
-                ?: return null
-            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+            val bytes = ContactsContract.Contacts.openContactPhotoInputStream(context.contentResolver, uri, false)?.use { input ->
+                val buffer = ByteArray(MAX_PHOTO_SOURCE_BYTES + 1)
+                var read = 0
+                while (read < buffer.size) {
+                    val n = input.read(buffer, read, buffer.size - read)
+                    if (n < 0) break
+                    read += n
+                }
+                if (read > MAX_PHOTO_SOURCE_BYTES) return null
+                buffer.copyOf(read)
+            } ?: return null
+            // Decoded at a power-of-two reduction already near the target: bounded bitmap memory.
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            val options = BitmapFactory.Options().apply { inSampleSize = ContactsBook.sampleSize(bounds.outWidth, bounds.outHeight) }
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
             val (w, h) = ContactsBook.photoSize(bitmap.width, bitmap.height)
             val scaled = if (w == bitmap.width && h == bitmap.height) bitmap else Bitmap.createScaledBitmap(bitmap, w, h, true)
             ByteArrayOutputStream().also { scaled.compress(Bitmap.CompressFormat.JPEG, 85, it) }.toByteArray()

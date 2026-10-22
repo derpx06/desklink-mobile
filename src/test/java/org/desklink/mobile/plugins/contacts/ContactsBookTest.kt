@@ -115,4 +115,16 @@ class ContactsBookTest {
         assertEquals("FAX", ContactsBook.phoneType(4))
         assertEquals("VOICE", ContactsBook.phoneType(0))
     }
+
+    @Test
+    fun fieldsAndNotesAreCutAtTheirBoundsAndPhotosDecodeNearTheTarget() {
+        assertEquals(ContactsBook.MAX_FIELD_CHARS, ContactsBook.escape("a".repeat(ContactsBook.MAX_FIELD_CHARS + 50)).length)
+        val card = ContactsBook.vcard(ContactCard("1", "x".repeat(1000), note = "n".repeat(ContactsBook.MAX_NOTE_CHARS + 1)))
+        assertTrue(card.split("\r\n").first { it.startsWith("NOTE:") }.length == 5 + ContactsBook.MAX_NOTE_CHARS)
+        assertTrue(card.split("\r\n").first { it.startsWith("FN:") }.length == 3 + ContactsBook.MAX_FIELD_CHARS)
+        assertEquals(1, ContactsBook.sampleSize(96, 96))
+        assertEquals(1, ContactsBook.sampleSize(191, 100))
+        assertEquals(2, ContactsBook.sampleSize(192, 100))
+        assertEquals(8, ContactsBook.sampleSize(1000, 800))
+    }
 }

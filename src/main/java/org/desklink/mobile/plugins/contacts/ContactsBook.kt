@@ -33,6 +33,9 @@ data class ContactCard(
 /** The pure half of contacts (F5): packets, vCards and sizes. Unit-tested. */
 object ContactsBook {
     const val PHOTO_SIZE = 96
+
+    /** One name part, number, email or organisation: longer is junk, and it keeps cards small. */
+    const val MAX_FIELD_CHARS = 256
     /** One packet's serialized size: the WebRTC payload bound is 128 KiB, with room for the frame. */
     const val PACKET_BUDGET = 100 * 1024
 
@@ -95,15 +98,15 @@ object ContactsBook {
         card.phones.forEach { (type, number) -> line("TEL;TYPE=$type:${escape(number)}") }
         card.emails.forEach { line("EMAIL;TYPE=INTERNET:${escape(it)}") }
         if (card.org.any(String::isNotBlank)) line("ORG:${card.org.joinToString(";") { escape(it) }}")
-        card.note?.takeIf(String::isNotBlank)?.let { line("NOTE:${escape(it)}") }
+        card.note?.takeIf(String::isNotBlank)?.let { line("NOTE:${escape(it, MAX_NOTE_CHARS)}") }
         card.photo?.let { line("PHOTO;ENCODING=b;TYPE=JPEG:${Base64.encodeToString(it, Base64.NO_WRAP)}") }
         if (card.updatedAt > 0) line("REV:${rev(card.updatedAt)}")
         append("END:VCARD")
     }
 
-    /** RFC 2426 text escaping; other control characters are dropped. */
-    fun escape(text: String): String = buildString {
-        for (c in text.replace("\r\n", "\n")) {
+    /** RFC 2426 text escaping; other control characters are dropped. Cut at [max] characters first. */
+    fun escape(text: String, max: Int = MAX_FIELD_CHARS): String = buildString {
+        for (c in text.replace("\r\n", "\n").take(max)) {
             when (c) {
                 '\\' -> append("\\\\")
                 ',' -> append("\\,")
@@ -123,6 +126,16 @@ object ContactsBook {
         6 -> "PAGER"
         17 -> "WORK,CELL" // TYPE_WORK_MOBILE
         else -> "VOICE"
+    }
+
+    /** K3: a contact's note, cut (the desk shows a few lines). */
+    const val MAX_NOTE_CHARS = 2000
+
+    /** The largest power of two that keeps a [width]×[height] image at least [PHOTO_SIZE] on its long side. */
+    fun sampleSize(width: Int, height: Int): Int {
+        var sample = 1
+        while (maxOf(width, height) / (sample * 2) >= PHOTO_SIZE) sample *= 2
+        return sample
     }
 
     /** A photo [width]×[height] scaled to fit [PHOTO_SIZE] on its long side; never enlarged, never 0. */
