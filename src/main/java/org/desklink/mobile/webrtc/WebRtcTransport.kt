@@ -171,6 +171,12 @@ class WebRtcTransport(
     interface Observer {
         fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject)
         fun onEnvelope(envelope: WebRtcEnvelope)
+
+        /**
+         * A message of the liveness channel (heartbeats only). Handled where it arrives, never queued
+         * behind other callbacks, so a slow feature handler cannot make a healthy desk look dead.
+         */
+        fun onLivenessEnvelope(envelope: WebRtcEnvelope) = onEnvelope(envelope)
         fun onControlChannelOpen()
         fun onRemoteVideoTrack(track: VideoTrack)
         /** MediaProjection revocation is a screen-session event, not a peer
@@ -328,7 +334,8 @@ class WebRtcTransport(
                         wireBinding.sessionId,
                         wireBinding.generation,
                     )
-                    observer.onEnvelope(envelope)
+                    if (channel.label() == WebRtcChannel.LIVENESS.label) observer.onLivenessEnvelope(envelope)
+                    else observer.onEnvelope(envelope)
                 }.onFailure(observer::onFailure)
             }
         })
@@ -921,6 +928,9 @@ class WebRtcTransport(
     override fun close(reason: DisconnectReason) {
         val previous = stateRef.getAndSet(TransportState.CLOSING)
         if (previous == TransportState.CLOSED || previous == TransportState.CLOSING) return
+        // Messages held back on the events channel were never sent: say so (a Lock or a Ring goes
+        // back to the offline queue), before the channels are disposed.
+        eventsSender.failAll("The WebRTC session closed")
         stopScreenCapture()
         pathExecutor.shutdownNow()
         inboundStatsTimer?.cancel()

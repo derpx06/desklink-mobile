@@ -14,6 +14,10 @@ import java.util.ArrayDeque
  *
  * Nothing is dropped silently: past [MAX_HELD_MESSAGES] / [MAX_HELD_BYTES] the message is refused
  * through its callback, which is how a caller finds out (the device queue reports or coalesces).
+ *
+ * The monitor guards only the queue. The native send and every callback run outside it, by one
+ * drainer at a time, so a native callback can never wait on a lock a sender holds (and the order of
+ * writes is the order of arrival).
  */
 class FlowControlledSender(
     private val bufferedAmount: () -> Long,
@@ -25,42 +29,67 @@ class FlowControlledSender(
 
     private val held = ArrayDeque<Held>()
     private var heldBytes = 0L
+    private var draining = false
 
-    @Synchronized
+    /** Set when the buffer went over [highWater] with messages waiting: they resume under [lowWater]. */
+    private var backedUp = false
+
     fun send(bytes: ByteArray, callback: TransportCallback) {
-        if (held.isEmpty() && bufferedAmount() <= highWater) return write(bytes, callback)
-        if (held.size >= MAX_HELD_MESSAGES || heldBytes + bytes.size > MAX_HELD_BYTES) {
+        val refused = synchronized(this) {
+            if (held.size >= MAX_HELD_MESSAGES || heldBytes + bytes.size > MAX_HELD_BYTES) {
+                true
+            } else {
+                held.addLast(Held(bytes, callback))
+                heldBytes += bytes.size
+                false
+            }
+        }
+        if (refused) {
             callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "The data channel is backed up"))
             return
         }
-        held.addLast(Held(bytes, callback))
-        heldBytes += bytes.size
+        drain()
     }
 
     /** The channel's buffered amount went down. */
-    @Synchronized
-    fun onBufferedAmountChange() {
-        if (held.isEmpty() || bufferedAmount() > lowWater) return
-        while (held.isNotEmpty() && bufferedAmount() <= highWater) {
-            val next = held.removeFirst()
-            heldBytes -= next.bytes.size
-            write(next.bytes, next.callback)
+    fun onBufferedAmountChange() = drain()
+
+    /** Writes held messages, in order, while the buffer allows; one thread at a time, outside the monitor. */
+    private fun drain() {
+        while (true) {
+            val next = synchronized(this) {
+                if (draining || held.isEmpty()) return
+                val buffered = bufferedAmount()
+                if (backedUp && buffered > lowWater) return
+                if (buffered > highWater) {
+                    backedUp = true
+                    return
+                }
+                backedUp = false
+                draining = true
+                held.removeFirst().also { heldBytes -= it.bytes.size }
+            }
+            try {
+                if (rawSend(next.bytes)) next.callback.onSuccess()
+                else next.callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "WebRTC data channel rejected message"))
+            } finally {
+                synchronized(this) { draining = false }
+            }
         }
     }
 
     @Synchronized
     fun heldCount(): Int = held.size
 
-    /** The channel closed: every held message is reported, in order. */
-    @Synchronized
+    /** The channel closed: every held message is reported (CLOSED), in order. */
     fun failAll(reason: String) {
-        while (held.isNotEmpty()) held.removeFirst().callback.onFailure(TransportError(TransportErrorCode.CLOSED, reason))
-        heldBytes = 0
-    }
-
-    private fun write(bytes: ByteArray, callback: TransportCallback) {
-        if (rawSend(bytes)) callback.onSuccess()
-        else callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "WebRTC data channel rejected message"))
+        val all = synchronized(this) {
+            held.toList().also {
+                held.clear()
+                heldBytes = 0
+            }
+        }
+        all.forEach { it.callback.onFailure(TransportError(TransportErrorCode.CLOSED, reason)) }
     }
 
     companion object {

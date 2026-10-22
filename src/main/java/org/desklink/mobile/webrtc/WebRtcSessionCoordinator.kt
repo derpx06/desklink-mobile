@@ -106,6 +106,7 @@ class WebRtcSessionCoordinator(
     private val recoveryExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "DeskLink-WebRTC-Recovery-${device.deviceId}").apply { isDaemon = true }
     }
+    private val pendingInitiation = ExpeditableTask(recoveryExecutor)
     private val transportCleanup = DeferredTaskExecutor(
         "DeskLink-WebRTC-Cleanup-${device.deviceId}",
     ) { error -> Log.w(TAG, "Failed to dispose the previous WebRTC transport", error) }
@@ -456,6 +457,8 @@ class WebRtcSessionCoordinator(
     /** An event that means "start over": the next failure takes the first rung, and "unavailable" clears. */
     private fun resetLadder(why: String) {
         recovery.reset()
+        // A rung already waiting (up to 16 s) is pointless now: bring it forward.
+        pendingInitiation.expedite(RESET_EXPEDITE_MS)
         device.setWebRtcUnavailable(false)
         Log.d(TAG, "Recovery ladder reset: $why")
     }
@@ -969,6 +972,19 @@ class WebRtcSessionCoordinator(
                     else -> Unit
                 }
                 sendSignal(binding, attemptId, type, payload)
+            }
+
+            override fun onLivenessEnvelope(envelope: WebRtcEnvelope) {
+                runCatching {
+                    require(sessions.isCurrent(binding)) { "Stale DeskLink session" }
+                    peerLiveness.onInbound(SystemClock.elapsedRealtime())
+                    val wire = requireNotNull(synchronized(lock) { activeWireBinding }) { "No active DeskLink WebRTC wire binding" }
+                    envelope.requireBoundTo(wire.peerDeviceId, wire.sessionId, wire.generation)
+                    // Heartbeats are idempotent, so no replay-cache entry; only a heartbeat may use this channel.
+                    val packet = WebRtcPacketBridge.decode(wire, envelope)
+                    require(packet.type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT) { "Only heartbeats use the liveness channel" }
+                    device.onWebRtcPacketReceived(packet)
+                }.onFailure { Log.w(TAG, "Rejected a liveness message: ${it.message}") }
             }
 
             override fun onEnvelope(envelope: WebRtcEnvelope) {
@@ -2283,11 +2299,11 @@ class WebRtcSessionCoordinator(
                 publish("WaitingForRecoveryOffer", null)
                 return@execute
             }
-            recoveryExecutor.schedule({
+            pendingInitiation.schedule(Runnable {
                 val current = sessions.currentBinding(device.deviceId)
                 recovery.release()
-                if (current == null || !sessions.isCurrent(current)) return@schedule
-                if (synchronized(lock) { closed || activeAttemptId != null }) return@schedule
+                if (current == null || !sessions.isCurrent(current)) return@Runnable
+                if (synchronized(lock) { closed || activeAttemptId != null }) return@Runnable
                 // Fetched before the lock: the relay's TURN grant may take 2 s.
                 val iceServers = runCatching { iceServersForPath() }
                 synchronized(lock) {
@@ -2298,7 +2314,7 @@ class WebRtcSessionCoordinator(
                             scheduleRecovery(current, attemptId, error.message ?: "WebRTC recovery failed", false)
                         }
                 }
-            }, delay, TimeUnit.MILLISECONDS)
+            }, delay)
         }
     }
 
@@ -2604,6 +2620,9 @@ class WebRtcSessionCoordinator(
         private const val TRANSIENT_DISCONNECT_GRACE_MILLIS = 12_000L
         private const val OFFER_CREATION_TIMEOUT_MILLIS = 10_000L
         private const val REMOTE_HEARTBEAT_SECONDS = 10L
+
+        /** A reset event (wake, network change) brings a waiting recovery attempt forward to this. */
+        private const val RESET_EXPEDITE_MS = 250L
         const val PEER_PROBE_AFTER_MS = 5_000L
         const val SCREEN_ON_PROBE_MS = 3_000L
         const val PEER_DEAD_AFTER_MS = 15_000L

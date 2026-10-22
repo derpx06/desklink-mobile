@@ -44,11 +44,9 @@ class FlowControlledSenderTest {
     fun aNewMessageNeverOvertakesHeldOnes() {
         buffered = 150
         sender.send("a".toByteArray(), cb("a"))
-        buffered = 0 // drained, but the callback has not run yet
+        buffered = 0 // drained, but nothing has told the sender yet
         sender.send("b".toByteArray(), cb("b"))
-        assertEquals(emptyList<String>(), wire)
-        sender.onBufferedAmountChange()
-        assertEquals(listOf("a", "b"), wire)
+        assertEquals("a goes first, then b", listOf("a", "b"), wire)
     }
 
     @Test
@@ -80,5 +78,35 @@ class FlowControlledSenderTest {
     fun theMarksAreAsContracted() {
         assertEquals(256 * 1024L, FlowControlledSender.EVENTS_HIGH_WATER)
         assertEquals(64 * 1024L, FlowControlledSender.EVENTS_LOW_WATER)
+    }
+
+    /** The native send and the callbacks run outside the monitor: a callback may call back into the sender. */
+    @Test
+    fun aCallbackMayReenterTheSenderWithoutDeadlock() {
+        val reentrant = object : TransportCallback {
+            override fun onSuccess() {
+                sender.send("again".toByteArray(), cb("again"))
+                sender.onBufferedAmountChange()
+            }
+
+            override fun onFailure(error: TransportError) = Unit
+        }
+        val done = java.util.concurrent.CountDownLatch(1)
+        Thread { sender.send("first".toByteArray(), reentrant); done.countDown() }.start()
+        assertTrue("deadlocked", done.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        assertEquals(listOf("first", "again"), wire)
+    }
+
+    @Test
+    fun concurrentSendersAndTheObserverKeepEveryMessageOnceAndInOrderPerSender() {
+        val sent = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val concurrent = FlowControlledSender({ 0 }, { sent += String(it); true }, highWater = 100, lowWater = 20)
+        val threads = (0 until 4).map { t ->
+            Thread { repeat(200) { n -> concurrent.send("$t:$n".toByteArray(), cb("x")); concurrent.onBufferedAmountChange() } }
+        }
+        threads.forEach(Thread::start)
+        threads.forEach { it.join(10_000) }
+        assertEquals(800, sent.size)
+        for (t in 0 until 4) assertEquals((0 until 200).map { "$t:$it" }, sent.filter { it.startsWith("$t:") })
     }
 }

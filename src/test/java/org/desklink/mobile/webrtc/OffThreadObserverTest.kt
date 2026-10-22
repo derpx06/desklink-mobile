@@ -99,4 +99,32 @@ class OffThreadObserverTest {
 
         assertTrue(target.states.isEmpty())
     }
+
+    /** A heartbeat must be handled where it arrives, even while the event thread is stuck in a slow handler. */
+    @Test
+    fun `liveness is delivered at once even when the event thread is busy`() {
+        val release = CountDownLatch(1)
+        val delivered = CountDownLatch(1)
+        val target = object : WebRtcTransport.Observer {
+            override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) = Unit
+            override fun onEnvelope(envelope: WebRtcEnvelope) = release.await().let { }
+            override fun onLivenessEnvelope(envelope: WebRtcEnvelope) = delivered.countDown()
+            override fun onControlChannelOpen() = Unit
+            override fun onRemoteVideoTrack(track: VideoTrack) = Unit
+            override fun onScreenCaptureStopped(reason: String) = Unit
+            override fun onConnectionStateChanged(state: WebRtcPeerHealth) = Unit
+            override fun onFailure(error: Throwable) = Unit
+        }
+        val events = DeferredTaskExecutor("test-observer-liveness")
+        try {
+            val observer = OffThreadObserver(target, events)
+            val envelope = WebRtcEnvelope.create("a", 1, 1, WebRtcChannel.LIVENESS, "desklink.packet.v1", ByteArray(1), 1)
+            observer.onEnvelope(envelope) // a feature message that is stuck
+            observer.onLivenessEnvelope(envelope)
+            assertTrue("the heartbeat waited behind a slow handler", delivered.await(1, TimeUnit.SECONDS))
+        } finally {
+            release.countDown()
+            events.close()
+        }
+    }
 }
