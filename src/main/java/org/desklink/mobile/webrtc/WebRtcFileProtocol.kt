@@ -50,6 +50,8 @@ data class WebRtcFileControl(
      */
     val clipboard: Boolean? = null,
     val mimeType: String? = null,
+    /** F3 (I1): the capture this file answers, on its Offer. */
+    val captureId: String? = null,
 ) {
     fun validate(wire: WebRtcWireBinding) {
         require(protocolVersion == VERSION) { "Unsupported DeskLink WebRTC file version" }
@@ -104,6 +106,7 @@ data class WebRtcFileControl(
             maxChunkSize?.let { value.put("maxChunkSize", it) }
             clipboard?.let { value.put("clipboard", it) }
             mimeType?.let { value.put("mimeType", it) }
+            captureId?.let { value.put("captureId", it) }
         }
 
     companion object {
@@ -134,6 +137,7 @@ data class WebRtcFileControl(
             maxChunkSize = value.optInt("maxChunkSize").takeIf { value.has("maxChunkSize") },
             clipboard = value.optBoolean("clipboard").takeIf { value.has("clipboard") },
             mimeType = value.optString("mimeType").takeIf(String::isNotEmpty)?.take(128),
+            captureId = value.optString("captureId").takeIf(String::isNotEmpty)?.take(64),
         )
     }
 }

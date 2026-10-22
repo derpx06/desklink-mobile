@@ -1652,6 +1652,38 @@ class WebRtcSessionCoordinator(
         publish("AudioSendStopped", reason)
     }
 
+    // ---- insert from phone (F3, I1) ------------------------------------------------------------------
+
+    private fun handleCaptureMessageLocked(message: WebRtcRemoteSessionControlMessage) {
+        val capture = org.desklink.mobile.plugins.capture.PhoneCapture
+        val id = message.captureId ?: message.remoteSessionId
+        when (message.kind) {
+            WebRtcRemoteSessionControlKind.CAPTURE_REQUEST -> {
+                val request = org.desklink.mobile.plugins.capture.CaptureRequest.of(device.deviceId, id, message.captureKind, message.target)
+                if (request == null) {
+                    sendCaptureCancelledLocked(id, "unsupported")
+                    return
+                }
+                capture.request(context, device.name, request)?.let { replaced -> sendCaptureCancelledLocked(replaced.captureId, "user") }
+            }
+            WebRtcRemoteSessionControlKind.CAPTURE_CANCELLED -> capture.cancelledByDesk(context, device.deviceId, id)
+            else -> Unit
+        }
+    }
+
+    /** `capture-result`: text/qr carry the text; photo/scan say what file follows (and how many pages). */
+    fun sendCaptureResult(captureId: String, kind: String, text: String? = null, mimeType: String? = null, pages: Int? = null): Boolean =
+        synchronized(lock) {
+            sendSessionControlLocked(WebRtcRemoteSessionControlKind.CAPTURE_RESULT, captureId) {
+                copy(captureId = captureId, captureKind = kind, text = text, mimeType = mimeType, pages = pages)
+            }
+        }
+
+    fun sendCaptureCancelled(captureId: String, reason: String): Boolean = synchronized(lock) { sendCaptureCancelledLocked(captureId, reason) }
+
+    private fun sendCaptureCancelledLocked(captureId: String, reason: String) =
+        sendSessionControlLocked(WebRtcRemoteSessionControlKind.CAPTURE_CANCELLED, captureId) { copy(captureId = captureId, reason = reason) }
+
     /** The peer went: every audio session ends with it, silently (there is no one to tell). */
     private fun endAudioWithPeerLocked() {
         cameraAudioLive = false
@@ -1806,6 +1838,12 @@ class WebRtcSessionCoordinator(
             return@synchronized
         }
         val message = WebRtcRemoteSessionControlMessage.fromJson(json)
+        // Insert from phone (F3) is its own exchange.
+        if (message.kind.isCapture) {
+            message.validate(wire, attemptId, System.currentTimeMillis())
+            handleCaptureMessageLocked(message)
+            return@synchronized
+        }
         // Audio (F1) has its own sessions too.
         if (message.kind.isAudio) {
             message.validate(wire, attemptId, System.currentTimeMillis())

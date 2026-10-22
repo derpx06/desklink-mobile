@@ -74,9 +74,14 @@ enum class WebRtcRemoteSessionControlKind(val wireName: String) {
     AUDIO_CONTROL("audio-control"),
     AUDIO_STOP("audio-stop"),
     AUDIO_DENIED("audio-denied"),
+    /** F3 (I1): desk → phone "take a photo/scan/text/QR for me"; the phone answers with a result or a cancel. */
+    CAPTURE_REQUEST("capture-request"),
+    CAPTURE_RESULT("capture-result"),
+    CAPTURE_CANCELLED("capture-cancelled"),
     ;
 
     val isAudio get() = wireName.startsWith("audio-")
+    val isCapture get() = wireName.startsWith("capture-")
 
     companion object {
         /** Null for a kind this build does not know: ignored, never an error that ends anything. */
@@ -137,6 +142,16 @@ data class WebRtcRemoteSessionControlMessage(
     /** F2 (D1): "mirror"/"extend" on `request-view` and `screen-ready`, and the phone view's density. */
     val display: String? = null,
     val scale: Double? = null,
+    /**
+     * F3 (I1): the capture's id (also its remoteSessionId), what to capture — sent as `captureKind`,
+     * since `kind` is this message's own kind — where it goes, and the result's text/type/pages.
+     */
+    val captureId: String? = null,
+    val captureKind: String? = null,
+    val target: String? = null,
+    val text: String? = null,
+    val mimeType: String? = null,
+    val pages: Int? = null,
 ) {
     fun validate(wire: WebRtcWireBinding, attemptId: String, now: Long) {
         require(remoteSessionVersion == VERSION) { "Unsupported DeskLink remote-session version" }
@@ -165,6 +180,7 @@ data class WebRtcRemoteSessionControlMessage(
         require(source == null || source in AUDIO_SOURCES) { "Unknown DeskLink audio source" }
         require(display == null || display in DISPLAY_MODES) { "Unknown DeskLink display mode" }
         require(scale == null || scale in 0.5..8.0) { "DeskLink display scale is invalid" }
+        require((text?.length ?: 0) <= MAX_CAPTURE_TEXT && (pages ?: 1) in 1..200) { "DeskLink capture result is too large" }
         require((sampleRate ?: 8000) in 8000..192000 && (channels ?: 1) in 1..2 && (value ?: 0) in 0..100) {
             "DeskLink audio format is invalid"
         }
@@ -217,6 +233,12 @@ data class WebRtcRemoteSessionControlMessage(
             this.value?.let { value.put("value", it) }
             display?.let { value.put("display", it) }
             scale?.let { value.put("scale", it) }
+            captureId?.let { value.put("captureId", it) }
+            captureKind?.let { value.put("captureKind", it) }
+            target?.let { value.put("target", it) }
+            text?.let { value.put("text", it) }
+            mimeType?.let { value.put("mimeType", it) }
+            pages?.let { value.put("pages", it) }
         }
 
     companion object {
@@ -231,6 +253,8 @@ data class WebRtcRemoteSessionControlMessage(
         val AUDIO_DIRECTIONS = setOf(DESK_TO_PHONE, PHONE_TO_DESK)
         val AUDIO_SOURCES = setOf("system", "mic")
         val DISPLAY_MODES = setOf("mirror", "extend")
+        /** A capture's text fits one control message (the envelope's payload bound). */
+        const val MAX_CAPTURE_TEXT = 32 * 1024
 
         fun fromJson(value: JSONObject): WebRtcRemoteSessionControlMessage {
             val kind = WebRtcRemoteSessionControlKind.fromWireName(value.getString("kind"))
@@ -272,6 +296,12 @@ data class WebRtcRemoteSessionControlMessage(
                 value = value.takeIf { it.has("value") }?.getInt("value"),
                 display = value.optString("display").takeIf(String::isNotEmpty),
                 scale = value.takeIf { it.has("scale") }?.getDouble("scale"),
+                captureId = value.optString("captureId").takeIf(String::isNotEmpty),
+                captureKind = value.optString("captureKind").takeIf(String::isNotEmpty),
+                target = value.optString("target").takeIf(String::isNotEmpty),
+                text = value.optString("text").takeIf(String::isNotEmpty),
+                mimeType = value.optString("mimeType").takeIf(String::isNotEmpty),
+                pages = value.takeIf { it.has("pages") }?.getInt("pages"),
             )
         }
     }
@@ -543,7 +573,10 @@ class WebRtcRemoteSessionController(
             WebRtcRemoteSessionControlKind.AUDIO_READY,
             WebRtcRemoteSessionControlKind.AUDIO_CONTROL,
             WebRtcRemoteSessionControlKind.AUDIO_STOP,
-            WebRtcRemoteSessionControlKind.AUDIO_DENIED -> return false
+            WebRtcRemoteSessionControlKind.AUDIO_DENIED,
+            WebRtcRemoteSessionControlKind.CAPTURE_REQUEST,
+            WebRtcRemoteSessionControlKind.CAPTURE_RESULT,
+            WebRtcRemoteSessionControlKind.CAPTURE_CANCELLED -> return false
         }
         return true
     }

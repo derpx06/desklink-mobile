@@ -265,7 +265,7 @@ private fun NearbyRow(computer: NearbyComputer, onPair: () -> Unit) {
 
 /** zxing's camera view, decoding QR codes until one is read; paused with the screen. */
 @Composable
-private fun QrCamera(onCode: (String) -> Unit) {
+internal fun QrCamera(onCode: (String) -> Unit) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val callback by rememberUpdatedState(onCode)
     val density = LocalDensity.current

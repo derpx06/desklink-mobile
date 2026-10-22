@@ -168,6 +168,8 @@ dependencies {
     implementation(libs.zxing.android.embedded) { isTransitive = false }
     implementation(libs.zxing.core)
     implementation(libs.webrtc)
+    // F3: on-device OCR, model bundled (owner-approved for "Insert from phone").
+    implementation(libs.mlkit.text.recognition)
 
     // Terminal emulation (Apache-2.0). Only the emulator core and TerminalRenderer are
     // used: there is no local PTY, output comes from the desktop over WebRTC.

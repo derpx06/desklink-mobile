@@ -198,7 +198,10 @@ class WebRtcFileTransferManager(
                     ).copy(
                         // C3: a clipboard image says so, and what it is.
                         clipboard = true.takeIf { packet.getBoolean("clipboard", false) },
-                        mimeType = packet.getStringOrNull("mimeType").takeIf { packet.getBoolean("clipboard", false) },
+                        // F3: the file answering a capture says which, and its type.
+                        mimeType = packet.getStringOrNull("mimeType")
+                            .takeIf { packet.getBoolean("clipboard", false) || packet.has("captureId") },
+                        captureId = packet.getStringOrNull("captureId"),
                     ),
                 ),
             )

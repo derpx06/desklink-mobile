@@ -13,4 +13,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <external-path name="images" path="Android/data/org.desklink.mobile/files/Pictures" />
     <!-- The desk's clipboard images, deleted after ten minutes (contract C3). -->
     <cache-path name="clipboard" path="clipboard/" />
+    <!-- F3: photos taken for the desk, deleted once sent. -->
+    <cache-path name="capture" path="capture/" />
 </paths>
