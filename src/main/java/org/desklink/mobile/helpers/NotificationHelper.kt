@@ -69,10 +69,20 @@ object NotificationHelper {
 
         nm.createNotificationChannelsCompat(channels)
 
-        // Delete any notification channels which weren't added.
-        // Use this to deprecate old channels.
-        nm.deleteUnlistedNotificationChannels(channels.map { channel -> channel.id })
+        // Delete channels nothing creates any more (deprecated ones). Channels made elsewhere stay:
+        // the live-session one (a running foreground service may hold it, and deleting it then throws)
+        // and each desk's "From <desk>". One refusal never stops the app from starting.
+        val keep = channels.map { it.id }.toSet()
+        nm.notificationChannelsCompat.map { it.id }
+            .filter { id -> deprecated(id, keep) }
+            .forEach { id -> runCatching { nm.deleteNotificationChannel(id) } }
     }
+
+    /** A channel no current code creates: safe to delete. */
+    internal fun deprecated(id: String, keep: Set<String>): Boolean =
+        id !in keep && id != NotificationChannelCompat.DEFAULT_CHANNEL_ID &&
+            id != org.desklink.mobile.plugins.screen.SessionLiveNotification.CHANNEL &&
+            !id.startsWith("desk_notifications_")
 
     fun setPersistentNotificationEnabled(context: Context?, enabled: Boolean) {
         val prefs = PreferenceManager.getDefaultSharedPreferences(context)

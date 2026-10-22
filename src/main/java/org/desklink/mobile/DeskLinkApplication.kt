@@ -124,6 +124,12 @@ class DeskLinkApplication : Application() {
         CrashReporter.offerPendingReport(this)
         LifecycleHelper.initializeObserver()
         org.desklink.mobile.plugins.clipboard.ClipboardListener.followForeground(this)
+        // Objects holding Compose state are made here, on the main thread before any composition,
+        // so a background thread touching them first cannot create state a running composition
+        // cannot read (see PluginFactory.instantiatePluginForDevice).
+        org.desklink.mobile.plugins.screen.ScreenControlPlugin.latestStatus
+        org.desklink.mobile.plugins.screen.PhoneScreenCaptureService.sharingDeviceId
+        org.desklink.mobile.plugins.share.TransferProgress.current
         loadRememberedDevicesFromSettings()
         // The transfer history keeps 30 days: prune it once per start, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.plugins.share.TransferHistory.store(this).prune() }

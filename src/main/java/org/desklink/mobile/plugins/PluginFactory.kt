@@ -44,8 +44,13 @@ object PluginFactory {
 
     fun instantiatePluginForDevice(context: Context, pluginKey: String, device: Device): Plugin? {
         try {
-            val plugin = pluginInfo[pluginKey]?.instantiableClass?.getDeclaredConstructor()?.newInstance()?.apply { setContext(context, device) }
-            return plugin
+            // Created inside a snapshot: Compose state the plugin holds (ScreenControlPlugin.remoteLive…)
+            // then has a record every snapshot can read. Made on a background thread in the global
+            // snapshot, a composition already running read it and crashed with "Reading a state that
+            // was created after the snapshot was taken".
+            return androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
+                pluginInfo[pluginKey]?.instantiableClass?.getDeclaredConstructor()?.newInstance()?.apply { setContext(context, device) }
+            }
         } catch (e: Exception) {
             Log.e("PluginFactory", "Could not instantiate plugin: $pluginKey", e)
             return null
