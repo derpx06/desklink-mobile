@@ -1040,8 +1040,11 @@ class WebRtcSessionCoordinator(
                         // "Type on <phone>" (C2): no screen session, so no lease; the person's
                         // per-desk switch is the consent, and only keys may come this way.
                         val typing = org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping
-                        require(typing.allowed(context, device.deviceId)) { "Typing on this phone is off for ${device.name}" }
                         require(typing.keyboardOnly(packet)) { "Focused-field input may carry keys only" }
+                        if (!typing.allowed(context, device.deviceId)) {
+                            typing.askToAllow(context, device)
+                            return@runCatching
+                        }
                     } else if (
                         packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
                         packet.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
