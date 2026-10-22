@@ -33,8 +33,8 @@ object AutomationTriggers {
     private val power = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                Intent.ACTION_POWER_CONNECTED -> Automations.fire(context, Event(Rules.TRIGGER_CHARGING_STARTED))
-                Intent.ACTION_POWER_DISCONNECTED -> Automations.fire(context, Event(Rules.TRIGGER_CHARGING_STOPPED))
+                Intent.ACTION_POWER_CONNECTED -> Automations.fire(context, Event(Rules.T_CHARGING, mapOf("state" to "start")))
+                Intent.ACTION_POWER_DISCONNECTED -> Automations.fire(context, Event(Rules.T_CHARGING, mapOf("state" to "stop")))
                 Intent.ACTION_BATTERY_CHANGED -> {
                     val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
                     val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100).takeIf { it > 0 } ?: 100
@@ -42,9 +42,9 @@ object AutomationTriggers {
                     val percent = level * 100 / scale
                     val previous = lastLevel
                     lastLevel = percent
-                    // Only a drop can cross a "battery ≤ N" threshold.
+                    // A5 `battery {below}`: sent once as the level drops (each new level is a crossing).
                     if (previous >= 0 && percent < previous) {
-                        Automations.fire(context, Event(Rules.TRIGGER_BATTERY_LOW, mapOf("level" to "$percent", "previous" to "$previous")))
+                        Automations.fire(context, Event(Rules.T_BATTERY, mapOf("below" to percent)))
                     }
                 }
             }
@@ -60,12 +60,12 @@ object AutomationTriggers {
             val context = context ?: return
             val ssid = runCatching { TrustedNetworkHelper(context).takeIf { it.hasPermissions }?.currentSSID }.getOrNull()
             lastSsid = ssid
-            Automations.fire(context, Event(Rules.TRIGGER_WIFI_CONNECTED, ssid?.let { mapOf("ssid" to it) }.orEmpty()))
+            Automations.fire(context, Event(Rules.T_WIFI, mapOf<String, Any>("state" to "connected") + ssid?.let { mapOf("ssid" to it.trim('"')) }.orEmpty()))
         }
 
         override fun onLost(network: Network) {
             val context = context ?: return
-            Automations.fire(context, Event(Rules.TRIGGER_WIFI_DISCONNECTED, lastSsid?.let { mapOf("ssid" to it) }.orEmpty()))
+            Automations.fire(context, Event(Rules.T_WIFI, mapOf<String, Any>("state" to "disconnected") + lastSsid?.let { mapOf("ssid" to it.trim('"')) }.orEmpty()))
             lastSsid = null
         }
     }
@@ -78,7 +78,7 @@ object AutomationTriggers {
             if (statusBarNotification.isOngoing || statusBarNotification.packageName.startsWith("org.desklink.mobile")) return
             if (statusBarNotification.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
             // Only the app: the notification's contents never reach a rule or a log.
-            Automations.fire(context, Event(Rules.TRIGGER_NOTIFICATION, mapOf("package" to statusBarNotification.packageName)))
+            Automations.fire(context, Event(Rules.T_NOTIFICATION, mapOf("app" to statusBarNotification.packageName)))
         }
 
         override fun onNotificationRemoved(statusBarNotification: StatusBarNotification) = Unit
@@ -97,6 +97,7 @@ object AutomationTriggers {
             addAction(Intent.ACTION_BATTERY_CHANGED)
         }
         ContextCompat.registerReceiver(app, power, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        AutomationAlarms.reschedule(app)
         runCatching {
             app.getSystemService(ConnectivityManager::class.java)?.registerNetworkCallback(
                 NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),

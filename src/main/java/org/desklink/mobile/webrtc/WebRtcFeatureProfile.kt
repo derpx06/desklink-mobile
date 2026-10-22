@@ -21,6 +21,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object WebRtcFeatureProfile {
     private val enabled = setOf(
+        // Automations (F7): both ways.
+        DeskLinkProtocol.PACKET_TYPE_AUTOMATIONS,
         DeskLinkProtocol.PACKET_TYPE_BATTERY,
         DeskLinkProtocol.PACKET_TYPE_CLIPBOARD,
         DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT,

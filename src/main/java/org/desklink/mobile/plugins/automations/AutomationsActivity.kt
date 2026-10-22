@@ -168,7 +168,7 @@ class AutomationsActivity : AppCompatActivity() {
                     Column {
                         templates(this@AutomationsActivity).forEach { template ->
                             Text(
-                                template.name,
+                                template.name.ifBlank { stringResource(R.string.automations_template_blank) },
                                 fontSize = 16.sp,
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button) {
                                     templates = false
@@ -197,21 +197,38 @@ class AutomationsActivity : AppCompatActivity() {
 
         Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().imePadding()) {
             ScreenHeader(onDone) {
-                IconButton(onClick = { Automations.delete(context, rule.id); onDone() }, modifier = Modifier.size(48.dp)) {
-                    Icon(painterResource(R.drawable.sym_delete), contentDescription = stringResource(R.string.automations_delete), tint = t.text)
+                if (!rule.builtin) {
+                    IconButton(onClick = { Automations.delete(context, rule.id); onDone() }, modifier = Modifier.size(48.dp)) {
+                        Icon(painterResource(R.drawable.sym_delete), contentDescription = stringResource(R.string.automations_delete), tint = t.text)
+                    }
                 }
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                // A built-in, or a rule with kinds this build does not know, is shown and never edited (A1, A7).
+                if (rule.builtin || !Rules.runnable(rule)) {
+                    Text(
+                        stringResource(if (rule.builtin) R.string.automations_builtin else R.string.automations_needs_newer),
+                        fontSize = 14.sp,
+                        color = t.textDim,
+                    )
+                    Text(summary(context, rule), fontSize = 15.sp)
+                    return@Column
+                }
+                Text(
+                    if (Rules.isDeskTrigger(rule.trigger.kind)) stringResource(R.string.automations_runs_on_desk) else stringResource(R.string.automations_runs_on_phone),
+                    fontSize = 13.sp,
+                    color = t.textDim,
+                )
                 OutlinedTextField(
                     value = rule.name,
-                    onValueChange = { rule = rule.copy(name = it.take(Rules.MAX_TEXT_CHARS)) },
+                    onValueChange = { rule = rule.copy(name = it.take(Rules.MAX_NAME_CHARS)) },
                     label = { Text(stringResource(R.string.automations_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Section(R.string.automations_when)
                 StepEditor(rule.trigger, Rules.TRIGGERS, onChange = { rule = rule.copy(trigger = it) }, onRemove = null)
-                if (rule.trigger.kind == Rules.TRIGGER_NFC_TAG) {
+                if (rule.trigger.kind == Rules.T_NFC) {
                     val tag = rule.trigger["tag"]
                     PillButton(
                         stringResource(if (writing) R.string.automations_nfc_waiting else R.string.automations_nfc_write),
@@ -233,8 +250,8 @@ class AutomationsActivity : AppCompatActivity() {
                         rule = rule.copy(conditions = rule.conditions.filterIndexed { i, _ -> i != index })
                     }
                 }
-                if (rule.conditions.size < Rules.MAX_CONDITIONS) {
-                    AddButton(R.string.automations_add_condition) { rule = rule.copy(conditions = rule.conditions + Step(Rules.CONDITION_CHARGING)) }
+                if (rule.conditions.size < Rules.MAX_STEPS) {
+                    AddButton(R.string.automations_add_condition) { rule = rule.copy(conditions = rule.conditions + Step(Rules.C_PHONE_CONNECTED, mapOf("connected" to true))) }
                 }
                 Section(R.string.automations_do)
                 rule.actions.forEachIndexed { index, action ->
@@ -242,15 +259,19 @@ class AutomationsActivity : AppCompatActivity() {
                         rule = rule.copy(actions = rule.actions.filterIndexed { i, _ -> i != index })
                     }
                 }
-                if (rule.actions.size < Rules.MAX_ACTIONS) {
-                    AddButton(R.string.automations_add_action) { rule = rule.copy(actions = rule.actions + Step(Rules.ACTION_NOTIFY)) }
+                if (rule.actions.size < Rules.MAX_STEPS) {
+                    AddButton(R.string.automations_add_action) { rule = rule.copy(actions = rule.actions + Step(Rules.A_NOTIFY)) }
                 }
                 Needs(rule)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val runOn = if (Rules.isDeskTrigger(rule.trigger.kind)) Rules.DESK else Rules.PHONE
                     PillButton(stringResource(R.string.automations_save), {
-                        if (Automations.save(context, rule)) onDone() else toast(R.string.automations_full)
+                        if (Automations.save(context, rule.copy(runOn = runOn))) onDone() else toast(R.string.automations_invalid)
                     }, height = 48.dp, enabled = rule.actions.isNotEmpty())
-                    PillButton(stringResource(R.string.automations_test), { Automations.testRun(context, rule) }, style = PillStyle.Outlined, height = 48.dp, enabled = rule.actions.isNotEmpty())
+                    // A desk-run rule is tested on the desk.
+                    if (runOn == Rules.PHONE) {
+                        PillButton(stringResource(R.string.automations_test), { Automations.testRun(context, rule) }, style = PillStyle.Outlined, height = 48.dp, enabled = rule.actions.isNotEmpty())
+                    }
                 }
                 if (history.isNotEmpty()) {
                     Section(R.string.automations_history)
@@ -281,6 +302,7 @@ class AutomationsActivity : AppCompatActivity() {
     private fun StepEditor(step: Step, kinds: List<String>, onChange: (Step) -> Unit, onRemove: (() -> Unit)?) {
         val t = tokens
         var menu by remember { mutableStateOf(false) }
+        val isCondition = kinds == Rules.CONDITIONS
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(t.surface).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -288,46 +310,71 @@ class AutomationsActivity : AppCompatActivity() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) {
                     Text(
-                        kindLabel(this@AutomationsActivity, step.kind),
+                        kindLabel(this@AutomationsActivity, step.kind, isCondition),
                         fontSize = 16.sp,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.DropdownList) { menu = true }.padding(vertical = 12.dp),
                     )
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         kinds.forEach { kind ->
-                            DropdownMenuItem(text = { Text(kindLabel(this@AutomationsActivity, kind)) }, onClick = { menu = false; onChange(Step(kind)) })
+                            DropdownMenuItem(text = { Text(kindLabel(this@AutomationsActivity, kind, isCondition)) }, onClick = { menu = false; onChange(Step(kind)) })
                         }
                     }
                 }
                 if (onRemove != null) {
                     IconButton(onClick = onRemove, modifier = Modifier.size(48.dp)) {
-                        Icon(painterResource(R.drawable.sym_close), contentDescription = stringResource(R.string.automations_remove, kindLabel(this@AutomationsActivity, step.kind)), tint = t.textDim)
+                        Icon(painterResource(R.drawable.sym_close), contentDescription = stringResource(R.string.automations_remove, kindLabel(this@AutomationsActivity, step.kind, isCondition)), tint = t.textDim)
                     }
                 }
             }
             params(step.kind).forEach { param ->
-                ParamField(param, step[param.key].orEmpty()) { value -> onChange(step.copy(params = step.params + (param.key to value.take(Rules.MAX_TEXT_CHARS)))) }
+                ParamField(param, step[param.key].orEmpty()) { value ->
+                    val typed: Any? = when (param.type) {
+                        Type.NUMBER -> value.toIntOrNull()
+                        Type.BOOL -> value.toBooleanStrictOrNull()
+                        else -> value.take(Rules.MAX_VALUE_CHARS).takeIf(String::isNotEmpty)
+                    }
+                    onChange(step.copy(params = if (typed == null) step.params - param.key else step.params + (param.key to typed)))
+                }
             }
         }
     }
 
-    private enum class Type { TEXT, NUMBER, TIME, CHOICE, DESK, COMMAND, APP }
+    private enum class Type { TEXT, NUMBER, TIME, CHOICE, BOOL, COMMAND, APP }
 
     private data class Param(val key: String, @StringRes val label: Int, val type: Type, val options: List<Pair<String, Int>> = emptyList())
 
+    private val onOff = listOf("true" to R.string.automations_on, "false" to R.string.automations_off)
+
+    /** Each kind's parameters (contract F7 A4–A6). */
     private fun params(kind: String): List<Param> = when (kind) {
-        Rules.TRIGGER_WIFI_CONNECTED, Rules.TRIGGER_WIFI_DISCONNECTED, Rules.CONDITION_WIFI -> listOf(Param("ssid", R.string.automations_param_ssid, Type.TEXT))
-        Rules.TRIGGER_BATTERY_LOW -> listOf(Param("percent", R.string.automations_param_percent, Type.NUMBER))
-        Rules.TRIGGER_NOTIFICATION -> listOf(Param("package", R.string.automations_param_app, Type.APP))
-        Rules.CONDITION_TIME -> listOf(Param("from", R.string.automations_param_from, Type.TIME), Param("to", R.string.automations_param_to, Type.TIME))
-        Rules.ACTION_RINGER -> listOf(Param("mode", R.string.automations_param_mode, Type.CHOICE, listOf("normal" to R.string.automations_ringer_normal, "vibrate" to R.string.automations_ringer_vibrate, "silent" to R.string.automations_ringer_silent)))
-        Rules.ACTION_VOLUME -> listOf(
+        Rules.T_WIFI -> listOf(
+            Param("state", R.string.automations_param_wifi_state, Type.CHOICE, listOf("connected" to R.string.automations_wifi_connected, "disconnected" to R.string.automations_wifi_disconnected)),
+            Param("ssid", R.string.automations_param_ssid, Type.TEXT),
+        )
+        Rules.T_CHARGING -> listOf(Param("state", R.string.automations_param_charging, Type.CHOICE, listOf("start" to R.string.automations_charging_start, "stop" to R.string.automations_charging_stop)))
+        Rules.T_BATTERY -> listOf(Param("below", R.string.automations_param_percent, Type.NUMBER))
+        Rules.T_CALL -> listOf(Param("state", R.string.automations_param_call, Type.CHOICE, listOf("incoming" to R.string.automations_call_incoming, "missed" to R.string.automations_call_missed)))
+        Rules.T_NOTIFICATION -> listOf(Param("app", R.string.automations_param_app, Type.APP))
+        Rules.T_TIME -> listOf(
+            Param("at", R.string.automations_param_at, Type.TIME),
+            Param("days", R.string.automations_param_days, Type.CHOICE, listOf("1234567" to R.string.automations_days_every, "12345" to R.string.automations_days_weekdays, "67" to R.string.automations_days_weekend)),
+        )
+        "command-finished" -> listOf(Param("job", R.string.automations_param_job, Type.TEXT))
+        Rules.C_PHONE_CONNECTED -> listOf(Param("connected", R.string.automations_param_connected, Type.BOOL, listOf("true" to R.string.automations_yes, "false" to R.string.automations_no)))
+        Rules.C_WIFI -> listOf(Param("ssid", R.string.automations_param_ssid, Type.TEXT))
+        Rules.C_TIME_BETWEEN -> listOf(Param("from", R.string.automations_param_from, Type.TIME), Param("to", R.string.automations_param_to, Type.TIME))
+        Rules.C_DESK_LOCKED -> listOf(Param("locked", R.string.automations_param_locked, Type.BOOL, listOf("true" to R.string.automations_yes, "false" to R.string.automations_no)))
+        Rules.A_RINGER -> listOf(Param("mode", R.string.automations_param_mode, Type.CHOICE, listOf("normal" to R.string.automations_ringer_normal, "vibrate" to R.string.automations_ringer_vibrate, "silent" to R.string.automations_ringer_silent)))
+        Rules.A_VOLUME -> listOf(
             Param("stream", R.string.automations_param_stream, Type.CHOICE, listOf("media" to R.string.automations_stream_media, "ring" to R.string.automations_stream_ring, "alarm" to R.string.automations_stream_alarm)),
             Param("percent", R.string.automations_param_percent, Type.NUMBER),
         )
-        Rules.ACTION_DND -> listOf(Param("on", R.string.automations_param_dnd, Type.CHOICE, listOf("true" to R.string.automations_on, "false" to R.string.automations_off)))
-        Rules.ACTION_OPEN_TERMINALS, Rules.ACTION_OPEN_DESK_SCREEN -> listOf(Param("device", R.string.automations_param_desk, Type.DESK))
-        Rules.ACTION_NOTIFY -> listOf(Param("text", R.string.automations_param_text, Type.TEXT))
-        Rules.ACTION_RUN_DESK_COMMAND -> listOf(Param("device", R.string.automations_param_desk, Type.DESK), Param("command", R.string.automations_param_command, Type.COMMAND))
+        Rules.A_DND -> listOf(Param("on", R.string.automations_param_dnd, Type.BOOL, onOff))
+        Rules.A_OPEN -> listOf(Param("screen", R.string.automations_param_screen, Type.CHOICE, listOf("terminals" to R.string.automations_screen_terminals, "desk-screen" to R.string.automations_screen_desk)))
+        Rules.A_NOTIFY, "notify" -> listOf(Param("title", R.string.automations_param_title, Type.TEXT), Param("body", R.string.automations_param_text, Type.TEXT))
+        "run-command" -> listOf(Param("commandId", R.string.automations_param_command, Type.COMMAND))
+        "keep-awake" -> listOf(Param("on", R.string.automations_param_keep_awake, Type.BOOL, onOff))
+        "open-url" -> listOf(Param("url", R.string.automations_param_url, Type.TEXT))
         else -> emptyList()
     }
 
@@ -352,8 +399,7 @@ class AutomationsActivity : AppCompatActivity() {
                 keyboardOptions = KeyboardOptions(keyboardType = if (param.type == Type.TEXT) KeyboardType.Text else KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
-            Type.CHOICE -> Choice(label, param.options.map { (v, l) -> v to stringResource(l) }, value, onValue)
-            Type.DESK -> Choice(label, desks().map { it.deviceId to it.name }, value, onValue)
+            Type.CHOICE, Type.BOOL -> Choice(label, param.options.map { (v, l) -> v to stringResource(l) }, value, onValue)
             Type.COMMAND -> {
                 val commands = remember { commands() }
                 if (commands.isEmpty()) Text(stringResource(R.string.automations_no_commands), fontSize = 13.sp, color = tokens.textDim)
@@ -384,18 +430,18 @@ class AutomationsActivity : AppCompatActivity() {
         val context = LocalContext.current
         val kinds = (listOf(rule.trigger) + rule.conditions + rule.actions)
         val location = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-        val wifiName = kinds.any { (it.kind == Rules.TRIGGER_WIFI_CONNECTED || it.kind == Rules.TRIGGER_WIFI_DISCONNECTED || it.kind == Rules.CONDITION_WIFI) && it["ssid"] != null }
+        val wifiName = kinds.any { (it.kind == Rules.T_WIFI || it.kind == Rules.C_WIFI) && it["ssid"] != null }
         if (wifiName && context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Need(R.string.automations_need_location) { location.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
         }
-        val dnd = kinds.any { it.kind == Rules.ACTION_DND || (it.kind == Rules.ACTION_RINGER && it["mode"] == "silent") }
+        val dnd = kinds.any { it.kind == Rules.A_DND || (it.kind == Rules.A_RINGER && it["mode"] == "silent") }
         if (dnd && !AutomationActions.dndAllowed(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Need(R.string.automations_need_dnd) { runCatching { startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) } }
         }
-        if (rule.trigger.kind == Rules.TRIGGER_NOTIFICATION && !NotificationReceiver.hasReadNotificationsPermission(context)) {
+        if (rule.trigger.kind == Rules.T_NOTIFICATION && !NotificationReceiver.hasReadNotificationsPermission(context)) {
             Need(R.string.automations_need_notifications) { runCatching { startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) } }
         }
-        if ((rule.trigger.kind == Rules.TRIGGER_CALL_INCOMING || rule.trigger.kind == Rules.TRIGGER_CALL_MISSED)) {
+        if (rule.trigger.kind == Rules.T_CALL) {
             Text(stringResource(R.string.automations_need_calls), fontSize = 13.sp, color = tokens.textDim)
         }
     }
@@ -424,37 +470,52 @@ class AutomationsActivity : AppCompatActivity() {
     }.distinctBy { it.first }
 
     companion object {
-        fun kindLabel(context: Context, kind: String): String = KIND_LABELS[kind]?.let(context::getString) ?: kind
+        fun kindLabel(context: Context, kind: String, condition: Boolean = false): String =
+            (CONDITION_LABELS[kind]?.takeIf { condition } ?: KIND_LABELS[kind])?.let(context::getString) ?: kind
 
         private val KIND_LABELS = mapOf(
-            Rules.TRIGGER_WIFI_CONNECTED to R.string.automations_kind_wifi_connected,
-            Rules.TRIGGER_WIFI_DISCONNECTED to R.string.automations_kind_wifi_disconnected,
-            Rules.TRIGGER_CHARGING_STARTED to R.string.automations_kind_charging_started,
-            Rules.TRIGGER_CHARGING_STOPPED to R.string.automations_kind_charging_stopped,
-            Rules.TRIGGER_BATTERY_LOW to R.string.automations_kind_battery_low,
-            Rules.TRIGGER_CALL_INCOMING to R.string.automations_kind_call_incoming,
-            Rules.TRIGGER_CALL_MISSED to R.string.automations_kind_call_missed,
-            Rules.TRIGGER_NOTIFICATION to R.string.automations_kind_notification,
-            Rules.TRIGGER_NFC_TAG to R.string.automations_kind_nfc_tag,
-            Rules.CONDITION_CHARGING to R.string.automations_kind_charging,
-            Rules.CONDITION_NOT_CHARGING to R.string.automations_kind_not_charging,
-            Rules.CONDITION_WIFI to R.string.automations_kind_wifi,
-            Rules.CONDITION_TIME to R.string.automations_kind_time_between,
-            Rules.ACTION_RING to R.string.automations_kind_ring,
-            Rules.ACTION_RINGER to R.string.automations_kind_ringer,
-            Rules.ACTION_VOLUME to R.string.automations_kind_volume,
-            Rules.ACTION_DND to R.string.automations_kind_dnd,
-            Rules.ACTION_OPEN_TERMINALS to R.string.automations_kind_open_terminals,
-            Rules.ACTION_OPEN_DESK_SCREEN to R.string.automations_kind_open_desk_screen,
-            Rules.ACTION_NOTIFY to R.string.automations_kind_notify,
-            Rules.ACTION_RUN_DESK_COMMAND to R.string.automations_kind_run_desk_command,
+            Rules.T_WIFI to R.string.automations_kind_wifi_trigger,
+            Rules.T_CHARGING to R.string.automations_kind_charging,
+            Rules.T_BATTERY to R.string.automations_kind_battery,
+            Rules.T_CALL to R.string.automations_kind_call,
+            Rules.T_NOTIFICATION to R.string.automations_kind_notification,
+            Rules.T_NFC to R.string.automations_kind_nfc,
+            Rules.T_TIME to R.string.automations_kind_time,
+            "phone-connected" to R.string.automations_kind_phone_connected,
+            "phone-left" to R.string.automations_kind_phone_left,
+            "desk-locked" to R.string.automations_kind_desk_locked,
+            "desk-unlocked" to R.string.automations_kind_desk_unlocked,
+            "desk-sleep" to R.string.automations_kind_desk_sleep,
+            "desk-resume" to R.string.automations_kind_desk_resume,
+            "command-finished" to R.string.automations_kind_command_finished,
+            Rules.C_WIFI to R.string.automations_kind_wifi,
+            Rules.C_TIME_BETWEEN to R.string.automations_kind_time_between,
+            Rules.A_RING to R.string.automations_kind_ring,
+            Rules.A_RINGER to R.string.automations_kind_ringer,
+            Rules.A_VOLUME to R.string.automations_kind_volume,
+            Rules.A_DND to R.string.automations_kind_dnd,
+            Rules.A_OPEN to R.string.automations_kind_open,
+            Rules.A_NOTIFY to R.string.automations_kind_notify,
+            "run-command" to R.string.automations_kind_run_desk_command,
+            "lock-desk" to R.string.automations_kind_lock_desk,
+            "keep-awake" to R.string.automations_kind_keep_awake,
+            "send-clipboard" to R.string.automations_kind_send_clipboard,
+            "open-url" to R.string.automations_kind_open_url,
+            "notify" to R.string.automations_kind_desk_notify,
+            "pause-media" to R.string.automations_kind_pause_media,
+        )
+
+        /** Kind labels for the condition list: `phone-connected`/`desk-locked` read as conditions there. */
+        private val CONDITION_LABELS = mapOf(
+            Rules.C_PHONE_CONNECTED to R.string.automations_kind_cond_connected,
+            Rules.C_DESK_LOCKED to R.string.automations_kind_cond_locked,
         )
 
         /** "When Wi-Fi “Home” connects · if charging · do 2 things". */
         fun summary(context: Context, rule: Rule): String = buildString {
             append(kindLabel(context, rule.trigger.kind))
-            rule.trigger.params.values.firstOrNull(String::isNotBlank)?.let { append(" “").append(it).append("”") }
-            if (rule.conditions.isNotEmpty()) append(" · ").append(rule.conditions.joinToString(", ") { kindLabel(context, it.kind) })
+            rule.trigger.params.values.map { it.toString() }.firstOrNull(String::isNotBlank)?.let { append(" “").append(it).append("”") }
+            if (rule.conditions.isNotEmpty()) append(" · ").append(rule.conditions.joinToString(", ") { kindLabel(context, it.kind, condition = true) })
             append(" → ").append(rule.actions.joinToString(", ") { kindLabel(context, it.kind) })
         }
 
@@ -474,12 +535,12 @@ class AutomationsActivity : AppCompatActivity() {
             fun id() = UUID.randomUUID().toString()
             fun s(res: Int) = context.getString(res)
             return listOf(
-                Rule(id(), s(R.string.automations_template_blank), trigger = Step(Rules.TRIGGER_CHARGING_STARTED)),
-                Rule(id(), s(R.string.automations_template_work), trigger = Step(Rules.TRIGGER_WIFI_CONNECTED), actions = listOf(Step(Rules.ACTION_RINGER, mapOf("mode" to "vibrate")))),
-                Rule(id(), s(R.string.automations_template_battery), trigger = Step(Rules.TRIGGER_BATTERY_LOW, mapOf("percent" to "20")), conditions = listOf(Step(Rules.CONDITION_NOT_CHARGING)), actions = listOf(Step(Rules.ACTION_NOTIFY, mapOf("text" to s(R.string.automations_template_battery_text))))),
-                Rule(id(), s(R.string.automations_template_nfc), trigger = Step(Rules.TRIGGER_NFC_TAG), actions = listOf(Step(Rules.ACTION_OPEN_TERMINALS))),
-                Rule(id(), s(R.string.automations_template_night), trigger = Step(Rules.TRIGGER_CHARGING_STARTED), conditions = listOf(Step(Rules.CONDITION_TIME, mapOf("from" to "22:00", "to" to "07:00"))), actions = listOf(Step(Rules.ACTION_DND, mapOf("on" to "true")))),
-                Rule(id(), s(R.string.automations_template_missed), trigger = Step(Rules.TRIGGER_CALL_MISSED), actions = listOf(Step(Rules.ACTION_RUN_DESK_COMMAND))),
+                Rule(id(), "", trigger = Step(Rules.T_CHARGING, mapOf("state" to "start")), actions = listOf(Step(Rules.A_NOTIFY))),
+                Rule(id(), s(R.string.automations_template_leave), trigger = Step("phone-left"), actions = listOf(Step("lock-desk")), runOn = Rules.DESK),
+                Rule(id(), s(R.string.automations_template_work), trigger = Step(Rules.T_WIFI, mapOf("state" to "connected")), actions = listOf(Step(Rules.A_RINGER, mapOf("mode" to "vibrate")))),
+                Rule(id(), s(R.string.automations_template_battery), trigger = Step(Rules.T_BATTERY, mapOf("below" to 20)), actions = listOf(Step(Rules.A_NOTIFY, mapOf("title" to s(R.string.automations_template_battery_text))))),
+                Rule(id(), s(R.string.automations_template_nfc), trigger = Step(Rules.T_NFC), actions = listOf(Step("run-command"))),
+                Rule(id(), s(R.string.automations_template_night), trigger = Step(Rules.T_CHARGING, mapOf("state" to "start")), conditions = listOf(Step(Rules.C_TIME_BETWEEN, mapOf("from" to "22:00", "to" to "07:00"))), actions = listOf(Step(Rules.A_DND, mapOf("on" to true)))),
             )
         }
     }

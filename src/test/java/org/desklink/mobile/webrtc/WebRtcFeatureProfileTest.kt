@@ -18,6 +18,7 @@ class WebRtcFeatureProfileTest {
     fun profileMatchesTheDesktopFeatureRegistry() {
         assertEquals(
             listOf(
+                "desklink.automations",
                 "desklink.battery",
                 "desklink.clipboard",
                 "desklink.clipboard.connect",
@@ -135,6 +136,7 @@ class WebRtcFeatureProfileTest {
 
     private companion object {
         val ALL_PACKET_TYPES = setOf(
+            DeskLinkProtocol.PACKET_TYPE_AUTOMATIONS,
             DeskLinkProtocol.PACKET_TYPE_BATTERY,
             DeskLinkProtocol.PACKET_TYPE_CLIPBOARD,
             DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT,

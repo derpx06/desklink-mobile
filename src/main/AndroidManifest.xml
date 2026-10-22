@@ -418,6 +418,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:label="@string/folders_title"
             android:exported="false" />
         <!-- F7: automations. -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.automations.AutomationAlarms$Receiver"
+            android:exported="false" />
         <activity
             android:name="org.desklink.mobile.plugins.automations.AutomationsActivity"
             android:label="@string/automations_title"

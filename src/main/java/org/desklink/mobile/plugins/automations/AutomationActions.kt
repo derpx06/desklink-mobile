@@ -20,7 +20,6 @@ import androidx.core.app.NotificationManagerCompat
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.helpers.NotificationHelper
-import org.desklink.mobile.plugins.runcommand.RunCommandPlugin
 import org.desklink.mobile.plugins.terminal.TerminalActivity
 
 /**
@@ -38,16 +37,18 @@ object AutomationActions {
 
     private const val CHANNEL_NOTIFY_ID = 7400
 
+    /** A failure that is a missing grant (A3 `done {error: "gate"}`). */
+    const val GATE = "gate"
+
+    /** A4 phone actions (and this phone's `phone-volume`, `phone-dnd`). */
     fun run(context: Context, action: Step): Result = when (action.kind) {
-        Rules.ACTION_RING -> ring(context)
-        Rules.ACTION_RINGER -> ringer(context, action["mode"])
-        Rules.ACTION_VOLUME -> volume(context, action["stream"], action["percent"]?.toIntOrNull())
-        Rules.ACTION_DND -> dnd(context, action["on"] != "false")
-        Rules.ACTION_OPEN_TERMINALS -> deskScreen(context, action["device"], terminals = true)
-        Rules.ACTION_OPEN_DESK_SCREEN -> deskScreen(context, action["device"], terminals = false)
-        Rules.ACTION_NOTIFY -> notify(context, context.getString(R.string.automations_title), action["text"] ?: "", null)
-        Rules.ACTION_RUN_DESK_COMMAND -> runDeskCommand(action["device"], action["command"])
-        else -> Result.Failed("unknown")
+        Rules.A_RING -> ring(context)
+        Rules.A_RINGER -> ringer(context, action["mode"])
+        Rules.A_VOLUME -> volume(context, action["stream"], action["percent"]?.toIntOrNull())
+        Rules.A_DND -> dnd(context, action["on"]?.toBoolean() ?: true)
+        Rules.A_OPEN -> deskScreen(context, null, terminals = action["screen"] != "desk-screen")
+        Rules.A_NOTIFY -> notify(context, action["title"] ?: context.getString(R.string.automations_title), action["body"] ?: "", null)
+        else -> Result.Failed("unsupported")
     }
 
     private fun ring(context: Context): Result {
@@ -72,7 +73,7 @@ object AutomationActions {
         }
         // Silent (and leaving it) needs Do Not Disturb access on Android 7+.
         if (!dndAllowed(context) && (target == AudioManager.RINGER_MODE_SILENT || audio.ringerMode == AudioManager.RINGER_MODE_SILENT)) {
-            return Result.Failed("needs Do Not Disturb access")
+            return Result.Failed(GATE)
         }
         return runCatching { audio.ringerMode = target; Result.Done }.getOrElse { Result.Failed("refused") }
     }
@@ -97,7 +98,7 @@ object AutomationActions {
 
     private fun dnd(context: Context, on: Boolean): Result {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return Result.Failed("unsupported")
-        if (!dndAllowed(context)) return Result.Failed("needs Do Not Disturb access")
+        if (!dndAllowed(context)) return Result.Failed(GATE)
         val manager = context.getSystemService(NotificationManager::class.java) ?: return Result.Failed("unsupported")
         manager.setInterruptionFilter(if (on) NotificationManager.INTERRUPTION_FILTER_PRIORITY else NotificationManager.INTERRUPTION_FILTER_ALL)
         return Result.Done
@@ -121,12 +122,12 @@ object AutomationActions {
 
     private fun notify(context: Context, title: String, text: String, open: Intent?): Result {
         val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return Result.Failed("notifications off")
+        if (!manager.areNotificationsEnabled()) return Result.Failed(GATE)
         val tap = open?.let { PendingIntent.getActivity(context, it.hashCode(), it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE) }
         val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title.take(Rules.MAX_TEXT_CHARS))
-            .setContentText(text.take(Rules.MAX_TEXT_CHARS))
+            .setContentTitle(title.take(Rules.MAX_VALUE_CHARS))
+            .setContentText(text.take(Rules.MAX_VALUE_CHARS))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setTimeoutAfter(10 * 60_000L)
@@ -136,14 +137,5 @@ object AutomationActions {
             manager.notify("automation", CHANNEL_NOTIFY_ID + (title.hashCode() and 0xFF), notification)
             Result.Done
         }.getOrElse { Result.Failed("notifications off") }
-    }
-
-    private fun runDeskCommand(deviceId: String?, command: String?): Result {
-        val key = command ?: return Result.Failed("no command chosen")
-        val device = desk(deviceId) ?: return Result.Failed("no desk")
-        if (!device.hasActiveWebRtcFeatureTransport) return Result.Failed("desk not connected")
-        val plugin = device.getPlugin(RunCommandPlugin::class.java) ?: return Result.Failed("run command off")
-        plugin.runCommand(key)
-        return Result.Done
     }
 }

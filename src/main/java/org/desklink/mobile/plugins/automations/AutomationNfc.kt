@@ -40,7 +40,7 @@ object AutomationNfc {
     @JvmStatic
     fun onTag(context: Context, tag: String) {
         if (!validTag(tag)) return
-        Automations.fire(context, Event(Rules.TRIGGER_NFC_TAG, mapOf("tag" to tag)))
+        Automations.fire(context, Event(Rules.T_NFC, mapOf("tag" to tag)))
     }
 
     fun available(context: Context) = NfcAdapter.getDefaultAdapter(context)?.isEnabled == true

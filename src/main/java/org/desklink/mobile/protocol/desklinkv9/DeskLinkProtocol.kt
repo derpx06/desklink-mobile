@@ -87,6 +87,9 @@ object DeskLinkProtocol {
 
     /** Both ways (F6): synced notes, `{op: "index"|"fetch"|"items", ...}`. */
     const val PACKET_TYPE_NOTES = "desklink.notes"
+
+    /** Both ways (F7): automation rules, events and actions, `{op: "index"|"fetch"|"items"|"event"|"do"|"done", ...}`. */
+    const val PACKET_TYPE_AUTOMATIONS = "desklink.automations"
     const val PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS =
         "desklink.contacts.request_all_uids_timestamps"
     const val PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS =
