@@ -3,6 +3,7 @@ package org.desklink.mobile.plugins.folders
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.security.MessageDigest
@@ -145,6 +146,52 @@ class FolderSyncTest {
         assertTrue(long.endsWith(" (conflict from Pixel 1970-01-01).txt"))
     }
 
+
+    /** The manifest the desk sends holds live items and tombstones: up to its 20,000, not the 10,000 live limit. */
+    @Test
+    fun theManifestIntakeIsTheDesksTwentyThousandNotTheLiveItemLimit() {
+        assertEquals(FolderSync.MAX_FILES, FolderSync.MAX_MANIFEST_ENTRIES)
+        assertTrue(FolderSync.MAX_MANIFEST_ENTRIES > FolderSync.MAX_BUCKET_ITEMS)
+        val entries = List(FolderSync.MAX_MANIFEST_ENTRIES + 1) { "f$it" }
+        assertEquals(FolderSync.MAX_MANIFEST_ENTRIES, FolderSync.takeManifest(entries).size)
+        assertEquals(FolderSync.MAX_MANIFEST_ENTRIES, FolderSync.takeManifest(entries.take(FolderSync.MAX_MANIFEST_ENTRIES)).size)
+        assertEquals(10_001, FolderSync.takeManifest(entries.take(10_001)).size)
+        assertEquals("f19999", FolderSync.takeManifest(entries).last())
+    }
+
+    /** A conflict copy's name is valid on both sides whatever the phone is called or the file ends with. */
+    @Test
+    fun aConflictCopyNameIsAlwaysAValidName() {
+        val phones = listOf("Pixel", "Alice's: phone", "a/b\\c", "x\u0000y\ntab\t", "::::", "\uD83D\uDCF1".repeat(60), "")
+        val paths = listOf(
+            "report.pdf", "d/report.pdf", "d/e/noext", "d/.hidden", "d/a.b.c",
+            "d/" + "s".repeat(250) + ".txt", "d/" + "é".repeat(120) + ".jpeg",
+            "d/archive.\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9", // 8 two-byte letters = 16 bytes
+            "d/archive.\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9", // 18 bytes
+        )
+        for (phone in phones) for (path in paths) {
+            val copy = FolderSync.conflictName(path, phone, 1_700_000_000_000)
+            assertNull("$copy refused: ${FolderSync.skipReason(copy, false)}", FolderSync.skipReason(copy, false))
+            val name = copy.substringAfterLast('/')
+            assertTrue(copy, name.toByteArray().size <= FolderSync.MAX_SEGMENT_BYTES)
+            assertTrue(copy, ':' !in name && '\\' !in name && name.none { it.isISOControl() })
+            assertEquals(path.substringBeforeLast('/', ""), copy.substringBeforeLast('/', ""))
+        }
+    }
+
+    @Test
+    fun theExtensionLimitIsSixteenBytesNotSixteenCharacters() {
+        // 16 bytes: kept. 18 bytes (9 letters of 2 bytes, 9 UTF-16 units): not an extension, so it stays in the stem.
+        val sixteen = FolderSync.conflictName("a.${"\u00e9".repeat(8)}", "P", 0)
+        assertTrue(sixteen, sixteen.endsWith(").${"\u00e9".repeat(8)}"))
+        val eighteen = FolderSync.conflictName("a.${"\u00e9".repeat(9)}", "P", 0)
+        assertTrue(eighteen, eighteen.startsWith("a.${"\u00e9".repeat(9)} (conflict from P "))
+        assertTrue(eighteen, eighteen.endsWith(")"))
+        // ASCII: sixteen kept, seventeen not.
+        assertTrue(FolderSync.conflictName("a.${"x".repeat(16)}", "P", 0).endsWith(".${"x".repeat(16)}"))
+        assertTrue(FolderSync.conflictName("a.${"x".repeat(17)}", "P", 0).endsWith(")"))
+        assertEquals(16, FolderSync.MAX_EXTENSION_BYTES)
+    }
 
     /** A pair at its 20,000-file bound: the manifest splits into parts that each cross the data channel. */
     @Test

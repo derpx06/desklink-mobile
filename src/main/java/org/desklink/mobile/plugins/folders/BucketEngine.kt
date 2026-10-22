@@ -558,10 +558,10 @@ object BucketEngine {
         if (parts !in 1..FolderSync.MAX_PARTS || part !in 1..parts) return
         live.onDesk = true
         if (part == 1) live.incoming.clear()
-        if (live.incoming.values.sumOf { it.size } >= FolderSync.MAX_BUCKET_ITEMS * 2) return live.incoming.clear()
+        if (live.incoming.values.sumOf { it.size } >= FolderSync.MAX_MANIFEST_ENTRIES) return live.incoming.clear()
         live.incoming[part] = entries(packet.getJSONArray("entries") ?: JSONArray(), fromDesk = true)
         if (live.incoming.size != parts) return
-        val remote = live.incoming.values.flatten().take(FolderSync.MAX_BUCKET_ITEMS).toMap()
+        val remote = FolderSync.takeManifest(live.incoming.values.flatten()).toMap()
         live.incoming.clear()
         if (live.phase == Phase.HELD_EMPTY) return
         live.remote = HashMap(remote.filterValues { !it.deleted && !it.dir }.mapValues { it.value.sha256 })
@@ -571,7 +571,7 @@ object BucketEngine {
     }
 
     /** Manifest entries, bounded and checked; the desk's are also filtered by the phone's own rules (P6, F8b). */
-    private fun entries(array: JSONArray, fromDesk: Boolean): List<Pair<String, Entry>> = (0 until minOf(array.length(), FolderSync.MAX_BUCKET_ITEMS * 2)).mapNotNull { i ->
+    private fun entries(array: JSONArray, fromDesk: Boolean): List<Pair<String, Entry>> = (0 until minOf(array.length(), FolderSync.MAX_MANIFEST_ENTRIES)).mapNotNull { i ->
         val o = array.optJSONObject(i) ?: return@mapNotNull null
         val path = o.opt("path") as? String ?: return@mapNotNull null
         val deleted = o.opt("deleted") == true

@@ -60,6 +60,10 @@ object FolderSync {
     const val MAX_SEGMENT_BYTES = 255
     const val MAX_RELPATH_BYTES = 1024
     const val MAX_NAME_CHARS = 80
+    /** A conflict copy keeps the original's extension only up to this many bytes (the desk's rule). */
+    const val MAX_EXTENSION_BYTES = 16
+    /** Characters no name may hold, as [skipReason] refuses them: a conflict copy's name never has them. */
+    private const val NAME_REFUSED = "/\\:\u0000"
     /** P2: one manifest packet, and parts per manifest. */
     const val PACKET_BUDGET = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET
     const val MAX_PARTS = 256
@@ -90,10 +94,11 @@ object FolderSync {
         val dir = path.substring(0, slash + 1)
         val name = path.substring(slash + 1)
         val dot = name.lastIndexOf('.')
-        val (stem0, ext) = if (dot > 0 && name.length - dot - 1 <= 16) name.substring(0, dot) to name.substring(dot) else name to ""
+        // The desk measures the extension in bytes, so a multi-byte one is cut off the same way here.
+        val (stem0, ext) = if (dot > 0 && name.substring(dot + 1).toByteArray().size <= MAX_EXTENSION_BYTES) name.substring(0, dot) to name.substring(dot) else name to ""
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { timeZone = TimeZone.getTimeZone("UTC") }
             .format(Date(Math.floorDiv(mtime, 1000L) * 1000L))
-        val who = phone.filter { it != '/' && it != '\\' && it != '\u0000' && !it.isISOControl() }.takeCodePoints(40)
+        val who = phone.filter { it !in NAME_REFUSED && !it.isISOControl() }.takeCodePoints(40)
         val suffix = " (conflict from $who $date)$ext"
         var stem = stem0
         while (stem.isNotEmpty() && (stem + suffix).toByteArray().size > MAX_SEGMENT_BYTES) stem = stem.dropLast(1)
@@ -237,6 +242,15 @@ object FolderSync {
     const val BUCKET_ID = "bucket"
     /** F8c: folder levels (`A/B/file`; folders `A` and `A/B`). */
     const val MAX_BUCKET_DEPTH = 2
+    /**
+     * Manifest entries taken from the desk's parts: live items and 30-day tombstones, so as many as
+     * the desk sends ([MAX_FILES]). The live-item limit [MAX_BUCKET_ITEMS] still applies to adds.
+     */
+    const val MAX_MANIFEST_ENTRIES = MAX_FILES
+
+    /** The entries of a complete manifest the phone reads, in order, at most [MAX_MANIFEST_ENTRIES]. */
+    fun <T> takeManifest(entries: List<T>): List<T> = entries.take(MAX_MANIFEST_ENTRIES)
+
     /** F8c: items per Bucket, files and folders together. */
     const val MAX_BUCKET_ITEMS = 10_000
     /** F8c: one file ("Files over 1 GB can't go in the Bucket"). */
