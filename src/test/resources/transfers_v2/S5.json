@@ -1,0 +1,217 @@
+{
+ "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+ "phoneDeviceId": "phone-device",
+ "deskDeviceId": "desk-device",
+ "sessionId": 9,
+ "connectionGeneration": 2,
+ "transferToken": "00112233445566778899aabbccddeeff",
+ "pattern": "byte(i) = ((i * 31) + (i >> 12)) & 0xff",
+ "format": "steps replayed in order; \"from\" the engine under test = \"phone\"; peer steps are fed in, phone steps are asserted in order; a frame is {pass, offset, length, last} with the payload taken from the pattern and, on a last frame, the block hash as trailer (trailer:\"bad\" corrupts it); control messages are compared parsed and without \"message\"",
+ "scenario": "S5",
+ "title": "the source cannot be read at block 1: block 0 goes out, then error {internal}; both ends free their slot and partial state",
+ "engine": "sender",
+ "sender": "phone",
+ "file": {
+  "name": "s5.bin",
+  "size": 2097152
+ },
+ "senderState": {
+  "hashes": "none",
+  "source": "read-error-at-block-1"
+ },
+ "end": {
+  "senderOutcome": "failed",
+  "storesEmpty": true
+ },
+ "steps": [
+  {
+   "from": "phone",
+   "control": {
+    "action": "offer",
+    "filename": "s5.bin",
+    "totalSize": 2097152,
+    "mtime": 1700000000000,
+    "blockSize": 1048576,
+    "maxFrameBytes": 61440
+   }
+  },
+  {
+   "from": "desk",
+   "control": {
+    "action": "accept",
+    "resumeBlock": 0,
+    "prefixSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "maxFrameBytes": 61440
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 0,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 61368,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 122736,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 184104,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 245472,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 306840,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 368208,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 429576,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 490944,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 552312,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 613680,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 675048,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 736416,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 797784,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 859152,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 920520,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 981888,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "phone",
+   "frame": {
+    "pass": 0,
+    "offset": 1043256,
+    "length": 5320,
+    "last": true
+   }
+  },
+  {
+   "from": "phone",
+   "control": {
+    "action": "error",
+    "code": "internal"
+   }
+  }
+ ]
+}

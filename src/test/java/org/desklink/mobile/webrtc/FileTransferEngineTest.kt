@@ -233,6 +233,8 @@ class FileTransferEngineTest {
 
     private fun harness(bytes: ByteArray, name: String = "report.bin") = Harness(BytesSource(bytes), bytes.size.toLong(), name)
 
+    private val EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
     private fun expectedFileHash(bytes: ByteArray): String {
         val sha = MessageDigest.getInstance("SHA-256")
         val blocks = (0 until FileV2.blockCount(bytes.size.toLong())).map { b ->
@@ -423,7 +425,7 @@ class FileTransferEngineTest {
     }
 
     @Test
-    fun aSenderThatLostItsRecordedHashesRestartsAtZeroAndTheReceiverTruncates() {
+    fun aSenderThatLostItsRecordedHashesReadsThemAgainAndStillResumesAtTheReceiversBlock() {
         val bytes = data(5 * FileV2.BLOCK_BYTES)
         val h = harness(bytes)
         val s = h.newSender()
@@ -432,11 +434,90 @@ class FileTransferEngineTest {
         h.receiver!!.suspend(); s.suspend()
         h.toReceiver.clear(); h.toSender.clear()
         h.framesSent.clear()
-        // The sender restarted and has no hashes (e.g. a cleared checkpoint): its prefix cannot match.
+        // The sender restarted and holds no hashes (a retry, a cleared sidecar): it hashes the prefix from the source.
         h.run(restore = emptyList())
-        assertEquals("starts again at block 0", 0L, h.framesSent.first().offset)
+        assertEquals("resumes at block 3, no re-send", 3L * FileV2.BLOCK_BYTES, h.framesSent.first().offset)
+        assertEquals(0, h.framesSent.first().pass)
         assertEquals(h.sha(bytes), h.deliveredSha)
         assertEquals(expectedFileHash(bytes), h.deliveredFileHash)
+    }
+
+    @Test
+    fun aPrefixThatIsNotTheSendersStartsAgainAtZeroUnderTheNextPassAndTheReceiverAdoptsIt() {
+        val bytes = data(5 * FileV2.BLOCK_BYTES)
+        val h = harness(bytes)
+        val s = h.newSender()
+        s.start()
+        while ((h.receiver?.verifiedBlocks ?: 0) < 3) h.pump(limit = 1)
+        h.receiver!!.suspend(); s.suspend()
+        h.toReceiver.clear(); h.toSender.clear()
+        h.framesSent.clear()
+        // Recorded hashes that are not what the receiver verified: its prefix cannot agree.
+        h.run(restore = List(3) { ByteArray(32) { 7 } })
+        assertEquals("starts again at block 0", 0L, h.framesSent.first().offset)
+        assertEquals("under pass + 1", 1, h.framesSent.first().pass)
+        assertEquals(h.sha(bytes), h.deliveredSha)
+        assertEquals(expectedFileHash(bytes), h.deliveredFileHash)
+    }
+
+    @Test
+    fun aRetryOfTheSameTransferNeverEmptiesItsSidecar() {
+        val bytes = data(5 * FileV2.BLOCK_BYTES)
+        val h = harness(bytes)
+        val s = h.newSender()
+        s.start()
+        while ((h.receiver?.verifiedBlocks ?: 0) < 3) h.pump(limit = 1)
+        s.suspend()
+        val stored = h.senderStore.readBlocks(h.id).size
+        assertTrue(stored >= 3)
+        // The same transfer offered again by a sender that holds nothing (a busy retry built with no hashes).
+        h.newSender(restore = emptyList()).start()
+        assertEquals("the stored hashes are still there", stored, h.senderStore.readBlocks(h.id).size)
+    }
+
+    @Test
+    fun aBlockAckThatIsNotTheSendersBlockRewindsUnderTheNextPassAndTheReceiverAdoptsIt() {
+        val bytes = data(3 * FileV2.BLOCK_BYTES)
+        val h = harness(bytes)
+        val s = h.newSender()
+        s.start()
+        h.pump(limit = 1)
+        (h.toSender.poll() as Msg.Ctl).let { s.onControl(it.control) } // the accept: streaming starts
+        // The first ack the receiver gives is replaced by one for a block the sender never read.
+        h.pump(holdAcks = true, limit = 40)
+        val forged = WebRtcFileControl(
+            action = WebRtcFileAction.BLOCK_ACK, transferId = h.id, deviceId = "desk", sessionId = 1, connectionGeneration = 1,
+            transferToken = h.token, blockIndex = 0, sha256 = "00".repeat(32),
+        )
+        h.toSender.clear()
+        s.onControl(forged)
+        h.pump()
+        assertTrue("it did not end with an error", h.senderOutcomes.none { it.first == FileSender.Outcome.FAILED })
+        assertEquals(1, h.framesSent.count { it.pass == 1 && it.offset == 0L })
+        assertEquals(h.sha(bytes), h.deliveredSha)
+        assertEquals(expectedFileHash(bytes), h.deliveredFileHash)
+    }
+
+    @Test
+    fun aStallThenDataSendsABareResumeSoTheSenderStopsWaiting() {
+        val bytes = data(2 * FileV2.BLOCK_BYTES)
+        val h = harness(bytes)
+        val s = h.newSender()
+        s.start()
+        h.pump(limit = 1)
+        val receiver = h.receiver!!
+        h.now = FileV2.NO_PROGRESS_MS + 1
+        receiver.tick(h.now)
+        assertEquals(FileCodes.NO_PROGRESS, h.receivedByDesk.last { it.action == WebRtcFileAction.PAUSE }.reason)
+        val before = h.receivedByDesk.size
+        // Data arrives again.
+        (h.toSender.poll() as Msg.Ctl).let { s.onControl(it.control) }
+        h.pump()
+        val resume = h.receivedByDesk.drop(before).first { it.action == WebRtcFileAction.RESUME }
+        assertNull(resume.resumeBlock)
+        assertNull(resume.prefixSha256)
+        assertNull(resume.pass)
+        assertEquals(h.sha(bytes), h.deliveredSha)
     }
 
     @Test
@@ -572,15 +653,17 @@ class FileTransferEngineTest {
         val h = harness(bytes)
         val s = h.newSender()
         s.start()
-        h.pump(limit = 2)
+        h.pump(limit = 4)
         val receiver = h.receiver!!
+        // The first frame of the stream was taken: the "adopt any pass" window after the accept is closed.
+        val before = receiver.verifiedBlocks
         val stranger = FileFrame.decode(FileFrame.encode(UUID.randomUUID(), 0, 0, 0, ByteArray(100), 0, 100, null))
         // Not this receiver's transfer: the manager never routes it; a frame past the file's size is dropped here.
         val past = FileFrame.decode(FileFrame.encode(UUID.fromString(h.id), 0, 5, 5L * FileV2.BLOCK_BYTES, ByteArray(100), 0, 100, null))
         val oldPass = FileFrame.decode(FileFrame.encode(UUID.fromString(h.id), 9, 0, 0, ByteArray(100), 0, 100, null))
         receiver.onFrame(past)
         receiver.onFrame(oldPass)
-        assertEquals(0, receiver.verifiedBlocks)
+        assertEquals(before, receiver.verifiedBlocks)
         assertEquals(emptyList<Any>(), h.receiverOutcomes)
         assertNotNull(stranger)
         h.pump()
@@ -680,7 +763,13 @@ class FileTransferEngineTest {
         s2.start()
         while (h2.receiver == null || h2.receiver!!.verifiedBlocks < 2) { if (h2.pump(limit = 1) == 0) break }
         h2.receiver!!.onDone(forged.copy(transferId = h2.id, transferToken = h2.token))
-        assertEquals(1, h2.receivedByDesk.count { it.action == WebRtcFileAction.BLOCK_NACK && it.blockIndex == 0 })
+        // One form on the wire for a final-hash mismatch: resume {0, SHA-256(""), pass + 1}.
+        val restart = h2.receivedByDesk.filter { it.action == WebRtcFileAction.RESUME }
+        assertEquals(1, restart.size)
+        assertEquals(0, restart.single().resumeBlock)
+        assertEquals(EMPTY_SHA256, restart.single().prefixSha256)
+        assertEquals(1, restart.single().pass)
+        assertEquals(0, h2.receivedByDesk.count { it.action == WebRtcFileAction.BLOCK_NACK })
         h2.receiver!!.onDone(forged.copy(transferId = h2.id, transferToken = h2.token))
         assertEquals(FileCodes.HASH_MISMATCH, h2.receivedByDesk.last { it.action == WebRtcFileAction.ERROR }.code)
         assertNull(h2.deliveredSha)

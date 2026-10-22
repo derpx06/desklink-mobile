@@ -218,10 +218,7 @@ class FileProtocolV2Test {
         bad(control(WebRtcFileAction.BLOCK_ACK) { copy(blockIndex = 0, sha256 = "zz") })
         bad(control(WebRtcFileAction.BLOCK_ACK) { copy(blockIndex = -1, sha256 = hex64) })
         bad(control(WebRtcFileAction.BLOCK_NACK) { copy(blockIndex = 0, pass = 256) })
-        bad(control(WebRtcFileAction.PAUSE) { copy(reason = "because") })
         bad(control(WebRtcFileAction.RESUME) { copy(resumeBlock = 1) }) // resume fields come together
-        bad(control(WebRtcFileAction.CANCEL) { copy(code = "weird") })
-        bad(control(WebRtcFileAction.ERROR) { copy(code = FileCodes.USER) })
         bad(control(WebRtcFileAction.ERROR) { copy(code = FileCodes.INTERNAL, message = "x".repeat(5000)) })
         bad(control(WebRtcFileAction.DONE) { copy(fileHash = hex64, blocks = -1, totalSize = 0) })
     }
@@ -246,5 +243,145 @@ class FileProtocolV2Test {
         val size = big.toJson().toString().toByteArray().size
         assertTrue("$size bytes", size < 2048)
         org.desklink.mobile.webrtc.assertAllCross(emptyList())
+    }
+
+    // ======================================================= the golden vectors (~/.cache/w3-golden-vectors.md)
+
+    private val goldenId = UUID.fromString("0f8fad5b-d9cb-469f-a165-70867728950e")
+    private val sha256Abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    private fun hexOf(bytes: ByteArray) = bytes.toHex()
+
+    @Test
+    fun f1_aWholeThreeByteFileIsOneLastFrameOf75Bytes() {
+        val abc = "abc".toByteArray()
+        val frame = FileFrame.encode(goldenId, 0, 0, 0, abc, 0, 3, MessageDigest.getInstance("SHA-256").digest(abc))
+        assertEquals(75, frame.size)
+        assertEquals(
+            "444c4632" + "01" + "00" + "0000" + "0f8fad5bd9cb469fa16570867728950e" + "00000000" + "0000000000000000" + "00000003" + "616263" + sha256Abc,
+            hexOf(frame),
+        )
+        val back = FileFrame.decode(frame, FileV2.FRAME_BYTES_PROVEN)
+        assertTrue(back.lastOfBlock)
+        assertEquals(sha256Abc, hexOf(back.trailer()!!))
+    }
+
+    @Test
+    fun f2_aMiddleFrameOfPass7InBlock1HasNoTrailer() {
+        val frame = FileFrame.encode(goldenId, 7, 1, 0x100000, "hello".toByteArray(), 0, 5, null)
+        assertEquals(45, frame.size)
+        assertEquals(
+            "444c4632" + "00" + "07" + "0000" + "0f8fad5bd9cb469fa16570867728950e" + "00000001" + "0000000000100000" + "00000005" + "68656c6c6f",
+            hexOf(frame),
+        )
+        val back = FileFrame.decode(frame, FileV2.FRAME_BYTES_PROVEN)
+        assertEquals(7, back.pass)
+        assertEquals(1, back.blockIndex)
+        assertNull(back.trailer())
+    }
+
+    @Test
+    fun f3_theSizeRules() {
+        val cap = FileV2.payloadCapacity(FileV2.FRAME_BYTES_PROVEN)
+        assertEquals(61_368, cap)
+        // The largest frame is 61,440 bytes: 40 header + 61,368 payload + 32 trailer.
+        val largest = FileFrame.encode(goldenId, 0, 0, 0, ByteArray(cap), 0, cap, ByteArray(32))
+        assertEquals(61_440, largest.size)
+        FileFrame.decode(largest, FileV2.FRAME_BYTES_PROVEN)
+        // Anything over 61,440 is rejected.
+        val over = FileFrame.encode(goldenId, 0, 0, 0, ByteArray(cap + 1), 0, cap + 1, ByteArray(32))
+        assertEquals(61_441, over.size)
+        assertThrows(IllegalArgumentException::class.java) { FileFrame.decode(over, FileV2.FRAME_BYTES_PROVEN) }
+        // A LAST frame with a missing trailer: the length no longer adds up.
+        val last = FileFrame.encode(goldenId, 0, 0, 0, "abc".toByteArray(), 0, 3, ByteArray(32))
+        assertThrows(IllegalArgumentException::class.java) { FileFrame.decode(last.copyOf(last.size - 32), FileV2.FRAME_BYTES_PROVEN) }
+        // A non-LAST frame that ends exactly at a block end.
+        val noLastAtEnd = FileFrame.encode(goldenId, 0, 0, FileV2.BLOCK_BYTES - 5L, "hello".toByteArray(), 0, 5, null)
+        assertThrows(IllegalArgumentException::class.java) { FileFrame.decode(noLastAtEnd, FileV2.FRAME_BYTES_PROVEN) }
+        // Nonzero reserved bytes; unknown flag bits.
+        val reserved = FileFrame.encode(goldenId, 0, 0, 0, "abc".toByteArray(), 0, 3, ByteArray(32)).also { it[6] = 1 }
+        assertThrows(IllegalArgumentException::class.java) { FileFrame.decode(reserved, FileV2.FRAME_BYTES_PROVEN) }
+        val flags = FileFrame.encode(goldenId, 0, 0, 0, "abc".toByteArray(), 0, 3, ByteArray(32)).also { it[4] = 0x03 }
+        assertThrows(IllegalArgumentException::class.java) { FileFrame.decode(flags, FileV2.FRAME_BYTES_PROVEN) }
+    }
+
+    @Test
+    fun h_theHashes() {
+        val sha = MessageDigest.getInstance("SHA-256")
+        assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", FileHashes.fileHash(emptyList()))
+        assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", hexOf(sha.digest(ByteArray(0))))
+        val abcBlock = sha.digest("abc".toByteArray())
+        assertEquals(sha256Abc, hexOf(abcBlock))
+        // The file hash of "abc" is SHA-256 of the block hash's 32 raw bytes.
+        assertEquals("4f8b42c22dd3729b519ba6f68d2da7cc5b2d606d05daed5ad5128cc03e6c6358", FileHashes.fileHash(listOf(abcBlock)))
+        assertEquals(1, FileV2.blockCount(FileV2.BLOCK_BYTES.toLong()))
+        assertEquals(2, FileV2.blockCount(FileV2.BLOCK_BYTES + 1L))
+    }
+
+    @Test
+    fun c_theControlVectors() {
+        val phoneWire = WebRtcWireBinding("desk-device", "phone-device", 9, 2)
+        fun message(action: WebRtcFileAction, block: WebRtcFileControl.() -> WebRtcFileControl = { this }) = WebRtcFileControl(
+            action = action, transferId = goldenId.toString(), deviceId = "phone-device", sessionId = 9, connectionGeneration = 2,
+            transferToken = "00112233445566778899aabbccddeeff",
+        ).block()
+        val cases = listOf(
+            message(WebRtcFileAction.OFFER) { copy(filename = "big.iso", totalSize = 4_294_967_296, mtime = 1_700_000_000_000, blockSize = 1_048_576, maxFrameBytes = 61_440) },
+            message(WebRtcFileAction.OFFER) { copy(filename = "a.jpg", totalSize = 10, mtime = 1_700_000_000_000, blockSize = 1_048_576, maxFrameBytes = 61_440, folder = "bucket", relpath = "Photos/a.jpg", contentSha256 = hex64) },
+            message(WebRtcFileAction.OFFER) { copy(filename = "clip.png", totalSize = 10, mtime = 1_700_000_000_000, blockSize = 1_048_576, maxFrameBytes = 61_440, clipboard = true, mimeType = "image/png") },
+            message(WebRtcFileAction.ACCEPT) { copy(resumeBlock = 3, prefixSha256 = hex64, maxFrameBytes = 61_440) },
+            message(WebRtcFileAction.BLOCK_ACK) { copy(blockIndex = 2, sha256 = hex64) },
+            message(WebRtcFileAction.BLOCK_NACK) { copy(blockIndex = 4, pass = 1, reason = "hash-mismatch") },
+            message(WebRtcFileAction.PAUSE) { copy(reason = "backlog") },
+            message(WebRtcFileAction.RESUME) { copy(resumeBlock = 4, prefixSha256 = hex64, pass = 2) },
+            message(WebRtcFileAction.RESUME),
+            message(WebRtcFileAction.DONE) { copy(fileHash = hex64, blocks = 5, totalSize = 5L * FileV2.BLOCK_BYTES) },
+            message(WebRtcFileAction.COMPLETE) { copy(fileHash = hex64) },
+        ) + FileCodes.CANCEL_CODES.map { code -> message(WebRtcFileAction.CANCEL) { copy(code = code) } } +
+            FileCodes.ERROR_CODES.map { code -> message(WebRtcFileAction.ERROR) { copy(code = code) } }
+        for (m in cases) {
+            val json = m.toJson()
+            // Compared as parsed values, never as strings.
+            assertEquals(9L, json.getLong("sessionId"))
+            assertEquals(2L, json.getLong("connectionGeneration"))
+            assertEquals("phone-device", json.getString("deviceId"))
+            assertEquals("00112233445566778899aabbccddeeff", json.getString("transferToken"))
+            assertEquals(m.action.wireName, json.getString("action"))
+            val back = WebRtcFileControl.fromJson(JSONObject(json.toString()))
+            assertEquals(m, back)
+            back.validate(phoneWire)
+        }
+        val offer = cases[0].toJson()
+        assertEquals(4_294_967_296L, offer.getLong("totalSize"))
+        assertEquals(1_700_000_000_000L, offer.getLong("mtime"))
+        assertEquals(1_048_576, offer.getInt("blockSize"))
+        assertEquals(61_440, offer.getInt("maxFrameBytes"))
+        // A bare resume carries none of the restart fields.
+        assertFalse(cases.single { it.action == WebRtcFileAction.RESUME && it.resumeBlock == null }.toJson().let { it.has("resumeBlock") || it.has("prefixSha256") || it.has("pass") })
+        // Every code on the wire has one case; the nack is {blockIndex 4, pass 1, hash-mismatch}.
+        assertEquals(4, FileCodes.CANCEL_CODES.size)
+        assertEquals(6, FileCodes.ERROR_CODES.size)
+    }
+
+    @Test
+    fun n_negativeCases() {
+        val phoneWire = WebRtcWireBinding("desk-device", "phone-device", 9, 2)
+        fun message(action: WebRtcFileAction, block: WebRtcFileControl.() -> WebRtcFileControl = { this }) = WebRtcFileControl(
+            action = action, transferId = goldenId.toString(), deviceId = "phone-device", sessionId = 9, connectionGeneration = 2,
+            transferToken = "00112233445566778899aabbccddeeff",
+        ).block()
+        // A resume with one or two of its three fields is rejected.
+        for (partial in listOf<WebRtcFileControl.() -> WebRtcFileControl>(
+            { copy(resumeBlock = 1) }, { copy(prefixSha256 = hex64) }, { copy(pass = 1) },
+            { copy(resumeBlock = 1, prefixSha256 = hex64) }, { copy(resumeBlock = 1, pass = 1) }, { copy(prefixSha256 = hex64, pass = 1) },
+        )) assertThrows(IllegalArgumentException::class.java) { message(WebRtcFileAction.RESUME, partial).validate(phoneWire) }
+        // Unknown cancel/error codes and unknown pause reasons are accepted, never thrown on.
+        message(WebRtcFileAction.CANCEL) { copy(code = "from-the-future") }.validate(phoneWire)
+        message(WebRtcFileAction.ERROR) { copy(code = "internal-v3") }.validate(phoneWire)
+        message(WebRtcFileAction.CANCEL).validate(phoneWire) // none at all
+        message(WebRtcFileAction.PAUSE) { copy(reason = "because") }.validate(phoneWire)
+        // ...and an unknown pause reason is a pause by the person.
+        assertEquals(FileCodes.USER, FileCodes.pauseReason("because"))
+        assertEquals(FileCodes.USER, FileCodes.pauseReason(null))
+        assertEquals(FileCodes.BACKLOG, FileCodes.pauseReason(FileCodes.BACKLOG))
     }
 }

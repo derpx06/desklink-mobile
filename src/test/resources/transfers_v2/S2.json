@@ -1,0 +1,396 @@
+{
+ "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+ "phoneDeviceId": "phone-device",
+ "deskDeviceId": "desk-device",
+ "sessionId": 9,
+ "connectionGeneration": 2,
+ "transferToken": "00112233445566778899aabbccddeeff",
+ "pattern": "byte(i) = ((i * 31) + (i >> 12)) & 0xff",
+ "format": "steps replayed in order; \"from\" the engine under test = \"phone\"; peer steps are fed in, phone steps are asserted in order; a frame is {pass, offset, length, last} with the payload taken from the pattern and, on a last frame, the block hash as trailer (trailer:\"bad\" corrupts it); control messages are compared parsed and without \"message\"",
+ "scenario": "S2",
+ "title": "the first frame after an accept is of pass 3, not 0: the receiver adopts that pass from the block boundary and the file arrives",
+ "engine": "receiver",
+ "sender": "desk",
+ "file": {
+  "name": "s2.bin",
+  "size": 2097152
+ },
+ "steps": [
+  {
+   "from": "desk",
+   "control": {
+    "action": "offer",
+    "filename": "s2.bin",
+    "totalSize": 2097152,
+    "mtime": 1700000000000,
+    "blockSize": 1048576,
+    "maxFrameBytes": 61440
+   }
+  },
+  {
+   "from": "phone",
+   "control": {
+    "action": "accept",
+    "resumeBlock": 0,
+    "prefixSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "maxFrameBytes": 61440
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 0,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 61368,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 122736,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 184104,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 245472,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 306840,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 368208,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 429576,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 490944,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 552312,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 613680,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 675048,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 736416,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 797784,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 859152,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 920520,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 981888,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1043256,
+    "length": 5320,
+    "last": true
+   }
+  },
+  {
+   "from": "phone",
+   "control": {
+    "action": "block-ack",
+    "blockIndex": 0,
+    "sha256": "b6b489647a3bb506b77904b97dce2e3c77ca5e85a5707b2821cb1605afa522c0"
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1048576,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1109944,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1171312,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1232680,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1294048,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1355416,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1416784,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1478152,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1539520,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1600888,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1662256,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1723624,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1784992,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1846360,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1907728,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 1969096,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 2030464,
+    "length": 61368,
+    "last": false
+   }
+  },
+  {
+   "from": "desk",
+   "frame": {
+    "pass": 3,
+    "offset": 2091832,
+    "length": 5320,
+    "last": true
+   }
+  },
+  {
+   "from": "phone",
+   "control": {
+    "action": "block-ack",
+    "blockIndex": 1,
+    "sha256": "b6b489647a3bb506b77904b97dce2e3c77ca5e85a5707b2821cb1605afa522c0"
+   }
+  },
+  {
+   "from": "desk",
+   "control": {
+    "action": "done",
+    "fileHash": "fe1a333b5fbc712d93dd0fb55db97e8034c79c549ded00771bb92b71b185ab59",
+    "blocks": 2,
+    "totalSize": 2097152
+   }
+  },
+  {
+   "from": "phone",
+   "control": {
+    "action": "complete",
+    "fileHash": "fe1a333b5fbc712d93dd0fb55db97e8034c79c549ded00771bb92b71b185ab59"
+   }
+  }
+ ]
+}

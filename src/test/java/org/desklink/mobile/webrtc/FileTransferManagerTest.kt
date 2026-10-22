@@ -307,6 +307,41 @@ class FileTransferManagerTest {
     }
 
     @Test
+    fun storedSendsStartInOrderTwoAtATimeAndTheThirdWaitsForASlot() {
+        val store = FileTransferStore(phone.root)
+        val ids = List(3) { UUID.randomUUID().toString() }.sorted()
+        ids.forEach { id ->
+            val file = store.spool(id)
+            file.writeBytes(data(FileV2.BLOCK_BYTES + 10))
+            assertTrue(store.save(FileCheckpoint(id, "send", "t".repeat(32), "desk", "$id.bin", file.length(), file.lastModified(), 0, spooled = true)))
+        }
+        phone.manager.resumeSends(phoneWire)
+        pump(maxMessages = 0)
+        assertEquals("two offers, never three at once", ids.take(2), phone.sent.filter { it.action == WebRtcFileAction.OFFER }.map { it.transferId })
+        pump()
+        assertEquals(3, desk.delivered.size)
+        assertEquals("none was told busy", 0, desk.sent.count { it.action == WebRtcFileAction.ERROR })
+        assertTrue(phone.root.listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun anUnknownCancelCodeEndsAReceiveLikeAnyOtherAndFreesItsSlotAndItsPartialFile() {
+        val a = UUID.randomUUID().toString()
+        val b = UUID.randomUUID().toString()
+        val c = UUID.randomUUID().toString()
+        desk.manager.handleControl(deskWire, offer(id = a, size = FileV2.BLOCK_BYTES * 2L))
+        desk.manager.handleControl(deskWire, offer(id = b, size = FileV2.BLOCK_BYTES * 2L))
+        pump(maxMessages = 0)
+        desk.manager.handleControl(deskWire, desk.control(WebRtcFileAction.CANCEL, a) { copy(code = "from-a-newer-build") })
+        pump(maxMessages = 0)
+        assertEquals("its partial file and checkpoint are gone", null, FileTransferStore(desk.root).load(a))
+        desk.manager.handleControl(deskWire, offer(id = c, size = FileV2.BLOCK_BYTES * 2L))
+        pump(maxMessages = 0)
+        assertEquals("the freed slot takes a new file", 3, desk.sent.count { it.action == WebRtcFileAction.ACCEPT })
+        assertEquals(0, desk.sent.count { it.action == WebRtcFileAction.ERROR })
+    }
+
+    @Test
     fun aReplayedOfferForATransferInProgressChangesNothing() {
         val id = UUID.randomUUID().toString()
         val o = offer(id = id, size = FileV2.BLOCK_BYTES * 2L)
@@ -315,7 +350,8 @@ class FileTransferManagerTest {
         val filesBefore = desk.root.listFiles().orEmpty().map { it.name }.sorted()
         desk.manager.handleControl(deskWire, o)
         pump(maxMessages = 0)
-        assertEquals(1, desk.sent.count { it.action == WebRtcFileAction.ACCEPT })
+        // The sender may not have got the first accept: a re-offer of a live id is answered again, from where we are.
+        assertEquals(2, desk.sent.count { it.action == WebRtcFileAction.ACCEPT })
         assertEquals(filesBefore, desk.root.listFiles().orEmpty().map { it.name }.sorted())
         // A replay with another token is refused, and the real transfer is untouched.
         desk.manager.handleControl(deskWire, offer(id = id, size = FileV2.BLOCK_BYTES * 2L).copy(transferToken = "z".repeat(32)))
