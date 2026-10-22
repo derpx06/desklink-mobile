@@ -441,7 +441,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="qr_progress_connecting">Connecting to the computer…</string>
     <string name="qr_progress_verifying">Verifying %1$s…</string>
     <string name="qr_progress_paired">Paired with %1$s</string>
-    <string name="qr_progress_timeout">The computer did not confirm the pairing. Scan the code again.</string>
+    <string name="qr_progress_timeout">The computer didn\'t accept the code. It may have expired: a code only lasts a few minutes. Show a new code on the computer and scan it again.</string>
+    <string name="qr_error_not_reached">Couldn\'t reach the computer. Check that this phone and the computer are on the same Wi-Fi, then scan the code again.</string>
+    <string name="qr_error_already_paired">This phone is already paired with %1$s.</string>
 
     <!-- Phase 2: tiles and the desk widget -->
     <string name="tile_lock_desk">Lock desk</string>

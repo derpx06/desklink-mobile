@@ -122,6 +122,11 @@ object QrPairing {
      * A paired desktop that now shows a different certificate, or null. Pairing
      * with the code would have to replace that pairing, so the user decides.
      */
+    /** Whether a paired computer's certificate is the one the code names. */
+    @JvmStatic
+    fun isSamePairing(pairedFingerprint: ByteArray, codeFingerprint: ByteArray): Boolean =
+        pairedFingerprint.contentEquals(codeFingerprint)
+
     @JvmStatic
     fun conflictingPairing(application: DeskLinkApplication, code: Code): Device? =
         application.getDevice(code.desktopId)
@@ -147,6 +152,10 @@ object QrPairing {
             // can carry any desktop's public id. Only after the user confirmed
             // (replaceExisting) is the old record dropped, since its pinned
             // certificate would otherwise refuse the new one.
+            // The same computer, the same identity, paired already: nothing to do, and nothing half-paired.
+            application.getDevice(code.desktopId)?.takeIf { it.isPaired && isSamePairing(fingerprint(it.certificate), code.fingerprint) }?.let {
+                error(application.getString(R.string.qr_error_already_paired, it.name))
+            }
             conflictingPairing(application, code)?.let { existing ->
                 if (!replaceExisting) throw ReplacesPairing(existing.name)
                 existing.unpair()
@@ -162,10 +171,7 @@ object QrPairing {
                 ?: BackgroundService.instance?.refreshDiscovery()
 
             val device = waitForLink(application, code)
-                ?: error(
-                    "The computer did not connect. Check both are on the same Wi-Fi. " +
-                        "If this phone was reinstalled, unpair it on the computer first.",
-                )
+                ?: error(application.getString(R.string.qr_error_not_reached))
             val mac = proof(
                 code.secret,
                 code.desktopId,

@@ -55,4 +55,11 @@ class QrPairingTest {
         }
         assertEquals(listOf("192.168.1.20"), QrPairing.parseAddresses("999.1.1.1,192.168.1.20,010.0.0.1").map { it.hostAddress })
     }
+
+    @Test
+    fun aCodeForTheComputerAlreadyPairedUnderTheSameIdentityIsRecognised() {
+        val fp = ByteArray(32) { it.toByte() }
+        org.junit.Assert.assertTrue(QrPairing.isSamePairing(fp.copyOf(), fp))
+        org.junit.Assert.assertFalse(QrPairing.isSamePairing(ByteArray(32), fp))
+    }
 }

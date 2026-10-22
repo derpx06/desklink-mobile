@@ -349,6 +349,8 @@ class Device : PacketReceiver {
                 deviceInfo = deviceInfo.copy(certificate = negotiated)
                 deviceInfo.saveInSettings(context)
                 TrustedDevices.addTrustedDevice(context, deviceInfo.id)
+                // A reinstalled or re-identified computer leaves a dead twin: drop it quietly.
+                runCatching { DeskLinkApplication.getInstance().dropSupersededPairings(this@Device) }
                 updateSessionPairingState(PairingState.PAIRED)
                 val generation = pairingGeneration.incrementAndGet()
 

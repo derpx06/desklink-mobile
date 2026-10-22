@@ -401,6 +401,15 @@ class DeskLinkApplication : Application() {
             }
     }
 
+    /** [fresh] was just paired: its offline twins (same name and model) are unpaired, with no prompt. */
+    fun dropSupersededPairings(fresh: Device) {
+        fun entry(d: Device) = PairingReplacement.Entry(d.deviceId, d.name, d.deviceType.toString(), d.isPaired, d.isReachable)
+        PairingReplacement.superseded(entry(fresh), devices.values.map(::entry)).forEach { id ->
+            Log.i("DeskLink", "Replacing the offline pairing of a computer paired again under a new identity")
+            devices[id]?.unpair()
+        }
+    }
+
     private val devicePairingCallback: PairingCallback = object : PairingCallback {
         override fun incomingPairRequest() {
             onDeviceListChanged()

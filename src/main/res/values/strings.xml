@@ -144,15 +144,15 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="cancel_pairing">Cancel pairing</string>
     <string name="unknown_device">Unknown device</string>
     <string name="unknown_sender">Unknown sender</string>
-    <string name="error_not_reachable">Device not reachable</string>
-    <string name="error_already_paired">Device already paired</string>
-    <string name="error_timed_out">Timed out</string>
-    <string name="error_clocks_not_match">Device clocks are out of sync</string>
-    <string name="error_canceled_by_user">Canceled by user</string>
-    <string name="error_canceled_by_other_peer">Canceled by other peer</string>
+    <string name="error_not_reachable">Couldn\'t reach the computer. Check that it is on and on the same Wi-Fi.</string>
+    <string name="error_already_paired">Already paired.</string>
+    <string name="error_timed_out">The computer didn\'t answer in time. Try again.</string>
+    <string name="error_clocks_not_match">The clocks on this phone and the computer are too far apart. Set both to automatic time and try again.</string>
+    <string name="error_canceled_by_user">Pairing was canceled.</string>
+    <string name="error_canceled_by_other_peer">The computer canceled the pairing.</string>
     <string name="qr_scan_to_pair">Scan QR code</string>
     <string name="qr_scan_prompt">Scan the code shown in DeskLink on your computer</string>
-    <string name="qr_not_a_pairing_code">That is not a DeskLink pairing code</string>
+    <string name="qr_not_a_pairing_code">That isn\'t a DeskLink pairing code. Scan the code shown in DeskLink on your computer.</string>
     <string name="qr_pairing_started">Pairing with your computer…</string>
     <string name="qr_replace_pairing_title">Replace the pairing with %1$s?</string>
     <string name="qr_replace_pairing_message">This code shows a different identity for a computer you already paired with. Only continue if you reinstalled DeskLink on that computer.</string>
@@ -324,7 +324,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="copy_url_to_clipboard">Copy URL to clipboard</string>
     <string name="clipboard_toast">Copied to clipboard</string>
 
-    <string name="device_not_reachable">Device is not reachable</string>
+    <string name="device_not_reachable">The computer isn\'t reachable right now.</string>
 
     <string name="pref_plugin_findremotedevice">Find remote device</string>
     <string name="pref_plugin_findremotedevice_desc">Ring your remote device</string>
