@@ -142,6 +142,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="clipboard_nothing_sent">The clipboard has no text to send</string>
     <string name="settings_clipboard_auto">Automatic sync (advanced)</string>
     <string name="settings_clipboard_auto_grant">Sends each copy without a tap. Needs a one-time command from a computer with adb — tap to copy it: %1$s</string>
+    <string name="settings_clipboard_auto_grant_oem">On OPPO, realme and OnePlus first turn on Developer options → Disable permission monitoring; on Xiaomi, USB debugging (Security settings). Otherwise the command is refused.</string>
     <string name="settings_clipboard_auto_copied">Command copied. Run it, then turn this on</string>
     <string name="settings_clipboard_auto_on">Each copy on this phone goes to %1$s on its own. When Android asks about device logs, choose Allow</string>
     <string name="settings_clipboard_overlay">Allow display over other apps</string>

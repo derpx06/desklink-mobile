@@ -199,6 +199,10 @@ private fun rememberResumeTick(): Int {
  * "Automatic sync (advanced)", KDE Connect's way: READ_LOGS, granted only over adb, lets DeskLink
  * see Android refuse it a new copy and read it for a moment. Never required.
  */
+/** Brands whose adb `pm grant` needs a developer-options switch first. */
+private fun needsOemSwitch(): Boolean =
+    Build.MANUFACTURER.lowercase() in setOf("oppo", "realme", "oneplus", "xiaomi", "redmi", "poco")
+
 @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
 @Composable
 private fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.SharedPreferences, onMessage: (String) -> Unit, changed: () -> Unit) {
@@ -213,7 +217,11 @@ private fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.Share
         GroupRow(
             stringResource(R.string.settings_clipboard_auto),
             icon = R.drawable.sym_refresh,
-            subtitle = stringResource(R.string.settings_clipboard_auto_grant, command),
+            // ColorOS/OxygenOS and MIUI refuse `pm grant` from adb until a developer switch is on.
+            subtitle = listOfNotNull(
+                stringResource(R.string.settings_clipboard_auto_grant, command),
+                stringResource(R.string.settings_clipboard_auto_grant_oem).takeIf { needsOemSwitch() },
+            ).joinToString("\n"),
             onClick = {
                 val cm = context.getSystemService(android.content.ClipboardManager::class.java)
                 cm?.setPrimaryClip(android.content.ClipData.newPlainText("adb", command))
