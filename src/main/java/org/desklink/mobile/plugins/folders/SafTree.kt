@@ -39,30 +39,18 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri) {
         return out
     }
 
-    /** Every file (P5 ignores, depth and count bounds); `tooMany` when the bound cut it short. */
-    fun scan(includeHidden: Boolean): Pair<Map<String, Item>, Boolean> {
-        val out = HashMap<String, Item>()
-        val queue = ArrayDeque<Pair<String, String>>()
-        queue += rootId to ""
-        var tooMany = false
-        while (queue.isNotEmpty()) {
-            val (docId, prefix) = queue.removeFirst()
-            for ((name, item) in children(docId)) {
-                val path = prefix + name
-                if (!FolderSync.validRelpath(path) || FolderSync.ignored(path, includeHidden)) continue
-                if (item.dir) {
-                    queue += item.documentId to "$path/"
-                } else if (item.size <= FolderSync.MAX_FILE_BYTES) {
-                    if (out.size >= FolderSync.MAX_FILES) {
-                        tooMany = true
-                        break
-                    }
-                    out[path] = item
-                }
+    /** F8b: the files at the top of the folder, and the names of the subfolders (not synced for now). */
+    fun scanTop(): Pair<Map<String, Item>, List<String>> {
+        val files = HashMap<String, Item>()
+        val folders = mutableListOf<String>()
+        for ((name, item) in children(rootId)) {
+            when {
+                item.dir -> if (folders.size < 100) folders += name
+                !FolderSync.validSegment(name) || item.size > FolderSync.MAX_FILE_BYTES -> Unit
+                files.size < FolderSync.MAX_BUCKET_ITEMS -> files[name] = item
             }
-            if (tooMany) break
         }
-        return out to tooMany
+        return files to folders.sorted()
     }
 
     /** The document at [path], or null. */
@@ -130,17 +118,10 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri) {
     /** Renames [item] within its directory (a conflict copy goes beside the original). */
     fun rename(item: Item, newName: String): Boolean = runCatching { DocumentsContract.renameDocument(resolver, uri(item), newName) != null }.getOrDefault(false)
 
-    /** Old temporaries a crash left behind. */
+    /** Old temporaries a crash left behind (top level: the Bucket holds files only). */
     fun cleanTemps() {
-        val queue = ArrayDeque<String>()
-        queue += rootId
-        var seen = 0
-        while (queue.isNotEmpty() && seen < 2048) {
-            seen++
-            for ((name, item) in children(queue.removeFirst())) {
-                if (item.dir) queue += item.documentId
-                else if (name.startsWith(".desklink-") && name.endsWith(".tmp") && System.currentTimeMillis() - item.mtime > 3_600_000) delete(item)
-            }
+        for ((name, item) in children(rootId)) {
+            if (!item.dir && name.startsWith(".desklink-") && name.endsWith(".tmp") && System.currentTimeMillis() - item.mtime > 3_600_000) delete(item)
         }
     }
 }

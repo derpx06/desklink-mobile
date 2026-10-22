@@ -200,6 +200,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     /** Launcher, notifications and shortcuts: which computer, and the pairing screen if one waits. */
     private fun handleIntent(intent: Intent) {
         when {
+            // Launcher shortcuts (long-press the icon).
+            intent.action == ACTION_NEW_NOTE -> startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, newNote = true))
+            intent.action == ACTION_ADD_TO_BUCKET -> startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this, selectedId))
             intent.hasExtra(FLAG_FORCE_OVERVIEW) -> resetTo(HOME)
             intent.hasExtra(EXTRA_DEVICE_ID) -> {
                 val id = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
@@ -438,6 +441,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     else -> showMessage(getString(R.string.settings_waiting_for, device.name))
                 }
             },
+            onAutomations = { startActivity(Intent(this, org.desklink.mobile.plugins.automations.AutomationsActivity::class.java)) },
+            onNotes = { startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this)) },
+            onNote = { noteId -> startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, noteId = noteId)) },
+            onNewNote = { startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, newNote = true)) },
+            onBucket = { startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this, id)) },
             onRunCommand = {
                 startActivity(Intent(this, org.desklink.mobile.plugins.runcommand.RunCommandActivity::class.java).putExtra("deviceId", id))
             },
@@ -912,8 +920,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 add(MoreExtra(R.drawable.sym_bolt, getString(R.string.feature_run_command), getString(R.string.feature_desc_run_command),
                     button(R.drawable.run_command_plugin_icon_24dp)?.let { b -> { b.onClick(this@MainActivity) } }
                         ?: open(RunCommandActivity::class.java, org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)))
-                add(MoreExtra(R.drawable.sym_folder_zip, getString(R.string.more_folders), getString(R.string.more_folders_summary)) {
-                    startActivity(Intent(this@MainActivity, org.desklink.mobile.plugins.folders.SyncedFoldersActivity::class.java).putExtra("deviceId", device.deviceId))
+                add(MoreExtra(R.drawable.sym_inventory, getString(R.string.more_bucket), getString(R.string.more_bucket_summary)) {
+                    startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this@MainActivity, device.deviceId))
                 })
                 add(MoreExtra(R.drawable.sym_draw, getString(R.string.more_drawing_pad), getString(R.string.feature_desc_digitizer),
                     open(DigitizerActivity::class.java, org.desklink.mobile.plugins.digitizer.DigitizerPlugin::class.java)))
@@ -1020,6 +1028,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     }
 
     companion object {
+        /** Launcher shortcuts (res/xml/shortcuts.xml). */
+        const val ACTION_NEW_NOTE = "org.desklink.mobile.action.NEW_NOTE"
+        const val ACTION_ADD_TO_BUCKET = "org.desklink.mobile.action.ADD_TO_BUCKET"
         const val EXTRA_DEVICE_ID = "deviceId"
         const val PAIR_REQUEST_STATUS = "pair_req_status"
         const val PAIRING_PENDING = "pending"

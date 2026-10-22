@@ -139,11 +139,18 @@ class AutomationsActivity : AppCompatActivity() {
                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                         Text(rule.name.ifBlank { stringResource(R.string.automations_unnamed) }, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(summary(this@AutomationsActivity, rule), fontSize = 13.sp, color = t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                        // A3: a rule the desk made or last edited waits for approval here.
+                                        if (!Automations.approved(this@AutomationsActivity, rule.id) && rule.actions.any { it.kind in Rules.PHONE_ACTIONS }) {
+                                            Text(stringResource(R.string.automations_needs_approval), fontSize = 12.sp, color = t.coralText)
+                                            TextButton(onClick = { Automations.approve(this@AutomationsActivity, rule.id) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                                                Text(stringResource(R.string.automations_approve))
+                                            }
+                                        }
                                     }
                                     val label = rule.name.ifBlank { stringResource(R.string.automations_unnamed) }
                                     Switch(
                                         checked = rule.enabled,
-                                        onCheckedChange = { on -> Automations.save(this@AutomationsActivity, rule.copy(enabled = on)) },
+                                        onCheckedChange = { on -> Automations.save(this@AutomationsActivity, rule.copy(enabled = on), approve = false) },
                                         colors = deskSwitchColors(),
                                         modifier = Modifier.semantics { contentDescription = label },
                                     )

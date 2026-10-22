@@ -136,12 +136,29 @@ class DeskLinkApplication : Application() {
         loadRememberedDevicesFromSettings()
         // The transfer history keeps 30 days: prune it once per start, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.plugins.share.TransferHistory.store(this).prune() }
+        // Long-press the app icon: "New note" and "Add to Bucket" (added beside the share shortcuts).
+        runCatching {
+            listOf(
+                Triple("new_note", R.string.shortcut_new_note, R.drawable.shortcut_new_note) to org.desklink.mobile.ui.MainActivity.ACTION_NEW_NOTE,
+                Triple("add_to_bucket", R.string.shortcut_add_to_bucket, R.drawable.shortcut_bucket) to org.desklink.mobile.ui.MainActivity.ACTION_ADD_TO_BUCKET,
+            ).forEach { (info, action) ->
+                val (id, label, icon) = info
+                androidx.core.content.pm.ShortcutManagerCompat.pushDynamicShortcut(
+                    this,
+                    androidx.core.content.pm.ShortcutInfoCompat.Builder(this, id)
+                        .setShortLabel(getString(label))
+                        .setIcon(androidx.core.graphics.drawable.IconCompat.createWithResource(this, icon))
+                        .setIntent(android.content.Intent(action).setClass(this, org.desklink.mobile.ui.MainActivity::class.java))
+                        .build(),
+                )
+            }
+        }
         // Snippets and notes (F6): opened and pruned off the main thread, before a screen asks.
         org.desklink.mobile.plugins.notes.NotesStore.preload(this)
         // Automations (F7) and synced folders (F8): read once off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute {
             org.desklink.mobile.plugins.automations.Automations.rules(this)
-            org.desklink.mobile.plugins.folders.FolderEngine.start(this)
+            org.desklink.mobile.plugins.folders.BucketEngine.start(this)
         }
 
         if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

@@ -15,4 +15,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <cache-path name="clipboard" path="clipboard/" />
     <!-- F3: photos taken for the desk, deleted once sent. -->
     <cache-path name="capture" path="capture/" />
+    <!-- F8b: a photo taken for the Bucket, deleted once copied in. -->
+    <cache-path name="bucket_photo" path="bucket-photo/" />
 </paths>

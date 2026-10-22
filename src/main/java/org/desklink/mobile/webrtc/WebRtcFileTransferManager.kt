@@ -528,7 +528,7 @@ class WebRtcFileTransferManager(
         // F8 P4: a synced file is taken only when this phone asked for it, else refused.
         if (message.folder != null) {
             val ref = org.desklink.mobile.plugins.folders.FolderRef(message.folder, requireNotNull(message.relpath), message.mtime)
-            if (!org.desklink.mobile.plugins.folders.FolderEngine.accepts(wire.peerDeviceId, ref, checksum, totalSize)) {
+            if (!org.desklink.mobile.plugins.folders.BucketEngine.accepts(wire.peerDeviceId, ref, checksum, totalSize)) {
                 runCatching {
                     send(OutboundWebRtcFileMessage.Control(controlFor(wire, WebRtcFileAction.ERROR, id, message.transferToken, error = "folder-refused")))
                 }
@@ -653,7 +653,7 @@ class WebRtcFileTransferManager(
             // F8: placed into the synced folder (the engine takes the file), never a share.
             checkpointStore.remove(checkpoint.transferId)
             active.remove(checkpoint.transferId, receiver)
-            org.desklink.mobile.plugins.folders.FolderEngine.arrived(receiver.wire.peerDeviceId, ref, partial, requireNotNull(checkpoint.sha256), checkpoint.totalSize)
+            org.desklink.mobile.plugins.folders.BucketEngine.arrived(receiver.wire.peerDeviceId, ref, partial, requireNotNull(checkpoint.sha256), checkpoint.totalSize)
             send(
                 OutboundWebRtcFileMessage.Control(
                     control(receiver.wire, WebRtcFileAction.COMPLETE, checkpoint.copy(offset = checkpoint.totalSize, state = "completed"), sha256 = checkpoint.sha256, offset = checkpoint.totalSize),

@@ -129,6 +129,14 @@ class NotesActivity : AppCompatActivity() {
                 tab.value = TAB_NOTES
                 editing.value = id
             }
+            intent.getBooleanExtra(EXTRA_NEW, false) -> {
+                tab.value = TAB_NOTES
+                editing.value = NEW
+            }
+            intent.hasExtra(EXTRA_NOTE) -> {
+                tab.value = TAB_NOTES
+                editing.value = intent.getStringExtra(EXTRA_NOTE)
+            }
             intent.getBooleanExtra(EXTRA_SNIPPETS, false) -> {
                 tab.value = TAB_SNIPPETS
                 editing.value = null
@@ -431,8 +439,12 @@ class NotesActivity : AppCompatActivity() {
         private const val STATE_TAB = "tab"
         const val EXTRA_SNIPPETS = "snippets"
 
-        fun intent(context: Context, snippets: Boolean = false): Intent =
-            Intent(context, NotesActivity::class.java).putExtra(EXTRA_SNIPPETS, snippets)
+        const val EXTRA_NOTE = "note"
+        const val EXTRA_NEW = "new"
+
+        fun intent(context: Context, snippets: Boolean = false, noteId: String? = null, newNote: Boolean = false): Intent =
+            Intent(context, NotesActivity::class.java).putExtra(EXTRA_SNIPPETS, snippets).putExtra(EXTRA_NEW, newNote)
+                .apply { noteId?.let { putExtra(EXTRA_NOTE, it) } }
 
         /** One tap on a snippet: on the clipboard (Android 13+ shows its own confirmation). */
         fun copy(context: Context, text: String) {

@@ -211,5 +211,51 @@ object FolderSync {
         return changed
     }
 
+    // ---- F8b the Bucket ----------------------------------------------------------------------------------------
+
+    /** F8b: a phone's Bucket is the pair with this id; it is the only pair. */
+    const val BUCKET_ID = "bucket"
+    /** F8b: items per Bucket. */
+    const val MAX_BUCKET_ITEMS = 10_000
+    /** F8b: a pasted text or link saved as a file. */
+    const val MAX_TEXT_BYTES = 1024 * 1024
+    /** F8b: free space kept on the phone beyond an incoming file. */
+    const val MIN_FREE_BYTES = 500L * 1024 * 1024
+    /** F8b: the Bucket shows a warning past this. */
+    const val WARN_BUCKET_BYTES = 10L * 1024 * 1024 * 1024
+
+    /**
+     * An entry from the desk's manifest the phone will take: a top-level file name (F8b: files only,
+     * no `/`, no folders) that the phone's own ignore rules would not skip (P6).
+     */
+    fun takesIncoming(path: String, dir: Boolean): Boolean = !dir && '/' !in path && validSegment(path) && !ignored(path, includeHidden = false)
+
+    /** F8b: an incoming file of [size] fits when [free] keeps [MIN_FREE_BYTES] after it. */
+    fun enoughSpace(free: Long, size: Long): Boolean = size in 0..MAX_FILE_BYTES && free - size >= MIN_FREE_BYTES
+
+    /**
+     * P6 empty-folder hold: a folder that had files and now scans empty (grant lost, card removed)
+     * is held, never tombstoned, until the person confirms.
+     */
+    fun holdEmpty(manifest: Map<String, Entry>, found: Map<String, Stat>, confirmed: Boolean): Boolean =
+        !confirmed && found.isEmpty() && manifest.values.any { !it.deleted }
+
+    /** F8b: a text or link saved as a file: "Text <date time>.txt", or "<host> <date>.url" (a freedesktop link). */
+    fun textItem(text: String, now: Long): Pair<String, ByteArray>? {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return null
+        val link = Regex("^https?://[^\\s]+$").matches(trimmed)
+        val stamp = SimpleDateFormat("yyyy-MM-dd HH.mm.ss", Locale.ROOT).format(Date(now))
+        val (name, body) = if (link) {
+            val host = runCatching { java.net.URI(trimmed).host }.getOrNull()?.removePrefix("www.")?.takeIf { it.isNotBlank() } ?: "Link"
+            "${host.filter { it != '/' && it != '\\' && !it.isISOControl() }} ${stamp.substring(0, 10)}.url" to
+                "[Desktop Entry]\nEncoding=UTF-8\nName=$host\nType=Link\nURL=$trimmed\n"
+        } else {
+            "Text $stamp.txt" to trimmed + "\n"
+        }
+        val bytes = body.toByteArray()
+        return if (bytes.size > MAX_TEXT_BYTES || !validSegment(name)) null else name to bytes
+    }
+
     fun validSha(sha: String) = sha.length == 64 && sha.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
 }

@@ -176,6 +176,11 @@ class HomeActions(
     val onRunCommand: () -> Unit,
     /** An action was tapped while the computer cannot take it; the message says why. */
     val onUnavailable: (String) -> Unit,
+    val onAutomations: () -> Unit = {},
+    val onNotes: () -> Unit = {},
+    val onNote: (String) -> Unit = {},
+    val onNewNote: () -> Unit = {},
+    val onBucket: () -> Unit = {},
     val onDeskSound: (Boolean) -> Unit = {},
 )
 
@@ -214,6 +219,9 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                     TerminalsTile(state, Modifier.weight(1f)) { gate(actions.onTerminals) }
                     DeskTile(state.ready, Modifier.weight(1f)) { gate(actions.onDeskScreen) }
                 }
+                // Local-first: Notes and the Bucket show whether or not the computer is there.
+                org.desklink.mobile.plugins.notes.NotesHomeCard(onOpenList = actions.onNotes, onOpenNote = actions.onNote, onNew = actions.onNewNote)
+                org.desklink.mobile.plugins.folders.BucketHomeCard(state.deviceId, state.name, onOpen = actions.onBucket)
                 SectionLabel(stringResource(R.string.home_quick_actions))
                 QuickActions(state, gate, actions) { linkDialog = true }
                 TransferAndClipboard(state, actions)
@@ -478,13 +486,14 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
         Triple(R.drawable.sym_waving_hand, R.string.home_ping_desk, actions.onPing),
         Triple(R.drawable.sym_vibration, R.string.home_ring_desk, actions.onRing),
         Triple(R.drawable.sym_swap_vert, R.string.transfers_title, actions.onTransfers),
+        Triple(R.drawable.sym_bolt, R.string.automations_title, actions.onAutomations),
     ) + if (state.hasCommands) listOf(Triple(R.drawable.sym_terminal, R.string.home_run_command, actions.onRunCommand)) else emptyList()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tiles.chunked(2).forEach { pair ->
             Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 pair.forEach { (icon, label, onClick) ->
                     // The history is on this phone: it opens whether or not the computer is there.
-                    QuickTile(icon, stringResource(label), state.ready, Modifier.weight(1f).fillMaxHeight()) { if (label == R.string.transfers_title) onClick() else gate(onClick) }
+                    QuickTile(icon, stringResource(label), state.ready, Modifier.weight(1f).fillMaxHeight()) { if (label == R.string.transfers_title || label == R.string.automations_title) onClick() else gate(onClick) }
                 }
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
             }

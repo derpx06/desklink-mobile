@@ -412,11 +412,24 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <receiver
             android:name="org.desklink.mobile.plugins.terminal.TerminalAttentionReceiver"
             android:exported="false" />
-        <!-- F8: synced folders. -->
+        <!-- F8b: the Bucket; "DeskLink Bucket" in the share sheet for any file, text or link. -->
         <activity
-            android:name="org.desklink.mobile.plugins.folders.SyncedFoldersActivity"
-            android:label="@string/folders_title"
-            android:exported="false" />
+            android:name="org.desklink.mobile.plugins.folders.BucketActivity"
+            android:label="@string/bucket_title"
+            android:exported="false"
+            android:launchMode="singleTop" />
+        <activity-alias
+            android:name="org.desklink.mobile.plugins.folders.ShareToBucketActivity"
+            android:label="@string/bucket_share_label"
+            android:targetActivity="org.desklink.mobile.plugins.folders.BucketActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity-alias>
         <!-- F7: automations. -->
         <receiver
             android:name="org.desklink.mobile.plugins.automations.AutomationAlarms$Receiver"

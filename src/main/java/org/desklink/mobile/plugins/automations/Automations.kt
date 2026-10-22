@@ -96,7 +96,7 @@ object Automations {
     fun history(context: Context, id: String): List<Run> = state(context).history[id].orEmpty()
 
     /** Adds or replaces [rule] (a local edit); false when invalid or at [Rules.MAX_RULES]. */
-    fun save(context: Context, rule: Rule): Boolean {
+    fun save(context: Context, rule: Rule, approve: Boolean = true): Boolean {
         val saved = synchronized(this) {
             val s = state(context)
             val old = s.rules[rule.id]
@@ -105,12 +105,23 @@ object Automations {
             val edited = if (old?.builtin == true) old.copy(enabled = rule.enabled) else rule
             val next = edited.copy(name = edited.name.take(Rules.MAX_NAME_CHARS), modified = later(old?.modified))
             if (Rules.ruleFrom(Rules.toJson(next)) == null) return false
-            commit(s.copy(rules = s.rules + (next.id to next)))
+            // Saving in the editor approves; the switch alone does not (A3).
+            commit(s.copy(rules = s.rules + (next.id to next), unapproved = if (approve) s.unapproved - next.id else s.unapproved))
             next
         }
         worker.execute { push(listOf(saved)) }
         return true
     }
+
+    /** "Approve": a rule the desk made or last edited may now run its phone actions. */
+    @Synchronized
+    fun approve(context: Context, id: String) {
+        val s = state(context)
+        if (id in s.unapproved) commit(s.copy(unapproved = s.unapproved - id))
+    }
+
+    @Synchronized
+    fun approved(context: Context, id: String) = id !in state(context).unapproved
 
     /** A tombstone (A1), pushed like an edit. Built-ins cannot be deleted. */
     fun delete(context: Context, id: String) {
@@ -169,12 +180,13 @@ object Automations {
                     var s = state(app)
                     var changed = false
                     for (i in 0 until minOf(raw.length(), Rules.MAX_RULES)) {
-                        val rule = Rules.ruleFrom(raw.optJSONObject(i)) ?: continue
+                        val rule = Rules.ruleFrom(raw.optJSONObject(i))?.takeIf { it.modified <= System.currentTimeMillis() + Rules.MAX_FUTURE_MS } ?: continue
                         val ours = s.rules[rule.id]
                         if (ours == null && s.rules.size >= Rules.MAX_RULES) continue
                         if (Rules.newer(rule, ours)) {
                             val origin = if (rule.runOn == Rules.DESK) s.origin + (rule.id to device.deviceId) else s.origin - rule.id
-                            s = s.copy(rules = s.rules + (rule.id to rule), origin = origin, history = if (rule.deleted) s.history - rule.id else s.history)
+                            val unapproved = if (Rules.unapprovedAfterSync(rule, ours, rule.id in s.unapproved)) s.unapproved + rule.id else s.unapproved - rule.id
+                            s = s.copy(rules = s.rules + (rule.id to rule), origin = origin, history = if (rule.deleted) s.history - rule.id else s.history, unapproved = unapproved)
                             changed = true
                         } else if (ours != null && ours.modified > rule.modified) {
                             back.add(ours)
@@ -197,7 +209,7 @@ object Automations {
                 val ruleId = packet.getStringOrNull("ruleId").orEmpty()
                 val action = Rules.stepFrom(packet.getJSONObject("action"))
                 // A3: only an action of a live, enabled desk rule from that desk, identical in our copy.
-                val rule = synchronized(this) { state(app).let { s -> s.rules[ruleId]?.takeIf { s.origin[ruleId] == device.deviceId } } }
+                val rule = synchronized(this) { state(app).let { s -> s.rules[ruleId]?.takeIf { s.origin[ruleId] == device.deviceId && ruleId !in s.unapproved } } }
                 val allowed = action != null && rule != null && !rule.deleted && rule.enabled && rule.runOn == Rules.DESK && action in rule.actions
                 val (ok, error) = when {
                     !allowed -> false to "refused"
@@ -269,8 +281,11 @@ object Automations {
     }
 
     private fun run(context: Context, rule: Rule, why: String) {
+        val approved = approved(context, rule.id)
         val results = rule.actions.map { action ->
-            if (action.kind in Rules.PHONE_ACTIONS) {
+            if (action.kind in Rules.PHONE_ACTIONS && !approved) {
+                action.kind to "Not approved on this phone yet"
+            } else if (action.kind in Rules.PHONE_ACTIONS) {
                 val result = runCatching { AutomationActions.run(context, action) }.getOrElse {
                     Log.w(TAG, "Action ${action.kind} failed", it)
                     AutomationActions.Result.Failed("error")

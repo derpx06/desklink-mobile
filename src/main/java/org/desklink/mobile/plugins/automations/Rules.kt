@@ -283,12 +283,33 @@ object Rules {
     const val STORED_VERSION = 2
 
     /** Rules, which desk each desk rule came from (local), and the history. */
-    data class Stored(val rules: Map<String, Rule>, val origin: Map<String, String>, val history: Map<String, List<Run>>)
+    data class Stored(
+        val rules: Map<String, Rule>,
+        val origin: Map<String, String>,
+        val history: Map<String, List<Run>>,
+        /** Rules the desk made or last edited, not yet approved here (local, never synced). */
+        val unapproved: Set<String> = emptySet(),
+    )
+
+    /** A rule this far ahead of our clock is invalid (A3 review fix). */
+    const val MAX_FUTURE_MS = 24 * 3600 * 1000L
+
+    /**
+     * Approval after a synced copy replaces ours: a rule from the desk needs approval unless the
+     * only difference is its switch (turning it on or off is not an edit).
+     */
+    fun unapprovedAfterSync(incoming: Rule, ours: Rule?, wasUnapproved: Boolean): Boolean = when {
+        incoming.deleted -> false
+        ours == null || ours.deleted -> true
+        incoming.copy(enabled = ours.enabled, modified = ours.modified) == ours -> wasUnapproved
+        else -> true
+    }
 
     fun toStored(stored: Stored): JSONObject = JSONObject()
         .put("version", STORED_VERSION)
         .put("rules", JSONArray().apply { stored.rules.values.forEach { put(toJson(it)) } })
         .put("origin", JSONObject(stored.origin))
+        .put("unapproved", JSONArray(stored.unapproved.toList()))
         .put("history", JSONObject().apply {
             stored.history.forEach { (id, runs) ->
                 put(id, JSONArray().apply { runs.forEach { put(JSONObject().put("at", it.at).put("ok", it.ok).put("detail", it.detail)) } })
@@ -318,6 +339,7 @@ object Rules {
                     .takeLast(MAX_HISTORY)
             }
         }
-        return Stored(rules, origin, history)
+        val unapproved = json.optJSONArray("unapproved")?.let { a -> (0 until a.length()).mapNotNull { a.opt(it) as? String }.filter { it in rules }.toSet() }.orEmpty()
+        return Stored(rules, origin, history, unapproved)
     }
 }

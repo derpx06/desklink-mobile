@@ -147,6 +147,19 @@ class RulesTest {
         assertEquals("kdeconnect://runcommand/automation/a1", AutomationNfc.uri("a1"))
     }
 
+    /** A3 review fix: a rule the desk made or last edited needs approval; its switch alone does not change that. */
+    @Test
+    fun approvalAfterSync() {
+        val ours = rule("r", Step(Rules.T_NFC), Step(Rules.A_RING), modified = 1)
+        assertTrue("new from the desk", Rules.unapprovedAfterSync(ours, null, wasUnapproved = false))
+        assertTrue("edited on the desk", Rules.unapprovedAfterSync(ours.copy(name = "x", modified = 2), ours, wasUnapproved = false))
+        assertFalse("only switched", Rules.unapprovedAfterSync(ours.copy(enabled = false, modified = 2), ours, wasUnapproved = false))
+        assertTrue("switching keeps it waiting", Rules.unapprovedAfterSync(ours.copy(enabled = false, modified = 2), ours, wasUnapproved = true))
+        assertFalse("a tombstone needs nothing", Rules.unapprovedAfterSync(ours.copy(deleted = true, modified = 3), ours, wasUnapproved = true))
+        val stored = Rules.fromStored(JSONObject(Rules.toStored(Rules.Stored(mapOf("r" to ours), emptyMap(), emptyMap(), setOf("r", "gone"))).toString()))
+        assertEquals(setOf("r"), stored.unapproved)
+    }
+
     private fun at(y: Int, mo: Int, d: Int, h: Int, mi: Int): Long =
         java.util.Calendar.getInstance().apply { clear(); set(y, mo - 1, d, h, mi) }.timeInMillis
 }

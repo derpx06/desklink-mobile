@@ -53,6 +53,7 @@ object Thumbnails {
             when (previewKind(record.mime, record.name)) {
                 PreviewKind.IMAGE -> FilePreview(loading = false, bitmap = thumbnail(context, uri, sizePx) ?: decodeSampled(context, uri, sizePx))
                 PreviewKind.VIDEO -> video(context, uri, sizePx)
+                PreviewKind.PDF -> FilePreview(loading = false, bitmap = thumbnail(context, uri, sizePx) ?: pdfPage(context, uri, sizePx))
                 else -> FilePreview(loading = false)
             }
         }.getOrDefault(FilePreview(loading = false))
@@ -89,6 +90,21 @@ object Thumbnails {
         while (minOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= sizePx) sample *= 2
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
         return context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+    }
+
+    /** A PDF's first page on white, at most [sizePx] wide (and never more than twice as tall). */
+    private fun pdfPage(context: Context, uri: Uri, sizePx: Int): Bitmap? = context.contentResolver.openFileDescriptor(uri, "r")?.use { fd ->
+        android.graphics.pdf.PdfRenderer(fd).use { renderer ->
+            if (renderer.pageCount == 0) return null
+            renderer.openPage(0).use { page ->
+                val width = sizePx.coerceIn(1, 1024)
+                val height = (width.toLong() * page.height / page.width.coerceAtLeast(1)).toInt().coerceIn(1, width * 2)
+                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+                    bitmap.eraseColor(android.graphics.Color.WHITE)
+                    page.render(bitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                }
+            }
+        }
     }
 
     private fun video(context: Context, uri: Uri, sizePx: Int): FilePreview {

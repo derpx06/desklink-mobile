@@ -11,31 +11,31 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
-/** F8 with one desk: link up on every feature-ready, and the desk's packets to [FolderEngine]. */
+/** F8 with one desk: link up on every feature-ready, and the desk's packets to [BucketEngine]. */
 @LoadablePlugin
 class FoldersPlugin : Plugin() {
     override val displayName: String
-        get() = context.getString(R.string.folders_title)
+        get() = context.getString(R.string.bucket_title)
 
     override val description: String
-        get() = context.getString(R.string.more_folders_summary)
+        get() = context.getString(R.string.bucket_subtitle_short)
 
     override val supportedPacketTypes: Array<String> = arrayOf(DeskLinkProtocol.PACKET_TYPE_FOLDERS)
 
     override val outgoingPacketTypes: Array<String> = supportedPacketTypes
 
     override fun onCreate(): Boolean {
-        FolderEngine.start(context)
+        BucketEngine.start(context)
         return true
     }
 
-    override fun onFeatureReady() = FolderEngine.link(device.deviceId, up = true)
+    override fun onFeatureReady() = BucketEngine.link(device.deviceId, up = true)
 
-    override fun onDestroy() = FolderEngine.link(device.deviceId, up = false)
+    override fun onDestroy() = BucketEngine.link(device.deviceId, up = false)
 
     override fun onPacketReceived(np: NetworkPacket): Boolean {
         if (np.type != DeskLinkProtocol.PACKET_TYPE_FOLDERS) return false
-        FolderEngine.onPacket(device.deviceId, np)
+        BucketEngine.onPacket(device.deviceId, np)
         return true
     }
 }
