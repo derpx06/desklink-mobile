@@ -97,8 +97,18 @@ class WebRtcFileTransferManagerTest {
 
         @Volatile
         var failSends = false
+
+        /** The data channel closed under the transfer, as WebRtcTransport reports it. */
+        @Volatile
+        var linkClosed = false
         val manager = WebRtcFileTransferManager(ctx, device) {
             if (failSends) throw IllegalStateException("WebRTC file transport is not ready")
+            if (linkClosed) {
+                throw org.desklink.mobile.transport.TransportError(
+                    org.desklink.mobile.transport.TransportErrorCode.CLOSED,
+                    "WebRTC data channel is not open",
+                )
+            }
             outbox.add(it)
             log.add(it)
         }.apply {
@@ -1168,6 +1178,83 @@ class WebRtcFileTransferManagerTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun aSendWhoseChannelClosesMidwayPausesTellsThePeerNothingAndResumesOnTheNextConnection() {
+        val phone = rig()
+        val desktop = peerRig(mirrored(wire))
+        val bytes = payload(3_000_000) // three send windows
+        val callback = Recorder()
+        val result = startSend(phone, sharePacket(bytes), callback)
+        awaitOffer(phone)
+        pump(phone, desktop, limit = 4)
+
+        // The data channel closes while the next window is going out.
+        phone.linkClosed = true
+        // Acks already in flight meet a paused transfer; then the closed link carries nothing.
+        runCatching { pump(phone, desktop) }
+        phone.outbox.clear()
+        desktop.outbox.clear()
+
+        assertFalse(result.get(10, TimeUnit.SECONDS))
+        assertTrue(callback.failures.single() is TransferResumingException)
+        assertFalse("no ERROR may reach the peer", WebRtcFileAction.ERROR in phone.actions)
+        assertEquals("paused", store.list().single { it.direction == "send" }.state)
+
+        val session2 = wire.copy(sessionId = 99, generation = 9)
+        phone.linkClosed = false
+        phone.wire = session2
+        desktop.wire = mirrored(session2)
+        phone.manager.resumeSends(session2)
+        pump(phone, desktop)
+
+        assertArrayEquals(bytes, drain(desktop.delivered.single()))
+        assertEquals(emptyList<TransferCheckpoint>(), store.list())
+    }
+
+    @Test
+    fun aReceiveWhoseAcknowledgementCannotLeaveIsPausedNotFailed() {
+        val rig = rig()
+        val bytes = payload(100_000)
+        rig.manager.handleControl(wire, offer(bytes))
+        feed(rig, bytes, to = CHUNK)
+        rig.linkClosed = true
+
+        assertThrows(org.desklink.mobile.transport.TransportError::class.java) {
+            feed(rig, bytes, from = CHUNK, to = 2 * CHUNK)
+        }
+
+        assertFalse(WebRtcFileAction.ERROR in rig.actions)
+        assertEquals("paused", store.load(ID)!!.state)
+        assertEquals("the stored chunk is kept", 2L * CHUNK, partial().length())
+        // The sender's re-offer resumes from the kept data.
+        rig.linkClosed = false
+        rig.manager.handleControl(wire, offer(bytes))
+        assertEquals(2L * CHUNK, rig.controls.last().offset)
+    }
+
+    @Test
+    fun reasonsSentToThePeerAreHumanTextNeverAClassName() {
+        val raw = listOf(
+            java.util.concurrent.ExecutionException(
+                org.desklink.mobile.transport.TransportError(
+                    org.desklink.mobile.transport.TransportErrorCode.SEND_FAILED, "rejected",
+                ),
+            ),
+            java.io.IOException("write failed: EIO (I/O error)"),
+            IllegalStateException(java.io.FileNotFoundException("/data/user/0/x (No such file)").toString()),
+            RuntimeException(),
+        )
+        for (error in raw) {
+            val reason = peerReason(error, "The phone could not send the file")
+            assertFalse(reason, "org.desklink" in reason || "Exception" in reason || "/" in reason)
+        }
+        assertEquals(
+            "Not enough space on the phone",
+            peerReason(java.io.IOException("write failed: ENOSPC (No space left on device)"), "x"),
+        )
+        assertEquals("Shared file changed during transfer", peerReason(IllegalArgumentException("Shared file changed during transfer"), "x"))
     }
 
     @Test

@@ -1869,11 +1869,12 @@ class WebRtcSessionCoordinator(
     }
 
     private fun sendFileMessage(message: OutboundWebRtcFileMessage) {
-        val activeTransport = synchronized(lock) {
-            val value = requireNotNull(transport) { "No active WebRTC peer connection" }
-            require(value.isReadyForPackets()) { "WebRTC file transport is not ready" }
-            value
-        }
+        // CLOSED, so the transfer pauses and resumes on the next connection instead of failing.
+        val activeTransport = synchronized(lock) { transport?.takeIf { it.isReadyForPackets() } }
+            ?: throw org.desklink.mobile.transport.TransportError(
+                org.desklink.mobile.transport.TransportErrorCode.CLOSED,
+                "WebRTC file transport is not ready",
+            )
         val (channel, messageType, payload) = when (message) {
             is OutboundWebRtcFileMessage.Control -> Triple(
                 WebRtcChannel.FILE_CONTROL,
@@ -1902,7 +1903,11 @@ class WebRtcSessionCoordinator(
                 }
             },
         )
-        completion.get(10, TimeUnit.SECONDS)
+        try {
+            completion.get(10, TimeUnit.SECONDS)
+        } catch (error: java.util.concurrent.ExecutionException) {
+            throw error.cause ?: error // the TransportError itself, not "ExecutionException: …"
+        }
     }
 
     private fun controlMessage(

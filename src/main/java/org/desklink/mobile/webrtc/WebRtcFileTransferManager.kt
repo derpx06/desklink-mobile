@@ -203,6 +203,7 @@ class WebRtcFileTransferManager(
                 ),
             )
         } catch (error: Throwable) {
+            if (linkClosed(error) && synchronized(this) { pause(sender, error) }) return false
             // The offer never left, so there is nothing to resume: leave no copy behind.
             active.remove(transferId, sender)
             discardSend(transferId)
@@ -268,7 +269,13 @@ class WebRtcFileTransferManager(
         try {
             writeChunk(wire, receiver, chunk)
         } catch (error: Throwable) {
-            failReceive(receiver, error.message ?: "Could not store the received data")
+            if (linkClosed(error)) {
+                // The chunk is stored; only its acknowledgement could not leave. The
+                // sender re-offers on the next connection and resumes from here.
+                pause(receiver, error)
+            } else {
+                failReceive(receiver, peerReason(error, "The phone could not store the file"))
+            }
             throw error
         }
     }
@@ -358,7 +365,7 @@ class WebRtcFileTransferManager(
                                 WebRtcFileAction.ERROR,
                                 message.transferId,
                                 message.transferToken,
-                                error = (error.message ?: "The file could not be received").take(256),
+                                error = peerReason(error, "The phone could not accept the file"),
                             ),
                         ),
                     )
@@ -376,9 +383,26 @@ class WebRtcFileTransferManager(
         try {
             block()
         } catch (error: Throwable) {
-            endSender(sender, WebRtcFileAction.ERROR, error.message ?: "The transfer failed")
+            if (!(linkClosed(error) && pause(sender, error))) {
+                endSender(sender, WebRtcFileAction.ERROR, peerReason(error, "The phone could not send the file"))
+            }
             throw error
         }
+    }
+
+    /**
+     * Like [close] for one transfer: the link went away under it, so it is kept (paused) for
+     * the next connection, its owner hears [TransferResumingException], and the peer is told
+     * nothing, since it cannot be reached. False if it had already ended.
+     */
+    private fun pause(transfer: ActiveTransfer, error: Throwable): Boolean {
+        if (!active.remove(transfer.checkpoint.transferId, transfer)) return false
+        checkpointStore.save(transfer.checkpoint.copy(state = "paused"))
+        if (transfer is ActiveTransfer.Sender) {
+            transfer.callback.onFailure(TransferResumingException(error.message ?: "The connection closed"))
+            transfer.completion.complete(false)
+        }
+        return true
     }
 
     /**
@@ -730,12 +754,9 @@ class WebRtcFileTransferManager(
                 }
             }
         } catch (error: Throwable) {
+            if (linkClosed(error) && pause(sender, error)) return
             // Fail now and tell the peer; waiting out the 30-minute deadline helps no one.
-            endSender(
-                sender,
-                WebRtcFileAction.ERROR,
-                error.message ?: "Shared file changed during transfer",
-            )
+            endSender(sender, WebRtcFileAction.ERROR, peerReason(error, "The phone could not read the file"))
         }
     }
 
@@ -928,3 +949,24 @@ class WebRtcFileTransferManager(
 
 /** The link went away mid-send; the checkpoint is kept and the next connection resumes it. */
 class TransferResumingException(reason: String) : IllegalStateException(reason)
+
+/** The link under a transfer closed or is not open yet: pause it, never fail it. */
+internal fun linkClosed(error: Throwable): Boolean =
+    error is org.desklink.mobile.transport.TransportError &&
+        error.code == org.desklink.mobile.transport.TransportErrorCode.CLOSED
+
+/**
+ * What the peer is told when a transfer ends here: short human text, never a class name or a
+ * raw platform message (those reached the desk as "org.desklink…TransportError: …").
+ */
+internal fun peerReason(error: Throwable, fallback: String): String {
+    val message = error.message.orEmpty()
+    return when {
+        generateSequence(error) { it.cause }.any { "ENOSPC" in it.message.orEmpty() || "No space left" in it.message.orEmpty() } ->
+            "Not enough space on the phone"
+        // Our own checks (require/check) say what went wrong in plain words.
+        (error is IllegalArgumentException || error is IllegalStateException) && message.isNotBlank() &&
+            !Regex("""Exception|Error:|org\.|java\.|android\.|/""").containsMatchIn(message) -> message.take(256)
+        else -> fallback
+    }
+}
