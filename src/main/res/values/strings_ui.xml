@@ -26,9 +26,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="navigate_up">Back</string>
 
     <!-- Device -->
-    <string name="feature_run_command">Run command</string>
-    <string name="feature_desc_run_command">Saved commands</string>
-    <string name="feature_desc_digitizer">Draw with a stylus</string>
     <string name="feature_desc_tv">TV remote</string>
     <string name="device_features">Features</string>
     <string name="device_encryption">Encryption</string>
@@ -104,7 +101,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_lock_desk">Lock desk</string>
     <string name="home_share_screen">Share screen</string>
     <string name="home_stop_sharing">Stop sharing</string>
-    <string name="home_presenter">Presenter</string>
     <string name="home_ping_desk">Ping desk</string>
     <string name="home_ring_desk">Ring desk</string>
     <string name="home_rang">Ringing %1$s</string>
@@ -273,13 +269,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_reach_anywhere">Reach from anywhere</string>
     <string name="settings_relay_not_set_up">No relay server set up. Enter one in More → Advanced network</string>
     <string name="settings_reach_anywhere_summary">Encrypted relay when off Wi‑Fi</string>
-    <string name="settings_quick_commands">Quick commands</string>
-    <string name="settings_quick_commands_none">None</string>
-    <string name="settings_quick_commands_subtitle">Chips under the terminal on %1$s. A tap types the command and Enter.</string>
-    <string name="settings_quick_commands_remove">Remove %1$s</string>
-    <string name="settings_quick_commands_hint">Command</string>
-    <string name="settings_quick_commands_add">Add</string>
-    <string name="settings_quick_commands_reset">Restore defaults</string>
     <string name="settings_more">More</string>
     <string name="settings_more_summary">Desk controls this phone, run command, drawing pad, network</string>
     <string name="settings_more_extras">Extras</string>
@@ -291,10 +280,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_features_summary">Turn features on or off for this computer</string>
     <string name="more_desk_controls">Desk controls this phone</string>
     <string name="more_desk_controls_summary">Pointer and taps, through Accessibility</string>
-    <string name="more_desk_types">Desk types on this phone</string>
-    <string name="more_desk_types_summary">The DeskLink keyboard</string>
-    <string name="more_drawing_pad">Drawing pad</string>
-    <string name="more_tv_remote">TV remote</string>
 
     <!-- UI v4: live sessions -->
     <string name="screen_share_live_title">%1$s sees your screen</string>
@@ -322,7 +307,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_you_are_here">You\'re here</string>
     <string name="terminal_running_on">Running on %1$s</string>
     <string name="terminal_show_system_bars">Show the status bar</string>
-    <string name="terminal_run_command">Run %1$s</string>
     <string name="terminal_compose_hint">Type a command</string>
     <string name="terminal_compose_send">Send with Enter</string>
     <string name="terminal_compose_show">Compose a command</string>
@@ -336,16 +320,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="remote_right_click_description">Right click</string>
     <string name="remote_key_super">Super key</string>
     <string name="remote_zoom_reset">Reset zoom</string>
-    <!-- UI v4: presenter -->
-    <string name="presenter_controlling">Controlling slides on %1$s</string>
-    <string name="presenter_elapsed">Elapsed</string>
-    <string name="presenter_back">Back</string>
-    <string name="presenter_blank">Blank</string>
-    <string name="presenter_set_total">Number of slides</string>
-    <string name="presenter_total_hint">Leave empty if you don\'t know</string>
-    <string name="presenter_restart">Start over</string>
-    <string name="presenter_slide">Slide %1$d</string>
-    <string name="presenter_slide_of">Slide %1$d of %2$d</string>
     <!-- UI v4: transfers -->
     <string name="transfers_title">Transfers</string>
     <string name="transfers_subtitle">Files with %1$s, last 30 days</string>
@@ -399,10 +373,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="handoff_not_now">Not now</string>
     <string name="handoff_continue">Continue</string>
 
-    <string name="home_run_command">Run command</string>
-    <string name="runcommand_terminal_off">Terminal access is off on %1$s. Turn it on there to run commands.</string>
-    <string name="runcommand_locked">%1$s wants its session password first. Open Terminals to enter it.</string>
-    <string name="runcommand_add_on_desk">Add commands in DeskLink\'s preferences on %1$s.</string>
 
     <string name="home_share_offered">Sharing with %1$s. Confirm on this phone when asked.</string>
     <string name="screen_offer_busy">%1$s is already in a screen session.</string>

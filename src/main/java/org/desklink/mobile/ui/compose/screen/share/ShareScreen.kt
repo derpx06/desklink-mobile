@@ -144,7 +144,7 @@ private fun ShareScreenCardContent(device: DeviceUiModel) {
             )
             if (!device.isReachable) {
                 Text(
-                    text = stringResource(id = R.string.runcommand_notreachable),
+                    text = stringResource(id = R.string.device_not_reachable),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFFCC2222),
                     fontSize = 14.sp,

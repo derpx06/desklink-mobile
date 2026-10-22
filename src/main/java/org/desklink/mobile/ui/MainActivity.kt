@@ -131,7 +131,7 @@ private const val REFRESH_MS = 1_000L
 /**
  * One Compose root. Home (the selected computer) is the root; Settings, pairing and the rest are
  * pushed full screen on a small back stack of route strings, which survives rotation and process
- * death. Terminals, the desk screen and the presenter are their own activities.
+ * death. Terminals and the desk screen are their own activities.
  */
 class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private val stack = mutableStateListOf<String>()

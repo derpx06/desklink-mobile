@@ -9,19 +9,12 @@
   <string name="pref_plugin_telephony_desc">Gələn zəng bildirişlərini göndərmək</string>
   <string name="pref_plugin_battery">Batareya məlumatı</string>
   <string name="pref_plugin_battery_desc">Batareya vəziyyətini vaxtaşırı bildirmək</string>
-  <string name="pref_plugin_connectivity_report">Bağlantı hesabatı</string>
-  <string name="pref_plugin_connectivity_report_desc">Şəbəkə siqnalının gücünü və vəziyyətini bildirin</string>
   <string name="pref_plugin_clipboard">Mübadilə Buferini eyniləşdirmək</string>
   <string name="pref_plugin_clipboard_desc">Mübadilə buferi tərkiblərini paylaşmaq</string>
   <string name="pref_plugin_clipboard_sent">Mübadilə buferini göndərmək</string>
   <string name="pref_plugin_mousepad">Məsafədən giriş</string>
-  <string name="pref_plugin_presenter_desc">Cihazınızı təqdimatda slaydları dəyişmək üçün istifadə edin</string>
-  <string name="pref_plugin_remotekeyboard">Məsafədən düyməyə basmanı almaq</string>
-  <string name="pref_plugin_remotekeyboard_desc">Düyməyə basmanı məsafədəki qurğudan almaq</string>
   <string name="pref_plugin_mpris">Multimedia idarəsi</string>
   <string name="pref_plugin_mpris_desc">Media oynadıcınızı idarə etməyə imkan verir</string>
-  <string name="pref_plugin_runcommand">Əmr başlatmaq</string>
-  <string name="pref_plugin_runcommand_desc">Əmrləri telefon və ya planşetiniz ilə məsafədən başlatmaq</string>
   <string name="pref_plugin_contacts">Əlaqələri eyniləşdirin</string>
   <string name="pref_plugin_contacts_desc">Cihazın kontak kitabçasını eyniləşdirməyə icazə vermək</string>
   <string name="pref_plugin_ping">Dümsükləmək</string>
@@ -39,25 +32,11 @@
   <string name="open_settings">Ayarları açmaq</string>
   <string name="no_permissions">Bildirişlər almağa icazə verməniz lazımdır</string>
   <string name="no_permission_mprisreceiver">Media oynadıcını idarə etmək üçün bildirişlərə girişə icazə verməniz lazımdır</string>
-  <string name="no_permissions_remotekeyboard">Düymə basılmalarını almaq üçün DeskLink Klaviaturasını aktiv etməlisiniz</string>
   <string name="send_ping">Dümsükləmək</string>
-  <string name="open_mpris_controls">Multimedia idarə edilməsi</string>
-  <string name="remotekeyboard_editing_only_title">Məsafədəki düymələri yalnız redaktə edərkən idarə edin</string>
-  <string name="remotekeyboard_not_connected">Aktiv bir uzaq klaviatura bağlantısı yoxdur, onu DeskLink-də yaradın</string>
-  <string name="remotekeyboard_connected">Uzaq klaviatura bağlantısını aktiv edin</string>
-  <string name="remotekeyboard_multiple_connections">Birdən çox uzaq klaviatura bağlantısı var, tənzimləmək üçün cihazı seçin</string>
   <string name="open_mousepad">Məsafədən giriş</string>
-  <string name="mousepad_info">Siçan kursorunu hərəkət etdirmək üçün barmağı ekranda sürüşdürün. Klik üçün ekrana vurun, sağ və orta siçan düymələri üçün iki/üç barmaqla toxunuş edin. Sürüşdürmək üçün iki barmaqdan istifadə edin. Hiroskop siçan funksionallığı plaqin ayarlarında aktiv edilməlidir</string>
-  <string name="mousepad_keyboard_input_not_supported">Qoşulmuş cihaz üçün klaviatura ilə daxiletmə dəstəklənmir</string>
-  <string name="mousepad_single_tap_settings_title">Bir barmaq toxunuşu əməlini təyin edin</string>
-  <string name="mousepad_double_tap_settings_title">İki barmaq toxunuşu əməlini təyin edin</string>
-  <string name="mousepad_triple_tap_settings_title">Üç barmaq toxunuşu əməlini təyin edin</string>
   <string name="mousepad_sensitivity_settings_title">Toxunma panelinin həsassləğını təyin edin</string>
-  <string name="mousepad_mouse_buttons_title">Siçan düymələrini göstərmək</string>
   <string name="mousepad_acceleration_profile_settings_title">Kursorun sürətini təyin edin</string>
   <string name="mousepad_scroll_direction_title">Sürüşdürmənin əks istiqaməti</string>
-  <string name="gyro_mouse_enabled_title">Qiroskoplu siçanı qoşun</string>
-  <string name="gyro_mouse_sensitivity_title">Qiroskopun həssaslığı</string>
   <string-array name="mousepad_tap_entries">
     <item>Sol toxunuş</item>
     <item>Sağ toxunuş</item>
@@ -79,17 +58,6 @@
     <item>Güclü</item>
     <item>Ən güclü</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Düymələrə vuruşları buraya göndərin:</string>
-  <string name="sendkeystrokes_textbox_hint">Düyməyə vurulmanı ana komputerə göndərin</string>
-  <string name="sendkeystrokes_disabled_toast">Düymə vuruşun göndərilməsi söndürülüb - onu ayarlardan aktiv edin</string>
-  <string name="sendkeystrokes_wrong_data">Səhv mime növü - \'text/x-keystrokes\' üçün lazımdır</string>
-  <string name="sendkeystrokes_sent_text">%2s cihazına %1s göndərildi</string>
-  <string name="sendkeystrokes_pref_category_summary">Bu modul, düyməyə vurmaqla, qoşulmuş ana komputerə göndərərərk başqa tətbiqlərin mətn hissəsininlərini mübadilə etməyə imkan verir</string>
-  <string name="sendkeystrokes_pref_category_title">Düymələrə vuruşları göndərin</string>
-  <string name="sendkeystrokes_pref_enabled">Düyməyə vuruşun göndərilməsini aktiv edin</string>
-  <string name="sendkeystrokes_pref_enabled_summary">\'text/x-keystrokes\' mime növü ilə verilənləri dinləyin</string>
-  <string name="sendkeystrokes_safe_text_enabled">Təhlükəsiz mətni dərhal göndərin</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Yalnız qısa nömrəli sətirləri təsdiqləmədən göndərin</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Düymə vuruşu kimi göndərmək</string>
   <string name="mouse_receiver_plugin_description">Uzaqdakı siçanın hərəkətini qəbul etmək</string>
   <string name="mouse_receiver_plugin_name">Siçanı qəbul edən</string>
@@ -151,9 +119,6 @@
   <string name="received_file_text">\'%1s\' açmaq üçün toxunun</string>
   <string name="cannot_create_file">%s faylı yaradıla bilmir</string>
   <string name="tap_to_answer">Cavab üçün toxunun</string>
-  <string name="right_click">Sağ Klik göndərmək</string>
-  <string name="middle_click">Orta Klik göndərmək</string>
-  <string name="show_keyboard">Klaviaturanı göstərmək</string>
   <string name="device_not_paired">Cihaz qoşulmayıb</string>
   <string name="request_pairing">Qoşulma tələbi</string>
   <string name="pairing_accept">Qəbul etmək</string>
@@ -162,11 +127,7 @@
   <string name="mpris_play">Səsləndirmək</string>
   <string name="mpris_pause">Fasilə</string>
   <string name="mpris_previous">Əvvəlki</string>
-  <string name="mpris_rew">Geri almaq</string>
-  <string name="mpris_ff">Sürətli irəli</string>
   <string name="mpris_next">Sonrakı</string>
-  <string name="mpris_loop">Dairəvi</string>
-  <string name="mpris_shuffle">Qarışıq</string>
   <string name="mpris_volume">Səs səviyyəsi</string>
   <string name="mpris_time_settings_title">İrəli/Geri düymələri</string>
   <string name="mpris_time_settings_summary">Basıldığında sürətli irəli/geriyə üçün vaxtı ayarlamaq</string>
@@ -202,14 +163,7 @@
   <string name="show_notification_if_screen_off">Yalnız ekran söndükdə bildiriş göndərmək</string>
   <string name="add_device_dialog_title">Cihaz əlavə etmək</string>
   <string name="add_device_hint">Host_adı və ya İP ünvanı</string>
-  <string name="no_players_connected">Pleyer tapılmadı</string>
   <string name="send_files">Faylları göndərmək</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Top left</item>
-    <item>Top right</item>
-    <item>Bottom left</item>
-    <item>Bottom right</item>
-  </string-array>
   <string name="block_notification_contents">Bildirilərin tərkiblərini kilidləmək</string>
   <string name="block_notification_images">Bildiriş şəlkillərini kilidləmək</string>
   <string name="pairing_title">DeskLink Cihazları</string>
@@ -247,15 +201,7 @@
   <string name="select_ringtone">Zəng səsini seçmək</string>
   <string name="telephony_pref_blocked_title">Əngəllənmiş nömrələr</string>
   <string name="telephony_pref_blocked_dialog_desc">Bu nömrədən SMS və zənglər göstərilməsin. Hər sətirdə bir nömrə göstərin</string>
-  <string name="mpris_coverart_description">Mövcud medianın üz qabığı</string>
   <string name="settings_icon_description">Ayarlar nişanı</string>
-  <string name="presenter_fullscreen">Tam_Ekran</string>
-  <string name="presenter_exit">Təqdimatdan çıxış</string>
-  <string name="presenter_lock_tip">Siz cihazınızı kilidləyə və səs düymələri ilə əvvəlki/sonrakı slayda keçid edə bilərsiniz</string>
-  <string name="add_command">Əmr əlavə etmək</string>
-  <string name="addcommand_explanation">Əmrlər qeyd edilməyib</string>
-  <string name="addcommand_explanation2">Sİz DeskLink sistem ayarlarında yeni əmrlər əlavə edə bilərsiniz</string>
-  <string name="add_command_description">İş masasında yeni əmr əlavə edə bilərsiniz</string>
   <string name="pref_plugin_mprisreceiver">Media Pleyer İdarəsi</string>
   <string name="pref_plugin_mprisreceiver_desc">Telefonunuzun media pleyerlərini digər cihazdan idarə edin</string>
   <string name="notification_channel_default">Digər bildirişlər</string>
@@ -265,22 +211,12 @@
   <string name="notification_channel_filetransfer_upload">Göndərilən fayl köçürməsi</string>
   <string name="notification_channel_filetransfer_error">Fayl köçürülməsi xətası</string>
   <string name="notification_channel_high_priority">Yüksək üstünlük</string>
-  <string name="mpris_stop">Cari pleyeri dayandırmaq</string>
   <string name="copy_url_to_clipboard">URL\'u mübadilə buferinə kopyalamaq</string>
   <string name="clipboard_toast">Mübadilə buferinə kopyalandı</string>
-  <string name="runcommand_notreachable">Cihaz əlçatan deyil</string>
-  <string name="runcommand_notpaired">Cihaz qoşulmayıb</string>
-  <string name="runcommand_nosuchdevice">Belə cihaz yoxdur</string>
-  <string name="runcommand_noruncommandplugin">Bu cihazda aktiv edilmiş Əmr Başlatma Əlavəsi yoxdur</string>
-  <string name="runcommand_category_device_controls_title">Cihazın idarə edilməsi</string>
-  <string name="runcommand_device_controls_summary">Əgər cihazınız idarəetməni dəstəkləyirsə, təyin etdiyiniz əmrlər burada görünəcək.</string>
-  <string name="set_runcommand_name_as_title">set_runcommand_name_as_title</string>
-  <string name="runcommand_name_as_title_title">Adı başlıq kimi göstərin</string>
+  <string name="device_not_reachable">Cihaz əlçatan deyil</string>
   <string name="pref_plugin_findremotedevice">Uzaq cihazı tapmaq</string>
   <string name="pref_plugin_findremotedevice_desc">Uzaq cihazınıza zəng göndərin</string>
   <string name="ring">Zəng</string>
-  <string name="pref_plugin_systemvolume">Sistem səs səviyyəsi</string>
-  <string name="pref_plugin_systemvolume_desc">Uzaq cihazın sistem səs səviyəsini idarə etmək</string>
   <string name="mute">Susdurmaq</string>
   <string name="all">Hamısı</string>
   <string name="devices">Cihazlar</string>
@@ -298,8 +234,6 @@
   <string name="block_images">Bildirişlərin şəkillərini bloklamaq</string>
   <string name="notification_channel_receivenotification">Digar cihazlardan bilsirişlər</string>
   <string name="no_app_for_opening">Bu faylı açmaq üçün uyğun tətbiq tapılmadı</string>
-  <string name="remote_keyboard_service">DeskLink Uzaq Klaviaturası</string>
-  <string name="presenter_pointer">Kursor</string>
   <string name="trusted_networks">Etibarlı şəbəkələr</string>
   <string name="trusted_networks_desc">Bilinən şəbəkələrin avtomatik aşkar edilməsini məhdudlaşdırmaq</string>
   <string name="add_trusted_network">%1s əlavə etmək</string>
@@ -308,32 +242,10 @@
   <string name="location_permission_needed_title">İcazə tələb edlir</string>
   <string name="location_permission_needed_desc">DeskLink üçün, hətta tətbiq arxa fonda işlədikdə belə qoşulduğunuz WiFi şəbəkəsini tanımaq üçün ona arxa planda məkandan istifadə etmə icazəsi tələb olunur. Bu onunla bağlıdır ki, hətta DeskLink bunu istifadə etməsə də ətrafınızdakı WiFi şəbəkəsi ilə yerinizi təyin etmək üçün istifadə edə biləsiniz.</string>
   <string name="clipboard_android_x_incompat">Android 10 bütün tətbiqlər üçün mübadilə buferinə girişi aradan qaldırıb. Bu qoşma söndürüləcək.</string>
-  <string name="mpris_open_url">Burada oxutmağa davam edin</string>
   <string name="cant_open_url">Oxutmanı davam etdirmək üçün URL açıla bilmir</string>
-  <string name="bigscreen_home">Ev</string>
-  <string name="bigscreen_up">Yuxarı</string>
-  <string name="bigscreen_left">Sola</string>
-  <string name="bigscreen_select">Seçim</string>
-  <string name="bigscreen_right">Sağa</string>
-  <string name="bigscreen_down">Aşağı</string>
-  <string name="bigscreen_mic">Mik</string>
-  <string name="pref_plugin_bigscreen_desc">Plasma Böyük Ekran\'ını cihazınızla məsafədən idarə edin</string>
-  <string name="bigscreen_optional_permission_explanation">Telefonunuzun mikrofon girişini paylaşmaq üçün telefonun səs girişinə icazə verməlisiniz</string>
-  <string name="bigscreen_speech_extra_prompt">Danışıq</string>
   <string name="message_reply_label">CAVAB</string>
   <string name="mark_as_read_label">OXUNMUŞ KİMİ İŞARƏLƏMƏK</string>
   <string name="user_display_name">Siz</string>
-  <string name="set_default_sms_app_title">MMS göndərmək</string>
-  <string name="set_group_message_as_mms_title">MMS qrupu göndərmək</string>
-  <string name="set_long_text_as_mms_title">Uzun mətni MMS kimi göndərmək</string>
-  <string name="convert_to_mms_after_title">MMS\'ə çevirmək</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Bir ismarıcdan sonra</item>
-    <item>İki ismarıcdan sonra</item>
-    <item>Üş ismarıcdan sonra1</item>
-    <item>Dörd ismarıcdan sonra1</item>
-    <item>Beş ismarıcdan sonra1</item>
-  </string-array>
   <string name="theme_dialog_title">Mövzunu seçin</string>
   <string-array name="theme_list">
     <item>Batareyaya Qənaət tərəfindən təyin edilr</item>
@@ -360,10 +272,6 @@
   <string name="rise_up">Qalxmaq</string>
   <string name="rise_down">Aşağı enmək</string>
   <string name="click_here_to_type">Yazmaq üçün toxunun</string>
-  <string name="clear_compose">Təmizləmək</string>
-  <string name="send_compose">Göndərin</string>
-  <string name="compose_send_title">Yazın göndərin</string>
-  <string name="open_compose_send">Mətn yazın</string>
   <string name="maintainer_and_developer">Müşayətçi və tərtibatçı</string>
   <string name="developer">Tərtibatçı</string>
   <string name="apple_support">macOS dəstəyi. İOS dəstəklənməsi üzərində işləyirik</string>
@@ -376,7 +284,6 @@
   <string name="saikrishna_arcot_task">Uzaq daxiletmə əlavəsində klaviaturanın istifadəsini dəstəklənməsi, xəta sazlamaları və əsas yaxşılaşdırmalar</string>
   <string name="everyone_else">İllər boyu DeskLink\'ə töhfə verən hər kəs</string>
   <string name="send_clipboard">Mübadilə yaddaşını göndərin</string>
-  <string name="tap_to_execute">İcra etmək üçün vurun</string>
   <string name="plugin_stats">Plaqin statistikası</string>
   <string name="enable_udp_broadcast">UDP cihaz aşkarlamasını aktiv edin</string>
   <string name="receive_notifications_permission_explanation">Başqa cihazdan bildirişlər almaq üçün onlara icazə vermək lazımdır</string>

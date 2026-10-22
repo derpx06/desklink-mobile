@@ -9,17 +9,11 @@
   <string name="pref_plugin_telephony_desc">Invia notificationes per appellos in arrivata</string>
   <string name="pref_plugin_battery">Reporto de batteria</string>
   <string name="pref_plugin_battery_desc">Periodicamente reporta stato de batteria</string>
-  <string name="pref_plugin_connectivity_report">Reporto de connectivitate</string>
-  <string name="pref_plugin_digitizer">Tabletta de Designar</string>
-  <string name="pref_plugin_digitizer_desc">Usa tu dispositivo como un tabletta de designar sensibile al pression</string>
   <string name="pref_plugin_clipboard">Sync de area de transferentia</string>
   <string name="pref_plugin_clipboard_desc">Comparti le contento de area de transferentia</string>
   <string name="pref_plugin_clipboard_sent">Area de transferentia inviate</string>
   <string name="pref_plugin_mousepad">Entrata remote</string>
-  <string name="pref_plugin_presenter">Presentation Remote</string>
-  <string name="pref_plugin_presenter_desc">Usa tu dispositivo per cambiar diapositivas in un presentation</string>
   <string name="pref_plugin_mpris">Controlos de Multimedia</string>
-  <string name="pref_plugin_runcommand">Executa commando</string>
   <string name="pref_plugin_ping">Ping</string>
   <string name="pref_plugin_ping_desc">Invia e recipe pings</string>
   <string name="pref_plugin_receive_notifications">Recipe notificationes</string>
@@ -31,9 +25,7 @@
   <string name="cancel">Cancella</string>
   <string name="open_settings">Aperi Preferentias</string>
   <string name="send_ping">Invia Ping</string>
-  <string name="open_mpris_controls">Controlo mutimedia</string>
   <string name="open_mousepad">Entrata remote</string>
-  <string name="bigscreen_show_home_title">"Monstra  button de domo"</string>
   <string-array name="mousepad_tap_entries">
     <item>Click sinistre</item>
     <item>Click dextere</item>
@@ -55,7 +47,6 @@
     <item>Stronger</item>
     <item>Strongest</item>
   </string-array>
-  <string name="sendkeystrokes_sent_text">"Inviate %1$s   a  dispositivo %2$s"</string>
   <string name="view_status_title">Stato</string>
   <string name="category_connected_devices">Dispositivos connectite</string>
   <string name="category_not_paired_devices">Dispositivos disponibile</string>
@@ -77,20 +68,13 @@
     <item quantity="other">"Inviate %2$d  files a %1$s"</item>
   </plurals>
   <string name="tap_to_open">Tocca per aperir</string>
-  <string name="left_click">Invia Click sinistre</string>
-  <string name="show_keyboard">Monstra Claviero</string>
-  <string name="show_mouse_and_keyboard">Monstra Mus e Claviero</string>
   <string name="pairing_accept">Accepta</string>
   <string name="pairing_reject">Rejecta</string>
   <string name="settings">Preferentias</string>
   <string name="mpris_play">Reproduce</string>
   <string name="mpris_pause">Pausa</string>
   <string name="mpris_previous">Precedente</string>
-  <string name="mpris_rew">Rebobina</string>
-  <string name="mpris_ff">Avantia velocemente</string>
   <string name="mpris_next">Proxime</string>
-  <string name="mpris_loop">Anella</string>
-  <string name="mpris_shuffle">Shuffle (miscer)</string>
   <string name="mpris_volume">Volumine</string>
   <string-array name="mpris_time_entries">
     <item>10 secundas</item>
@@ -108,14 +92,7 @@
   <string name="show_notification_if_screen_off">Invia notificationes si le schermo es extinguite</string>
   <string name="add_device_dialog_title">Adde dispositivo</string>
   <string name="add_device_hint">Nomine de hospite o adresse IP</string>
-  <string name="no_players_connected">Necun Jocatores trovate</string>
   <string name="send_files">Invia files</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>In alto a sinistra</item>
-    <item>In alto a dextera</item>
-    <item>In basso a sinistra</item>
-    <item>In basso a dextera</item>
-  </string-array>
   <string name="block_notification_contents">Bloca contentos de notification</string>
   <string name="block_notification_images">Bloca imagines de notification</string>
   <string name="device_rename_confirm">Renomina</string>
@@ -125,16 +102,12 @@
   <string name="open">Aperi</string>
   <string name="close">Claude</string>
   <string name="settings_icon_description">Icone de Preferentias</string>
-  <string name="presenter_fullscreen">Schermo plen</string>
   <string name="notification_channel_media_control">Controlo de multimedia</string>
   <string name="notification_channel_filetransfer">Transferimento de file in arrivata</string>
   <string name="notification_channel_filetransfer_complete">Transferimento de file in arrivata complete</string>
   <string name="notification_channel_filetransfer_upload">Transferimento de file in partita</string>
   <string name="notification_channel_high_priority">Prioritate alte</string>
   <string name="copy_url_to_clipboard">Copia URL a area de transferentia</string>
-  <string name="runcommand_notpaired">Dispositivo non es associate</string>
-  <string name="runcommand_category_device_controls_title">Controlos de dispositivo</string>
-  <string name="pref_plugin_systemvolume">Volumine de systema</string>
   <string name="mute">Surdina</string>
   <string name="all">Omne</string>
   <string name="devices">Dispositivos</string>
@@ -144,35 +117,14 @@
   <string name="settings_more_settings_title">Altere preferentias</string>
   <string name="extra_options">Optiones extra</string>
   <string name="privacy_options">Optiones de confidentialitate</string>
-  <string name="presenter_pointer">Punctator</string>
   <string name="trusted_networks">Retes digne de fide</string>
   <string name="add_trusted_network">Adde %1s</string>
   <string name="allow_all_networks_text">Permitte toto</string>
   <string name="location_permission_needed_title">Permission requirite</string>
-  <string name="mpris_open_url">Continua a executar hic</string>
   <string name="cant_open_url">Non pote aperir URL per continuar a executar</string>
-  <string name="bigscreen_home">Domo o initio</string>
-  <string name="bigscreen_up">In alto</string>
-  <string name="bigscreen_left">Sinistra</string>
-  <string name="bigscreen_select">Selige</string>
-  <string name="bigscreen_right">Dextera</string>
-  <string name="bigscreen_down">A basso</string>
-  <string name="bigscreen_back">Retro</string>
-  <string name="bigscreen_mic">Mic</string>
-  <string name="bigscreen_speech_extra_prompt">Voce</string>
   <string name="message_reply_label">RESPONSA</string>
   <string name="mark_as_read_label">MARCA COMO LEGITE</string>
   <string name="user_display_name">Tu</string>
-  <string name="set_default_sms_app_title">Invia MMS</string>
-  <string name="set_group_message_as_mms_title">Invia MMS de gruppo</string>
-  <string name="convert_to_mms_after_title">"Converte  a MMS"</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Post un message</item>
-    <item>Post duo messages</item>
-    <item>Post tres messages</item>
-    <item>Post quatro messages</item>
-    <item>POst cinque messages</item>
-  </string-array>
   <string name="theme_dialog_title">Selige thema</string>
   <string-array name="theme_list">
     <item>Fixate per le sparnio de batteria</item>
@@ -196,17 +148,12 @@
   <string name="version">Version %s</string>
   <string name="rise_down">Leva a basso</string>
   <string name="click_here_to_type">Tocca hic pro typar</string>
-  <string name="clear_compose">Clara</string>
-  <string name="send_compose">Invia</string>
-  <string name="compose_send_title">Compone invia</string>
-  <string name="open_compose_send">Compone texto</string>
   <string name="maintainer_and_developer">Mantenitor e developpator</string>
   <string name="developer">Disveloppator</string>
   <string name="bug_fixes_and_general_improvements">Fixationes de bug e melioramentos general</string>
   <string name="holger_kaelberer_task">Plugin de claviero remote e correctiones de falta</string>
   <string name="everyone_else">Alcun altere qui ha contribuite a DeskLink durante le annos</string>
   <string name="send_clipboard">Invia Area de transferentia</string>
-  <string name="tap_to_execute">Toccaper executar</string>
   <string name="plugin_stats">"Statisticas de plugin "</string>
   <string name="receive_notifications_permission_explanation">Notificationes necessita esser permettite a reciper los ex altere dispositivos</string>
   <string name="findmyphone_notifications_explanation">Le permission de notificationes es necessari assi que le telephono pote sonar quando le app es in le fundo</string>

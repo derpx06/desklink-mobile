@@ -9,24 +9,14 @@
   <string name="pref_plugin_telephony_desc">أرسل إشعارات للمكالمات الواردة</string>
   <string name="pref_plugin_battery">تقرير البطّاريّة</string>
   <string name="pref_plugin_battery_desc">بلّغ عن حالة البطّاريّة دوريًّا</string>
-  <string name="pref_plugin_connectivity_report">تقرير الاتصال</string>
-  <string name="pref_plugin_connectivity_report_desc">تقرير قوة إشارة الشبكة والحالة</string>
-  <string name="pref_plugin_digitizer">لوح رسم</string>
-  <string name="pref_plugin_digitizer_desc">استخدم جهازك كلوحة رسم حساسة للضغط</string>
   <string name="pref_plugin_clipboard">مزامنة الحافظة</string>
   <string name="pref_plugin_clipboard_desc">شارك محتوى الحافظة</string>
   <string name="pref_plugin_clipboard_sent">أرسل للحافظة</string>
   <string name="pref_plugin_mousepad">الإدخال البعيد</string>
   <string name="pref_plugin_mousepad_desc_nontv">استخدم الهاتف أو اللوحيّ كفأرة ولوحة مفاتيح</string>
   <string name="pref_plugin_mousepad_desc_tv">استخدم الهاتف أو اللوحيّ كمتحكم بالتلفاز</string>
-  <string name="pref_plugin_presenter">متحكم العرض التقديمي</string>
-  <string name="pref_plugin_presenter_desc">استخدام جهازك لتغيير الشرائح في العرض التقديمي</string>
-  <string name="pref_plugin_remotekeyboard">تلقي ضغطات المفاتيح البعيدة</string>
-  <string name="pref_plugin_remotekeyboard_desc">تلقي أحداث الضغط على المفاتيح من الأجهزة البعيدة</string>
   <string name="pref_plugin_mpris">تحكّمات الوسائط المتعدّدة</string>
   <string name="pref_plugin_mpris_desc">توفّر تحكّمًا بعيدًا لمشغّل الوسائط</string>
-  <string name="pref_plugin_runcommand">شغّل أمرًا</string>
-  <string name="pref_plugin_runcommand_desc">شغّل أوامر عن بعد من الهاتف أو اللوحيّ</string>
   <string name="pref_plugin_contacts">مزامن المتراسلين</string>
   <string name="pref_plugin_contacts_desc">اسمح بمزامنة دفتر المتراسلين في الجهاز</string>
   <string name="pref_plugin_ping">وخزة Ping</string>
@@ -46,31 +36,13 @@
   <string name="open_settings">افتح الإعدادات</string>
   <string name="no_permissions">عليك إعطاء التّطبيق صلاحيّات للنّفاذ إلى الإشعارات</string>
   <string name="no_permission_mprisreceiver">لتكون قادرًا على التحكم في مشغلات الوسائط الخاصة بك، تحتاج إلى منح حق الوصول إلى الإشعارات</string>
-  <string name="no_permissions_remotekeyboard">لتلقي ضغطات المفاتيح تحتاج إلى تنشيط لوحة المفاتيح البعيدة لجسر كِيدِي</string>
   <string name="send_ping">أرسل وخزة ping</string>
-  <string name="open_mpris_controls">متحكّمات الوسائط المتعدّدة</string>
-  <string name="remotekeyboard_editing_only_title">التعامل مع المفاتيح البعيدة فقط عند التحرير</string>
-  <string name="remotekeyboard_not_connected">لا يوجد اتصال لوحة المفاتيح بعيدة نشط، وإنشاء واحد في جسر كِيدِي</string>
-  <string name="remotekeyboard_connected">اتصال لوحة المفاتيح بعيدة نشط</string>
-  <string name="remotekeyboard_multiple_connections">هناك أكثر من اتصال لوحة مفاتيح بعيدة، حدد الجهاز لتضبطه</string>
   <string name="open_mousepad">الإدخال البعيد</string>
   <string name="open_mousepad_tv">جهاز التحكم عن بعد للتلفاز</string>
-  <string name="mousepad_info">حرك إصبعًا على الشاشة لتحريك مؤشر الفأرة. اطرق للنقرة، واستخدم اثنين أو ثلاث أصابع للأزرار اليمنى والوسطى. استخدام أصبعين للتمرير. استخدم الضغط طويلًا للسحب والإفلات. يمكن تمكين وظيفة الفأرة التوجيهية Gyro من تفضيلات الملحقة.</string>
-  <string name="mousepad_info_no_gestures">حرك إصبعًا على الشاشة لتحريك مؤشر الفأرة، اطرق للنقرة.</string>
-  <string name="mousepad_keyboard_input_not_supported">إدخال لوحة المفاتيح غير مدعوم من قبل الجهاز المقترن</string>
-  <string name="mousepad_single_tap_settings_title">اضبط إجراء الطَرق بأصبع واحدة</string>
-  <string name="mousepad_double_tap_settings_title">اضبط إجراء الطرق بأصبعين</string>
-  <string name="mousepad_triple_tap_settings_title">اضبط إجراء الطرق بثلاث أصابع</string>
   <string name="mousepad_sensitivity_settings_title">اضبط حساسيّة لوحة اللمس</string>
-  <string name="mousepad_mouse_buttons_title">أظهر أزرار الفأرة</string>
   <string name="mousepad_acceleration_profile_settings_title">عيّن تسارع المؤشر</string>
   <string name="mousepad_scroll_direction_title">اعكس اتّجاه التّمرير</string>
   <string name="mousepad_scroll_sensitivity_title">حساسية التمرير</string>
-  <string name="gyro_mouse_enabled_title">تمكين الفأر التوجيهي</string>
-  <string name="gyro_mouse_sensitivity_title">حساسية التوجيه</string>
-  <string name="bigscreen_hide_mouse_input">أخفِ زر الإدخال عن بُعد للفأرة ولوحة المفاتيح</string>
-  <string name="bigscreen_show_home_title">اعرض زر المنزل</string>
-  <string name="bigscreen_show_back_title">أظهر زر العودة</string>
   <string-array name="mousepad_tap_entries">
     <item>النّقر باليسار</item>
     <item>النقر باليمين</item>
@@ -92,17 +64,6 @@
     <item>أقوى</item>
     <item>الأقوى</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">أرسل ضغطات المفاتيح إلى</string>
-  <string name="sendkeystrokes_textbox_hint">أرسل ضغطات المفاتيح إلى المضيف</string>
-  <string name="sendkeystrokes_disabled_toast">إرسال ضغطات المفاتيح معطل - تمكينه في الإعدادات</string>
-  <string name="sendkeystrokes_wrong_data">نوع ملف غير صحيح - يجب أن يكون \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_sent_text">أرسل %1$s إلى جهاز %2$s</string>
-  <string name="sendkeystrokes_pref_category_summary">تسمح هذه الوحدة للتطبيقات الأخرى بمشاركة مقاطع النص على شكل ضغطات مفاتيح والتي ستُرسل إلى المضيف المتصل</string>
-  <string name="sendkeystrokes_pref_category_title">أرسل ضغطات المفاتيح</string>
-  <string name="sendkeystrokes_pref_enabled">مكّن إرسال ضغطات المفاتيح</string>
-  <string name="sendkeystrokes_pref_enabled_summary">ستمع إلى البيانات التي تحتوي على نوع ملف التعريف \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_safe_text_enabled">أرسل نص آمن فورًا</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">أرسل سلاسل رقمية قصيرة فقط دون تأكيد</string>
   <string name="pref_plugin_mousepad_send_keystrokes">أرسل كضغطات مفاتيح</string>
   <string name="mouse_receiver_plugin_description">استقبل حركة الفأرة البعيدة</string>
   <string name="mouse_receiver_plugin_name">مستقبل الفأرة</string>
@@ -200,11 +161,6 @@
   <string name="received_file_text">اطرق لفتح \'%1s\'</string>
   <string name="cannot_create_file">تعذّر إنشاء الملف %s</string>
   <string name="tap_to_answer">اطرق للإجابة</string>
-  <string name="left_click">أرسل نقرة باليسار</string>
-  <string name="right_click">أرسل نقرة باليمين</string>
-  <string name="middle_click">أرسل نقرة بالوسط</string>
-  <string name="show_keyboard">أظهر لوحة المفاتيح</string>
-  <string name="show_mouse_and_keyboard">أظهر لوحة المفاتيح والفأرة</string>
   <string name="device_not_paired">الجهاز غير مقترن</string>
   <string name="pairing_duplicate_names">تنبيه: هناك عدة أجهزة تحمل نفس الاسم.</string>
   <string name="request_pairing">اطلب الاقتران</string>
@@ -215,11 +171,7 @@
   <string name="mpris_play">شغّل</string>
   <string name="mpris_pause">ألبث</string>
   <string name="mpris_previous">السّابق</string>
-  <string name="mpris_rew">رجوع</string>
-  <string name="mpris_ff">تقدّم سريع</string>
   <string name="mpris_next">التّالي</string>
-  <string name="mpris_loop">حلقة</string>
-  <string name="mpris_shuffle">اخلط</string>
   <string name="mpris_volume">المستوى</string>
   <string name="mpris_time_settings_title">زرّا التّقدّم والإرجاع</string>
   <string name="mpris_time_settings_summary">اضبط الوقت عند نقر زرّيّ التّقديم أو الإرجاع</string>
@@ -262,21 +214,7 @@
   <string name="show_notification_if_screen_off">أرسل إشعارات فقط إذا كانت الشاشة مغلقة</string>
   <string name="add_device_dialog_title">أضف جهازاً</string>
   <string name="add_device_hint">اسم المضيف أو عنوان IP</string>
-  <string name="no_players_connected">لم يُعثر على مشغّلات</string>
   <string name="send_files">أرسل ملفّات</string>
-  <string name="use_digitizer">استعمله كلوح رسم</string>
-  <string name="digitizer_draw_button">ارسم بإصبعك</string>
-  <string name="digitizer_preference_title_hide_draw_button">أخفِ زر الرسم</string>
-  <string name="digitizer_preference_summary_hide_draw_button">يخفي زر الرسم تمامًا، مما يجعل الرسم بالإصبع مستحيلًا. لا تمكّن هذه الميزة إلا إذا كان جهازك يدعم الإدخال بالقلم.</string>
-  <string name="digitizer_preference_title_draw_button_side">جانب زر ” ارسم بإصبعك ”</string>
-  <string name="digitizer_preference_title_enable_exit_fullscreen_gesture">مكّن إيماءة الخروج من وضع ملء الشاشة</string>
-  <string name="digitizer_preference_summary_enable_exit_fullscreen_gesture">إذا مُكِّن هذا الخيار، فإن النقر مع الاستمرار بإصبعك على لوحة الرسم سيؤدي إلى تعطيل وضع ملء الشاشة.</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>أعلى اليسار</item>
-    <item>أعلى اليمين</item>
-    <item>أسفل اليسار</item>
-    <item>أسفل اليمين</item>
-  </string-array>
   <string name="block_notification_contents">احظر محتويات الإشعار</string>
   <string name="block_notification_images">احظر صور الإشعار</string>
   <string name="pairing_title">أجهزة «جسر كِيدِي»</string>
@@ -314,15 +252,7 @@
   <string name="select_ringtone">اختر النغمة</string>
   <string name="telephony_pref_blocked_title">أرقام محظورة</string>
   <string name="telephony_pref_blocked_dialog_desc">لا تعرض المكالمات والرسائل النصية القصيرة من هذه الأرقام. يرجى تحديد رقم واحد لكل سطر</string>
-  <string name="mpris_coverart_description">الصورة الفنية للوسيط الحالي</string>
   <string name="settings_icon_description">أيقونة الإعدادات</string>
-  <string name="presenter_fullscreen">ملء الشّاشة</string>
-  <string name="presenter_exit">اخرج من العرض التقديمي</string>
-  <string name="presenter_lock_tip">يمكنك قفل جهازك واستخدام مفاتيح الصوت للانتقال إلى الشريحة السابقة/التالية</string>
-  <string name="add_command">أضف أمراً</string>
-  <string name="addcommand_explanation">لا يوجد أوامر مسجلة</string>
-  <string name="addcommand_explanation2">يمكنك إضافة أوامر جديدة في إعدادات نظام جسر كِيدِي في إعدادات نظام جسر كِيدِي</string>
-  <string name="add_command_description">يمكنك إضافة أوامر على سطح المكتب</string>
   <string name="pref_plugin_mprisreceiver">متحكم الوسائط</string>
   <string name="pref_plugin_mprisreceiver_desc">تحكم في مشغلات الوسائط في هاتفك من جهاز آخر</string>
   <string name="notification_channel_default">الإشعارات الأخرى</string>
@@ -333,22 +263,12 @@
   <string name="notification_channel_filetransfer_upload">نقل الملفات الصادرة</string>
   <string name="notification_channel_filetransfer_error">خطأ في النقل الملف</string>
   <string name="notification_channel_high_priority">مرتفعة الأولوية</string>
-  <string name="mpris_stop">أوقف المشغل الحالي</string>
   <string name="copy_url_to_clipboard">انسخ المسار إلى الحافظة</string>
   <string name="clipboard_toast">نُسخ إلى الحافظة</string>
-  <string name="runcommand_notreachable">الجهاز غير قابل الوصول</string>
-  <string name="runcommand_notpaired">الجهاز غير مقترن</string>
-  <string name="runcommand_nosuchdevice">لا يوجد جهاز من هذا القبيل</string>
-  <string name="runcommand_noruncommandplugin">لم يُمكّن ملحقة تشغيل الأوامر في هذا الجهاز</string>
-  <string name="runcommand_category_device_controls_title">متحكمات الجهاز</string>
-  <string name="runcommand_device_controls_summary">إذا كان جهازك يدعم عناصر تحكم الجهاز، فستظهر الأوامر التي ضبطتها هناك.</string>
-  <string name="set_runcommand_name_as_title">اجعل اسم الأمر كعنوان</string>
-  <string name="runcommand_name_as_title_title">اعرض الاسم كعنوان</string>
+  <string name="device_not_reachable">الجهاز غير قابل الوصول</string>
   <string name="pref_plugin_findremotedevice">اعثر على جهاز بعيد</string>
   <string name="pref_plugin_findremotedevice_desc">رنّ على الجهاز البعيد</string>
   <string name="ring">رّن</string>
-  <string name="pref_plugin_systemvolume">صوت النظام</string>
-  <string name="pref_plugin_systemvolume_desc">تحكّم في مستوى صوت النظام للجهاز البعيد</string>
   <string name="mute">اكتم</string>
   <string name="all">الكلّ</string>
   <string name="devices">الأجهزة</string>
@@ -369,8 +289,6 @@
   <string name="notification_channel_receivenotification">إشعارات من أجهزة أخرى</string>
   <string name="findmyphone_preference_title_flashlight">شغّل المصباح</string>
   <string name="no_app_for_opening">لا يوجد تطبيق مناسب لفتح هذا الملف</string>
-  <string name="remote_keyboard_service">لوحة مفاتيح بعيده لجسر كِيدِي</string>
-  <string name="presenter_pointer">المؤشر</string>
   <string name="trusted_networks">الشّبكات الموثوقة</string>
   <string name="trusted_networks_desc">اقَصْر الاكتشاف الآليّ على الشبكات المعروفة</string>
   <string name="add_trusted_network">أضف %1s</string>
@@ -380,34 +298,10 @@
   <string name="bluetooth_permission_needed_desc">يحتاج جسر كِيدِي إلى إذن للاتصال بالأجهزة القريبة لإتاحة الأجهزة المقترنة باستخدام البلوتوث في جسر كِيدِي.</string>
   <string name="location_permission_needed_desc">يحتاج جسر كِيدِي إلى إذن الموقع في الخلفية لمعرفة شبكة الواي فاي التي تتصل بها حتى عندما يكون التطبيق في الخلفية. وذلك لأنه يمكن استخدام اسم شبكات الواي فاي من حولك للعثور على موقعك، حتى وإن لم يكن هذا ما يفعله جسر كِيدِي.</string>
   <string name="clipboard_android_x_incompat">أزال أندرويد 10 الوصول للحافظة إلى جميع التطبيقات. ستعطل هذه الملحقة.</string>
-  <string name="mpris_open_url">استمر في التشغيل هنا</string>
   <string name="cant_open_url">تعذر فتح العنوان للاستمرار في التشغيل</string>
-  <string name="bigscreen_home">المنزل</string>
-  <string name="bigscreen_up">أعلى</string>
-  <string name="bigscreen_left">يسار</string>
-  <string name="bigscreen_select">اختر</string>
-  <string name="bigscreen_right">يمين</string>
-  <string name="bigscreen_down">أسفل</string>
-  <string name="bigscreen_back">عُد</string>
-  <string name="bigscreen_mic">ميكروفون</string>
-  <string name="pref_plugin_bigscreen">جهاز التحكم عن بعد للتلفاز</string>
-  <string name="pref_plugin_bigscreen_desc">استخدم جهازك كجهاز تحكم عن بُعد لشاشة البلازما الكبيرة</string>
-  <string name="bigscreen_optional_permission_explanation">لمشاركة إدخال الميكروفون من هاتفك تحتاج إلى إتاحة الوصول إلى إدخال الصوت في الهاتف</string>
-  <string name="bigscreen_speech_extra_prompt">حديث</string>
   <string name="message_reply_label">ردّ</string>
   <string name="mark_as_read_label">علّم كمقروءة</string>
   <string name="user_display_name">أنت</string>
-  <string name="set_default_sms_app_title">أرسل رسالة قصيرة</string>
-  <string name="set_group_message_as_mms_title">أرسل رسالة جماعية</string>
-  <string name="set_long_text_as_mms_title">أرسل نص طويل كرسالة وسائط</string>
-  <string name="convert_to_mms_after_title">حول إلى رسالة وسائط</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>بعد رسالة واحدة</item>
-    <item>بعد رسالتين</item>
-    <item>بعد ثلاث رسائل</item>
-    <item>بعد أربع رسائل</item>
-    <item>بعد خمس رسائل</item>
-  </string-array>
   <string name="theme_dialog_title">اختر سمة</string>
   <string-array name="theme_list">
     <item>معينة بواسطة حافظ البطارية</item>
@@ -434,12 +328,6 @@
   <string name="rise_up">ارفع</string>
   <string name="rise_down">اخفض</string>
   <string name="click_here_to_type">اطُرق هنا لتكتب</string>
-  <string name="clear_compose">امحُ</string>
-  <string name="send_compose">أرسل</string>
-  <string name="compose_send_title">اكتب أرسل</string>
-  <string name="open_compose_send">اكتب نصًا</string>
-  <string name="double_tap_to_drag">طرق مزدوج للسحب</string>
-  <string name="hold_to_drag">اضغط مع الاستمرار للسحب</string>
   <string name="maintainer_and_developer">الصائن ومطوّر</string>
   <string name="developer">مطوّر</string>
   <string name="apple_support">دعم ماك أو إس. العمل على دعم iOS</string>
@@ -453,7 +341,6 @@
   <string name="shellwen_chen_task">تحسين أمان SFTP، وتحسين قابلية صيانة هذا المشروع، وإصلاح الأخطاء والتحسينات العامة</string>
   <string name="everyone_else">كل من ساهم في جسر كِيدِي على مدار السنوات الماضية</string>
   <string name="send_clipboard">أرسل الحافظة</string>
-  <string name="tap_to_execute">اطرق لتنفيذه</string>
   <string name="plugin_stats">ملحقة الإحصائيات</string>
   <string name="enable_udp_broadcast">مكّن اكتشاف الجهاز عن طريق UDP</string>
   <string name="enable_bluetooth">مكّن بلوتوث (بيتا)</string>
@@ -472,9 +359,4 @@
   <string name="device_host_invalid">المضيف غير صالح. استخدم اسم مضيف أو IPv4 أو IPv6 صالحاً</string>
   <string name="device_host_duplicate">المضيف موجود مسبقًا في القائمة</string>
   <string name="enable_fullscreen">مكّن ملء الشّاشة</string>
-  <string name="pref_presenter_enable_volume_keys_title">مفاتيح الصوت تغيير الشرائح</string>
-  <string name="pref_presenter_sensitivity_title">حساسية المؤشر</string>
-  <string name="pref_presenter_enable_volume_keys_summary">الوضع الاحتياطي غير متوفر في إصدارات أندرويد 13 إلى 15</string>
-  <string name="presenter_volume_keys_foreground_tip">يمكنك ترك الشاشة تعمل لاستخدام مفاتيح الصوت للانتقال إلى الشريحة السابقة/التالية</string>
-  <string name="presenter_volume_keys_tip">يمكنك ترك الشاشة تعمل أو قفل جهازك لاستخدام مفاتيح الصوت للانتقال إلى الشريحة السابقة/التالية.</string>
 </resources>

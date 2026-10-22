@@ -9,19 +9,12 @@
   <string name="pref_plugin_telephony_desc">Kirim notifikasi untuk panggilan yang masuk</string>
   <string name="pref_plugin_battery">Laporan baterai</string>
   <string name="pref_plugin_battery_desc">Status baterai laporkan secara berkala</string>
-  <string name="pref_plugin_connectivity_report">Laporan koneksi</string>
-  <string name="pref_plugin_connectivity_report_desc">Laporkan kekuatan sinyal jaringan dan status</string>
   <string name="pref_plugin_clipboard">Sinkron papan klip</string>
   <string name="pref_plugin_clipboard_desc">Berbagi konten papan klip</string>
   <string name="pref_plugin_clipboard_sent">Papan Klip Terkirim</string>
   <string name="pref_plugin_mousepad">Masukan jarak jauh</string>
-  <string name="pref_plugin_presenter_desc">Gunakan peranti Anda untuk mengubah slide dalam sebuah presentasi</string>
-  <string name="pref_plugin_remotekeyboard">Terima penekanan tombol jarak jauh</string>
-  <string name="pref_plugin_remotekeyboard_desc">Terima peristiwa penekanan tombol dari peranti jarak jauh</string>
   <string name="pref_plugin_mpris">Kendalikan multimedia</string>
   <string name="pref_plugin_mpris_desc">Menyediakan sebuah kendali jarak jauh untuk pemutar media Anda</string>
-  <string name="pref_plugin_runcommand">Jalankan Perintah</string>
-  <string name="pref_plugin_runcommand_desc">Pemicu perintah jarak jauh dari ponsel dan tablet Anda</string>
   <string name="pref_plugin_contacts">Penyinkron Kontak</string>
   <string name="pref_plugin_contacts_desc">Izinkan menyinkronkan buku kontak pada peranti</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -39,24 +32,11 @@
   <string name="open_settings">Buka pengaturan</string>
   <string name="no_permissions">Anda perlu memberikan izin untuk mengakses notifikasi</string>
   <string name="no_permission_mprisreceiver">Untuk dapat mengendalikan pemutar media, Anda perlu memberikan akses ke notifikasi</string>
-  <string name="no_permissions_remotekeyboard">Untuk menerima penekanan tombol, Anda perlu mengaktifkan DeskLink Remote Keyboard</string>
   <string name="send_ping">Kirim ping</string>
-  <string name="open_mpris_controls">Kendali multimedia</string>
-  <string name="remotekeyboard_editing_only_title">Menangani tombol jarak jauh hanya ketika mengedit</string>
-  <string name="remotekeyboard_not_connected">Tidak ada koneksi keyboard jarak jauh yang aktif, buat satu dalam DeskLink</string>
-  <string name="remotekeyboard_connected">Koneksi keyboard jarak jauh telah aktif</string>
-  <string name="remotekeyboard_multiple_connections">Ada lebih dari satu koneksi keyboard jarak jauh, pilih peranti untuk diatur</string>
   <string name="open_mousepad">Masukan jarak jauh</string>
-  <string name="mousepad_info_no_gestures">Gerakkan jari pada layar untuk memindahkan kursor tetikus, ketuk untuk klik.</string>
-  <string name="mousepad_keyboard_input_not_supported">Masukan papan tik tidak didukung oleh perangkat tersanding.</string>
-  <string name="mousepad_single_tap_settings_title">Setel aksi ketuk satu jari</string>
-  <string name="mousepad_double_tap_settings_title">Setel aksi ketuk dua jari</string>
-  <string name="mousepad_triple_tap_settings_title">Setel aksi ketuk tiga jari</string>
   <string name="mousepad_sensitivity_settings_title">Setel kepekaan touchpad</string>
-  <string name="mousepad_mouse_buttons_title">Tampilkan tombol tetikus</string>
   <string name="mousepad_acceleration_profile_settings_title">Setel akselerasi pointer</string>
   <string name="mousepad_scroll_direction_title">Arah Menggulir Terbalik</string>
-  <string name="gyro_mouse_enabled_title">Aktifkan tetikus giroskop</string>
   <string-array name="mousepad_tap_entries">
     <item>Klik kiri</item>
     <item>Klik kanan</item>
@@ -78,17 +58,6 @@
     <item>Kuat</item>
     <item>Sangat Kuat</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Kirimkan penekanan tombol ke</string>
-  <string name="sendkeystrokes_textbox_hint">Kirimkan penekanan tombol ke hos</string>
-  <string name="sendkeystrokes_disabled_toast">Mengirim penekanan tombol dinonaktifkan - aktifkan di pengaturan</string>
-  <string name="sendkeystrokes_wrong_data">Tipe mime tidak sah - harus \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_sent_text">Terkirim %1$s ke peranti %2$s</string>
-  <string name="sendkeystrokes_pref_category_summary">Modul ini mengizinkan aplikasi lain untuk membagikan segmen teks sebagai penekanan tombol yang akan terkirim ke host yang terhubung</string>
-  <string name="sendkeystrokes_pref_category_title">Kirimkan Penekanan Tombol</string>
-  <string name="sendkeystrokes_pref_enabled">Aktifkan pengiriman Penekanan Tombol</string>
-  <string name="sendkeystrokes_pref_enabled_summary">Mendengarkan untuk data dengan tipe mime \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_safe_text_enabled">Segera mengirim teks aman</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Kirimkan string pendek hanya angka tanpa konfirmasi</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Kirim sebagai penekanan tombol</string>
   <string name="mouse_receiver_plugin_description">Terima penggerakan mouse jarak jauh</string>
   <string name="mouse_receiver_plugin_name">Penerima mouse</string>
@@ -141,9 +110,6 @@
   <string name="received_file_text">Ketuk untuk membuka \'%1s\'</string>
   <string name="cannot_create_file">Tidak dapat membuat file %s</string>
   <string name="tap_to_answer">Ketuk untuk menjawab</string>
-  <string name="right_click">Kirim Klik Kanan</string>
-  <string name="middle_click">Kirim Klik Tengah</string>
-  <string name="show_keyboard">Tampilkan Papan Tik</string>
   <string name="device_not_paired">Peranti tidak disandingkan</string>
   <string name="request_pairing">Minta penyandingan</string>
   <string name="pairing_accept">Setujui</string>
@@ -152,11 +118,7 @@
   <string name="mpris_play">Putar</string>
   <string name="mpris_pause">Jeda</string>
   <string name="mpris_previous">Sebelumnya</string>
-  <string name="mpris_rew">Mundur</string>
-  <string name="mpris_ff">Maju-capat</string>
   <string name="mpris_next">Selanjutnya</string>
-  <string name="mpris_loop">Ulangi</string>
-  <string name="mpris_shuffle">Acak</string>
   <string name="mpris_volume">Volume</string>
   <string name="mpris_time_settings_title">Tombol mundur/maju</string>
   <string name="mpris_time_settings_summary">Sesuaikan waktu untuk mempercepat mundur/maju ketika ditekan</string>
@@ -193,14 +155,7 @@
   <string name="show_notification_if_screen_off">Hanya kirimkan notifikasi saja ketika layarnya mati</string>
   <string name="add_device_dialog_title">Tambahkan peranti</string>
   <string name="add_device_hint">Alamat IP atau hostname</string>
-  <string name="no_players_connected">Tidak ada pemutar yang ditemukan</string>
   <string name="send_files">Kirim file</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Top left</item>
-    <item>Top right</item>
-    <item>Bottom left</item>
-    <item>Bottom right</item>
-  </string-array>
   <string name="pairing_title">Peranti DeskLink</string>
   <string name="pairing_description">Perangkat lain yang menjalankan DeskLink dalam jaringan Anda yang sama seharusnya muncul di sini.</string>
   <string name="device_rename_title">Ubah nama peranti</string>
@@ -232,32 +187,18 @@
   <string name="select_ringtone">Pilih sebuah ringtone</string>
   <string name="telephony_pref_blocked_title">Nomor yang diblokir</string>
   <string name="telephony_pref_blocked_dialog_desc">Jangan tampilkan panggilan dan SMS dari nomor tersebut. Silakan tentukan satu nomor tiap baris</string>
-  <string name="mpris_coverart_description">Seni sampul media saat ini</string>
   <string name="settings_icon_description">Ikon pengaturan</string>
-  <string name="presenter_fullscreen">Layar penuh</string>
-  <string name="presenter_exit">Keluarkan presentasi</string>
-  <string name="presenter_lock_tip">Anda dapat mengunci peranti Anda dan gunakanlah tombol volume untuk menuju ke salindia sebelumnya/selanjutnya</string>
-  <string name="add_command">Tambahkan sebuah perintah</string>
-  <string name="addcommand_explanation">Tidak ada perintah yang diregister</string>
-  <string name="addcommand_explanation2">Anda dapat menambahkan perintah baru dalam System Settings DeskLink</string>
-  <string name="add_command_description">Anda dapat menambahkan perintah pada desktop</string>
   <string name="pref_plugin_mprisreceiver">Kendali Pemutar Media</string>
   <string name="pref_plugin_mprisreceiver_desc">Kendalikan pemutar media ponsel Anda dari peranti lainnya</string>
   <string name="notification_channel_default">Notifikasi lainnya</string>
   <string name="notification_channel_media_control">Kontrol multimedia</string>
   <string name="notification_channel_high_priority">Prioritas tinggi</string>
-  <string name="mpris_stop">Hentikan player saat ini</string>
   <string name="copy_url_to_clipboard">Salin URL ke clipboard</string>
   <string name="clipboard_toast">Disalin ke clipboard</string>
-  <string name="runcommand_notreachable">Peranti tidak tercapai</string>
-  <string name="runcommand_notpaired">Peranti tidak tersanding</string>
-  <string name="runcommand_nosuchdevice">Di sini tidak ada peranti seperti itu</string>
-  <string name="runcommand_noruncommandplugin">Perangkat ini tidak memiliki Plugin Run Command yang difungsikan</string>
+  <string name="device_not_reachable">Peranti tidak tercapai</string>
   <string name="pref_plugin_findremotedevice">Temukan peranti jarak jauh</string>
   <string name="pref_plugin_findremotedevice_desc">Deringkan peranti jarak jauh Anda</string>
   <string name="ring">Deringkan</string>
-  <string name="pref_plugin_systemvolume">System volume</string>
-  <string name="pref_plugin_systemvolume_desc">Kendalikan volume sistem pada peranti remot</string>
   <string name="mute">Bungkam</string>
   <string name="all">Semua</string>
   <string name="devices">Peranti</string>
@@ -275,8 +216,6 @@
   <string name="block_images">Blokir citra-citra dalam notifikasi</string>
   <string name="notification_channel_receivenotification">Notifikasi dari peranti lainnya</string>
   <string name="no_app_for_opening">Tidak menemukan aplikasi yang dapat membuka berkas ini</string>
-  <string name="remote_keyboard_service">Keyboard Remote DeskLink</string>
-  <string name="presenter_pointer">Penunjuk</string>
   <string name="trusted_networks">Jaringan terpercaya</string>
   <string name="trusted_networks_desc">Membatasi autodiscovery untuk mengetahui jaringan</string>
   <string name="add_trusted_network">Tambahkan %1s</string>
@@ -284,32 +223,10 @@
   <string name="allow_all_networks_text">Perbolehkan semua</string>
   <string name="location_permission_needed_title">Diperlukan perizinan</string>
   <string name="clipboard_android_x_incompat">Android 10 telah menghapus akses papan klip ke semua aplikasi. Plugin ini akan dinonaktifkan.</string>
-  <string name="mpris_open_url">Lanjut putar di sini</string>
   <string name="cant_open_url">Tidak bisa membuka URL untuk melanjutkan pemutaran</string>
-  <string name="bigscreen_home">Rumah</string>
-  <string name="bigscreen_up">Naik</string>
-  <string name="bigscreen_left">Kiri</string>
-  <string name="bigscreen_select">Pilih</string>
-  <string name="bigscreen_right">Kanan</string>
-  <string name="bigscreen_down">Turun</string>
-  <string name="bigscreen_mic">Mic</string>
-  <string name="pref_plugin_bigscreen_desc">Gunakan peranti Anda sebagai remot untuk Plasma Bigscreen</string>
-  <string name="bigscreen_optional_permission_explanation">Untuk membagikan masukan mikrofon dari ponsel Anda perlu memberikan akses terhadap masukan audio ponsel</string>
-  <string name="bigscreen_speech_extra_prompt">Lisankan</string>
   <string name="message_reply_label">BALAS</string>
   <string name="mark_as_read_label">TANDAI SEBAGAI DIBACA</string>
   <string name="user_display_name">Anda</string>
-  <string name="set_default_sms_app_title">Kirim MMS</string>
-  <string name="set_group_message_as_mms_title">Kirim MMS grup</string>
-  <string name="set_long_text_as_mms_title">Kirim pesan teks panjang sebagai MMS</string>
-  <string name="convert_to_mms_after_title">Konversikan ke MMS</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Setelah satu pesan</item>
-    <item>Setelah dua pesan</item>
-    <item>Setelah tiga pesan</item>
-    <item>Setelah empat pesan</item>
-    <item>Setelah lima pesan</item>
-  </string-array>
   <string name="theme_dialog_title">Pilih tema</string>
   <string-array name="theme_list">
     <item>Atur berdasarkan Hemat Baterai</item>
@@ -336,9 +253,6 @@
   <string name="rise_up">Naik</string>
   <string name="rise_down">Turun</string>
   <string name="click_here_to_type">Ketuk di sini untuk mengetik</string>
-  <string name="clear_compose">Hapus</string>
-  <string name="send_compose">Kirim</string>
-  <string name="open_compose_send">Komposisikan teks</string>
   <string name="maintainer_and_developer">Perawat dan pengembang</string>
   <string name="developer">Pengembang</string>
   <string name="apple_support">Dukungan macOS. Bekerja pada dukungan iOS</string>
@@ -351,6 +265,5 @@
   <string name="saikrishna_arcot_task">Dukungan untuk penggunaan keyboard di dalam plugin masukan jarak jauh, perbaikan kutu dan peningkatan pada umumnya</string>
   <string name="everyone_else">Semua orang yang telah berkontribusi pada DeskLink selama bertahun-tahun</string>
   <string name="send_clipboard">Kirim papan klip</string>
-  <string name="tap_to_execute">Ketuk untuk menjalankan</string>
   <string name="enable_bluetooth">Aktifkan Bluetooth (beta)</string>
 </resources>

@@ -51,7 +51,7 @@ import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.tokens
 
-/** Light status-bar icons while a dark screen (scanner, terminal, presenter) is up, in either theme. */
+/** Light status-bar icons while a dark screen (scanner, terminal) is up, in either theme. */
 @Composable
 fun DarkSystemBars() {
     val view = androidx.compose.ui.platform.LocalView.current

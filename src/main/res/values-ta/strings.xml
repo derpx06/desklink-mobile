@@ -9,19 +9,12 @@
   <string name="pref_plugin_telephony_desc">உள்வரும் அழைப்புகளுக்கு அறிவிப்புகள் அனுப்பு</string>
   <string name="pref_plugin_battery">மின்கல அறிக்கை</string>
   <string name="pref_plugin_battery_desc">மின்கல நிலையை அவ்வப்போது கூறு</string>
-  <string name="pref_plugin_connectivity_report">இணைப்பு அறிக்கை</string>
-  <string name="pref_plugin_connectivity_report_desc">பிணைய பலத்தையும் நிலையையும் தெரிவி</string>
   <string name="pref_plugin_clipboard">"பிடிப்புப்பலகை ஒத்திசைவு "</string>
   <string name="pref_plugin_clipboard_desc">பிடிப்புப்பலகை உள்ளடக்கத்தை பகிர்</string>
   <string name="pref_plugin_clipboard_sent">பிடிப்புப்பலகை அனுப்பப்பட்டது</string>
   <string name="pref_plugin_mousepad">தொலை உள்ளீடு</string>
-  <string name="pref_plugin_presenter_desc">"உங்கள் சாதனத்தைக் கொண்டு வில்லைக்காட்சியில்  (slideshow) காட்சிகளை மாற்றுங்கள்"</string>
-  <string name="pref_plugin_remotekeyboard">தொலை விசைகளை பெறு</string>
-  <string name="pref_plugin_remotekeyboard_desc">தொலை சாதனங்களிலிருந்து விசையழுத்தல்களைப் பெறும்</string>
   <string name="pref_plugin_mpris">பல்லூடக கட்டுப்பாடு</string>
   <string name="pref_plugin_mpris_desc">உங்கள் ஊடக இயக்கிக்கு ஒரு தொலையியக்கியை வழங்கும்</string>
-  <string name="pref_plugin_runcommand">கட்டளையை இயக்கு</string>
-  <string name="pref_plugin_runcommand_desc">உங்கள் திறன்பேசி அல்லது பலகைக்கணினியிலிருந்து கட்டளைகளை இயக்குங்கள்</string>
   <string name="pref_plugin_contacts">தொடர்பு ஒத்திசைப்பி</string>
   <string name="pref_plugin_contacts_desc">சாதனத்தின் தொடர்பு பட்டியலை ஒத்திசைக்க உதவும்</string>
   <string name="pref_plugin_ping">பிங்</string>
@@ -39,26 +32,12 @@
   <string name="open_settings">அமைப்புகளை திற</string>
   <string name="no_permissions">நீங்கள் அறிவிப்புகளை அணுக அனுமதி தர வேண்டும்</string>
   <string name="no_permission_mprisreceiver">ஊடக இயக்கிகளை கட்டுப்படுத்த, நீங்கள் அறிவிப்புகளை அணுகும் அனுமதியை அளிக்க வேண்டும்</string>
-  <string name="no_permissions_remotekeyboard">விசைகளை பெற நீங்கள் கே.டீ.யீ. கனெக்ட் தொலை விசைப்பலகையை செயல்படுத்த வேண்டும்</string>
   <string name="send_ping">பிங் அனுப்பு</string>
-  <string name="open_mpris_controls">பல்லூடக கட்டுப்பாடு</string>
-  <string name="remotekeyboard_editing_only_title">தொகுக்கும் போது மட்டும் தொலை விசைகளை ஏற்க</string>
-  <string name="remotekeyboard_not_connected">எந்த தொலை விசைப்பலகை இணைப்பும் செயலில் இல்லை. கே.டீ.யீ. கொனெக்டைக் கொண்டு ஒன்றை அமைக்கவும்</string>
-  <string name="remotekeyboard_connected">தொலை விசைப்பலகை இணைப்பு செயலில் உள்ளது</string>
-  <string name="remotekeyboard_multiple_connections">பல தொலை விசைப்பலகை இணைப்புகள் உள்ளன. அமைக்க வேண்டிய சாதனத்தை தேர்ந்தெடுங்கள்</string>
   <string name="open_mousepad">தொலை உள்ளீடு</string>
-  <string name="mousepad_info">சுட்டிக்குறியை நகர்த்த ஒரு விரலை திரையில் நகர்த்தவும். \'க்ளிக்\' செய்வதற்கு தட்டுங்கள். வலது/நடு சுட்டி பட்டன்களுக்கு இரண்டு/மூன்று விரல்களை பயன்படுத்தவும். இரண்டு விரல்களைக் கொண்டு உருளவும். இழுத்து போடுவதற்கு நீண்ட அழுத்தத்தை பயன்படுத்தவும். சுழல்காட்டி சுட்டியைபோல் செயல்பட வேண்டுமெனில் செருகுநிரல் அமைப்புகளில் உரிய அம்சத்தை இயக்கலாம்</string>
-  <string name="mousepad_keyboard_input_not_supported">இணைக்கப்பட்டுள்ள சாதனம், விசைப்பலகை உள்ளீட்டை ஆதரிக்காது</string>
-  <string name="mousepad_single_tap_settings_title">ஒருவிரலால் தட்டுவதற்குரிய செயலை அமை</string>
-  <string name="mousepad_double_tap_settings_title">இரண்டு விரல்களால் தட்டுவதற்குரிய செயலை அமை</string>
-  <string name="mousepad_triple_tap_settings_title">மூன்று விரல்களால் தட்டுவதற்குரிய செயலை அமை</string>
   <string name="mousepad_sensitivity_settings_title">தொடுபலகையின் உணர்வுத்திறத்தை அமை</string>
-  <string name="mousepad_mouse_buttons_title">சுட்டி பட்டன்களைக் காட்டு</string>
   <string name="mousepad_acceleration_profile_settings_title">சுட்டிக்குறியின் வேகவளர்ச்சியை அமை</string>
   <string name="mousepad_scroll_direction_title">உருளல் திசையை புரட்டு</string>
   <string name="mousepad_scroll_sensitivity_title">உருளலுக்கான உணர்வுத்திறம்</string>
-  <string name="gyro_mouse_enabled_title">சுழல்காட்டி சுட்டியை இயக்கு</string>
-  <string name="gyro_mouse_sensitivity_title">சுழல்காட்டியின் உணர்வுத்திறம்</string>
   <string-array name="mousepad_tap_entries">
     <item>இடது கிளிக்</item>
     <item>வலது கிளிக்</item>
@@ -80,17 +59,6 @@
     <item>திடமானது</item>
     <item>மிக திடமானது</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">விசைகளை இங்கே அனுப்பு</string>
-  <string name="sendkeystrokes_textbox_hint">விசைகளை புரவனுக்கு அனுப்பு</string>
-  <string name="sendkeystrokes_disabled_toast">விசைகளை அனுப்புதல் முடங்கியுள்ளது - அமைப்புகளில் இதை இயக்குங்கள்</string>
-  <string name="sendkeystrokes_wrong_data">செல்லுபடியாகாத மைம் வகை - \'text/x-keystrokes\'-ஆக இருக்க வேண்டும்</string>
-  <string name="sendkeystrokes_sent_text">%2$s என்ற சாதனத்துக்கு %1$s அனுப்பப்பட்டது</string>
-  <string name="sendkeystrokes_pref_category_summary">மற்ற செயலிகள் பகிரும் சொற்றொடர்களை இணைக்கப்பட்ட புரவனுக்கு விசைகளாக இந்த கூறு அனுப்பும்</string>
-  <string name="sendkeystrokes_pref_category_title">விசைகளை அனுப்பு</string>
-  <string name="sendkeystrokes_pref_enabled">விசைகள் அனுப்புதலை இயக்கு</string>
-  <string name="sendkeystrokes_pref_enabled_summary">\'text/x-keystrokes\' என்ற மைம் வகையைக் கொண்ட தரவுக்கு காத்திரு</string>
-  <string name="sendkeystrokes_safe_text_enabled">தீதற்ற சரங்களை உடனே அனுப்பு</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">எண்களை மட்டும் கொண்ட குறுகிய சரங்களை உறுதிப்படுத்தாமல் அனுப்பு</string>
   <string name="pref_plugin_mousepad_send_keystrokes">விசைகளாக அனுப்பு</string>
   <string name="mouse_receiver_plugin_description">தொலை சுட்டி அசைவைப் பெறு</string>
   <string name="mouse_receiver_plugin_name">சுட்டி பெறுநர்</string>
@@ -152,9 +120,6 @@
   <string name="received_file_text">\'%1s\'-ஐ திறக்க தட்டு</string>
   <string name="cannot_create_file">%s என்ற கோப்பை உருவாக்க முடியவில்லை</string>
   <string name="tap_to_answer">பதிலளிக்க தட்டவும்</string>
-  <string name="right_click">வலது க்ளிக்கை அனுப்பு</string>
-  <string name="middle_click">நடு க்ளிக்கை அனுப்பு</string>
-  <string name="show_keyboard">விசைப்பலகையைக் காட்டு</string>
   <string name="device_not_paired">சாதனம் இணைக்கப்படவில்லை</string>
   <string name="request_pairing">இணைப்பு கோரு</string>
   <string name="pairing_accept">ஏற்றுக்கொள்</string>
@@ -163,11 +128,7 @@
   <string name="mpris_play">இயக்கு</string>
   <string name="mpris_pause">பொறு</string>
   <string name="mpris_previous">முந்தையது</string>
-  <string name="mpris_rew">பின்னோக்கி செல்</string>
-  <string name="mpris_ff">வேகமாக முன்னோக்கி செல்</string>
   <string name="mpris_next">அடுத்தது</string>
-  <string name="mpris_loop">சுழற்று</string>
-  <string name="mpris_shuffle">கலக்கு</string>
   <string name="mpris_volume">ஒலியளவு</string>
   <string name="mpris_time_settings_title">பின்னோக்கி/முன்னோக்கி செல்வதற்கான பொத்தான்கள்</string>
   <string name="mpris_time_settings_summary">அழுத்தும்போது எவ்வளவு நேரம் பின்னோக்கி/முன்னோக்கி செல்ல வேண்டும் என்று தேர்வு செய்யுங்கள்</string>
@@ -203,14 +164,7 @@
   <string name="show_notification_if_screen_off">திரை அணைவிலிருந்தால் மட்டும் அறிவிப்புகள் அனுப்பு</string>
   <string name="add_device_dialog_title">சாதனத்தைச் சேர்</string>
   <string name="add_device_hint">புரவன் பெயர் அல்லது IP முகவரி</string>
-  <string name="no_players_connected">எந்த ஊடக இயக்கியும் கண்டுபிடிக்கப்படவில்லை</string>
   <string name="send_files">கோப்புகளை அனுப்பு</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Top left</item>
-    <item>Top right</item>
-    <item>Bottom left</item>
-    <item>Bottom right</item>
-  </string-array>
   <string name="block_notification_contents">அறிவிப்புகளின் உள்ளடக்கத்தை காட்டாதே</string>
   <string name="block_notification_images">அறிவிப்புகளில் படங்களை காட்டாதே</string>
   <string name="pairing_title">கே.டீ.யீ. கனெக்ட் சாதனங்கள்</string>
@@ -248,15 +202,7 @@
   <string name="select_ringtone">மணியோசையைத் தேர்ந்தெடு</string>
   <string name="telephony_pref_blocked_title">தடுக்கப்பட்ட எண்கள்</string>
   <string name="telephony_pref_blocked_dialog_desc">இந்த எண்களிலிருந்து அழைப்புகள் மற்றும் SMS-கள் காட்டப்படா. வரிக்கு ஓர் எண்ணை மட்டும் குறிப்பிடவும்</string>
-  <string name="mpris_coverart_description">தற்போதைய ஊடகத்தின் அட்டை படம்</string>
   <string name="settings_icon_description">அமைப்புகளுக்கான சின்னம்</string>
-  <string name="presenter_fullscreen">முழுத்திரை</string>
-  <string name="presenter_exit">வில்லைக்காட்சியிலிருந்து வெளியேறு</string>
-  <string name="presenter_lock_tip">நீங்கள் உங்கள் சாதனத்தைப் பூட்டினாலும் அடுத்த/முந்தைய காட்சிக்கு செல்ல ஒலியளவு விசைகளைப் பயன்படுத்தலாம்</string>
-  <string name="add_command">கட்டளையைச் சேர்</string>
-  <string name="addcommand_explanation">எக்கட்டளையும் பதிவு செய்யப்படவில்லை</string>
-  <string name="addcommand_explanation2">கே.டீ.யீ. கனெக்ட் கணினி அமைப்புகளில் நீங்கள் புதிய கட்டளைகளைச் சேர்க்கலாம்</string>
-  <string name="add_command_description">நீங்கள் மேசைக்கணினியிலிருந்து கட்டளைகளை சேர்க்கலாம்</string>
   <string name="pref_plugin_mprisreceiver">ஊடக இயக்கி கட்டுப்பாடு</string>
   <string name="pref_plugin_mprisreceiver_desc">இன்னொரு சாதனத்திலிருந்து உங்கள் திறன்பேசியின் ஊடக இயக்கிகளை கட்டுப்படுத்துங்கள்</string>
   <string name="notification_channel_default">பிற அறிவிப்புகள்</string>
@@ -266,21 +212,12 @@
   <string name="notification_channel_filetransfer_upload">வெளிசெல்லும் கோப்பு</string>
   <string name="notification_channel_filetransfer_error">கோப்பு இடமாற்ற சிக்கல்</string>
   <string name="notification_channel_high_priority">அதிக முன்னுரிமை</string>
-  <string name="mpris_stop">தற்போதைய இயக்கியை நிறுத்து</string>
   <string name="copy_url_to_clipboard">முகவரியை பிடிப்புப்பலகையில் நகலெடு</string>
   <string name="clipboard_toast">பிடிப்புப்பலகையில் நகலெடுக்கப்பட்டது</string>
-  <string name="runcommand_notreachable">சாதனத்தைக் கிட்ட முடியவில்லை</string>
-  <string name="runcommand_notpaired">சாதனம் இணைக்கப்படவில்லை</string>
-  <string name="runcommand_nosuchdevice">அப்படி எச்சாதனமுமில்லை</string>
-  <string name="runcommand_noruncommandplugin">இச்சாதனத்தில் கட்டளைகளை இயக்கும் செருகுநிரல் இயக்கப்படவில்லை.</string>
-  <string name="runcommand_category_device_controls_title">சாதன கட்டுப்படுத்திகள்</string>
-  <string name="runcommand_device_controls_summary">உங்கள் சாதனம் சாதனக் கட்டுப்படுத்திகளை ஆதரிக்குமாயின், நீங்கள் அமைத்துள்ள கட்டளைகள் அங்கு காட்டப்படும்.</string>
-  <string name="runcommand_name_as_title_title">பெயரை தலைப்பாக காட்டு</string>
+  <string name="device_not_reachable">சாதனத்தைக் கிட்ட முடியவில்லை</string>
   <string name="pref_plugin_findremotedevice">தொலை சாதனத்தை கண்டுபிடி</string>
   <string name="pref_plugin_findremotedevice_desc">தொலை சாதனத்தை ஒலிக்க செய்</string>
   <string name="ring">ஒலிக்கச்செய்</string>
-  <string name="pref_plugin_systemvolume">கணினி ஒலியளவு</string>
-  <string name="pref_plugin_systemvolume_desc">தொலை சாதனத்தின் ஒலி அளவை கட்டுப்படுத்து</string>
   <string name="mute">ஒலியை அடக்கு</string>
   <string name="all">அனைத்து</string>
   <string name="devices">சாதனங்கள்</string>
@@ -298,8 +235,6 @@
   <string name="block_images">அறிவிப்புகளில் படங்களை காட்டாதே</string>
   <string name="notification_channel_receivenotification">மற்ற சாதனங்களிலிருந்து அறிவிப்புகள்</string>
   <string name="no_app_for_opening">இக்கோப்பை திறப்பதற்குகந்த செயலி ஏதுமில்லை</string>
-  <string name="remote_keyboard_service">கே.டீ.யீ. கனெக்ட் தொலை விசைப்பலகை</string>
-  <string name="presenter_pointer">சுட்டி</string>
   <string name="trusted_networks">நம்பகமான பிணையங்கள்</string>
   <string name="trusted_networks_desc">தெரிந்த பிணையங்களில் மட்டும் தானாக சாதனங்களை கண்டுபிடி</string>
   <string name="add_trusted_network">%1s-ஐச் சேர்</string>
@@ -308,32 +243,10 @@
   <string name="location_permission_needed_title">அனுமதி தேவை</string>
   <string name="location_permission_needed_desc">"கே.டீ.யீ. கனெக்ட் குவியத்தில் இல்லாத போதும் அருகலை பிணையங்களைக் கண்டறிய, பின்னணி இருப்பிட அனுமதி தேவை.  இவ்வனுமதியைக் கொண்டு உங்கள் இருப்பிடத்தைக் கண்டுபிடிக்கும் சாத்தியமுள்ளதால் இது இப்பெயரைக் கொண்டுள்ளது, ஆனால் கே.டீ.யீ. கனெக்ட் ஒருபோதும் உங்கள் இருப்பிடத்தைக் கண்டறிய முயற்சிக்காது."</string>
   <string name="clipboard_android_x_incompat">ஆண்ட்ராய்டு 10 எல்லா செயலிகளுக்கான பிடிப்புப்பலகை அனுமதியை நீக்கிவிட்டது. இந்த செருகுநிரல் இயங்காது.</string>
-  <string name="mpris_open_url">இங்கிருந்து தொடர்ந்து இயக்கு</string>
   <string name="cant_open_url">தொடர்ந்து இயக்க முகவரியை திறக்க முடியவில்லை</string>
-  <string name="bigscreen_home">முகப்பு</string>
-  <string name="bigscreen_up">மேலே</string>
-  <string name="bigscreen_left">இடதுபுறமாக</string>
-  <string name="bigscreen_select">தேர்ந்தெடு</string>
-  <string name="bigscreen_right">வலதுபுறமாக</string>
-  <string name="bigscreen_down">கீழே</string>
-  <string name="bigscreen_mic">ஒலிவாங்கி</string>
-  <string name="pref_plugin_bigscreen_desc">பிளாஸ்மா பெருந்திரைக்கு உங்கள் சாதனத்தை தொலையியக்கியாக பயன்படுத்துங்கள்</string>
-  <string name="bigscreen_optional_permission_explanation">உங்கள் திறன்பேசியிலிருந்து ஒலிவாங்கி உள்ளீட்டைப் பகிர நீங்கள் அதன் ஒலி உள்ளீட்டுக்கு அணுகல் அளிக்க வேண்டும்</string>
-  <string name="bigscreen_speech_extra_prompt">பேச்சு</string>
   <string name="message_reply_label">பதில்</string>
   <string name="mark_as_read_label">படித்ததாகக் குறி</string>
   <string name="user_display_name">நீங்கள்</string>
-  <string name="set_default_sms_app_title">MMS அனுப்பு</string>
-  <string name="set_group_message_as_mms_title">குழு MMS அனுப்பு</string>
-  <string name="set_long_text_as_mms_title">நெடுவுரையை MMS-ஆக அனுப்பு</string>
-  <string name="convert_to_mms_after_title">MMS-ஆக மாற்று</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>ஒரு தகவலுக்குப் பிறகு</item>
-    <item>இரு தகவல்களுக்குப் பிறகு</item>
-    <item>மூன்று தகவல்களுக்குப் பிறகு</item>
-    <item>நான்கு தகவல்களுக்குப் பிறகு</item>
-    <item>ஐந்து தகவல்களுக்குப் பிறகு</item>
-  </string-array>
   <string name="theme_dialog_title">நிறத்திட்டத்தை தேர்வுசெய்</string>
   <string-array name="theme_list">
     <item>மின்கல சேமிப்பை பொறுத்து அமை</item>
@@ -358,10 +271,6 @@
   <string name="visit_contributors_homepage">பங்களிப்பாளரது முதற்பக்கத்துக்குச் செல்\n%s</string>
   <string name="version">பதிப்பு %s</string>
   <string name="click_here_to_type">எழுத இங்கு தட்டுங்கள்</string>
-  <string name="clear_compose">காலியாக்கு</string>
-  <string name="send_compose">அனுப்பு</string>
-  <string name="compose_send_title">உரையை இயற்றி அனுப்பு</string>
-  <string name="open_compose_send">உரையை இயற்று</string>
   <string name="maintainer_and_developer">பராமரிப்பாளரும் நிரலாளரும்</string>
   <string name="developer">நிரலாளர்</string>
   <string name="apple_support">macOS ஆதரவு. iOS ஆதரவை வழங்கவும் முயற்சிக்கிறார்</string>
@@ -374,7 +283,6 @@
   <string name="saikrishna_arcot_task">தொலை உள்ளீட்டு செருகுநிரலில் விசைப்பலகையைப் பயன்படுத்துவதற்கான ஆதரவு, பிழைதிருத்தம், மற்றும் பொதுவான மேம்பாடு</string>
   <string name="everyone_else">கடந்த ஆண்டுகளில் கே.டீ.யீ. கனெக்டிற்கு பங்களித்த மற்றவர்கள்</string>
   <string name="send_clipboard">பிடிப்புப்பலகையை அனுப்பு</string>
-  <string name="tap_to_execute">இயக்க தட்டவும்</string>
   <string name="plugin_stats">செருகுநிரல் புள்ளிவிவரங்கள்</string>
   <string name="enable_udp_broadcast">UDP சாதன கண்டுபிடிப்பை இயக்கு</string>
   <string name="receive_notifications_permission_explanation">மற்ற சாதனங்களில் அறிவிப்புகளைப் பெறுவதற்கு அறிவிப்புகள் அனுமதி தேவை</string>

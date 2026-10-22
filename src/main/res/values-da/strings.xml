@@ -6,12 +6,8 @@
   <string name="pref_plugin_clipboard">Synk. af udklipsholder</string>
   <string name="pref_plugin_clipboard_desc">Del indholdet af udklipsholderen</string>
   <string name="pref_plugin_mousepad">Eksternt input</string>
-  <string name="pref_plugin_remotekeyboard">Modtag eksterne tastetryk</string>
-  <string name="pref_plugin_remotekeyboard_desc">Modtag tastetryk-hændelser fra eksterne enheder</string>
   <string name="pref_plugin_mpris">Multimediekontroller</string>
   <string name="pref_plugin_mpris_desc">Giver en fjernbetjening til din medieafspiller</string>
-  <string name="pref_plugin_runcommand">Kør kommando</string>
-  <string name="pref_plugin_runcommand_desc">Kør eksterne kommandoer fra din telefon eller tablet</string>
   <string name="pref_plugin_ping">Ping</string>
   <string name="pref_plugin_ping_desc">Send og modtag ping</string>
   <string name="pref_plugin_notifications">Synk. af bekendtgørelser</string>
@@ -26,14 +22,7 @@
   <string name="open_settings">Åbn indstillinger</string>
   <string name="no_permissions">Du skal give tilladelse for at tilgå bekendtgørelser</string>
   <string name="send_ping">Send ping</string>
-  <string name="open_mpris_controls">Multimediekontrol</string>
-  <string name="remotekeyboard_editing_only_title">Håndtér kun eksterne tastetryk under redigering</string>
-  <string name="remotekeyboard_not_connected">Der er ingen aktiv ekstern tastaturforbindelse. Opret en i DeskLink</string>
-  <string name="remotekeyboard_connected">Ekstern tastaturforbindelse er aktiv</string>
-  <string name="remotekeyboard_multiple_connections">Der er mere end en ekstern tastaturforbindelse, vælg den enhed der skal konfigureres</string>
   <string name="open_mousepad">Eksternt input</string>
-  <string name="mousepad_double_tap_settings_title">Angiv handling for tap med to fingre</string>
-  <string name="mousepad_triple_tap_settings_title">Angiv handling for tap med tre fingre</string>
   <string name="mousepad_sensitivity_settings_title">Angiv følsomhed for touchpad</string>
   <string name="mousepad_scroll_direction_title">Omvendt rulleretning</string>
   <string-array name="mousepad_sensitivity_entries">
@@ -67,17 +56,12 @@
   <string name="pair_requested">Anmodet om parring</string>
   <string name="received_file_text">Tap for at åbne \"%1s\"</string>
   <string name="tap_to_answer">Tap for at svare</string>
-  <string name="right_click">Send højreklik</string>
-  <string name="middle_click">Send midterklik</string>
-  <string name="show_keyboard">Vis tastatur</string>
   <string name="device_not_paired">Enhed ikke parret</string>
   <string name="request_pairing">Anmod om parring</string>
   <string name="pairing_accept">Acceptér</string>
   <string name="pairing_reject">Afvis</string>
   <string name="mpris_play">Afspil</string>
   <string name="mpris_previous">Forrige</string>
-  <string name="mpris_rew">Spol tilbage</string>
-  <string name="mpris_ff">Spol frem</string>
   <string name="mpris_next">Næste</string>
   <string name="mpris_volume">Lydstyrke</string>
   <string name="mpris_time_settings_title">Spol frem/tilbage-knapper</string>
@@ -102,14 +86,7 @@
   <string name="share_destination_folder_preference">Destinationsmappe</string>
   <string name="title_activity_notification_filter">Bekendtgørelsesfilter</string>
   <string name="filter_apps_info">Bekendtgørelser vil blive synkroniseret for de valgte apps.</string>
-  <string name="no_players_connected">Ingen afspillere fundet</string>
   <string name="send_files">Send filer</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Top left</item>
-    <item>Top right</item>
-    <item>Bottom left</item>
-    <item>Bottom right</item>
-  </string-array>
   <string name="pairing_title">DeskLink-enheder</string>
   <string name="pairing_description">Andre enheder som kører DeskLink i samme netværk som dig, bør dukke op her.</string>
   <string name="device_rename_title">Omdøb enhed</string>
@@ -130,13 +107,6 @@
   <string name="plugins_need_optional_permission">Nogle plugins har deaktiverede funktioner pga. manglende tilladelser (tap for mere info):</string>
   <string name="telepathy_permission_explanation">For at læse og skrive sms\'er fra din desktop, skal du give tilladelse til sms</string>
   <string name="telephony_optional_permission_explanation">For at se et kontaktnavn i stedet for et telefonnummer, skal du give adgang til telefonens kontakter</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>After one message</item>
-    <item>After two messages</item>
-    <item>After three messages</item>
-    <item>After four messages</item>
-    <item>After five messages</item>
-  </string-array>
   <string-array name="theme_list">
     <item>Set by Battery Saver</item>
     <item/>

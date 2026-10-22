@@ -9,24 +9,14 @@
   <string name="pref_plugin_telephony_desc">着信通知を送信</string>
   <string name="pref_plugin_battery">バッテリレポート</string>
   <string name="pref_plugin_battery_desc">定期的にバッテリ状態を報告</string>
-  <string name="pref_plugin_connectivity_report">接続性レポート</string>
-  <string name="pref_plugin_connectivity_report_desc">信号強度とネットワークの状態を報告</string>
-  <string name="pref_plugin_digitizer">ペンタブレット</string>
-  <string name="pref_plugin_digitizer_desc">このデバイスを感圧式ペンタブレットとして使用</string>
   <string name="pref_plugin_clipboard">クリップボードの同期</string>
   <string name="pref_plugin_clipboard_desc">クリップボードの内容を共有</string>
   <string name="pref_plugin_clipboard_sent">クリップボードが送信されました</string>
   <string name="pref_plugin_mousepad">リモート入力</string>
   <string name="pref_plugin_mousepad_desc_nontv">スマートフォンやタブレットをタッチパッドやキーボードとして利用</string>
   <string name="pref_plugin_mousepad_desc_tv">スマートフォンやタブレットをテレビリモコンとして利用</string>
-  <string name="pref_plugin_presenter">プレゼンテーションリモート</string>
-  <string name="pref_plugin_presenter_desc">デバイスを使ってプレゼンテーションのスライドを操作</string>
-  <string name="pref_plugin_remotekeyboard">リモートからキー入力を受信</string>
-  <string name="pref_plugin_remotekeyboard_desc">リモートデバイスからキーイベントを受信</string>
   <string name="pref_plugin_mpris">マルチメディアの操作</string>
   <string name="pref_plugin_mpris_desc">メディアプレーヤーをリモート操作</string>
-  <string name="pref_plugin_runcommand">コマンドを実行</string>
-  <string name="pref_plugin_runcommand_desc">スマートフォンやタブレットからリモートコマンドを実行</string>
   <string name="pref_plugin_contacts">連絡先の同期</string>
   <string name="pref_plugin_contacts_desc">デバイスの連絡先データと同期</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -44,28 +34,13 @@
   <string name="open_settings">設定を開く</string>
   <string name="no_permissions">通知にアクセスするには権限を付与する必要があります</string>
   <string name="no_permission_mprisreceiver">メディアプレーヤーを操作するには、通知へのアクセスを許可する必要があります</string>
-  <string name="no_permissions_remotekeyboard">キー入力を受信するには DeskLink リモートキーボードを有効化する必要があります</string>
   <string name="send_ping">Ping を送信</string>
-  <string name="open_mpris_controls">マルチメディアの操作</string>
-  <string name="remotekeyboard_editing_only_title">編集中にのみリモートキーを取り扱う</string>
-  <string name="remotekeyboard_not_connected">有効なリモートキーボード接続がありません。DeskLink で確立してください</string>
-  <string name="remotekeyboard_connected">リモートキーボード接続はアクティブです</string>
-  <string name="remotekeyboard_multiple_connections">複数のリモートキーボード接続があります。設定するデバイスを選択してください</string>
   <string name="open_mousepad">リモート入力</string>
   <string name="open_mousepad_tv">テレビリモコン</string>
-  <string name="mousepad_info">スクリーン上で指を動かすとマウスカーソルが移動します。タップは左クリックになり、2本指タップは右クリック、3本指タップは中クリックになります。2本指でスクロール、長押しでドラッグ&amp;ドロップできます。プラグイン設定からジャイロマウス機能を有効化できます。</string>
-  <string name="mousepad_info_no_gestures">スクリーン上で指を動かすとマウスカーソルが移動します。タップするとクリックできます。</string>
-  <string name="mousepad_keyboard_input_not_supported">ペアリングされたデバイスはキーボード入力をサポートしていません</string>
-  <string name="mousepad_single_tap_settings_title">1本指タップのアクションを設定</string>
-  <string name="mousepad_double_tap_settings_title">2本指タップのアクションを設定</string>
-  <string name="mousepad_triple_tap_settings_title">3本指タップのアクションを設定</string>
   <string name="mousepad_sensitivity_settings_title">タッチパッドの感度を設定</string>
-  <string name="mousepad_mouse_buttons_title">マウスボタンを表示</string>
   <string name="mousepad_acceleration_profile_settings_title">ポインタの速度を設定</string>
   <string name="mousepad_scroll_direction_title">スクロールの方向を反転</string>
   <string name="mousepad_scroll_sensitivity_title">スクロールの感度</string>
-  <string name="gyro_mouse_enabled_title">ジャイロマウスを有効化</string>
-  <string name="gyro_mouse_sensitivity_title">ジャイロスコープの感度</string>
   <string-array name="mousepad_tap_entries">
     <item>左クリック</item>
     <item>右クリック</item>
@@ -87,17 +62,6 @@
     <item>強</item>
     <item>最強</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">キー入力を送信</string>
-  <string name="sendkeystrokes_textbox_hint">キー入力をホストに送信</string>
-  <string name="sendkeystrokes_disabled_toast">キー入力の送信は無効化されています。設定で有効化してください</string>
-  <string name="sendkeystrokes_wrong_data">無効な MIME タイプです。\'text/x-keystrokes\' である必要があります</string>
-  <string name="sendkeystrokes_sent_text">ファイル %1$s をデバイス %2$s へ送信しました</string>
-  <string name="sendkeystrokes_pref_category_summary">このモジュールは他のアプリがテキストのセグメントを接続されたホストにキー入力として共有できるようにします</string>
-  <string name="sendkeystrokes_pref_category_title">キー入力を送信</string>
-  <string name="sendkeystrokes_pref_enabled">キー入力の送信を有効化</string>
-  <string name="sendkeystrokes_pref_enabled_summary">MIME タイプが \'text/x-keystrokes\' のデータを受け付ける</string>
-  <string name="sendkeystrokes_safe_text_enabled">安全なテキストをすぐに送信する</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">確認なしで短い数値のみの文字列を送信する</string>
   <string name="pref_plugin_mousepad_send_keystrokes">キー入力として送信</string>
   <string name="mouse_receiver_plugin_description">リモートからマウスの動きを受信</string>
   <string name="mouse_receiver_plugin_name">マウスレシーバ</string>
@@ -154,10 +118,6 @@
   <string name="received_file_text">タップして \'%1s\' を開く</string>
   <string name="cannot_create_file">ファイル %s を作成できません</string>
   <string name="tap_to_answer">タップして応答</string>
-  <string name="left_click">左クリックを送信</string>
-  <string name="right_click">右クリックを送信</string>
-  <string name="middle_click">中クリックを送信</string>
-  <string name="show_keyboard">キーボードを表示</string>
   <string name="device_not_paired">デバイスはペアリングされていません</string>
   <string name="pairing_duplicate_names">警告: 同じ名前の複数のデバイスがあります。</string>
   <string name="request_pairing">ペアリングを要求</string>
@@ -168,11 +128,7 @@
   <string name="mpris_play">再生</string>
   <string name="mpris_pause">一時停止</string>
   <string name="mpris_previous">前へ</string>
-  <string name="mpris_rew">巻き戻し</string>
-  <string name="mpris_ff">早送り</string>
   <string name="mpris_next">次へ</string>
-  <string name="mpris_loop">繰り返し</string>
-  <string name="mpris_shuffle">シャッフル</string>
   <string name="mpris_volume">音量</string>
   <string name="mpris_time_settings_title">早送り/巻き戻しボタン</string>
   <string name="mpris_time_settings_summary">押した時に早送り/巻き戻しする時間を調整</string>
@@ -214,18 +170,7 @@
   <string name="show_notification_if_screen_off">スクリーンがオフのときのみ通知を送信</string>
   <string name="add_device_dialog_title">デバイスを追加</string>
   <string name="add_device_hint">ホスト名/IP アドレス</string>
-  <string name="no_players_connected">プレーヤーが見つかりませんでした</string>
   <string name="send_files">ファイルを送信</string>
-  <string name="use_digitizer">ペンタブレットとして使用</string>
-  <string name="digitizer_preference_title_hide_draw_button">描画ボタンを非表示</string>
-  <string name="digitizer_preference_summary_hide_draw_button">描画ボタンを完全に非表示にします。これにより指描きはできなくなります。スタイラスペンに対応している場合のみ有効にしてください。</string>
-  <string name="digitizer_preference_title_draw_button_side">指描きボタンの位置</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>左上</item>
-    <item>右上</item>
-    <item>左下</item>
-    <item>右下</item>
-  </string-array>
   <string name="block_notification_contents">通知の内容をブロック</string>
   <string name="block_notification_images">通知の画像をブロック</string>
   <string name="pairing_title">DeskLink デバイス</string>
@@ -263,15 +208,7 @@
   <string name="select_ringtone">着信音を選択</string>
   <string name="telephony_pref_blocked_title">ブロックされた番号</string>
   <string name="telephony_pref_blocked_dialog_desc">ここで設定された番号からの通話と SMS は非表示になります。一行にひとつずつ電話番号を入力してください</string>
-  <string name="mpris_coverart_description">現在のメディアのカバーアート</string>
   <string name="settings_icon_description">設定アイコン</string>
-  <string name="presenter_fullscreen">フルスクリーン</string>
-  <string name="presenter_exit">プレゼンテーションを終了</string>
-  <string name="presenter_lock_tip">デバイスをロックして、音量キーでスライドを前/次に移動できます</string>
-  <string name="add_command">コマンドを追加</string>
-  <string name="addcommand_explanation">コマンドが登録されていません</string>
-  <string name="addcommand_explanation2">システム設定の DeskLink ページで新しいコマンドを追加できます</string>
-  <string name="add_command_description">デスクトップから新しいコマンドを追加できます</string>
   <string name="pref_plugin_mprisreceiver">メディアプレーヤーの操作</string>
   <string name="pref_plugin_mprisreceiver_desc">他のデバイスからスマートフォンのメディアプレーヤーを操作</string>
   <string name="notification_channel_default">他の通知</string>
@@ -282,22 +219,12 @@
   <string name="notification_channel_filetransfer_upload">ファイル送信</string>
   <string name="notification_channel_filetransfer_error">ファイル転送エラー</string>
   <string name="notification_channel_high_priority">高い優先度</string>
-  <string name="mpris_stop">現在のプレーヤーを停止</string>
   <string name="copy_url_to_clipboard">URL をクリップボードにコピー</string>
   <string name="clipboard_toast">クリップボードにコピーしました</string>
-  <string name="runcommand_notreachable">デバイスに到達できません</string>
-  <string name="runcommand_notpaired">デバイスはペアリングされていません</string>
-  <string name="runcommand_nosuchdevice">そのようなデバイスはありません</string>
-  <string name="runcommand_noruncommandplugin">このデバイスは「コマンドを実行」プラグインを有効にしていません</string>
-  <string name="runcommand_category_device_controls_title">デバイスの操作</string>
-  <string name="runcommand_device_controls_summary">あなたのデバイスが「デバイスの操作」をサポートする場合、設定したコマンドがそこに表示されます。</string>
-  <string name="set_runcommand_name_as_title">set_runcommand_name_as_title</string>
-  <string name="runcommand_name_as_title_title">名前をタイトルとして表示</string>
+  <string name="device_not_reachable">デバイスに到達できません</string>
   <string name="pref_plugin_findremotedevice">リモートデバイスを探す</string>
   <string name="pref_plugin_findremotedevice_desc">リモートデバイスを鳴動させる</string>
   <string name="ring">鳴らす</string>
-  <string name="pref_plugin_systemvolume">システム音量</string>
-  <string name="pref_plugin_systemvolume_desc">リモートデバイスのシステム音量を操作</string>
   <string name="mute">ミュート</string>
   <string name="all">すべて</string>
   <string name="devices">デバイス</string>
@@ -317,8 +244,6 @@
   <string name="notification_channel_receivenotification">他のデバイスからの通知</string>
   <string name="findmyphone_preference_title_flashlight">フラッシュライトを点滅</string>
   <string name="no_app_for_opening">このファイルを開くための適切なアプリが見つかりません</string>
-  <string name="remote_keyboard_service">DeskLink リモートキーボード</string>
-  <string name="presenter_pointer">ポインタ</string>
   <string name="trusted_networks">信頼済みネットワーク</string>
   <string name="trusted_networks_desc">自動検出を既知のネットワークでのみに制限する</string>
   <string name="add_trusted_network">%1s を追加</string>
@@ -328,32 +253,10 @@
   <string name="bluetooth_permission_needed_desc">Bluetooth でデバイスをペアリングするには、付近のデバイスの接続の権限が必要です。</string>
   <string name="location_permission_needed_desc">DeskLink がバックグラウンドの間でも接続している WiFi ネットワークを識別できるよう、バックグラウンドでの位置情報へのアクセスの許可が必要です。WiFi ネットワーク名は位置情報としても使われることがあるため、この権限が必要です。(DeskLink が位置情報を収集することはありません)</string>
   <string name="clipboard_android_x_incompat">Android 10 はすべてのアプリからクリップボードへのアクセスを削除しました。このプラグインは無効化されます。</string>
-  <string name="mpris_open_url">このデバイスで再生を続ける</string>
   <string name="cant_open_url">再生を続けるための URL を開けません</string>
-  <string name="bigscreen_home">ホーム</string>
-  <string name="bigscreen_up">上へ</string>
-  <string name="bigscreen_left">左</string>
-  <string name="bigscreen_select">選択</string>
-  <string name="bigscreen_right">右</string>
-  <string name="bigscreen_down">下へ</string>
-  <string name="bigscreen_mic">マイク</string>
-  <string name="pref_plugin_bigscreen_desc">デバイスを Plasma Bigscreen のリモコンとして使う</string>
-  <string name="bigscreen_optional_permission_explanation">端末のマイク入力を共有するには、端末の音声入力へのアクセスを許可する必要があります</string>
-  <string name="bigscreen_speech_extra_prompt">発声</string>
   <string name="message_reply_label">返信</string>
   <string name="mark_as_read_label">既読としてマーク</string>
   <string name="user_display_name">あなた</string>
-  <string name="set_default_sms_app_title">SMS を送信</string>
-  <string name="set_group_message_as_mms_title">グループ MMS を送信</string>
-  <string name="set_long_text_as_mms_title">長いテキストを MMS として送信する</string>
-  <string name="convert_to_mms_after_title">MMS に変換</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>1 つのメッセージの後</item>
-    <item>2 つのメッセージの後</item>
-    <item>3 つのメッセージの後</item>
-    <item>4 つのメッセージの後</item>
-    <item>5 つのメッセージの後</item>
-  </string-array>
   <string name="theme_dialog_title">テーマを選択</string>
   <string-array name="theme_list">
     <item>バッテリセーバによる設定</item>
@@ -380,12 +283,6 @@
   <string name="rise_up">上へ</string>
   <string name="rise_down">下へ</string>
   <string name="click_here_to_type">タップしてタイプ</string>
-  <string name="clear_compose">クリア</string>
-  <string name="send_compose">送信</string>
-  <string name="compose_send_title">送信するテキストを作成する</string>
-  <string name="open_compose_send">テキストを作成する</string>
-  <string name="double_tap_to_drag">タブルタップしてドラッグ</string>
-  <string name="hold_to_drag">長押ししてドラッグ</string>
   <string name="maintainer_and_developer">メンテナ、開発者</string>
   <string name="developer">開発者</string>
   <string name="apple_support">macOS サポート。iOS サポート (作業中)</string>
@@ -399,7 +296,6 @@
   <string name="shellwen_chen_task">SFTP のセキュリティの改善、このプロジェクトのメンテナンス性の改善、バグ修正と全体的な改善</string>
   <string name="everyone_else">DeskLink に貢献してきたその他すべての人々</string>
   <string name="send_clipboard">クリップボードを送信</string>
-  <string name="tap_to_execute">タップして実行</string>
   <string name="plugin_stats">プラグイン統計</string>
   <string name="enable_udp_broadcast">UDP デバイス検知を有効化</string>
   <string name="enable_bluetooth">Bluetooth を有効化 (ベータ)</string>
@@ -416,9 +312,4 @@
   <string name="ping_in_progress">Ping 中…</string>
   <string name="device_host_invalid">無効なホストです。正しいホスト名や IPv4 または IPv6 を指定してください</string>
   <string name="device_host_duplicate">このホストはすでにリストに追加されています</string>
-  <string name="pref_presenter_enable_volume_keys_title">音量キーでスライドを移動</string>
-  <string name="pref_presenter_sensitivity_title">ポインタ感度</string>
-  <string name="pref_presenter_enable_volume_keys_summary">Android 13 ~ 15 では画面ロック中の操作に対応していません。</string>
-  <string name="presenter_volume_keys_foreground_tip">この画面を閉じている間も、音量キーでスライドの戻る/進む操作を行うことができます。</string>
-  <string name="presenter_volume_keys_tip">この画面を閉じたりデバイスをロックしている間も、音量キーでスライドの戻る/進む操作を行うことができます。</string>
 </resources>

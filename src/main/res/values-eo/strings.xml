@@ -9,20 +9,12 @@
   <string name="pref_plugin_telephony_desc">Sendi sciigojn pri envenantaj vokoj</string>
   <string name="pref_plugin_battery">Bateria raporto</string>
   <string name="pref_plugin_battery_desc">Periode raporti staton de la baterio</string>
-  <string name="pref_plugin_connectivity_report">Raporto pri konektebleco</string>
-  <string name="pref_plugin_connectivity_report_desc">Raporti retan signalforton kaj staton</string>
   <string name="pref_plugin_clipboard">Sinkronigo de tondujo</string>
   <string name="pref_plugin_clipboard_desc">Kunhavigi la enhavon de la tondujo</string>
   <string name="pref_plugin_clipboard_sent">Clipboard Sendita</string>
   <string name="pref_plugin_mousepad">Fora enigo</string>
-  <string name="pref_plugin_presenter">Prezento fora</string>
-  <string name="pref_plugin_presenter_desc">Uzu vian aparaton por ŝanĝi lumbildojn en prezento</string>
-  <string name="pref_plugin_remotekeyboard">Ricevi forajn klavojn</string>
-  <string name="pref_plugin_remotekeyboard_desc">Ricevi klavopremajn eventojn de foraj aparatoj</string>
   <string name="pref_plugin_mpris">Plurmedia regiloj</string>
   <string name="pref_plugin_mpris_desc">Provizas teleregilon por via plurmedia ludilo</string>
-  <string name="pref_plugin_runcommand">Lanĉi Komandon</string>
-  <string name="pref_plugin_runcommand_desc">Ekigi forajn komandojn de via telefono aŭ tabuleto</string>
   <string name="pref_plugin_contacts">Sinkronigilo de Kontaktoj</string>
   <string name="pref_plugin_contacts_desc">Permesi sinkronigi la kontaktlibron de la aparato</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -40,27 +32,12 @@
   <string name="open_settings">Malfermi agordojn</string>
   <string name="no_permissions">Vi devas doni permeson aliri sciigojn</string>
   <string name="no_permission_mprisreceiver">Por povi regi viajn plurmediajn ludilojn, vi devas doni aliron al la sciigoj</string>
-  <string name="no_permissions_remotekeyboard">Por ricevi klavpremojn vi devas aktivigi la DeskLink Remote Keyboard</string>
   <string name="send_ping">Sendi ping</string>
-  <string name="open_mpris_controls">Mastrumo de Aŭdvidaĵoj</string>
-  <string name="remotekeyboard_editing_only_title">Pritrakti forajn klavojn nur dum redaktado</string>
-  <string name="remotekeyboard_not_connected">Ne estas aktiva fora klavara konekto, starigu unu en DeskLink</string>
-  <string name="remotekeyboard_connected">Fora klavara konekto estas aktiva</string>
-  <string name="remotekeyboard_multiple_connections">Estas pli ol unu fora klavara konekto, elektu la aparaton por agordi</string>
   <string name="open_mousepad">Fora enigo</string>
-  <string name="mousepad_info">Movu fingron sur la ekrano por movi la muskursonon. Frapu por klako, kaj uzu du/tri fingrojn por dekstraj kaj mezaj butonoj. Uzu 2 fingrojn por rulumi. Uzu longan premon por treni kaj faligi. Gyro-musfunkcio povas esti ebligita de aldonaĵaj preferoj</string>
-  <string name="mousepad_info_no_gestures">Movu fingron sur la ekranon por movi la muskursonon, frapetu por klako.</string>
-  <string name="mousepad_keyboard_input_not_supported">Klavara enigo ne subtenata de la parigita aparato</string>
-  <string name="mousepad_single_tap_settings_title">Agordi unufingran frapet-agon</string>
-  <string name="mousepad_double_tap_settings_title">Agordi dufingran frapet-agon</string>
-  <string name="mousepad_triple_tap_settings_title">Agordi trifingran frapet-agon</string>
   <string name="mousepad_sensitivity_settings_title">Agordi la sentemon de la tuŝplato</string>
-  <string name="mousepad_mouse_buttons_title">Montri musbutonojn</string>
   <string name="mousepad_acceleration_profile_settings_title">Agordi montrilo-akcelon</string>
   <string name="mousepad_scroll_direction_title">Inversa Scrolling Direkto</string>
   <string name="mousepad_scroll_sensitivity_title">Scroll-sentemo</string>
-  <string name="gyro_mouse_enabled_title">Ebligi giroskopan muson</string>
-  <string name="gyro_mouse_sensitivity_title">Giroskopa sentemo</string>
   <string-array name="mousepad_tap_entries">
     <item>Maldekstre klako</item>
     <item>Dekstre klaku</item>
@@ -82,17 +59,6 @@
     <item>Pli forta</item>
     <item>Plej forte</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Sendi klavopremojn al</string>
-  <string name="sendkeystrokes_textbox_hint">Sendi klavopremojn al gastiganto</string>
-  <string name="sendkeystrokes_disabled_toast">Sendi klavopremojn estas malŝaltita - ebligu ĝin en la agordoj</string>
-  <string name="sendkeystrokes_wrong_data">Nevalida mimspeco - devas esti \'teksto/x-klavopremoj\'</string>
-  <string name="sendkeystrokes_sent_text">Sendis %1$s al aparato %2$s</string>
-  <string name="sendkeystrokes_pref_category_summary">Ĉi tiu modulo permesas al aliaj programoj dividi tekstajn segmentojn kiel klavopremojn, kiuj estos senditaj al la konektita gastiganto</string>
-  <string name="sendkeystrokes_pref_category_title">Sendi klavopremojn</string>
-  <string name="sendkeystrokes_pref_enabled">Ebligi la sendon de klavopremoj</string>
-  <string name="sendkeystrokes_pref_enabled_summary">Aŭskulti datumojn kun mimo-tipo \'teksto/x-klavopremoj\'</string>
-  <string name="sendkeystrokes_safe_text_enabled">Sendi sekuran tekston tuj</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Sendi mallongajn nur-nombrajn ĉenojn sen konfirmo</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Sendi kiel klavopremojn</string>
   <string name="mouse_receiver_plugin_description">Ricevi foran musan movon</string>
   <string name="mouse_receiver_plugin_name">Musa ricevilo</string>
@@ -157,10 +123,6 @@
   <string name="received_file_text">Frapeti por malfermi \'%1s\'</string>
   <string name="cannot_create_file">Ne eblas krei dosieron %s</string>
   <string name="tap_to_answer">Frapeti por respondi</string>
-  <string name="left_click">Sendi Maldekstran Klakon</string>
-  <string name="right_click">Sendi Dekstran Klakon</string>
-  <string name="middle_click">Sendi Mezan Klakon</string>
-  <string name="show_keyboard">Montri Klavaron</string>
   <string name="device_not_paired">Aparato ne parigita</string>
   <string name="request_pairing">Peti parigon</string>
   <string name="pairing_accept">Akcepti</string>
@@ -169,11 +131,7 @@
   <string name="mpris_play">Ludi</string>
   <string name="mpris_pause">Paŭzi</string>
   <string name="mpris_previous">Antaŭa</string>
-  <string name="mpris_rew">Rebobeni</string>
-  <string name="mpris_ff">Rapide antaŭen</string>
   <string name="mpris_next">Sekva</string>
-  <string name="mpris_loop">Bukli</string>
-  <string name="mpris_shuffle">Miksi</string>
   <string name="mpris_volume">Laŭteco</string>
   <string name="mpris_time_settings_title">Antaŭen/revenigi butonojn</string>
   <string name="mpris_time_settings_summary">Alĝustigi la tempon por rapide antaŭen/revenigi kiam premate</string>
@@ -213,14 +171,7 @@
   <string name="show_notification_if_screen_off">Sendi sciigojn nur se la ekrano estas malŝaltita</string>
   <string name="add_device_dialog_title">Aldoni aparaton</string>
   <string name="add_device_hint">Gastnomo aŭ IP-adreso</string>
-  <string name="no_players_connected">Neniuj ludantoj trovitaj</string>
   <string name="send_files">Sendi dosierojn</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Top left</item>
-    <item>Top right</item>
-    <item>Bottom left</item>
-    <item>Bottom right</item>
-  </string-array>
   <string name="block_notification_contents">Bloki sciigan enhavon</string>
   <string name="block_notification_images">Bloki sciigajn bildojn</string>
   <string name="pairing_title">KDE Konekti Aparatojn</string>
@@ -258,15 +209,7 @@
   <string name="select_ringtone">Elekti sonoron</string>
   <string name="telephony_pref_blocked_title">Blokitaj nombroj</string>
   <string name="telephony_pref_blocked_dialog_desc">Ne montru vokojn kaj SMS de ĉi tiuj numeroj. Bonvolu specifi unu numeron po linio</string>
-  <string name="mpris_coverart_description">Kovrilo de aktuala aŭdvidaĵo</string>
   <string name="settings_icon_description">Piktogramo de agordoj</string>
-  <string name="presenter_fullscreen">Plenekrane</string>
-  <string name="presenter_exit">Eliri prezenton</string>
-  <string name="presenter_lock_tip">Vi povas ŝlosi vian aparaton kaj uzi la laŭtec-klavojn por iri al la antaŭa/sekva lumbildo</string>
-  <string name="add_command">Aldoni komandon</string>
-  <string name="addcommand_explanation">Ne estas komandoj registritaj</string>
-  <string name="addcommand_explanation2">Vi povas aldoni novajn komandojn en la DeskLink System Settings</string>
-  <string name="add_command_description">Vi povas aldoni komandojn sur la labortablo</string>
   <string name="pref_plugin_mprisreceiver">Media Player Regado</string>
   <string name="pref_plugin_mprisreceiver_desc">Mastrumi la plurmediajn ludilojn de via telefono de alia aparato</string>
   <string name="notification_channel_default">Aliaj sciigoj</string>
@@ -276,22 +219,12 @@
   <string name="notification_channel_filetransfer_upload">Eliranta dosiertransigo</string>
   <string name="notification_channel_filetransfer_error">Eraro pri dosiertransigo</string>
   <string name="notification_channel_high_priority">Alta prioritato</string>
-  <string name="mpris_stop">Halti la nunan ludanton</string>
   <string name="copy_url_to_clipboard">Kopii URL al tondujo</string>
   <string name="clipboard_toast">Kopiita al tondujo</string>
-  <string name="runcommand_notreachable">La aparato ne estas atingebla</string>
-  <string name="runcommand_notpaired">La aparato ne estas parigita</string>
-  <string name="runcommand_nosuchdevice">Ne ekzistas tia aparato</string>
-  <string name="runcommand_noruncommandplugin">Ĉi tiu aparato ne havas la Run Command Plugin ebligita</string>
-  <string name="runcommand_category_device_controls_title">Aparataj Regiloj</string>
-  <string name="runcommand_device_controls_summary">Se via aparato subtenas Aparatajn Regilojn, komandoj, kiujn vi agordis, aperos tie.</string>
-  <string name="set_runcommand_name_as_title">set_runcommand_name_as_title</string>
-  <string name="runcommand_name_as_title_title">Montri nomon kiel titolon</string>
+  <string name="device_not_reachable">La aparato ne estas atingebla</string>
   <string name="pref_plugin_findremotedevice">Trovi malproksiman aparaton</string>
   <string name="pref_plugin_findremotedevice_desc">Sonigi vian fora aparato</string>
   <string name="ring">Ringo</string>
-  <string name="pref_plugin_systemvolume">Sistema volumo</string>
-  <string name="pref_plugin_systemvolume_desc">Mastrumi la sisteman laŭtecon de la fora aparato</string>
   <string name="mute">Silentigi</string>
   <string name="all">Ĉiuj</string>
   <string name="devices">Aparatoj</string>
@@ -309,8 +242,6 @@
   <string name="block_images">Bloki bildojn en sciigoj</string>
   <string name="notification_channel_receivenotification">Sciigoj de aliaj aparatoj</string>
   <string name="no_app_for_opening">Neniu taŭga aplikaĵo trovita por malfermi ĉi tiun dosieron</string>
-  <string name="remote_keyboard_service">KDE Konekti Foran Klavaron</string>
-  <string name="presenter_pointer">Montrilo</string>
   <string name="trusted_networks">Fidindaj retoj</string>
   <string name="trusted_networks_desc">Limigi aŭtomatan malkovron al konataj retoj</string>
   <string name="add_trusted_network">Aldoni %1s</string>
@@ -320,32 +251,10 @@
   <string name="bluetooth_permission_needed_desc">DeskLink bezonas permeson por konekti al proksimaj aparatoj por fari aparatojn parigitaj per Bluetooth disponebla en DeskLink.</string>
   <string name="location_permission_needed_desc">DeskLink bezonas la fonlokan permeson por scii la WiFi-reton al kiu vi estas konektita eĉ kiam la programo estas en la fono. Ĉi tio estas ĉar la nomo de la WiFi-retoj ĉirkaŭ vi povus esti uzata por trovi vian lokon, eĉ kiam tion ne faras DeskLink.</string>
   <string name="clipboard_android_x_incompat">Android 10 forigis aliron al tondujo al ĉiuj aplikaĵoj. Ĉi tiu kromaĵo estos malŝaltita.</string>
-  <string name="mpris_open_url">Daŭre ludi ĉi tie</string>
   <string name="cant_open_url">Ne povas malfermi URL por daŭrigi ludadon</string>
-  <string name="bigscreen_home">Hejmo</string>
-  <string name="bigscreen_up">Supren</string>
-  <string name="bigscreen_left">Maldekstra</string>
-  <string name="bigscreen_select">Elekti</string>
-  <string name="bigscreen_right">Dekstra</string>
-  <string name="bigscreen_down">Malsupren</string>
-  <string name="bigscreen_mic">Mikrofono</string>
-  <string name="pref_plugin_bigscreen_desc">Uzu vian aparaton kiel fora por Plasma Bigscreen</string>
-  <string name="bigscreen_optional_permission_explanation">Por dividi mikrofonan enigon de via telefono, vi devas doni aliron al la sonenigo de la telefono</string>
-  <string name="bigscreen_speech_extra_prompt">Parolado</string>
   <string name="message_reply_label">RESPONDO</string>
   <string name="mark_as_read_label">MARKI KIEL LEGITA</string>
   <string name="user_display_name">Vi</string>
-  <string name="set_default_sms_app_title">Sendi MMS</string>
-  <string name="set_group_message_as_mms_title">Sendi grupajn MMS</string>
-  <string name="set_long_text_as_mms_title">Sendi longan tekston kiel MMS</string>
-  <string name="convert_to_mms_after_title">Konverti al MMS</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Post unu mesaĝo</item>
-    <item>Post du mesaĝoj</item>
-    <item>Post tri mesaĝoj</item>
-    <item>Post kvar mesaĝoj</item>
-    <item>Post kvin mesaĝoj</item>
-  </string-array>
   <string name="theme_dialog_title">Elekti etoson</string>
   <string-array name="theme_list">
     <item>Agordita de Bateria Ŝparanto</item>
@@ -372,12 +281,6 @@
   <string name="rise_up">Leviĝi</string>
   <string name="rise_down">Leviĝi Malsupren</string>
   <string name="click_here_to_type">Frapetu ĉi tie por tajpi</string>
-  <string name="clear_compose">Viŝi</string>
-  <string name="send_compose">Sendi</string>
-  <string name="compose_send_title">Verki sendon</string>
-  <string name="open_compose_send">Verki tekston</string>
-  <string name="double_tap_to_drag">Duoble frapetu por treni</string>
-  <string name="hold_to_drag">Teni por treni</string>
   <string name="maintainer_and_developer">Prizorganto kaj programisto</string>
   <string name="developer">Ellaboranto</string>
   <string name="apple_support">subteno de macOS. Laborante pri iOS-subteno</string>
@@ -391,7 +294,6 @@
   <string name="shellwen_chen_task">Plibonigi la sekurecon de SFTP, plibonigi la funkciteneblon de ĉi projekto, cimkorektoj kaj ĝeneralaj plibonigoj</string>
   <string name="everyone_else">Ĉiuj aliaj, kiuj kontribuis al DeskLink tra la jaroj</string>
   <string name="send_clipboard">Sendi tondujon</string>
-  <string name="tap_to_execute">Frapi por plenumi</string>
   <string name="plugin_stats">Statistiko de kromprogramoj</string>
   <string name="enable_udp_broadcast">Ebligi UDP-aparatan malkovron</string>
   <string name="enable_bluetooth">Ŝalti bluetooth (beta)</string>

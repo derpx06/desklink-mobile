@@ -142,7 +142,6 @@ data class HomeState(
     val historyCount: Int = 0,
     /** The desk lets this phone unlock it and the link is the local network: "Unlock desk" shows. */
     val canUnlock: Boolean = false,
-    /** The desk listed commands to run: a Run command tile shows. */
 ) {
     val ready get() = connection == DeviceConnection.LOCAL || connection == DeviceConnection.AWAY || connection == DeviceConnection.CONNECTED
 }

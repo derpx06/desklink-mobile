@@ -294,7 +294,7 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
                 cancelTimer()
                 Log.e("PairingHandler", "Exception sending pairing request", e)
                 this@PairingHandler.state = PairState.NotPaired
-                callback.pairingFailed(device.context.getString(R.string.runcommand_notreachable))
+                callback.pairingFailed(device.context.getString(R.string.device_not_reachable))
             }
         }
         val np = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR)

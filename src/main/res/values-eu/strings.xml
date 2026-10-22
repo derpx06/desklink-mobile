@@ -9,24 +9,14 @@
   <string name="pref_plugin_telephony_desc">Bidali jakinarazpenak sarrerako deietarako</string>
   <string name="pref_plugin_battery">Bateriaren txostena</string>
   <string name="pref_plugin_battery_desc">Bidali bateriaren egoera aldiro</string>
-  <string name="pref_plugin_connectivity_report">Konektagarritasun txostena</string>
-  <string name="pref_plugin_connectivity_report_desc">Eman sareko seinale-sendotasunaren eta egoeraren berri</string>
-  <string name="pref_plugin_digitizer">Marrazketa-tableta</string>
-  <string name="pref_plugin_digitizer_desc">Erabili gailu hau presioarekiko sentikorra den marrazketa-tableta gisa</string>
   <string name="pref_plugin_clipboard">Arbelaren sinkronizazioa</string>
   <string name="pref_plugin_clipboard_desc">Partekatu arbelaren edukia</string>
   <string name="pref_plugin_clipboard_sent">Arbelekoa bidali da</string>
   <string name="pref_plugin_mousepad">Urrutiko sarrera</string>
   <string name="pref_plugin_mousepad_desc_nontv">Erabili zure telefonoa edo tableta ukimen-sagu eta teklatu gisa</string>
   <string name="pref_plugin_mousepad_desc_tv">Erabili zure telefonoa edo tableta TBren urruneko aginte gisa</string>
-  <string name="pref_plugin_presenter">Aurkezpenetarako urruneko agintea</string>
-  <string name="pref_plugin_presenter_desc">Erabili zure gailua aurkezpen bateko diapositibak aldatzeko</string>
-  <string name="pref_plugin_remotekeyboard">Jaso urruneko tekla-sakatzeak</string>
-  <string name="pref_plugin_remotekeyboard_desc">Jaso tekla-sakatze gertaerak urruneko gailuetatik</string>
   <string name="pref_plugin_mpris">Multimedia kontrolak</string>
   <string name="pref_plugin_mpris_desc">Zure euskarri-jotzailearen urruneko kontrola ematen dizu</string>
-  <string name="pref_plugin_runcommand">Exekutatu agindua</string>
-  <string name="pref_plugin_runcommand_desc">Abiarazi urruneko aginduak zure telefono edo tabletatik</string>
   <string name="pref_plugin_contacts">Kontaktuen sinkronizatzailea</string>
   <string name="pref_plugin_contacts_desc">Utzi gailuaren kontaktuen liburuak sinkronizatzen</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -46,31 +36,13 @@
   <string name="open_settings">Ireki ezarpenak</string>
   <string name="no_permissions">Jakinarazpenak atzitzeko baimena eman behar duzu</string>
   <string name="no_permission_mprisreceiver">Zure euskarri-jotzaileak kontrolatu ahal izateko jakinarazpenetara atzipena eman behar diozu</string>
-  <string name="no_permissions_remotekeyboard">Sakatzeak jasotzeko DeskLinken urruneko teklatua aktibatu behar duzu</string>
   <string name="send_ping">Bidali ping</string>
-  <string name="open_mpris_controls">Multimedia kontrola</string>
-  <string name="remotekeyboard_editing_only_title">Erabili urruneko teklak editatzean besterik ez</string>
-  <string name="remotekeyboard_not_connected">Ez dago urruneko teklatuarekin konexio aktiborik, ezarri bat DeskLink erabiliz</string>
-  <string name="remotekeyboard_connected">Urruneko teklatuarekin konexioa aktibo dago</string>
-  <string name="remotekeyboard_multiple_connections">Urruneko teklatuekin konexio bat baino gehiago dago, hautatu konfiguratu beharreko gailua</string>
   <string name="open_mousepad">Urruneko sarrera</string>
   <string name="open_mousepad_tv">TBko urrutiko agintea</string>
-  <string name="mousepad_info">Mugitu hatz bat pantailan zehar saguaren erakuslea mugitzeko. Egin tak klik baterako, eta erabili bi/hiru hatz eskuin eta erdiko botoietarako. Erabili 2 hatz kiribiltzeko. Erabili sakatze luze bat arrastatu eta jaregiteko. Saguaren giroskopio funtzionalitatea pluginen hobespenetatik gaitu daiteke.</string>
-  <string name="mousepad_info_no_gestures">Mugitu hatz bat pantailan kurtsorea mugitzeko, egin tak klik egiteko.</string>
-  <string name="mousepad_keyboard_input_not_supported">Parekatutako gailuak ez du teklatuko sarreraren euskarririk</string>
-  <string name="mousepad_single_tap_settings_title">Ezarri hatz bakarrarekin tak egitearen ekintza</string>
-  <string name="mousepad_double_tap_settings_title">Ezarri bi hatzez tak egitearen ekintza</string>
-  <string name="mousepad_triple_tap_settings_title">Ezarri hiru hatzez tak egitearen ekintza</string>
   <string name="mousepad_sensitivity_settings_title">Ezarri ukimen-saguaren sentikortasuna</string>
-  <string name="mousepad_mouse_buttons_title">Erakutsi saguaren botoiak</string>
   <string name="mousepad_acceleration_profile_settings_title">Ezarri erakuslearen azelerazio</string>
   <string name="mousepad_scroll_direction_title">Alderantzikatu korritzearen norabidea</string>
   <string name="mousepad_scroll_sensitivity_title">Kiribiltze sentikortasuna</string>
-  <string name="gyro_mouse_enabled_title">Gaitu giroskopio-sagua</string>
-  <string name="gyro_mouse_sensitivity_title">Giroskopioaren sentikortasuna</string>
-  <string name="bigscreen_hide_mouse_input">Ezkutatu saguaren eta teklatuaren urrutiko agintearen sarrera-botoia</string>
-  <string name="bigscreen_show_home_title">Erakutsi Etxe botoia</string>
-  <string name="bigscreen_show_back_title">Erakutsi Atzera botoia</string>
   <string-array name="mousepad_tap_entries">
     <item>Ezkerreko klik</item>
     <item>Eskuineko klik</item>
@@ -92,17 +64,6 @@
     <item>Sendoagoa</item>
     <item>Sendoena</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Bidali tekla-joaldiak hona</string>
-  <string name="sendkeystrokes_textbox_hint">Bidali tekla-joaldiak ostalarira</string>
-  <string name="sendkeystrokes_disabled_toast">Tekla-joaldiak bidaltzea ezgaituta dago - gaitu ezazu ezarpenetan</string>
-  <string name="sendkeystrokes_wrong_data">MIME-mota baliogabea - \'text/x-keystrokes\' izan behar da</string>
-  <string name="sendkeystrokes_sent_text">%1$s %2$s gailura bidali da</string>
-  <string name="sendkeystrokes_pref_category_summary">Modulu honek, beste aplikazioei, konektatutako ostalarira tekla-joaldi gisa bidaliko diren testu-segmentuak partekatzeko aukera eskaintzen die</string>
-  <string name="sendkeystrokes_pref_category_title">Bidali tekla-joaldiak</string>
-  <string name="sendkeystrokes_pref_enabled">Gaitu tekla-joaldiak bidaltzea</string>
-  <string name="sendkeystrokes_pref_enabled_summary">\'text/x-keystrokes\' MIME-motako datuak entzutea</string>
-  <string name="sendkeystrokes_safe_text_enabled">Bidali testu segurua berehala</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Bidali zenbakizko kate laburrak berrespenik gabe</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Bidali tekla-joaldi gisa</string>
   <string name="mouse_receiver_plugin_description">Jaso urrutiko saguaren mugimenduak</string>
   <string name="mouse_receiver_plugin_name">Sagu jasotzailea</string>
@@ -168,11 +129,6 @@
   <string name="received_file_text">Tak egin \'%1s\' irekitzeko</string>
   <string name="cannot_create_file">Ezin da sortu %s fitxategia</string>
   <string name="tap_to_answer">Tak egin erantzuteko</string>
-  <string name="left_click">Bidali ezkerreko klik</string>
-  <string name="right_click">Bidali eskumako klik</string>
-  <string name="middle_click">Bidali erdiko klik</string>
-  <string name="show_keyboard">Erakutsi teklatua</string>
-  <string name="show_mouse_and_keyboard">Erakutsi sagua eta teklatua</string>
   <string name="device_not_paired">Gailua parekatu gabe</string>
   <string name="pairing_duplicate_names">Kontuz: Izen bereko hainbat gailu daude.</string>
   <string name="request_pairing">Eskatu parekatzea</string>
@@ -183,11 +139,7 @@
   <string name="mpris_play">Jo</string>
   <string name="mpris_pause">Eten</string>
   <string name="mpris_previous">Aurrekoa</string>
-  <string name="mpris_rew">Atzera eraman</string>
-  <string name="mpris_ff">Aurrera eraman</string>
   <string name="mpris_next">Hurrengoa</string>
-  <string name="mpris_loop">Begizta</string>
-  <string name="mpris_shuffle">Nahasi</string>
   <string name="mpris_volume">Bolumena</string>
   <string name="mpris_time_settings_title">Atzera eraman / Aurrera eraman botoiak</string>
   <string name="mpris_time_settings_summary">Doitu sakatzean aurrera/atzera azkar egin beharreko denbora</string>
@@ -230,21 +182,7 @@
   <string name="show_notification_if_screen_off">Bidali jakinarazpenak bakarrik pantaila itzalita badago</string>
   <string name="add_device_dialog_title">Gehitu gailua</string>
   <string name="add_device_hint">Ostalari-izena edo IP helbidea</string>
-  <string name="no_players_connected">Ez da jotzailerik aurkitu</string>
   <string name="send_files">Bidali fitxategiak</string>
-  <string name="use_digitizer">Erabili marrazketa-tableta gisa</string>
-  <string name="digitizer_draw_button">Marraztu hatza erabiliz</string>
-  <string name="digitizer_preference_title_hide_draw_button">Ezkutatu marrazteko botoia</string>
-  <string name="digitizer_preference_summary_hide_draw_button">Marrazteko botoia erabat ezkutatzen du, hatzekin marraztea ezinezkoa bihurtuz. Gaitu hau zure gailuak arkatz-digitalaren sarrera onartzen badu bakarrik.</string>
-  <string name="digitizer_preference_title_draw_button_side">\"Marraztu hatzarekin\" botoiaren alboa</string>
-  <string name="digitizer_preference_title_enable_exit_fullscreen_gesture">Gaitu pantaila osotik irteteko keinua</string>
-  <string name="digitizer_preference_summary_enable_exit_fullscreen_gesture">Gaituta badago, hatzarekin marrazteko panelean tak egin eta eutsiz gero pantaila osoko modua ezgaituko du.</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Goian ezkerrean</item>
-    <item>Goian eskuinean</item>
-    <item>Behean ezkerrean</item>
-    <item>Behean eskuinean</item>
-  </string-array>
   <string name="block_notification_contents">Oztopatu jakinarazpenen edukia</string>
   <string name="block_notification_images">Oztopatu jakinarazpenen irudiak</string>
   <string name="pairing_title">DeskLink gailuak</string>
@@ -282,15 +220,7 @@
   <string name="select_ringtone">Hautatu dei-tonu bat</string>
   <string name="telephony_pref_blocked_title">Blokeatutako zenbakiak</string>
   <string name="telephony_pref_blocked_dialog_desc">Ez erakutsi zenbaki hauen deiak eta SMSak. Zehaztu zenbaki bat lerroko</string>
-  <string name="mpris_coverart_description">Uneko euskarriaren azaleko irudia</string>
   <string name="settings_icon_description">Ezarpenen ikonoa</string>
-  <string name="presenter_fullscreen">Pantaila-betea</string>
-  <string name="presenter_exit">Irten aurkezpenetik</string>
-  <string name="presenter_lock_tip">Zure gailua giltzatu dezakezu eta bolumen teklak botoi gisa erabili aurreko/hurrengo diapositibara joateko</string>
-  <string name="add_command">Gehitu komando bat</string>
-  <string name="addcommand_explanation">Ez dago komandorik erregistraturik</string>
-  <string name="addcommand_explanation2">Komando berriak gehitu ditzakezu DeskLink sistemaren ezarpenetan</string>
-  <string name="add_command_description">Komandoak gehitu ditzakezu mahaigainean</string>
   <string name="pref_plugin_mprisreceiver">Euskarri-jotzailearen kontrola</string>
   <string name="pref_plugin_mprisreceiver_desc">Kontrolatu zure telefonoaren euskarri-jotzaileak beste gailu batetik</string>
   <string name="notification_channel_default">Beste jakinarazpen batzuk</string>
@@ -301,22 +231,12 @@
   <string name="notification_channel_filetransfer_upload">Irteerako fitxategi transmisioa</string>
   <string name="notification_channel_filetransfer_error">Fitxategi transmisio errorea</string>
   <string name="notification_channel_high_priority">Lehentasun handia</string>
-  <string name="mpris_stop">Gelditu uneko jotzailea</string>
   <string name="copy_url_to_clipboard">Kopiatu URLa arbelera</string>
   <string name="clipboard_toast">Arbelera kopiatua</string>
-  <string name="runcommand_notreachable">Gailua ez dago eskuragarri</string>
-  <string name="runcommand_notpaired">Gailua ez dago parekatua</string>
-  <string name="runcommand_nosuchdevice">Ez dago halako gailurik</string>
-  <string name="runcommand_noruncommandplugin">Gailu honek ez dauka gaituta «Exekutatu Komandoa» plugina</string>
-  <string name="runcommand_category_device_controls_title">Gailuaren aginteak</string>
-  <string name="runcommand_device_controls_summary">Zure gailuak Gailuen Aginteak onartzen baditu, konfiguratu dituzun komandoak hemen agertuko dira.</string>
-  <string name="set_runcommand_name_as_title">ezarri_exekuziokomando_izena_titulu_gisa</string>
-  <string name="runcommand_name_as_title_title">Erakutsi izena titulu gisa</string>
+  <string name="device_not_reachable">Gailua ez dago eskuragarri</string>
   <string name="pref_plugin_findremotedevice">Aurkitu urruneko gailua</string>
   <string name="pref_plugin_findremotedevice_desc">Jo zure urruneko gailuaren tonua</string>
   <string name="ring">Tonua jo</string>
-  <string name="pref_plugin_systemvolume">Sistemaren bolumena</string>
-  <string name="pref_plugin_systemvolume_desc">Kontrolatu urruneko gailuaren sistemako bolumena</string>
   <string name="mute">Isilarazi</string>
   <string name="all">Guztiak</string>
   <string name="devices">Gailuak</string>
@@ -337,8 +257,6 @@
   <string name="notification_channel_receivenotification">Beste gailu batzuen jakinarazpenak</string>
   <string name="findmyphone_preference_title_flashlight">Esku-argia keinuka piztu</string>
   <string name="no_app_for_opening">Ez da fitxategi hau irekitzeko aplikazio egokirik aurkitu</string>
-  <string name="remote_keyboard_service">DeskLink urruneko teklatua</string>
-  <string name="presenter_pointer">Erakuslea</string>
   <string name="trusted_networks">Konfiantza duten sareak</string>
   <string name="trusted_networks_desc">Mugatu aurkitze automatikoa sare ezagunetara</string>
   <string name="add_trusted_network">Gehitu %1s</string>
@@ -348,34 +266,10 @@
   <string name="bluetooth_permission_needed_desc">DeskLink-ek hurbileko gailuetara konektatzeko baimena behar du, Bluetooth bidez parekatutako gailuak DeskLink-en erabilgarri ipintzeko.</string>
   <string name="location_permission_needed_desc">DeskLink-ek konektatuta zauden Wi-Fi sarea zein den jakiteko atzeko planoko kokapen baimena behar du, baita aplikazioa atzeko planoan dagoenean ere. Hori horrela da, zure inguruko Wi-Fi sareen izenak zure kokalekua aurkitzeko erabil daitezkeelako, nahiz eta hori ez izan DeskLink-ek egiten duena.</string>
   <string name="clipboard_android_x_incompat">Android 10ek arbela atzitzeko aukera kendu die aplikazio guztiei. Plugin hau desgaitu egingo da.</string>
-  <string name="mpris_open_url">Jarraitu hemen jotzen</string>
   <string name="cant_open_url">Ezin da ireki URLa jotzen jarraitzeko</string>
-  <string name="bigscreen_home">Etxea</string>
-  <string name="bigscreen_up">Gora</string>
-  <string name="bigscreen_left">Ezkerrean</string>
-  <string name="bigscreen_select">Hautatu</string>
-  <string name="bigscreen_right">Eskuinean</string>
-  <string name="bigscreen_down">Behera</string>
-  <string name="bigscreen_back">Atzera</string>
-  <string name="bigscreen_mic">Mikrofonoa</string>
-  <string name="pref_plugin_bigscreen">TBko urrutiko agintea</string>
-  <string name="pref_plugin_bigscreen_desc">Erabili zure gailua Plasma Bigscreen-en urrutiko aginte gisa</string>
-  <string name="bigscreen_optional_permission_explanation">Zure telefonoko mikrofonoko sarrerakoa partekatzeko, telefonoko audio sarrerakora sarbidea eman behar diozu</string>
-  <string name="bigscreen_speech_extra_prompt">Hizketa</string>
   <string name="message_reply_label">ERANTZUN</string>
   <string name="mark_as_read_label">MARKATU IRAKURRITAKO GISA</string>
   <string name="user_display_name">Zu</string>
-  <string name="set_default_sms_app_title">Bidali MMS</string>
-  <string name="set_group_message_as_mms_title">Bidali taldeko MMS</string>
-  <string name="set_long_text_as_mms_title">Bidali testu luzea MMS gisa</string>
-  <string name="convert_to_mms_after_title">Bihurtu MMS</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Mezu baten ondoren</item>
-    <item>Bi mezu ondoren</item>
-    <item>Hiru mezu ondoren</item>
-    <item>Lau mezu ondoren</item>
-    <item>Bost mezu ondoren</item>
-  </string-array>
   <string name="theme_dialog_title">Aukeratu gaia</string>
   <string-array name="theme_list">
     <item>Ezarri bateria aurrezteko</item>
@@ -402,12 +296,6 @@
   <string name="rise_up">Goratu</string>
   <string name="rise_down">Beheratu</string>
   <string name="click_here_to_type">Tak egin hemen tekleatzeko</string>
-  <string name="clear_compose">Garbitu</string>
-  <string name="send_compose">Bidali</string>
-  <string name="compose_send_title">Bidalketa osatu</string>
-  <string name="open_compose_send">Konposatu testua</string>
-  <string name="double_tap_to_drag">Tak bikoitza arrastatzeko</string>
-  <string name="hold_to_drag">Eutsi arrastatzeko</string>
   <string name="maintainer_and_developer">Arduraduna eta garatzailea</string>
   <string name="developer">Garatzailea</string>
   <string name="apple_support">macOS-ren euskarria. iOS-en euskarria lantzen</string>
@@ -421,7 +309,6 @@
   <string name="shellwen_chen_task">SFTPren segurtasuna hobetu, proiektu honen mantentze-gaitasuna hobetu, akatsak konpondu eta hobekuntza orokorrak</string>
   <string name="everyone_else">Urteetan DeskLink-ekin lagundu duten gainerako guztiak</string>
   <string name="send_clipboard">Bidali arbelekoa</string>
-  <string name="tap_to_execute">Tak egin exekutatzeko</string>
   <string name="plugin_stats">Pluginaren estatistikak</string>
   <string name="enable_udp_broadcast">Gaitu UDP bidez gailua aurkitzea</string>
   <string name="enable_bluetooth">Gaitu bluetooth (beta)</string>
@@ -440,9 +327,4 @@
   <string name="device_host_invalid">Ostalaria baliogabea da. Erabili balio duen ostalari-izen bat, IPv4, edo IPv6</string>
   <string name="device_host_duplicate">Ostalaria jada zerrendan dago</string>
   <string name="enable_fullscreen">Gaitu pantaila osoa</string>
-  <string name="pref_presenter_enable_volume_keys_title">Bolumen-botoiek diapositibak aldatzen dituzte</string>
-  <string name="pref_presenter_sensitivity_title">Erakuslearen sentikortasuna</string>
-  <string name="pref_presenter_enable_volume_keys_summary">Egonean egotea ez da onartzen Android 13 eta 15 bertsioen artean</string>
-  <string name="presenter_volume_keys_foreground_tip">Pantaila piztuta utz dezakezu, bolumen-botoiekin aurreko/hurrengo diapositibara joateko</string>
-  <string name="presenter_volume_keys_tip">Pantaila piztuta edo gailua giltzatuta utzi dezakezu, bolumen-botoiekin aurreko/hurrengo diapositibara joateko</string>
 </resources>

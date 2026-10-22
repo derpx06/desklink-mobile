@@ -9,20 +9,12 @@
   <string name="pref_plugin_telephony_desc">Envíe notificacións de chamadas entrantes.</string>
   <string name="pref_plugin_battery">Informe da batería</string>
   <string name="pref_plugin_battery_desc">Informar periodicamente do estado da batería.</string>
-  <string name="pref_plugin_connectivity_report">Informe de conectividade</string>
-  <string name="pref_plugin_connectivity_report_desc">Informar da forza do sinal e do estado da rede</string>
   <string name="pref_plugin_clipboard">Sincronización do portapapeis</string>
   <string name="pref_plugin_clipboard_desc">Comparta o contido do portapapeis.</string>
   <string name="pref_plugin_clipboard_sent">Enviouse o portapapeis</string>
   <string name="pref_plugin_mousepad">Entrada remota</string>
-  <string name="pref_plugin_presenter">Mando de presentación</string>
-  <string name="pref_plugin_presenter_desc">Use o dispositivo para cambiar de dispositiva nunha presentación</string>
-  <string name="pref_plugin_remotekeyboard">Recibir teclas premidas remotamente.</string>
-  <string name="pref_plugin_remotekeyboard_desc">Recibir eventos de teclas premidas de dispositivos remotos.</string>
   <string name="pref_plugin_mpris">Controis multimedia</string>
   <string name="pref_plugin_mpris_desc">Fornece un mando a distancia para o reprodutor.</string>
-  <string name="pref_plugin_runcommand">Executar unha orde</string>
-  <string name="pref_plugin_runcommand_desc">Activar ordes remotas desde o teléfono ou tableta.</string>
   <string name="pref_plugin_contacts">Sincronizador de contactos</string>
   <string name="pref_plugin_contacts_desc">Permitir sincronizar a axenda de contactos do dispositivo</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -40,27 +32,12 @@
   <string name="open_settings">Abrir a configuración</string>
   <string name="no_permissions">Debe conceder permisos para acceder ás notificacións</string>
   <string name="no_permission_mprisreceiver">Para poder controlar os seus reprodutores multimedia ten que garantir acceso ás notificacións</string>
-  <string name="no_permissions_remotekeyboard">Para recibir presións de tecla ten que activar o teclado remoto de DeskLink</string>
   <string name="send_ping">Enviar un ping</string>
-  <string name="open_mpris_controls">Control multimedia</string>
-  <string name="remotekeyboard_editing_only_title">Xestionar teclas remotas só ao editar.</string>
-  <string name="remotekeyboard_not_connected">Non hai ningunha conexión de teclado remoto activa, estabeleza unha en DeskLink.</string>
-  <string name="remotekeyboard_connected">A conexión de teclado remoto está activa.</string>
-  <string name="remotekeyboard_multiple_connections">Hai máis dunha conexión de teclado remoto, seleccione o dispositivo para configurar.</string>
   <string name="open_mousepad">Entrada remota</string>
-  <string name="mousepad_info">Mova un dedo na pantalla para mover o cursor do rato. Toque para facer clic, e use dous ou tres dedos para os botóns secundario e central. Use dous dedos para desprazar. Prema durante un tempo para arrastrar e soltar. A funcionalidade de rato de xiroscopio pode activarse desde a configuración do complemento.</string>
-  <string name="mousepad_info_no_gestures">Mova un dedo na pantalla para mover o cursor, toque para facer clic.</string>
-  <string name="mousepad_keyboard_input_not_supported">O dispositivo emparellado non permite entrada de teclado</string>
-  <string name="mousepad_single_tap_settings_title">Definir a acción de tocar cun dedo</string>
-  <string name="mousepad_double_tap_settings_title">Definir a acción de tocar con dous dedos</string>
-  <string name="mousepad_triple_tap_settings_title">Definir a acción de tocar con tres dedos</string>
   <string name="mousepad_sensitivity_settings_title">Definir a sensibilidade do punteiro táctil</string>
-  <string name="mousepad_mouse_buttons_title">Amosar os botóns do rato</string>
   <string name="mousepad_acceleration_profile_settings_title">Definir a aceleración do punteiro</string>
   <string name="mousepad_scroll_direction_title">Inverter a dirección de desprazamento</string>
   <string name="mousepad_scroll_sensitivity_title">Sensibilidade de desprazamento</string>
-  <string name="gyro_mouse_enabled_title">Activar o rato de xiroscopio</string>
-  <string name="gyro_mouse_sensitivity_title">Sensibilidade de xiroscopio</string>
   <string-array name="mousepad_tap_entries">
     <item>Clic esquerdo</item>
     <item>Clic dereito</item>
@@ -82,17 +59,6 @@
     <item>Máis forte</item>
     <item>A máis forte</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Enviar as pulsacións de tecla a</string>
-  <string name="sendkeystrokes_textbox_hint">Enviar as pulsacións de tecla á máquina</string>
-  <string name="sendkeystrokes_disabled_toast">O envío de pulsación de teclas está desactivado; actíveo na configuración.</string>
-  <string name="sendkeystrokes_wrong_data">Tipo MIME incorrecto, ten que ser «text/x-keystrokes».</string>
-  <string name="sendkeystrokes_sent_text">Enviouse %1$s ao dispositivo %2$s</string>
-  <string name="sendkeystrokes_pref_category_summary">Este módulo permite a outras aplicacións compartir segmentos de texto como pulsacións de tecla que se enviarán á máquina conectada</string>
-  <string name="sendkeystrokes_pref_category_title">Enviar pulsacións de tecla</string>
-  <string name="sendkeystrokes_pref_enabled">Activar o envío de pulsacións de tecla</string>
-  <string name="sendkeystrokes_pref_enabled_summary">Escoitar en busca de datos de tipo MIME «text/x-keystrokes»</string>
-  <string name="sendkeystrokes_safe_text_enabled">Enviar os textos seguros inmediatamente</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Enviar as cadeas numéricas curtas sen confirmación</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Enviar como pulsacións de tecla</string>
   <string name="mouse_receiver_plugin_description">Recibir movementos de rato remotos</string>
   <string name="mouse_receiver_plugin_name">Receptor de rato</string>
@@ -157,10 +123,6 @@
   <string name="received_file_text">Toque para abrir «%1s».</string>
   <string name="cannot_create_file">Non é posíbel crear o ficheiro %s</string>
   <string name="tap_to_answer">Toque para contestar</string>
-  <string name="left_click">Enviar un clic esquerdo</string>
-  <string name="right_click">Enviar un clic secundario</string>
-  <string name="middle_click">Enviar un clic central</string>
-  <string name="show_keyboard">Amosar o teclado</string>
   <string name="device_not_paired">O dispositivo non está emparellado</string>
   <string name="pairing_duplicate_names">Ollo: Hai varios dispositivos co mesmo nome.</string>
   <string name="request_pairing">Solicitar emparellarse</string>
@@ -171,11 +133,7 @@
   <string name="mpris_play">Reproducir</string>
   <string name="mpris_pause">Deter</string>
   <string name="mpris_previous">Anterior</string>
-  <string name="mpris_rew">Retroceder</string>
-  <string name="mpris_ff">Cara a adiante</string>
   <string name="mpris_next">Seguinte</string>
-  <string name="mpris_loop">Bucle</string>
-  <string name="mpris_shuffle">Desordenar</string>
   <string name="mpris_volume">Volume</string>
   <string name="mpris_time_settings_title">Botóns de avanzar e retroceder</string>
   <string name="mpris_time_settings_summary">Axuste o tempo que avanzar ou retroceder ao premer</string>
@@ -216,14 +174,7 @@
   <string name="show_notification_if_screen_off">Enviar notificacións só se a pantalla está apagada</string>
   <string name="add_device_dialog_title">Engadir o dispositivo</string>
   <string name="add_device_hint">Nome de máquina ou enderezo IP</string>
-  <string name="no_players_connected">Non se atoparon reprodutores.</string>
   <string name="send_files">Enviar ficheiros</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Top left</item>
-    <item>Top right</item>
-    <item>Bottom left</item>
-    <item>Bottom right</item>
-  </string-array>
   <string name="block_notification_contents">Bloquear o contido das notificacións</string>
   <string name="block_notification_images">Bloquear as imaxes das notificacións</string>
   <string name="pairing_title">Dispositivos con DeskLink</string>
@@ -261,15 +212,7 @@
   <string name="select_ringtone">Seleccione un ton de chamada</string>
   <string name="telephony_pref_blocked_title">Números bloqueados</string>
   <string name="telephony_pref_blocked_dialog_desc">Non amosar chamadas nin SMS destes números. Indique un número por liña.</string>
-  <string name="mpris_coverart_description">Portada da obra actual.</string>
   <string name="settings_icon_description">Icona da configuración.</string>
-  <string name="presenter_fullscreen">Pantalla completa</string>
-  <string name="presenter_exit">Saír da presentación</string>
-  <string name="presenter_lock_tip">Pode bloquear o dispositivo e usar as teclas de volume para ir aos fotogramas anterior e seguinte</string>
-  <string name="add_command">Engadir unha orde</string>
-  <string name="addcommand_explanation">Non hai ordes rexistradas.</string>
-  <string name="addcommand_explanation2">Pode engadir novas ordes desde a configuración do sistema de DeskLink.</string>
-  <string name="add_command_description">Pode engadir ordes no escritorio.</string>
   <string name="pref_plugin_mprisreceiver">Control do reprodutor de multimedia</string>
   <string name="pref_plugin_mprisreceiver_desc">Controlar os reprodutores do seu móbil desde outro dispositivo</string>
   <string name="notification_channel_default">Outras notificacións</string>
@@ -279,22 +222,12 @@
   <string name="notification_channel_filetransfer_upload">Transferencia de ficheiros saíntes</string>
   <string name="notification_channel_filetransfer_error">Erro de transferencia de ficheiro</string>
   <string name="notification_channel_high_priority">Prioridade alta</string>
-  <string name="mpris_stop">Deter o reprodutor actual</string>
   <string name="copy_url_to_clipboard">Copiar o URL no portapapeis</string>
   <string name="clipboard_toast">Copiouse no portapapeis</string>
-  <string name="runcommand_notreachable">O dispositivo está inaccesíbel.</string>
-  <string name="runcommand_notpaired">O dispositivo non está emparellado</string>
-  <string name="runcommand_nosuchdevice">Non hai tal dispositivo</string>
-  <string name="runcommand_noruncommandplugin">O dispositivo non ten o complemento de «Executar unha orde» activado</string>
-  <string name="runcommand_category_device_controls_title">Controis de dispositivo</string>
-  <string name="runcommand_device_controls_summary">Se o dispositivo permite controis de dispositivo, as ordes que configure aparecerán alí.</string>
-  <string name="set_runcommand_name_as_title">set_runcommand_name_as_title</string>
-  <string name="runcommand_name_as_title_title">Amosar o nome como título</string>
+  <string name="device_not_reachable">O dispositivo está inaccesíbel.</string>
   <string name="pref_plugin_findremotedevice">Atopar un dispositivo remoto</string>
   <string name="pref_plugin_findremotedevice_desc">Facer soar o dispositivo remoto</string>
   <string name="ring">Facer soar</string>
-  <string name="pref_plugin_systemvolume">Volume do sistema</string>
-  <string name="pref_plugin_systemvolume_desc">Controlar o volume do sistema do dispositivo remoto</string>
   <string name="mute">Silenciar</string>
   <string name="all">Todo</string>
   <string name="devices">Dispositivos</string>
@@ -314,8 +247,6 @@
   <string name="block_images">Bloquear as imaxes nas notificacións</string>
   <string name="notification_channel_receivenotification">Notificacións desde outros dispositivos</string>
   <string name="no_app_for_opening">Non se atopou ningunha aplicación axeitada para abrir o ficheiro.</string>
-  <string name="remote_keyboard_service">Teclado remoto de DeskLink</string>
-  <string name="presenter_pointer">Punteiro</string>
   <string name="trusted_networks">Redes de confianza</string>
   <string name="trusted_networks_desc">Restrinxir o descubrimento automático a redes coñecidas</string>
   <string name="add_trusted_network">Engadir %1s</string>
@@ -325,32 +256,10 @@
   <string name="bluetooth_permission_needed_desc">DeskLink require permisos para conectarse a dispositivos próximos para poñer dispositivos emparellados mediante Bluetooth a disposición de DeskLink.</string>
   <string name="location_permission_needed_desc">DeskLink necesita o permiso de localización en segundo planto para saber a que rede WiFi se conectou incluso cando a aplicación está en segundo plano. Isto é porque o nome das redes WiFi ao redor seu podería usarse para descubrir a súa localización, aínda que DeskLink non faga tal cousa.</string>
   <string name="clipboard_android_x_incompat">Android 10 retirou o acceso ao portapapeis a todas as aplicacións. Desactivarase este complemento.</string>
-  <string name="mpris_open_url">Continuar reproducindo aquí</string>
   <string name="cant_open_url">Non é posíbel abrir o URL para continuar reproducindo</string>
-  <string name="bigscreen_home">Inicio</string>
-  <string name="bigscreen_up">Subir</string>
-  <string name="bigscreen_left">Esquerda</string>
-  <string name="bigscreen_select">Seleccionar</string>
-  <string name="bigscreen_right">Dereita</string>
-  <string name="bigscreen_down">Baixar</string>
-  <string name="bigscreen_mic">Micrófono</string>
-  <string name="pref_plugin_bigscreen_desc">Use o seu dispositivo como mando de Plasma Bigscreen</string>
-  <string name="bigscreen_optional_permission_explanation">Para compartir entrada de micrófono do seu teléfono ten que dar acceso á entrada de son do teléfono.</string>
-  <string name="bigscreen_speech_extra_prompt">Fala</string>
   <string name="message_reply_label">RESPONDER</string>
   <string name="mark_as_read_label">MARCAR COMO LIDO</string>
   <string name="user_display_name">Vostede</string>
-  <string name="set_default_sms_app_title">Enviar MMS</string>
-  <string name="set_group_message_as_mms_title">Enviar MMS grupais</string>
-  <string name="set_long_text_as_mms_title">Enviar texto longo como MMS</string>
-  <string name="convert_to_mms_after_title">Converter en MMS</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Tras unha mensaxe</item>
-    <item>Tras dúas mensaxes</item>
-    <item>Tras tres mensaxes</item>
-    <item>Tras catro mensaxes</item>
-    <item>Tras cinco mensaxes</item>
-  </string-array>
   <string name="theme_dialog_title">Escoller un tema</string>
   <string-array name="theme_list">
     <item>Definir polo aforrador de batería</item>
@@ -377,12 +286,6 @@
   <string name="rise_up">Ir ao principio</string>
   <string name="rise_down">Ir ao final</string>
   <string name="click_here_to_type">Toque aquí para escribir</string>
-  <string name="clear_compose">Baleirar</string>
-  <string name="send_compose">Enviar</string>
-  <string name="compose_send_title">Preparar un envío</string>
-  <string name="open_compose_send">Escribir texto</string>
-  <string name="double_tap_to_drag">Toque dúas veces para arrastrar</string>
-  <string name="hold_to_drag">Manteña para arrastrar</string>
   <string name="maintainer_and_developer">Mantemento e desenvolvemento</string>
   <string name="developer">Desenvolvemento</string>
   <string name="apple_support">Compatibilidade con macOS. Traballando na compatibilidade con iOS</string>
@@ -396,7 +299,6 @@
   <string name="shellwen_chen_task">Mellorar a seguridade de SFTP, facilitar o mantemento do proxecto, correccións de fallos e melloras xerais.</string>
   <string name="everyone_else">O resto de xente que colaborou en DeskLink ao longo dos anos</string>
   <string name="send_clipboard">Enviar o portapapeis</string>
-  <string name="tap_to_execute">Toque para executar</string>
   <string name="plugin_stats">Estatísticas do complemento</string>
   <string name="enable_udp_broadcast">Activar o descubrimento de dispositivos UDP.</string>
   <string name="enable_bluetooth">Activar o Bluetooth (beta)</string>

@@ -9,24 +9,14 @@
   <string name="pref_plugin_telephony_desc">Odošle upozornenia na prichádzajúce hovory</string>
   <string name="pref_plugin_battery">Hlásenia batérie</string>
   <string name="pref_plugin_battery_desc">Pravidelne hlási stav batérie</string>
-  <string name="pref_plugin_connectivity_report">Hlásenia batérie</string>
-  <string name="pref_plugin_connectivity_report_desc">Hlásenie o stave a sile sieťového signálu</string>
-  <string name="pref_plugin_digitizer">Nájsť môj tablet</string>
-  <string name="pref_plugin_digitizer_desc">Použitie vášho mobilného zariadenia ako ukazovateľa na objekty na obrazovke</string>
   <string name="pref_plugin_clipboard">Synchronizácia schránky</string>
   <string name="pref_plugin_clipboard_desc">Zdieľa obsah schránky</string>
   <string name="pref_plugin_clipboard_sent">Schránka odoslaná</string>
   <string name="pref_plugin_mousepad">Vzdialený vstup</string>
   <string name="pref_plugin_mousepad_desc_nontv">Použije váš telefón alebo tablet ako touchpad a klávesnicu</string>
   <string name="pref_plugin_mousepad_desc_tv">Použije váš telefón alebo tablet ako touchpad a klávesnicu</string>
-  <string name="pref_plugin_presenter">Diaľkové ovládanie obrazovky Bigscreen</string>
-  <string name="pref_plugin_presenter_desc">Použije vaše zariadenie na zmenu snímok prezentácie</string>
-  <string name="pref_plugin_remotekeyboard">Prijímanie vzdialených stlačení klávesov</string>
-  <string name="pref_plugin_remotekeyboard_desc">Prijme udalosti stlačenia klávesov z diaľkových zariadení</string>
   <string name="pref_plugin_mpris">Multimediálne ovládače</string>
   <string name="pref_plugin_mpris_desc">Poskytuje diaľkové ovládanie pre váš prehrávač médií</string>
-  <string name="pref_plugin_runcommand">Spustenie príkazu</string>
-  <string name="pref_plugin_runcommand_desc">Vyvolá vzdialené príkazy z vášho telefónu alebo tabletu</string>
   <string name="pref_plugin_contacts">Nástroj na synchronizáciu kontaktov</string>
   <string name="pref_plugin_contacts_desc">Umožní synchronizáciu adresára kontaktov zariadenia</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -46,31 +36,13 @@
   <string name="open_settings">Otvoriť nastavenia</string>
   <string name="no_permissions">Musíte udeliť oprávnenia na prístup k upozorneniam</string>
   <string name="no_permission_mprisreceiver">Aby ste mohli ovládať multimediálne prehrávače, musíte udeliť prístup k upozorneniam</string>
-  <string name="no_permissions_remotekeyboard">Na prijímanie stlačenia klávesov, musíte aktivovať vzdialenú klávesnicu aplikácie DeskLink</string>
   <string name="send_ping">Odoslať ping</string>
-  <string name="open_mpris_controls">Multimediálny ovládač</string>
-  <string name="remotekeyboard_editing_only_title">Spracovať vzdialené klávesy iba počas upravovania</string>
-  <string name="remotekeyboard_not_connected">Nie je žiadne aktívne pripojenie k vzdialenej klávesnici. Vytvorte nejaké v aplikácii DeskLink</string>
-  <string name="remotekeyboard_connected">Pripojenie k vzdialenej klávesnici je aktívne</string>
-  <string name="remotekeyboard_multiple_connections">Je dostupných viac pripojení k vzdialeným klávesniciam, vyberte zariadenie na nastavenie</string>
   <string name="open_mousepad">Vzdialený vstup</string>
   <string name="open_mousepad_tv">TV diaľkový ovládač</string>
-  <string name="mousepad_info">Posúvajte prst na obrazovke pre pohyb kurzorom. Ťuknutím kliknete a použitím dvoch/troch prstov stlačíte pravé a stredné tlačidlo. Použitím dvoch prstov rolujete. Použite dlhého stlačenia vykonáte ťahanie a spustenie.</string>
-  <string name="mousepad_info_no_gestures">Pohybujte prstom po obrazovke na presun kurzora myši, ťuknite na kliknutie.</string>
-  <string name="mousepad_keyboard_input_not_supported">Tento plugin nie je podporovaný zariadením</string>
-  <string name="mousepad_single_tap_settings_title">Nastaviť akciu po ťuknutí dvoma prstami</string>
-  <string name="mousepad_double_tap_settings_title">Nastaviť akciu po ťuknutí dvoma prstami</string>
-  <string name="mousepad_triple_tap_settings_title">Nastaviť akciu po ťuknutí troma prstami</string>
   <string name="mousepad_sensitivity_settings_title">Nastaviť citlivosť touchpadu</string>
-  <string name="mousepad_mouse_buttons_title">Zobraziť tlačidlá myši</string>
   <string name="mousepad_acceleration_profile_settings_title">Nastaviť zrýchlenie ukazovateľa</string>
   <string name="mousepad_scroll_direction_title">Obrátiť smer rolovania</string>
   <string name="mousepad_scroll_sensitivity_title">Nastaviť citlivosť touchpadu</string>
-  <string name="gyro_mouse_enabled_title">Povoliť gyroskopickú myš</string>
-  <string name="gyro_mouse_sensitivity_title">Nastaviť citlivosť touchpadu</string>
-  <string name="bigscreen_hide_mouse_input">Skryť tlačidlo vzdialeného vstupu myši a klávesnice</string>
-  <string name="bigscreen_show_home_title">Zobraziť tlačidlo Domov</string>
-  <string name="bigscreen_show_back_title">Zobraziť tlačidlo Späť</string>
   <string-array name="mousepad_tap_entries">
     <item>Ľavý klik</item>
     <item>Pravý klik</item>
@@ -92,17 +64,6 @@
     <item>Silnejšie</item>
     <item>Najsilnejšie</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Odoslať stlačenia klávesov do</string>
-  <string name="sendkeystrokes_textbox_hint">Odoslať stlačenia klávesov hostiteľovi</string>
-  <string name="sendkeystrokes_disabled_toast">Odosielanie klávesových úderov je zakázané - povoľte ho v nastaveniach</string>
-  <string name="sendkeystrokes_wrong_data">Neplatný typ MIME - musí byť \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_sent_text">Odoslané %1$s do zariadenia %2$s</string>
-  <string name="sendkeystrokes_pref_category_summary">Tento modul umožňuje iným aplikáciám zdieľať textové segmenty ako klávesové údery, ktoré budú odoslané na pripojený hostiteľ</string>
-  <string name="sendkeystrokes_pref_category_title">Odoslať stlačenia klávesov</string>
-  <string name="sendkeystrokes_pref_enabled">Povoliť odosielanie stlačení klávesov</string>
-  <string name="sendkeystrokes_pref_enabled_summary">Počúvať dáta s typom MIME \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_safe_text_enabled">Odoslať bezpečný text okamžite</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Odoslať krátke čisto číselné reťazce bez potvrdenia</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Odoslať ako klávesové údery</string>
   <string name="mouse_receiver_plugin_description">Prijímanie pohybu vzdialenej myši</string>
   <string name="mouse_receiver_plugin_name">Prijímač myši</string>
@@ -184,11 +145,6 @@
   <string name="received_file_text">Ťuknutím otvoríte súbor \"%1s\"</string>
   <string name="cannot_create_file">Nedá sa vytvoriť súbor %s</string>
   <string name="tap_to_answer">Ťuknutím odpoviete</string>
-  <string name="left_click">Odoslať kliknutie pravým tlačidlom</string>
-  <string name="right_click">Odoslať kliknutie pravým tlačidlom</string>
-  <string name="middle_click">Odoslať kliknutie stredným tlačidlom</string>
-  <string name="show_keyboard">Zobraziť klávesnicu</string>
-  <string name="show_mouse_and_keyboard">Zobraziť klávesnicu</string>
   <string name="device_not_paired">Zariadenie nie je spárované</string>
   <string name="pairing_duplicate_names">Pozor: Existuje viacero zariadení s rovnakým názvom.</string>
   <string name="request_pairing">Požiadať o spárovanie</string>
@@ -199,11 +155,7 @@
   <string name="mpris_play">Prehrať</string>
   <string name="mpris_pause">Pozastaviť</string>
   <string name="mpris_previous">Predošlé</string>
-  <string name="mpris_rew">Pretočiť dozadu</string>
-  <string name="mpris_ff">Pretočiť dopredu</string>
   <string name="mpris_next">Nasledovné</string>
-  <string name="mpris_loop">Opakovať</string>
-  <string name="mpris_shuffle">Zamiešať</string>
   <string name="mpris_volume">Hlasitosť</string>
   <string name="mpris_time_settings_title">Tlačidlá pretočenia dopredu/dozadu</string>
   <string name="mpris_time_settings_summary">Upraviť čas pretáčania dopredu/dozadu po stlačení tlačidla</string>
@@ -246,21 +198,7 @@
   <string name="show_notification_if_screen_off">Odošle upozornenia na prichádzajúce hovory</string>
   <string name="add_device_dialog_title">Pridanie zariadenia</string>
   <string name="add_device_hint">Názov hostiteľa alebo adresa IP</string>
-  <string name="no_players_connected">Nenašli sa žiadne prehrávače</string>
   <string name="send_files">Odoslať súbory</string>
-  <string name="use_digitizer">Použiť ako grafický tablet</string>
-  <string name="digitizer_draw_button">Kresliť prstom</string>
-  <string name="digitizer_preference_title_hide_draw_button">Skryť tlačidlo kreslenia</string>
-  <string name="digitizer_preference_summary_hide_draw_button">Úplne skryje tlačidlo kreslenia, čím znemožní kreslenie prstom. Povoľte toto iba ak vaše zariadenie podporuje vstup perom.</string>
-  <string name="digitizer_preference_title_draw_button_side">Strana tlačidla „Kresliť prstom“</string>
-  <string name="digitizer_preference_title_enable_exit_fullscreen_gesture">Povoliť gesto na ukončenie celej obrazovky</string>
-  <string name="digitizer_preference_summary_enable_exit_fullscreen_gesture">Ak je povolené, ťuknutie a podržanie prsta na kresliace ploché vypne režim celej obrazovky.</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Vľavo hore</item>
-    <item>Vpravo hore</item>
-    <item>Vľavo dole</item>
-    <item>Vpravo dole</item>
-  </string-array>
   <string name="block_notification_contents">Blokovať obrázky v upozorneniach</string>
   <string name="block_notification_images">Blokovať obrázky v upozorneniach</string>
   <string name="pairing_title">Zariadenia aplikácie DeskLink</string>
@@ -298,15 +236,7 @@
   <string name="select_ringtone">Vybrať zvonenie</string>
   <string name="telephony_pref_blocked_title">Blokované čísla</string>
   <string name="telephony_pref_blocked_dialog_desc">Z týchto čísel sa nebudú zobrazovať hovori ani správy SMS. Prosím, určte jedno číslo na riadok</string>
-  <string name="mpris_coverart_description">Obrázok obalu aktuálneho média</string>
   <string name="settings_icon_description">Ikona nastavení</string>
-  <string name="presenter_fullscreen">Na celú obrazovku</string>
-  <string name="presenter_exit">Ukončiť prezentáciu</string>
-  <string name="presenter_lock_tip">Môžete uzamknúť vaše zariadenie a použiť klávesy hlasitosti na prechod na predchádzajúci a nasledujúci snímok</string>
-  <string name="add_command">Pridať príkaz</string>
-  <string name="addcommand_explanation">Nie sú registrované žiadne príkazy</string>
-  <string name="addcommand_explanation2">Môžete pridať nové príkazy v systémových nastaveniach aplikácie DeskLink</string>
-  <string name="add_command_description">Môžete pridať príkazy na počítači</string>
   <string name="pref_plugin_mprisreceiver">Multimediálny ovládač</string>
   <string name="pref_plugin_mprisreceiver_desc">Ovláda multimediálne prehrávače vášho telefónu z iného zariadenia</string>
   <string name="notification_channel_default">Ostatné upozornenia</string>
@@ -317,22 +247,12 @@
   <string name="notification_channel_filetransfer_upload">Prenos súborov</string>
   <string name="notification_channel_filetransfer_error">Chyba prenosu súboru</string>
   <string name="notification_channel_high_priority">Vysoká priorita</string>
-  <string name="mpris_stop">Zastaviť aktuálny prehrávač</string>
   <string name="copy_url_to_clipboard">Kopírovať URL do schránky</string>
   <string name="clipboard_toast">Uložené do schránky</string>
-  <string name="runcommand_notreachable">Zariadenie nie je dosiahnuteľné</string>
-  <string name="runcommand_notpaired">Zariadenie nie je spárované</string>
-  <string name="runcommand_nosuchdevice">Neexistuje žiadne zariadenie</string>
-  <string name="runcommand_noruncommandplugin">Toto zariadenie nemá povolený zásuvný modul spustenia príkazu</string>
-  <string name="runcommand_category_device_controls_title">Ikona zariadenia</string>
-  <string name="runcommand_device_controls_summary">Ak vaše zariadenie podporuje ovládanie zariadenia, nakonfigurované príkazy sa tam zobrazia.</string>
-  <string name="set_runcommand_name_as_title">set_runcommand_name_as_title</string>
-  <string name="runcommand_name_as_title_title">Zobraziť názov ako nadpis</string>
+  <string name="device_not_reachable">Zariadenie nie je dosiahnuteľné</string>
   <string name="pref_plugin_findremotedevice">Nájdenie vzdialeného zariadenia</string>
   <string name="pref_plugin_findremotedevice_desc">Zazvoní na vašom vzdialenom zariadení</string>
   <string name="ring">Zazvoniť</string>
-  <string name="pref_plugin_systemvolume">Systémová hlasitosť</string>
-  <string name="pref_plugin_systemvolume_desc">Ovláda systémovú hlasitosť vzdialeného zariadenia</string>
   <string name="mute">Stlmiť</string>
   <string name="all">Všetko</string>
   <string name="devices">Zariadenia</string>
@@ -353,8 +273,6 @@
   <string name="notification_channel_receivenotification">Upozornenia z iných zariadení</string>
   <string name="findmyphone_preference_title_flashlight">Blikať baterkou</string>
   <string name="no_app_for_opening">Nenašla sa vhodná aplikácia na otvorenie tohto súboru</string>
-  <string name="remote_keyboard_service">DeskLink Vzdialená Klávesnica</string>
-  <string name="presenter_pointer">Ukazovateľ</string>
   <string name="trusted_networks">Dôveryhodné siete</string>
   <string name="trusted_networks_desc">Obmedzí automatické objavovanie iba na známe siete</string>
   <string name="add_trusted_network">Pridať sieť %1s</string>
@@ -364,34 +282,10 @@
   <string name="bluetooth_permission_needed_desc">DeskLink potrebuje oprávnenie na pripojenie k blízkym zariadeniam, aby boli zariadenia spárované cez Bluetooth dostupné v DeskLink.</string>
   <string name="location_permission_needed_desc">DeskLink potrebuje oprávnenie na polohu na pozadí, aby poznal WiFi sieť, ku ktorej ste pripojení, aj keď je aplikácia na pozadí. Je to preto, že názvy WiFi sietí vo vašom okolí by sa mohli použiť na zistenie vašej polohy, aj keď to nie je to, čo DeskLink robí.</string>
   <string name="clipboard_android_x_incompat">V systéme Android 10 je odstránený prístup k schránke pre všetky aplikácie. Tento zásuvný modul bude zakázaný.</string>
-  <string name="mpris_open_url">Pokračovať v prehrávaní tu</string>
   <string name="cant_open_url">Nedá sa otvoriť URL pre pokračovanie v prehrávaní</string>
-  <string name="bigscreen_home">Domov</string>
-  <string name="bigscreen_up">Hore</string>
-  <string name="bigscreen_left">Doľava</string>
-  <string name="bigscreen_select">Vybrať</string>
-  <string name="bigscreen_right">Doprava</string>
-  <string name="bigscreen_down">Dole</string>
-  <string name="bigscreen_back">Späť</string>
-  <string name="bigscreen_mic">Mikrofón</string>
-  <string name="pref_plugin_bigscreen">TV diaľkový ovládač</string>
-  <string name="pref_plugin_bigscreen_desc">Použije vaše zariadenie ako diaľkové ovládanie obrazovky Plasma Bigscreen</string>
-  <string name="bigscreen_optional_permission_explanation">Na zdieľanie mikrofónového vstupu z vášho telefónu musíte dať prístup k zvukovému vstupu telefónu</string>
-  <string name="bigscreen_speech_extra_prompt">Reč</string>
   <string name="message_reply_label">Odpovedať</string>
   <string name="mark_as_read_label">Označiť ako prečítané</string>
   <string name="user_display_name">Vy</string>
-  <string name="set_default_sms_app_title">Odoslať MMS</string>
-  <string name="set_group_message_as_mms_title">Odoslať skupinovú MMS</string>
-  <string name="set_long_text_as_mms_title">Poslať dlhý text ako MMS</string>
-  <string name="convert_to_mms_after_title">Konvertovať na MMS</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Po jednej správe</item>
-    <item>Po dvoch správach</item>
-    <item>Po troch správach</item>
-    <item>Po štyroch správach</item>
-    <item>Po piatich správach</item>
-  </string-array>
   <string name="theme_dialog_title">Vybrať tému</string>
   <string-array name="theme_list">
     <item>Nastavené šetričom batérie</item>
@@ -418,12 +312,6 @@
   <string name="rise_up">Povstať</string>
   <string name="rise_down">Dole</string>
   <string name="click_here_to_type">Ťuknutím otvoríte</string>
-  <string name="clear_compose">Vyčistiť</string>
-  <string name="send_compose">Poslať</string>
-  <string name="compose_send_title">Vybrať tému</string>
-  <string name="open_compose_send">Vybrať tému</string>
-  <string name="double_tap_to_drag">Dvojité ťuknutie na ťahanie</string>
-  <string name="hold_to_drag">Podržať na ťahanie</string>
   <string name="maintainer_and_developer">Správca a vývojár</string>
   <string name="developer">Vývojár</string>
   <string name="apple_support">Podpora macOS. Práca na podpore iOS</string>
@@ -437,7 +325,6 @@
   <string name="shellwen_chen_task">Vylepšenie bezpečnosti SFTP, vylepšenie udržiavateľnosti tohto projektu, opravy chýb a všeobecné vylepšenia</string>
   <string name="everyone_else">Všetci ostatní, ktorí v priebehu rokov prispeli do DeskLink</string>
   <string name="send_clipboard">Odoslať schránku</string>
-  <string name="tap_to_execute">Ťuknutím otvoríte</string>
   <string name="plugin_stats">Nastavenia zás. modulu</string>
   <string name="enable_udp_broadcast">Povoliť vyhľadávanie zariadení cez UDP</string>
   <string name="enable_bluetooth">Povoliť Bluetooth (beta)</string>
@@ -456,9 +343,4 @@
   <string name="device_host_invalid">Hostiteľ je neplatný. Použite platný názov hostiteľa, IPv4 alebo IPv6</string>
   <string name="device_host_duplicate">Hostiteľ už existuje v zozname</string>
   <string name="enable_fullscreen">Na celú obrazovku</string>
-  <string name="pref_presenter_enable_volume_keys_title">Klávesy hlasitosti menia snímky</string>
-  <string name="pref_presenter_sensitivity_title">Nastaviť citlivosť touchpadu</string>
-  <string name="pref_presenter_enable_volume_keys_summary">V pohotovostnom režime nie je podporované na verziách Android medzi 13 a 15</string>
-  <string name="presenter_volume_keys_foreground_tip">Môžete uzamknúť vaše zariadenie a použiť klávesy hlasitosti na prechod na predchádzajúci a nasledujúci snímok</string>
-  <string name="presenter_volume_keys_tip">Môžete uzamknúť vaše zariadenie a použiť klávesy hlasitosti na prechod na predchádzajúci a nasledujúci snímok</string>
 </resources>

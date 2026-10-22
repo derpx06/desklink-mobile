@@ -9,24 +9,14 @@
   <string name="pref_plugin_telephony_desc">Pošlji obvestila o dohodnih klicih</string>
   <string name="pref_plugin_battery">Poročilo o bateriji</string>
   <string name="pref_plugin_battery_desc">Občasno poročaj o stanju baterije</string>
-  <string name="pref_plugin_connectivity_report">Poročilo o povezovanju</string>
-  <string name="pref_plugin_connectivity_report_desc">Poročilo moč signala omrežja in status</string>
-  <string name="pref_plugin_digitizer">Risalna tablica</string>
-  <string name="pref_plugin_digitizer_desc">Uporabite svojo napravo kot risalno tablico, občutljivo na pritisk</string>
   <string name="pref_plugin_clipboard">Uskladi odložišči</string>
   <string name="pref_plugin_clipboard_desc">Deli skupno vsebino odložišča</string>
   <string name="pref_plugin_clipboard_sent">Odložišče je poslano</string>
   <string name="pref_plugin_mousepad">Oddaljeni vhod</string>
   <string name="pref_plugin_mousepad_desc_nontv">Uporabi telefon ali tablični računalnik kot sledilno ploščico in tipkovnico</string>
   <string name="pref_plugin_mousepad_desc_tv">Uporabi telefon ali tablični računalnik kot oddaljeni TV</string>
-  <string name="pref_plugin_presenter">Oddaljena predstavitev</string>
-  <string name="pref_plugin_presenter_desc">S svojo napravo lahko menjate slike v predstavitvi</string>
-  <string name="pref_plugin_remotekeyboard">Sprejem oddaljenih pritiskov tipk</string>
-  <string name="pref_plugin_remotekeyboard_desc">Prejemanje dogodkov tipk od oddaljenih naprav</string>
   <string name="pref_plugin_mpris">Upravljanje večpredstavnosti</string>
   <string name="pref_plugin_mpris_desc">Omogoča daljinski upravljalnik za predvajalnik medijev</string>
-  <string name="pref_plugin_runcommand">Izvedi ukaz</string>
-  <string name="pref_plugin_runcommand_desc">S telefona ali tabličnega računalnika sprožate oddaljene ukaze</string>
   <string name="pref_plugin_contacts">Usklajevalnik stikov</string>
   <string name="pref_plugin_contacts_desc">Dovoli usklajevanje računalnikovega adresarja z imeni iz naprave</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -46,31 +36,13 @@
   <string name="open_settings">Odpri nastavitve</string>
   <string name="no_permissions">Za dostop do obvestil morate odobriti dovoljenje</string>
   <string name="no_permission_mprisreceiver">Če želite upravljati svoje predvajalnike medijev, morate odobriti dostop do obvestil</string>
-  <string name="no_permissions_remotekeyboard">Za sprejem pritiskov tipk morate aktivirati oddaljeno tipkovnico DeskLink</string>
   <string name="send_ping">Pošlji ping</string>
-  <string name="open_mpris_controls">Upravljanje večpredstavnosti</string>
-  <string name="remotekeyboard_editing_only_title">Oddaljene tipke uporabljajte samo med urejanjem</string>
-  <string name="remotekeyboard_not_connected">Ni dejavne povezave z oddaljeno tipkovnico, vzpostavite jo v DeskLinku</string>
-  <string name="remotekeyboard_connected">Povezava z oddaljeno tipkovnico je dejavna</string>
-  <string name="remotekeyboard_multiple_connections">Obstaja več kot ena povezava na oddaljeno tipkovnico, izberite napravo in nastavitve</string>
   <string name="open_mousepad">Oddaljeni input</string>
   <string name="open_mousepad_tv">TV daljinec</string>
-  <string name="mousepad_info">Premaknite prst po zaslonu da bi premikali miško. Tapnite za klik in uporabite dva/tri prste za desni in srednji gumb. Za pomikanje uporabite dva prsta. Uporabite dolg pritisk za povleci in spusti. Žiroskopsko zmožnost miške lahko omogočite iz nastavitve vtičnika</string>
-  <string name="mousepad_info_no_gestures">Premaknite prst po zaslonu, da premaknete kazalec miške, tapnite za klik.</string>
-  <string name="mousepad_keyboard_input_not_supported">Vnos s tipkovnice ni podprt na sparjeni napravi</string>
-  <string name="mousepad_single_tap_settings_title">Nastavite akcijo tapkanja enega prsta</string>
-  <string name="mousepad_double_tap_settings_title">Nastavite akcijo tapkanja dveh prstov</string>
-  <string name="mousepad_triple_tap_settings_title">Nastavite akcijo tapkanja treh prstov</string>
   <string name="mousepad_sensitivity_settings_title">Nastavi občutljivost drsne ploščice</string>
-  <string name="mousepad_mouse_buttons_title">Prikaži miškine gumbe</string>
   <string name="mousepad_acceleration_profile_settings_title">Nastavi pospeške kazalca</string>
   <string name="mousepad_scroll_direction_title">Smer povratnega drsenja</string>
   <string name="mousepad_scroll_sensitivity_title">Občutljivost drsenja</string>
-  <string name="gyro_mouse_enabled_title">Omogoči žiroskopsko miško</string>
-  <string name="gyro_mouse_sensitivity_title">Občutljivost žiroskopa</string>
-  <string name="bigscreen_hide_mouse_input">Skrij gumb za vnos z miško in tipkovnico na daljinskem upravljalniku</string>
-  <string name="bigscreen_show_home_title">Prikaži gumb Domov</string>
-  <string name="bigscreen_show_back_title">Prikaži gumb Nazaj</string>
   <string-array name="mousepad_tap_entries">
     <item>Levi klik</item>
     <item>Desni klik</item>
@@ -92,17 +64,6 @@
     <item>Močneje</item>
     <item>Najmočnejše</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Pošlji pritiske tipk na</string>
-  <string name="sendkeystrokes_textbox_hint">Pošlji pritiske tipk gostitelju</string>
-  <string name="sendkeystrokes_disabled_toast">Pošiljanje pritiskov tipk je onemogočeno - omogočite jih v nastavitvah</string>
-  <string name="sendkeystrokes_wrong_data">Neveljavna vrsta mime - mora biti \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_sent_text">Poslano %1$s na napravo %2$s</string>
-  <string name="sendkeystrokes_pref_category_summary">Ta modul omogoča drugim aplikacijam, da si delijo segmente besedila kot pritiske tipk, ki jih bo prejele za pošiljanje k povezanemu gostitelju</string>
-  <string name="sendkeystrokes_pref_category_title">Pošlji pritiske tipk</string>
-  <string name="sendkeystrokes_pref_enabled">Omogoči pošiljanje pritiskov tipk</string>
-  <string name="sendkeystrokes_pref_enabled_summary">Poslušaj podatke z vrsto mime \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_safe_text_enabled">Pošlji varno besedilo takoj</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Pošlji kratke samo številčne niz brez potrditve</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Pošlji kot pritiske tipk</string>
   <string name="mouse_receiver_plugin_description">Sprejemaj gibanje oddaljene miške</string>
   <string name="mouse_receiver_plugin_name">Sprejemnik miške</string>
@@ -184,11 +145,6 @@
   <string name="received_file_text">Tapkaj, da odpreš \'%1s\'</string>
   <string name="cannot_create_file">Ni mogoče ustvariti datoteke %s</string>
   <string name="tap_to_answer">Tapkaj za odgovor</string>
-  <string name="left_click">Pošlji levi klik</string>
-  <string name="right_click">Pošlji desni klik</string>
-  <string name="middle_click">Pošlji sredinski klik</string>
-  <string name="show_keyboard">Pokaži tipkovnico</string>
-  <string name="show_mouse_and_keyboard">Pokaži muško in tipkovnico</string>
   <string name="device_not_paired">Naprava ni uparjena</string>
   <string name="pairing_duplicate_names">POZOR: Obstaja več naprav z istim imenom.</string>
   <string name="request_pairing">Zahtevaj uparjanje</string>
@@ -199,11 +155,7 @@
   <string name="mpris_play">Predvajaj</string>
   <string name="mpris_pause">Premor</string>
   <string name="mpris_previous">Prejšnji</string>
-  <string name="mpris_rew">Previj</string>
-  <string name="mpris_ff">Hitro previj naprej</string>
   <string name="mpris_next">Naslednji</string>
-  <string name="mpris_loop">Zanka</string>
-  <string name="mpris_shuffle">Razmešaj</string>
   <string name="mpris_volume">Glasnost</string>
   <string name="mpris_time_settings_title">Gumba naprej/nazaj</string>
   <string name="mpris_time_settings_summary">Prilagodite čas za hitro premikanje naprej/nazaj, ko ga pritisnete</string>
@@ -246,21 +198,7 @@
   <string name="show_notification_if_screen_off">Pošlji obvestila le, če je zaslon izključen</string>
   <string name="add_device_dialog_title">Dodaj napravo</string>
   <string name="add_device_hint">Ime gostitelja ali naslov IP</string>
-  <string name="no_players_connected">Ni najdenih predvajalnikov</string>
   <string name="send_files">Pošlji datoteke</string>
-  <string name="use_digitizer">Uporabi kot risalno tablico</string>
-  <string name="digitizer_draw_button">Nariši s prstom</string>
-  <string name="digitizer_preference_title_hide_draw_button">Skrij gumb za risanje</string>
-  <string name="digitizer_preference_summary_hide_draw_button">Popolnoma skrije gumb za risanje, zaradi česar je risanje s prsti nemogoče. To omogočite le, če vaša naprava podpira vnos s pisalom.</string>
-  <string name="digitizer_preference_title_draw_button_side">Stran gumba »Risanje s prstom«</string>
-  <string name="digitizer_preference_title_enable_exit_fullscreen_gesture">Omogoči gesto za izhod iz celozaslonskega načina</string>
-  <string name="digitizer_preference_summary_enable_exit_fullscreen_gesture">Če je omogočeno, boste s tapkanjem in držanjem risalne površine s prstom onemogočili celozaslonski način.</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Zgoraj levo</item>
-    <item>Zgoraj desno</item>
-    <item>Spodaj levo</item>
-    <item>Spodaj desno</item>
-  </string-array>
   <string name="block_notification_contents">Blokiraj vsebine obvestil</string>
   <string name="block_notification_images">Blokiraj slike v obvestilih</string>
   <string name="pairing_title">Naprave DeskLink</string>
@@ -298,15 +236,7 @@
   <string name="select_ringtone">Izberite melodijo zvonjenja</string>
   <string name="telephony_pref_blocked_title">Blokirane številke</string>
   <string name="telephony_pref_blocked_dialog_desc">Ne prikazuj klicev in SMS s teh številk. Navedite po eno telefonsko številko v vsaki vrsti</string>
-  <string name="mpris_coverart_description">Naslovnica trenutnega medija</string>
   <string name="settings_icon_description">Ikona nastavitev</string>
-  <string name="presenter_fullscreen">Polni zaslon</string>
-  <string name="presenter_exit">Izhod iz predstavitve</string>
-  <string name="presenter_lock_tip">Napravo lahko zaklenete in s tipkami za glasnost prehajate na prejšnjo/naslednjo sliko</string>
-  <string name="add_command">Dodaj ukaz</string>
-  <string name="addcommand_explanation">Nobenih ukazov ni registriranih</string>
-  <string name="addcommand_explanation2">Nove ukaze lahko dodate v sistemskih nastavitvah DeskLink</string>
-  <string name="add_command_description">Ukaze lahko dodate na namizju</string>
   <string name="pref_plugin_mprisreceiver">Nadzor predvajalnika medijev</string>
   <string name="pref_plugin_mprisreceiver_desc">Upravljajte predstavnostne predvajalnike telefona iz druge naprave</string>
   <string name="notification_channel_default">Ostala obvestila</string>
@@ -317,22 +247,12 @@
   <string name="notification_channel_filetransfer_upload">Prenos datotek tja</string>
   <string name="notification_channel_filetransfer_error">Napaka pri prenosu datoteke</string>
   <string name="notification_channel_high_priority">Visoka prednost</string>
-  <string name="mpris_stop">Ustavi trenutni predvajalnik</string>
   <string name="copy_url_to_clipboard">Kopiraj spletni naslov na odložišče</string>
   <string name="clipboard_toast">Kopirano na odložišče</string>
-  <string name="runcommand_notreachable">Naprava ni dosegljiva</string>
-  <string name="runcommand_notpaired">Naprava ni uparjena</string>
-  <string name="runcommand_nosuchdevice">Ni take naprave</string>
-  <string name="runcommand_noruncommandplugin">Ta naprava nima omogočenega vtičnika za zagonski ukaz</string>
-  <string name="runcommand_category_device_controls_title">Nadzor naprave</string>
-  <string name="runcommand_device_controls_summary">Če vaša naprava podpira nadzor naprave, se tam prikažejo ukazi, ki ste jih konfigurirali.</string>
-  <string name="set_runcommand_name_as_title">nastavi_ukaz_ime_kot_naslov</string>
-  <string name="runcommand_name_as_title_title">Prikaži ime kot naslov</string>
+  <string name="device_not_reachable">Naprava ni dosegljiva</string>
   <string name="pref_plugin_findremotedevice">Najdi oddaljeno napravo</string>
   <string name="pref_plugin_findremotedevice_desc">Zazvonite vašo oddaljeno napravo</string>
   <string name="ring">Zazvoni</string>
-  <string name="pref_plugin_systemvolume">Sistemska glasnost</string>
-  <string name="pref_plugin_systemvolume_desc">Nadzoruj sistemsko glasnost oddaljene naprave</string>
   <string name="mute">Izklop zvoka</string>
   <string name="all">Vse</string>
   <string name="devices">Naprave</string>
@@ -353,8 +273,6 @@
   <string name="notification_channel_receivenotification">Obvestila ostalih naprav</string>
   <string name="findmyphone_preference_title_flashlight">Prižgi svetilko</string>
   <string name="no_app_for_opening">Ni primerne aplikacije za odpiranje te datoteke</string>
-  <string name="remote_keyboard_service">Oddaljena tipkovnica DeskLink</string>
-  <string name="presenter_pointer">Kazalec</string>
   <string name="trusted_networks">Zaupanje vredna omrežja</string>
   <string name="trusted_networks_desc">Omejite samodejno odkrivanje na znana omrežja</string>
   <string name="add_trusted_network">Dodaj %1s</string>
@@ -364,34 +282,10 @@
   <string name="bluetooth_permission_needed_desc">DeskLink potrebuje dovoljenje za povezavo z bližnjimi napravami, da bodo naprave, seznanjene z Bluetoothom, na voljo v DeskLink.</string>
   <string name="location_permission_needed_desc">"DeskLink potrebuje dovoljenje omrežja, da pozna WiFi omrežje, s katerim ste povezani, tudi če je aplikacija v ozadju. To je zato, ker se ime omrežja wifi  lahko uporabi za iskanje svoje lokacije, četudi to ne počne DeskLink."</string>
   <string name="clipboard_android_x_incompat">Android 10 je odstranil dostop do odložišča za vse aplikacije. Ta vtičnik bo onemogočen.</string>
-  <string name="mpris_open_url">Nadaljuj s predvajanjem tukaj</string>
   <string name="cant_open_url">Ne morem odpreti spletnega naslova za nadaljevanje predvajanja</string>
-  <string name="bigscreen_home">Domov</string>
-  <string name="bigscreen_up">Gor</string>
-  <string name="bigscreen_left">Levo</string>
-  <string name="bigscreen_select">Izberi</string>
-  <string name="bigscreen_right">Desno</string>
-  <string name="bigscreen_down">Dol</string>
-  <string name="bigscreen_back">Nazaj</string>
-  <string name="bigscreen_mic">Mikrofon</string>
-  <string name="pref_plugin_bigscreen">TV daljinec</string>
-  <string name="pref_plugin_bigscreen_desc">Uporabite svojo napravo kot daljinec za Plasmin veliki zaslon</string>
-  <string name="bigscreen_optional_permission_explanation">Če želite deliti vhod mikrofona iz telefona, morate imeti dostop do avdio vhoda telefona</string>
-  <string name="bigscreen_speech_extra_prompt">Govor</string>
   <string name="message_reply_label">ODGOVORI</string>
   <string name="mark_as_read_label">OZNAČI KOT PREBRANO</string>
   <string name="user_display_name">Vi</string>
-  <string name="set_default_sms_app_title">Pošlji MMS</string>
-  <string name="set_group_message_as_mms_title">Pošlji skupinski SMS</string>
-  <string name="set_long_text_as_mms_title">Pošlji dolgo besedilo kot MMS</string>
-  <string name="convert_to_mms_after_title">Pretvori v MMS</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Po enem sporočilu</item>
-    <item>Po dveh sporočilih</item>
-    <item>Po treh sporočilih</item>
-    <item>Po štirih sporočilih</item>
-    <item>Po petih sporočilih</item>
-  </string-array>
   <string name="theme_dialog_title">Izberite temo</string>
   <string-array name="theme_list">
     <item>Določeno z ohranjevalnikom baterije</item>
@@ -418,12 +312,6 @@
   <string name="rise_up">Dvigni</string>
   <string name="rise_down">Spusti</string>
   <string name="click_here_to_type">Tapkajte, tukaj za tipkanje</string>
-  <string name="clear_compose">Očisti</string>
-  <string name="send_compose">Pošlji</string>
-  <string name="compose_send_title">Sestavite besedilo</string>
-  <string name="open_compose_send">Sestavite besedilo</string>
-  <string name="double_tap_to_drag">Dvakrat tapnite za povlek</string>
-  <string name="hold_to_drag">Držite za povlek</string>
   <string name="maintainer_and_developer">Vzdrževalec in razvijalec</string>
   <string name="developer">Razvijalec</string>
   <string name="apple_support">podpora za macOS. Delo na podpori za iOS</string>
@@ -437,7 +325,6 @@
   <string name="shellwen_chen_task">Izboljšanje varnosti SFTP, izboljšanje vzdržljivosti tega projekta, popravki napak in splošne izboljšave</string>
   <string name="everyone_else">Vsi ostali, ki so prispevali za DeskLink v letih razvoja</string>
   <string name="send_clipboard">Pošlji odložišče</string>
-  <string name="tap_to_execute">Tapkajte za izvedbo</string>
   <string name="plugin_stats">Stanje vtičnikov</string>
   <string name="enable_udp_broadcast">Omogoči odkrivanje naprav UDP</string>
   <string name="enable_bluetooth">Omogoči bluetooth (beta)</string>
@@ -456,9 +343,4 @@
   <string name="device_host_invalid">Gostitelj ni veljaven. Uporabite veljavno ime gostitelja, IPv4 ali IPv6</string>
   <string name="device_host_duplicate">Gostitelj že obstaja na seznamu</string>
   <string name="enable_fullscreen">Omogoči celotni zaslon</string>
-  <string name="pref_presenter_enable_volume_keys_title">Tipke za glasnost zamenjujejo slike</string>
-  <string name="pref_presenter_sensitivity_title">Občutljivost kazalca</string>
-  <string name="pref_presenter_enable_volume_keys_summary">V stanju pripravljenosti ni podprto v različicah Androida med 13 in 15</string>
-  <string name="presenter_volume_keys_foreground_tip">Zaslon lahko pustite vklopljen, če želite s tipkama za glasnost preskočiti na prejšnjo/naslednjo sliko</string>
-  <string name="presenter_volume_keys_tip">Zaslon lahko pustite vklopljen ali zaklenete napravo, da se s tipkama za glasnost premaknete na prejšnjo/naslednjo sliko</string>
 </resources>

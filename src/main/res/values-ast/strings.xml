@@ -11,12 +11,7 @@
   <string name="pref_plugin_clipboard_desc">Comparte\'l conteníu del cartafueyu</string>
   <string name="pref_plugin_mousepad">Entrada remota</string>
   <string name="pref_plugin_mousepad_desc">Usa\'l preséu como panel táctil y tecláu</string>
-  <string name="pref_plugin_presenter">Mandu pa presentaciones de diapositives</string>
-  <string name="pref_plugin_presenter_desc">Usa esti preséu pa cambiar de diapositives nuna presentación</string>
-  <string name="pref_plugin_remotekeyboard">Receición de calcos de tecles remotos</string>
   <string name="pref_plugin_mpris">Controles multimedia</string>
-  <string name="pref_plugin_runcommand">Execución de comandos</string>
-  <string name="pref_plugin_runcommand_desc">Aiciona comandos remotos dende\'l preséu</string>
   <string name="pref_plugin_contacts">Sincronizador de contautos</string>
   <string name="pref_plugin_contacts_desc">Permite la sincronización de la llista telefónica del teléfonu</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -33,15 +28,8 @@
   <string name="cancel">Encaboxar</string>
   <string name="no_permissions">Precises conceder l\'accesu a los avisos</string>
   <string name="no_permission_mprisreceiver">Pa ser a controlar reproductores multimedia precises conceder l\'accesu a los avisos</string>
-  <string name="no_permissions_remotekeyboard">Pa recibir calcos de tecles precises activar el tecláu remotu de DeskLink</string>
   <string name="send_ping">Unviar un ping</string>
-  <string name="open_mpris_controls">Mandu multimedia</string>
-  <string name="remotekeyboard_editing_only_title">Remanar les tecles remotes namás al editar</string>
-  <string name="remotekeyboard_connected">La conexón col tecláu remotu ta activa</string>
   <string name="open_mousepad">Entrada remota</string>
-  <string name="mousepad_info">Movi un deu pela pantalla pa mover el mur. Con un toque faes un clic esquierdu y teniendo primío faes l\'aición d\'arrastrar y soltar, col toque de dos deos simules un clic derechu y col toque de tres simules un clic col botón d\'en mediu del mur. Esliza dos deos pela pantalla pa desplazate.</string>
-  <string name="mousepad_double_tap_settings_title">Aición al tocar con dos deos</string>
-  <string name="mousepad_triple_tap_settings_title">Aición al tocar con tres deos</string>
   <string name="mousepad_sensitivity_settings_title">Sensibilidá del panel táctil</string>
   <string name="mousepad_acceleration_profile_settings_title">Aceleración del punteru</string>
   <string name="mousepad_scroll_direction_title">Direición de desplazamientu inversa</string>
@@ -109,9 +97,6 @@
   <string name="received_file_text">Toca p\'abrir «%1s»</string>
   <string name="cannot_create_file">Nun pue crease\'l ficheru %s</string>
   <string name="tap_to_answer">Toca pa responder</string>
-  <string name="right_click">Unviar un clic derechu</string>
-  <string name="middle_click">Unviar un clic d\'en mediu</string>
-  <string name="show_keyboard">Amosar el tecláu</string>
   <string name="device_not_paired">Nun s\'empareyó\'l preséu</string>
   <string name="request_pairing">Solicitar l\'empareyamientu</string>
   <string name="pairing_accept">Aceutar</string>
@@ -147,7 +132,6 @@
   <string name="filter_apps_info">Van sincronizase los avisos de les aplicaciones esbillaes.</string>
   <string name="add_device_dialog_title">Amiestu d\'un preséu</string>
   <string name="add_device_hint">Nome d\'agospiu o direición IP</string>
-  <string name="no_players_connected">Nun s\'atoparon reproductores</string>
   <string name="send_files">Unviar ficheros</string>
   <string name="pairing_title">Preseos con DeskLink</string>
   <string name="pairing_description">Equí deberíen apaecer los demás preseos que tean executando DeskLink na mesma rede.</string>
@@ -169,13 +153,6 @@
   <string name="select_ringtone">Timbre</string>
   <string name="telephony_pref_blocked_title">Númberos bloquiaos</string>
   <string name="telephony_pref_blocked_dialog_desc">Nun s\'amuesen les llamaes nin SMS de los númberos que configures. Especifica un númberu per llinia.</string>
-  <string name="presenter_fullscreen">Pantalla completa</string>
-  <string name="presenter_exit">Colar de la presentación</string>
-  <string name="presenter_lock_tip">Pues bloquiar esti preséu y usar les tecles de volume pa dir a la diapositiva anterior/siguiente</string>
-  <string name="add_command">Amiestu d\'un comandu</string>
-  <string name="addcommand_explanation">Nun hai comandos rexistraos.</string>
-  <string name="addcommand_explanation2">Pues amestar más nos axustes de DeskLink del ordenador</string>
-  <string name="add_command_description">Pues amestar más comandos nel ordenador</string>
   <string name="pref_plugin_mprisreceiver">Mandu pa reproductores multimedia</string>
   <string name="pref_plugin_mprisreceiver_desc">Controla los reproductores multimedia d\'esti preséu dende otru</string>
   <string name="notification_channel_default">Otros avisos</string>
@@ -186,13 +163,9 @@
   <string name="notification_channel_sms_mms">Mensaxes nuevos</string>
   <string name="copy_url_to_clipboard">Copiar la URL al cartafueyu</string>
   <string name="clipboard_toast">Copióse al cartafueyu</string>
-  <string name="runcommand_notreachable">El preséu nun ye algamable</string>
-  <string name="runcommand_notpaired">El preséu nun ta empareyáu</string>
-  <string name="runcommand_noruncommandplugin">Esti preséu nun tien activáu\'l plugin Execución de comandos</string>
+  <string name="device_not_reachable">El preséu nun ye algamable</string>
   <string name="pref_plugin_findremotedevice_desc">Fai que\'l preséu remotu suene</string>
   <string name="ring">Facer sonar</string>
-  <string name="pref_plugin_systemvolume">Volume del sistema</string>
-  <string name="pref_plugin_systemvolume_desc">Controla\'l volume del sistema del preséu remotu</string>
   <string name="all">Too</string>
   <string name="devices">Preseos</string>
   <string name="settings_rename">Nome del preséu</string>
@@ -210,8 +183,6 @@
   <string name="take_picture">Llanzamientu de la cámara</string>
   <string name="plugin_photo_desc">Llanza l\'aplicación de la cámara p\'acenciellar la fechura y tresferencia de semeyes</string>
   <string name="no_app_for_opening">Nun atopó nenguna aplicación afayadiza p\'abrir esti ficheru.</string>
-  <string name="remote_keyboard_service">Tecláu remotu de DeskLink</string>
-  <string name="presenter_pointer">Punteru</string>
   <string name="trusted_networks">Redes d\'enfotu</string>
   <string name="trusted_networks_desc">Torga la descubrición automática en redes conocíes</string>
   <string name="empty_trusted_networks_list_text">Entá nun amestesti nenguna rede d\'enfotu</string>
@@ -220,18 +191,8 @@
   <string name="location_permission_needed_desc">Android rique\'l permisu Allugamientu pa indentificar redes Wi-Fi</string>
   <string name="clipboard_android_x_incompat">Android 10 quitó l\'accesu al cartafueyu en toles aplicaciones. Esti plugin va desactivase.</string>
   <string name="cant_open_url">Nun pue abrise la URL pa siguir cola reproducción</string>
-  <string name="bigscreen_optional_permission_explanation">Pa compartir la entrada del micrófonu del preséu precises dar accesu a la entrada d\'audiu del preséu</string>
   <string name="message_reply_label">RESPONDER</string>
   <string name="user_display_name">Tu</string>
-  <string name="set_long_text_as_mms_title">Unviar testos llargos como MMS</string>
-  <string name="convert_to_mms_after_title">Conversión a MMS</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Dempués d\'un mensaxes</item>
-    <item>Dempués de dos mensaxes</item>
-    <item>Dempués de tres mensaxes</item>
-    <item>Dempués de cuatro mensaxes</item>
-    <item>Dempués de cinco mensaxes</item>
-  </string-array>
   <string name="theme_dialog_title">Estilu de l\'aplicación</string>
   <string-array name="theme_list">
     <item>Set by Battery Saver</item>

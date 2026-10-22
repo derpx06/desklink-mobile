@@ -9,24 +9,14 @@
   <string name="pref_plugin_telephony_desc">Stuur meldingen voor inkomende oproepen</string>
   <string name="pref_plugin_battery">Batterijrapportage</string>
   <string name="pref_plugin_battery_desc">Rapporteer periodiek de status van de batterij</string>
-  <string name="pref_plugin_connectivity_report">Rapport over connectiviteit</string>
-  <string name="pref_plugin_connectivity_report_desc">Signaalsterkte en status van netwerk rapporteren</string>
-  <string name="pref_plugin_digitizer">Tekentablet</string>
-  <string name="pref_plugin_digitizer_desc">Gebruik uw apparaat als een drukgevoelige tekentablet</string>
   <string name="pref_plugin_clipboard">Klembordsynchronisatie</string>
   <string name="pref_plugin_clipboard_desc">De inhoud van het klembord delen</string>
   <string name="pref_plugin_clipboard_sent">Klembord verzonden</string>
   <string name="pref_plugin_mousepad">Invoer op afstand</string>
   <string name="pref_plugin_mousepad_desc_nontv">Uw telefoon of tablet gebruiken als een touchpad en toetsenbord</string>
   <string name="pref_plugin_mousepad_desc_tv">Uw telefoon of tablet gebruiken als afstandsbediening voor de TV</string>
-  <string name="pref_plugin_presenter">Presentatie op afstand</string>
-  <string name="pref_plugin_presenter_desc">Uw apparaat gebruiken om dia\'s te wisselen in een presentatie</string>
-  <string name="pref_plugin_remotekeyboard">Toetsaanslagen van afstand ontvangen</string>
-  <string name="pref_plugin_remotekeyboard_desc">Toetsaanslaggebeurtenissen ontvangen van externe apparaten</string>
   <string name="pref_plugin_mpris">Bediening van multimedia</string>
   <string name="pref_plugin_mpris_desc">Biedt een afstandsbediening voor uw mediaspeler</string>
-  <string name="pref_plugin_runcommand">Commando uitvoeren</string>
-  <string name="pref_plugin_runcommand_desc">Commando\'s afvuren op afstand vanaf uw telefoon of tablet</string>
   <string name="pref_plugin_contacts">Synchronisator van contactpersonen</string>
   <string name="pref_plugin_contacts_desc">Staat synchronisatie van het contactpersonenboek van het apparaat toe</string>
   <string name="pref_plugin_ping">Ping</string>
@@ -46,31 +36,13 @@
   <string name="open_settings">Instellingen openen</string>
   <string name="no_permissions">U moet toestemming geven voor toegang tot meldingen</string>
   <string name="no_permission_mprisreceiver">Om in staat te zijn uw mediaspelers te besturen moet u toegan geven tot de meldingen</string>
-  <string name="no_permissions_remotekeyboard">Om indrukken van toetsen te ontvangen moet u het DeskLink Remote Keyboard activeren</string>
   <string name="send_ping">Ping verzenden</string>
-  <string name="open_mpris_controls">Bediening van multimedia</string>
-  <string name="remotekeyboard_editing_only_title">Behandel toetsen op afstand alleen bij bewerken</string>
-  <string name="remotekeyboard_not_connected">Er is geen actieve verbinding met een toetsenbord op afstand, maak er een  in DeskLink</string>
-  <string name="remotekeyboard_connected">Verbinding met toetsenbord op afstand is actief</string>
-  <string name="remotekeyboard_multiple_connections">Er is meer dan een verbinding met een toetsenbord op afstand, selecteer het te configureren apparaat</string>
   <string name="open_mousepad">Invoer op afstand</string>
   <string name="open_mousepad_tv">TV op afstand</string>
-  <string name="mousepad_info">Veeg met een vinger op het scherm om de muiscursor te verplaatsen. Tik om te klikken en gebruik twee/drie vingers voor rechter en middelste knop. Twee vingers gebruiken voor schuiven. Druk lang voor slepen en loslaten. Functionaliteit van gyro-muis kan ingeschakeld worden vanuit voorkeuren in plug-in</string>
-  <string name="mousepad_info_no_gestures">Veeg met een vinger op het scherm om de muiscursor te verplaatsen, tik om te klikken</string>
-  <string name="mousepad_keyboard_input_not_supported">Toetsenbordinvoer wordt niet ondersteund door het gepaarde apparaat</string>
-  <string name="mousepad_single_tap_settings_title">Tikactie met één vinger instellen</string>
-  <string name="mousepad_double_tap_settings_title">Tikactie met twee vingers instellen</string>
-  <string name="mousepad_triple_tap_settings_title">Tikactie met drie vingers instellen</string>
   <string name="mousepad_sensitivity_settings_title">Gevoeligheid van touchpad instellen</string>
-  <string name="mousepad_mouse_buttons_title">Muisknoppen tonen</string>
   <string name="mousepad_acceleration_profile_settings_title">Aanwijzerversnelling instellen</string>
   <string name="mousepad_scroll_direction_title">Schuifrichting omdraaien</string>
   <string name="mousepad_scroll_sensitivity_title">Gevoeligheid voor schuiven</string>
-  <string name="gyro_mouse_enabled_title">Gyroscoopmuis inschakelen</string>
-  <string name="gyro_mouse_sensitivity_title">Gyroscoopgevoeligheid</string>
-  <string name="bigscreen_hide_mouse_input">Invoerknop verbergen van muis en toetsenbord op afstand</string>
-  <string name="bigscreen_show_home_title">Homeknop tonen</string>
-  <string name="bigscreen_show_back_title">Terugknop tonen</string>
   <string-array name="mousepad_tap_entries">
     <item>Linker muisklik</item>
     <item>Rechter muisklik</item>
@@ -92,17 +64,6 @@
     <item>Sterker</item>
     <item>Sterkst</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Toetsaanslagen verzenden naar</string>
-  <string name="sendkeystrokes_textbox_hint">Toetsaanslagen verzenden naar host</string>
-  <string name="sendkeystrokes_disabled_toast">Verzenden van toetsaanslagen is uitgeschakeld - schakel het in in de instellingen</string>
-  <string name="sendkeystrokes_wrong_data">Ongeldig mime-type - moet \'text/x-keystrokes\' zijn</string>
-  <string name="sendkeystrokes_sent_text">%1$s verzenden naar apparaat %2$s</string>
-  <string name="sendkeystrokes_pref_category_summary">Deze module biedt andere toepassingen om tekstsegmenten als toetsaanslagen te delen die verzonden gaan worden naar de verbonden host</string>
-  <string name="sendkeystrokes_pref_category_title">Toetsaanslagen verzenden</string>
-  <string name="sendkeystrokes_pref_enabled">Toetsaanslagen verzenden inschakelen</string>
-  <string name="sendkeystrokes_pref_enabled_summary">Luister naar gegevens met mime-type \'text/x-keystrokes\'</string>
-  <string name="sendkeystrokes_safe_text_enabled">Stuur tekst voor opslag onmiddellijk</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Stuur korte alleen-numerieke tekenreeks zonder confirmatie</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Als toetsaanslagen verzenden</string>
   <string name="mouse_receiver_plugin_description">Muisbewegingen van afstand ontvangen</string>
   <string name="mouse_receiver_plugin_name">Muisontvanger</string>
@@ -168,11 +129,6 @@
   <string name="received_file_text">Tap om \'%1s\' te openen</string>
   <string name="cannot_create_file">Kan bestand %s niet aanmaken</string>
   <string name="tap_to_answer">Tap om te antwoorden</string>
-  <string name="left_click">Linker muisklik verzenden</string>
-  <string name="right_click">Verstuur een rechter muisklik</string>
-  <string name="middle_click">Verstuur een middelste muisklik</string>
-  <string name="show_keyboard">Toetsenbord tonen</string>
-  <string name="show_mouse_and_keyboard">Muis en toetsenbord tonen</string>
   <string name="device_not_paired">Apparaat is niet gepaard</string>
   <string name="pairing_duplicate_names">Voorzichtig: er zijn meerdere apparaten met dezelfde naam.</string>
   <string name="request_pairing">Verzoek voor maken van paar</string>
@@ -183,11 +139,7 @@
   <string name="mpris_play">Afspelen</string>
   <string name="mpris_pause">Pauzeren</string>
   <string name="mpris_previous">Vorige</string>
-  <string name="mpris_rew">Terugspoelen</string>
-  <string name="mpris_ff">Snel vooruit</string>
   <string name="mpris_next">Volgende</string>
-  <string name="mpris_loop">Lus</string>
-  <string name="mpris_shuffle">Willekeurig afspelen</string>
   <string name="mpris_volume">Volume</string>
   <string name="mpris_time_settings_title">Knoppen vooruit/terug</string>
   <string name="mpris_time_settings_summary">Pas de tijd aan om snel voorwaarts/terug te gaan bij indrukken</string>
@@ -230,21 +182,7 @@
   <string name="show_notification_if_screen_off">Meldingen alleen sturen als het scherm uit staat</string>
   <string name="add_device_dialog_title">Apparaat toevoegen</string>
   <string name="add_device_hint">Hostnaam of IP-adres</string>
-  <string name="no_players_connected">Geen spelers gevonden</string>
   <string name="send_files">Bestanden verzenden</string>
-  <string name="use_digitizer">Gebruiken als tekentablet</string>
-  <string name="digitizer_draw_button">Tekenen met vinger</string>
-  <string name="digitizer_preference_title_hide_draw_button">Tekenknop verbergen</string>
-  <string name="digitizer_preference_summary_hide_draw_button">Verberg de tekenknop helemaal, maakt tekenen met de vinger onmogelijk. Schakel dit alleen in als uw apparaat invoer met stylus ondersteunt.</string>
-  <string name="digitizer_preference_title_draw_button_side">Zijkant van knop “Met vinger tekenen”</string>
-  <string name="digitizer_preference_title_enable_exit_fullscreen_gesture">Gebaar voor \"Uit volledige scherm gaan\" inschakelen</string>
-  <string name="digitizer_preference_summary_enable_exit_fullscreen_gesture">Indien ingeschakeld, tikken en zo houden op het tekenpad met uw vinger zal modus volledig scherm uitschakelen.</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Linksboven</item>
-    <item>Rechtsboven</item>
-    <item>Linksonder</item>
-    <item>Rechtsonder</item>
-  </string-array>
   <string name="block_notification_contents">Inhoud van meldingen blokkeren</string>
   <string name="block_notification_images">Afbeeldingen van meldingen blokkeren</string>
   <string name="pairing_title">Apparaten van DeskLink</string>
@@ -282,15 +220,7 @@
   <string name="select_ringtone">Selecteer een ringtone</string>
   <string name="telephony_pref_blocked_title">Geblokkeerde nummers</string>
   <string name="telephony_pref_blocked_dialog_desc">Geen oproepen en SMSen vanaf deze nummers tonen. Specificeer één nummer per regel</string>
-  <string name="mpris_coverart_description">Cover-illustratie van huidige media</string>
   <string name="settings_icon_description">Pictogram voor instellingen</string>
-  <string name="presenter_fullscreen">Volledig scherm</string>
-  <string name="presenter_exit">Presentatie beëindigen</string>
-  <string name="presenter_lock_tip">U kunt uw apparaat vergrendelen en de volumetoetsen gebruiken om naar de vorige/volgende dia te gaan</string>
-  <string name="add_command">Een commando toevoegen</string>
-  <string name="addcommand_explanation">Er zijn geen commando\'s geregistreerd</string>
-  <string name="addcommand_explanation2">U kunt nieuwe commando\'s in de instellingen voor het DeskLink-systeem toevoegen</string>
-  <string name="add_command_description">U kunt commando\'s toevoegen op het bureaublad</string>
   <string name="pref_plugin_mprisreceiver">Besturing van mediaspeler</string>
   <string name="pref_plugin_mprisreceiver_desc">Uw mediaspelers op uw telefoon besturen vanaf een andere apparaat</string>
   <string name="notification_channel_default">Overige meldingen</string>
@@ -301,22 +231,12 @@
   <string name="notification_channel_filetransfer_upload">Uitgaande bestandsoverdracht</string>
   <string name="notification_channel_filetransfer_error">Bestandsoverdrachtfout</string>
   <string name="notification_channel_high_priority">Hoge prioriteit</string>
-  <string name="mpris_stop">Stop de huidige speler</string>
   <string name="copy_url_to_clipboard">URL-adres kopiëren naar klembord</string>
   <string name="clipboard_toast">Gekopieerd naar klembord</string>
-  <string name="runcommand_notreachable">Apparaat is niet bereikbaar</string>
-  <string name="runcommand_notpaired">Apparaat is niet gepaard</string>
-  <string name="runcommand_nosuchdevice">Dit apparaat bestaat niet</string>
-  <string name="runcommand_noruncommandplugin">Dit apparaat heeft de \"Run Command Plugin\" niet ingeschakeld</string>
-  <string name="runcommand_category_device_controls_title">Besturing van apparaat</string>
-  <string name="runcommand_device_controls_summary">Als uw apparaat besturing ondersteunt, zullen commando\'s die u hebt geconfigureerd daar verschijnen.</string>
-  <string name="set_runcommand_name_as_title">set_runcommand_name_as_title</string>
-  <string name="runcommand_name_as_title_title">Naam als titel tonen</string>
+  <string name="device_not_reachable">Apparaat is niet bereikbaar</string>
   <string name="pref_plugin_findremotedevice">Apparaat op afstand zoeken</string>
   <string name="pref_plugin_findremotedevice_desc">Maak een oproep naar uw apparaat op afstand</string>
   <string name="ring">Oproep doen</string>
-  <string name="pref_plugin_systemvolume">Systeemvolume</string>
-  <string name="pref_plugin_systemvolume_desc">Bestuur het systeemvolume vanaf uw apparaat op afstand</string>
   <string name="mute">Dempen</string>
   <string name="all">Alles</string>
   <string name="devices">Apparaten</string>
@@ -337,8 +257,6 @@
   <string name="notification_channel_receivenotification">Meldingen van andere apparaten</string>
   <string name="findmyphone_preference_title_flashlight">Flitslamp laten flitsen</string>
   <string name="no_app_for_opening">Geen geschikte toepassing gevonden om dit bestand te openen</string>
-  <string name="remote_keyboard_service">DeskLink Toetsenbord op afstand</string>
-  <string name="presenter_pointer">Aanwijzer</string>
   <string name="trusted_networks">Vertrouwde netwerken</string>
   <string name="trusted_networks_desc">Automatisch ontdekken beperken tot bekende netwerken</string>
   <string name="add_trusted_network">%1s toevoegen</string>
@@ -348,34 +266,10 @@
   <string name="bluetooth_permission_needed_desc">DeskLink heeft rechten nodig om te verbinden met apparaten dichtbij om apparaten te laten paren met Bluetooth beschikbaar in DeskLink.</string>
   <string name="location_permission_needed_desc">DeskLink heeft de permissie achtergrondlocatie nodig om het WiFi-netwerk te weten waarmee u bent verbonden zelfs wanneer de toepassing in de achtergrond is. Dit vanwege dat de naam van de WiFi-netwerken om u heen gebruikt zouden kunnen worden om uw locatie te vinden, zelfs wanneer dit niet is wat DeskLink doet.</string>
   <string name="clipboard_android_x_incompat">Android 10 heeft toegang tot het klembord naar alle toepassingen verwijderd. Deze plug-in zal uitgeschakeld worden.</string>
-  <string name="mpris_open_url">Hier doorgaan met afspelen</string>
   <string name="cant_open_url">Kan URL niet openen om door te gaan met afspelen</string>
-  <string name="bigscreen_home">Home</string>
-  <string name="bigscreen_up">Omhoog</string>
-  <string name="bigscreen_left">Links</string>
-  <string name="bigscreen_select">Selecteren</string>
-  <string name="bigscreen_right">Rechts</string>
-  <string name="bigscreen_down">Omlaag</string>
-  <string name="bigscreen_back">Terug</string>
-  <string name="bigscreen_mic">Mic</string>
-  <string name="pref_plugin_bigscreen">TV op afstand</string>
-  <string name="pref_plugin_bigscreen_desc">Gebruik uw apparaat als een Bigscreen op afstand</string>
-  <string name="bigscreen_optional_permission_explanation">Om microfooninvoer vanaf uw telefoon te delen moet u toegang geven tot de geluidsinvoer van de telefoon</string>
-  <string name="bigscreen_speech_extra_prompt">Spraak</string>
   <string name="message_reply_label">BEANTWOORDEN</string>
   <string name="mark_as_read_label">MARKEREN ALS GELEZEN</string>
   <string name="user_display_name">U</string>
-  <string name="set_default_sms_app_title">MMS verzenden</string>
-  <string name="set_group_message_as_mms_title">MMS verzenden naar groep</string>
-  <string name="set_long_text_as_mms_title">Lange tekst als MMS verzenden</string>
-  <string name="convert_to_mms_after_title">Naar MMS converteren</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Na één bericht</item>
-    <item>Na twee berichten</item>
-    <item>Na drie berichten</item>
-    <item>Na vier berichten</item>
-    <item>Na vijf berichten</item>
-  </string-array>
   <string name="theme_dialog_title">Thema kiezen</string>
   <string-array name="theme_list">
     <item>Op batterijbesparing instellen</item>
@@ -402,12 +296,6 @@
   <string name="rise_up">Opkomen</string>
   <string name="rise_down">Neergaan</string>
   <string name="click_here_to_type">Tik hier om te typen</string>
-  <string name="clear_compose">Wissen</string>
-  <string name="send_compose">Verzenden</string>
-  <string name="compose_send_title">Opstellen van verzending</string>
-  <string name="open_compose_send">Tekst opstellen</string>
-  <string name="double_tap_to_drag">Dubbel tikken om te slepen</string>
-  <string name="hold_to_drag">Ingedrukt houden om te slepen</string>
   <string name="maintainer_and_developer">Onderhouder en ontwikkelaar</string>
   <string name="developer">Ontwikkelaar</string>
   <string name="apple_support">macOS ondersteuning. Werken aan iOS ondersteuning</string>
@@ -421,7 +309,6 @@
   <string name="shellwen_chen_task">Verbeter de beveiliging van SFTP, verbeter de onderhoudbaarheid van dit project, reparaties van bugs en algemene verbeteringen</string>
   <string name="everyone_else">Ieder ander die over de jaren heeft bijgedragen aan DeskLink</string>
   <string name="send_clipboard">Klembord verzenden</string>
-  <string name="tap_to_execute">Tik om uit te voeren</string>
   <string name="plugin_stats">Plug-in-statistieken</string>
   <string name="enable_udp_broadcast">Ontdekken van UDP-apparaat inschakelen</string>
   <string name="enable_bluetooth">Bluetooth inschakelen (beta)</string>
@@ -440,9 +327,4 @@
   <string name="device_host_invalid">Host is ongeldig. Gebruik een geldige hostnaam, IPv4 of IPv6</string>
   <string name="device_host_duplicate">Host bestaat al in de lijst</string>
   <string name="enable_fullscreen">Volledig scherm inschakelen</string>
-  <string name="pref_presenter_enable_volume_keys_title">Volumetoetsen wijzigen schuifregelaars</string>
-  <string name="pref_presenter_sensitivity_title">Gevoeligheid van aanwijzer</string>
-  <string name="pref_presenter_enable_volume_keys_summary">Bij standby niet ondersteund op Android versie tussen 13 en 15</string>
-  <string name="presenter_volume_keys_foreground_tip">U kunt het scherm aan laten om de volumetoetsen te gebruiken om naar de vorige/volgende dia te gaan</string>
-  <string name="presenter_volume_keys_tip">U kunt het scherm aan laten of uw apparaat vergrendelen om de volumetoetsen te gebruiken om naar de vorige/volgende dia te gaan</string>
 </resources>

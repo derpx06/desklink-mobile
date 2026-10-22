@@ -9,24 +9,14 @@
   <string name="pref_plugin_telephony_desc">Lähetä ilmoitukset saapuvista puheluista</string>
   <string name="pref_plugin_battery">Akkuraportti</string>
   <string name="pref_plugin_battery_desc">Raportoi akun tila säännöllisesti</string>
-  <string name="pref_plugin_connectivity_report">Verkkoyhteysraportti</string>
-  <string name="pref_plugin_connectivity_report_desc">Ilmoita kentän voimakkuus ja tila</string>
-  <string name="pref_plugin_digitizer">Piirtopöytä</string>
-  <string name="pref_plugin_digitizer_desc">Käytä laitetta paineen tunnistavana piirtopöytänä</string>
   <string name="pref_plugin_clipboard">Leikepöydän synkronointi</string>
   <string name="pref_plugin_clipboard_desc">Jaa leikepöydän sisältö</string>
   <string name="pref_plugin_clipboard_sent">Leikepöytä lähetetty</string>
   <string name="pref_plugin_mousepad">Kauko-ohjaus</string>
   <string name="pref_plugin_mousepad_desc_nontv">Käytä puhelinta tai tablettia kosketuslevynä ja näppäimistönä</string>
   <string name="pref_plugin_mousepad_desc_tv">Käytä puhelinta tai tablettia TV-kaukosäätimenä</string>
-  <string name="pref_plugin_presenter">Esityskaukosäädin</string>
-  <string name="pref_plugin_presenter_desc">Käytä laitettasi esitysdiojen vaihtamiseen</string>
-  <string name="pref_plugin_remotekeyboard">Vastaanota etänäppäinpainallukset</string>
-  <string name="pref_plugin_remotekeyboard_desc">Vastaanottaa etälaitteiden näppäinpainallustapahtumat</string>
   <string name="pref_plugin_mpris">Multimedian ohjaus</string>
   <string name="pref_plugin_mpris_desc">Mahdollistaa mediasoittimen etäohjauksen</string>
-  <string name="pref_plugin_runcommand">Suorita komento</string>
-  <string name="pref_plugin_runcommand_desc">Suorita komentoja etänä puhelimelta tai tabletilta</string>
   <string name="pref_plugin_contacts">Yhteystietosynkronointi</string>
   <string name="pref_plugin_contacts_desc">Sallii laitteen yhteystietojen synkronoinnin</string>
   <string name="pref_plugin_ping">Tiedustelupaketti</string>
@@ -44,31 +34,13 @@
   <string name="open_settings">Avaa asetukset</string>
   <string name="no_permissions">Ilmoitusten näkemiseksi sinun on annettava käyttöoikeus ilmoituksiin</string>
   <string name="no_permission_mprisreceiver">Hallitaksesi mediasoittimiasi sinun on annettava käyttöoikeudet ilmoituksiin</string>
-  <string name="no_permissions_remotekeyboard">Näppäinpainallusten vastaanottamiseksi DeskLinkin etänäppäimistö on aktivoitava</string>
   <string name="send_ping">Lähetä tiedustelupaketti</string>
-  <string name="open_mpris_controls">Multimedian ohjaus</string>
-  <string name="remotekeyboard_editing_only_title">Käsittele etänäppäimet vain muokattaessa</string>
-  <string name="remotekeyboard_not_connected">Etänäppäimistöyhteyksiä ei ole käytössä: muodosta yhteys DeskLinkissa</string>
-  <string name="remotekeyboard_connected">Etänäppäimistöyhteys on käytössä</string>
-  <string name="remotekeyboard_multiple_connections">Etänäppäimistöyhteyksiä on useampia: valitse asetettava laite</string>
   <string name="open_mousepad">Kauko-ohjaus</string>
   <string name="open_mousepad_tv">TV-kaukosäädin</string>
-  <string name="mousepad_info">Siirrä hiirikohdistinta liikuttamalla sormea näytöllä. Tee hiirenpainallus napauttamalla, ja käytä kahta tai kolmea sormea oikealle ja keskipainikkeelle. Vieritä kahdella sormella. Pitkällä painalluksella voit vetää ja pudottaa. Gyrohiiritoiminnon voi ottaa käyttää liitännäisen asetuksista</string>
-  <string name="mousepad_info_no_gestures">Siirrä hiiriosoitinta liikuttamalla sormea näytöllä, napautus napsauttaa.</string>
-  <string name="mousepad_keyboard_input_not_supported">Paritettu laite ei tue näppäimistösyötettä</string>
-  <string name="mousepad_single_tap_settings_title">Aseta yhden sormen napautuksen toiminto</string>
-  <string name="mousepad_double_tap_settings_title">Aseta kahden sormen napautuksen toiminto</string>
-  <string name="mousepad_triple_tap_settings_title">Aseta kolmen sormen napautuksen toiminto</string>
   <string name="mousepad_sensitivity_settings_title">Aseta kosketuslevyn herkkyys</string>
-  <string name="mousepad_mouse_buttons_title">Näytä hiiripainikkeet</string>
   <string name="mousepad_acceleration_profile_settings_title">Aseta osoittimen kiihdytys</string>
   <string name="mousepad_scroll_direction_title">Käänteinen vierityssuunta</string>
   <string name="mousepad_scroll_sensitivity_title">Vieritysherkkyys</string>
-  <string name="gyro_mouse_enabled_title">Käytä gyroskooppihiirtä</string>
-  <string name="gyro_mouse_sensitivity_title">Gyroskoopin herkkyys</string>
-  <string name="bigscreen_hide_mouse_input">Piilota hiiren ja näppäimistön etäsyötepainike</string>
-  <string name="bigscreen_show_home_title">Näytä Koti-painike</string>
-  <string name="bigscreen_show_back_title">Näytä Takaisin-painike</string>
   <string-array name="mousepad_tap_entries">
     <item>Vasen napsautus</item>
     <item>Oikea napsautus</item>
@@ -90,17 +62,6 @@
     <item>Vahvempi</item>
     <item>Vahvin</item>
   </string-array>
-  <string name="sendkeystrokes_send_to">Lähetä näppäinpainallukset…</string>
-  <string name="sendkeystrokes_textbox_hint">Lähetä näppäinpainallukset koneelle</string>
-  <string name="sendkeystrokes_disabled_toast">Näppäinpainallusten lähetys ei ole käytössä: ota se käyttöön asetuksista</string>
-  <string name="sendkeystrokes_wrong_data">Virheellinen MIME-tyyppi: vaaditaan ”text/x-keystrokes”</string>
-  <string name="sendkeystrokes_sent_text">Lähetettiin %1$s laitteelle %2$s</string>
-  <string name="sendkeystrokes_pref_category_summary">Tällä moduulilla muut sovellukset voivat jakaa tekstikatkelmia yhdistetylle koneelle lähetettyinä näppäinpainalluksina</string>
-  <string name="sendkeystrokes_pref_category_title">Lähetä näppäinpainalluksia</string>
-  <string name="sendkeystrokes_pref_enabled">Salli näppäinpainallusten lähettäminen</string>
-  <string name="sendkeystrokes_pref_enabled_summary">Kuuntele dataa, jonka MIME-tyyppi on ”text/x-keystrokes”</string>
-  <string name="sendkeystrokes_safe_text_enabled">Lähetä turvallinen teksti välittömästi</string>
-  <string name="sendkeystrokes_safe_text_enabled_summary">Lähetä lyhyet vain numeeriset jonot vahvistuksetta</string>
   <string name="pref_plugin_mousepad_send_keystrokes">Lähetä näppäinpainalluksina</string>
   <string name="mouse_receiver_plugin_description">Vastaanota etähiiren liike</string>
   <string name="mouse_receiver_plugin_name">Hiirivastaanotin</string>
@@ -165,11 +126,6 @@
   <string name="received_file_text">Avaa ”%1s” napauttamalla</string>
   <string name="cannot_create_file">Ei voida luoda tiedostoa %s</string>
   <string name="tap_to_answer">Vastaa napauttamalla</string>
-  <string name="left_click">Lähetä vasemman painikkeen napsautus</string>
-  <string name="right_click">Lähetä oikean painikkeen napsautus</string>
-  <string name="middle_click">Lähetä keskipainikkeen napsautus</string>
-  <string name="show_keyboard">Näytä näppäimistö</string>
-  <string name="show_mouse_and_keyboard">Näytä hiiri ja näppäimistö</string>
   <string name="device_not_paired">Laitetta ei ole kytketty pariksi</string>
   <string name="pairing_duplicate_names">Varoitus: Useammalla laitteella on sama nimi.</string>
   <string name="request_pairing">Pyydä pariksi kytkemistä</string>
@@ -180,11 +136,7 @@
   <string name="mpris_play">Toista</string>
   <string name="mpris_pause">Tauko</string>
   <string name="mpris_previous">Edellinen</string>
-  <string name="mpris_rew">Kelaa takaisin</string>
-  <string name="mpris_ff">Pikakelaa</string>
   <string name="mpris_next">Seuraava</string>
-  <string name="mpris_loop">Silmukka</string>
-  <string name="mpris_shuffle">Sekoita</string>
   <string name="mpris_volume">Äänenvoimakkuus</string>
   <string name="mpris_time_settings_title">Kelauspainikkeet</string>
   <string name="mpris_time_settings_summary">Säädä painettaessa tapahtuvan kelauksen kestoa</string>
@@ -226,21 +178,7 @@
   <string name="show_notification_if_screen_off">Lähetä ilmoitukset vain näyttö ei ole käytössä</string>
   <string name="add_device_dialog_title">Lisää laite</string>
   <string name="add_device_hint">Konenimi tai IP-osoite</string>
-  <string name="no_players_connected">Soittimia ei löytynyt</string>
   <string name="send_files">Lähetä tiedostoja</string>
-  <string name="use_digitizer">Käytä piirtopöytänä</string>
-  <string name="digitizer_draw_button">Piirrä sormella</string>
-  <string name="digitizer_preference_title_hide_draw_button">Piilota piirtämiskuvake</string>
-  <string name="digitizer_preference_summary_hide_draw_button">Piilottaa piirtämiskuvakkeen kokonaan, jolloin sormella ei voi piirtää. Käytä vain, jos laite tukee piirtokynäsyötettä.</string>
-  <string name="digitizer_preference_title_draw_button_side">”Piirrä sormella” -painikkeen kylki</string>
-  <string name="digitizer_preference_title_enable_exit_fullscreen_gesture">Salli koko näytön poistumisele</string>
-  <string name="digitizer_preference_summary_enable_exit_fullscreen_gesture">Jos käytössä, piirtopöydän napautus ja pitäminen sormella poistaa koko näytön tilan käytöstä.</string>
-  <string-array name="digitizer_preference_entries_draw_button_side">
-    <item>Ylävasen</item>
-    <item>Yläoikea</item>
-    <item>Alavasen</item>
-    <item>Alaoikea</item>
-  </string-array>
   <string name="block_notification_contents">Estä ilmoitusten sisältö</string>
   <string name="block_notification_images">Estä ilmoitusten kuvat</string>
   <string name="pairing_title">DeskLink -laitteet</string>
@@ -278,15 +216,7 @@
   <string name="select_ringtone">Valitse soittoääni</string>
   <string name="telephony_pref_blocked_title">Estetyt numerot</string>
   <string name="telephony_pref_blocked_dialog_desc">Älä näytä soittoja äläkä tekstiviestejä näistä numeroista. Anna numero per rivi.</string>
-  <string name="mpris_coverart_description">Nykyisen median kansikuva</string>
   <string name="settings_icon_description">Asetuskuvake</string>
-  <string name="presenter_fullscreen">Koko näyttö</string>
-  <string name="presenter_exit">Poistu esitystilasta</string>
-  <string name="presenter_lock_tip">Laitteen voi lukita ja käyttää äänenvoimakkuuspainikkeita edellinen/seuraava dia -painikkeina</string>
-  <string name="add_command">Lisää komento</string>
-  <string name="addcommand_explanation">Komentoja ei ole rekisteröity</string>
-  <string name="addcommand_explanation2">Voit lisätä uusia komentoja DeskLinkin järjestelmäasetuksissa</string>
-  <string name="add_command_description">Voit lisätä komentoja työpöydälle</string>
   <string name="pref_plugin_mprisreceiver">Mediasoittimen hallinta</string>
   <string name="pref_plugin_mprisreceiver_desc">Hallitse puhelimesi mediasoittimia toiselta laitteelta</string>
   <string name="notification_channel_default">Muut ilmoitukset</string>
@@ -297,22 +227,12 @@
   <string name="notification_channel_filetransfer_upload">Lähtevä tiedostonsiirto</string>
   <string name="notification_channel_filetransfer_error">Tiedostonsiirtovirhe</string>
   <string name="notification_channel_high_priority">Korkea etusija</string>
-  <string name="mpris_stop">Pysäytä nykyinen soitin</string>
   <string name="copy_url_to_clipboard">Kopioi verkko-osoite leikepöydälle</string>
   <string name="clipboard_toast">Kopioitu leikepöydälle</string>
-  <string name="runcommand_notreachable">Laite tavoittamattomissa</string>
-  <string name="runcommand_notpaired">Laitetta ei ole kytketty pariksi</string>
-  <string name="runcommand_nosuchdevice">Tätä laitetta ei ole</string>
-  <string name="runcommand_noruncommandplugin">Laitteen Suorita komento -liitännäinen ei ole käytössä</string>
-  <string name="runcommand_category_device_controls_title">Laiteohjaimet</string>
-  <string name="runcommand_device_controls_summary">Jos laite tukee laiteohjaimia, määrittämäsi komennot ilmestyvät tähän.</string>
-  <string name="set_runcommand_name_as_title">aseta_komennon_nimi_otsikoksi</string>
-  <string name="runcommand_name_as_title_title">Nämä otsikkona nimi</string>
+  <string name="device_not_reachable">Laite tavoittamattomissa</string>
   <string name="pref_plugin_findremotedevice">Etsi etälaite</string>
   <string name="pref_plugin_findremotedevice_desc">Soita etälaitteeseen</string>
   <string name="ring">Soita</string>
-  <string name="pref_plugin_systemvolume">Järjestelmän äänenvoimakkuus</string>
-  <string name="pref_plugin_systemvolume_desc">Säädä etälaitteen järjestelmän äänenvoimakkuutta</string>
   <string name="mute">Vaimenna</string>
   <string name="all">Kaikki</string>
   <string name="devices">Laitteet</string>
@@ -332,8 +252,6 @@
   <string name="block_images">Estä ilmoitusten kuvat</string>
   <string name="notification_channel_receivenotification">Muiden laitteiden ilmoitukset</string>
   <string name="no_app_for_opening">Tämän tiedoston avaamiseen sopivaa sovellusta ei löytynyt</string>
-  <string name="remote_keyboard_service">DeskLink -etänäppäimistö</string>
-  <string name="presenter_pointer">Osoitin</string>
   <string name="trusted_networks">Luotetut verkot</string>
   <string name="trusted_networks_desc">Rajaa automaattihaku tunnettuihin verkkoihin</string>
   <string name="add_trusted_network">Lisää %1s</string>
@@ -343,34 +261,10 @@
   <string name="bluetooth_permission_needed_desc">DeskLink vaatii oikeuden yhdistää lähellä oleviin laitteisiin, jotta voisi kytkeä niitä Bluetoothilla pariksi.</string>
   <string name="location_permission_needed_desc">DeskLink tarvitsee taustasijaintioikeudet tietääkseen myös sovelluksen olleessa taustalla, mihin langattomaan verkkoon on kirjauduttu. Ympärilläsi olevien langattomien verkkojen nimiä voi käyttää sijaintisi selvittämiseen, vaikka DeskLink ei tietoa siihen käytäkään.</string>
   <string name="clipboard_android_x_incompat">Android 10 on poistanut kaikkien sovellusten leikepöytäkäytön. Liitännäinen poistetaan käytöstä.</string>
-  <string name="mpris_open_url">Jatka toistoa tästä</string>
   <string name="cant_open_url">Verkko-osoitetta ei voi avata toiston jatkamiseksi</string>
-  <string name="bigscreen_home">Koti</string>
-  <string name="bigscreen_up">Ylemmäs</string>
-  <string name="bigscreen_left">Vasemmalle</string>
-  <string name="bigscreen_select">Valitse</string>
-  <string name="bigscreen_right">Oikea</string>
-  <string name="bigscreen_down">Alemmas</string>
-  <string name="bigscreen_back">Takaisin</string>
-  <string name="bigscreen_mic">Mikrofoni</string>
-  <string name="pref_plugin_bigscreen">TV-kaukosäädin</string>
-  <string name="pref_plugin_bigscreen_desc">Käytä laitetta Plasma Bigscreen -kaukosäätimenä</string>
-  <string name="bigscreen_optional_permission_explanation">Jakaaksesi puhelimen mikrofonisyötteen puhelimen äänisyötteeseen on annettava käyttöoikeus</string>
-  <string name="bigscreen_speech_extra_prompt">Puhe</string>
   <string name="message_reply_label">VASTAA</string>
   <string name="mark_as_read_label">MERKITSE LUETUKSI</string>
   <string name="user_display_name">Sinä</string>
-  <string name="set_default_sms_app_title">Lähetä multimediaviesti</string>
-  <string name="set_group_message_as_mms_title">Lähetä ryhmämultimediaviesti</string>
-  <string name="set_long_text_as_mms_title">Lähetä pitkä teksti multimediaviestinä</string>
-  <string name="convert_to_mms_after_title">Muunna multimediaviestiksi</string>
-  <string-array name="convert_to_mms_after_entries">
-    <item>Yhden viestin jälkeen</item>
-    <item>Kahden viestin jälkeen</item>
-    <item>Kolmen viestin jälkeen</item>
-    <item>Neljän viestin jälkeen</item>
-    <item>Viiden viestin jälkeen</item>
-  </string-array>
   <string name="theme_dialog_title">Valitse teema</string>
   <string-array name="theme_list">
     <item>Akunsäästäjän asettama</item>
@@ -397,12 +291,6 @@
   <string name="rise_up">Nouse ylemmäs</string>
   <string name="rise_down">Laskeudu alemmas</string>
   <string name="click_here_to_type">Napauta ja kirjoita</string>
-  <string name="clear_compose">Tyhjennä</string>
-  <string name="send_compose">Lähetä</string>
-  <string name="compose_send_title">Kirjoita teksti</string>
-  <string name="open_compose_send">Kirjoita teksti</string>
-  <string name="double_tap_to_drag">Vedä kaksoisnapauttamalla</string>
-  <string name="hold_to_drag">Vedä pitämällä pohjassa</string>
   <string name="maintainer_and_developer">Ylläpitäjä ja kehittäjä</string>
   <string name="developer">Kehittäjä</string>
   <string name="apple_support">macOS-tuki. Työn alla iOS-tuki</string>
@@ -416,7 +304,6 @@
   <string name="shellwen_chen_task">Parantaa SFTP:n tietoturvaa ja tämän projektin ylläpidettävyyttä, korjaa virheitä ja yleisesti parantaa asioita</string>
   <string name="everyone_else">Kaikki muut vuosien varrella DeskLinkia avustaneet</string>
   <string name="send_clipboard">Lähetä leikepöytä</string>
-  <string name="tap_to_execute">Suorita napauttamalla</string>
   <string name="plugin_stats">Liitännäisen tilastot</string>
   <string name="enable_udp_broadcast">Käytä UDP-laitehakua</string>
   <string name="enable_bluetooth">Käytä Bluetoothia (beeta)</string>
