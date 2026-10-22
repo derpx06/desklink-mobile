@@ -134,6 +134,9 @@ data class WebRtcRemoteSessionControlMessage(
     val sampleRate: Int? = null,
     val channels: Int? = null,
     val value: Int? = null,
+    /** F2 (D1): "mirror"/"extend" on `request-view` and `screen-ready`, and the phone view's density. */
+    val display: String? = null,
+    val scale: Double? = null,
 ) {
     fun validate(wire: WebRtcWireBinding, attemptId: String, now: Long) {
         require(remoteSessionVersion == VERSION) { "Unsupported DeskLink remote-session version" }
@@ -160,6 +163,8 @@ data class WebRtcRemoteSessionControlMessage(
         require(action == null || action in CAMERA_ACTIONS || action in AUDIO_ACTIONS) { "Unknown DeskLink camera or audio action" }
         require(audioDirection == null || audioDirection in AUDIO_DIRECTIONS) { "Unknown DeskLink audio direction" }
         require(source == null || source in AUDIO_SOURCES) { "Unknown DeskLink audio source" }
+        require(display == null || display in DISPLAY_MODES) { "Unknown DeskLink display mode" }
+        require(scale == null || scale in 0.5..8.0) { "DeskLink display scale is invalid" }
         require((sampleRate ?: 8000) in 8000..192000 && (channels ?: 1) in 1..2 && (value ?: 0) in 0..100) {
             "DeskLink audio format is invalid"
         }
@@ -210,6 +215,8 @@ data class WebRtcRemoteSessionControlMessage(
             sampleRate?.let { value.put("sampleRate", it) }
             channels?.let { value.put("channels", it) }
             this.value?.let { value.put("value", it) }
+            display?.let { value.put("display", it) }
+            scale?.let { value.put("scale", it) }
         }
 
     companion object {
@@ -223,6 +230,7 @@ data class WebRtcRemoteSessionControlMessage(
         const val PHONE_TO_DESK = "phone-to-desk"
         val AUDIO_DIRECTIONS = setOf(DESK_TO_PHONE, PHONE_TO_DESK)
         val AUDIO_SOURCES = setOf("system", "mic")
+        val DISPLAY_MODES = setOf("mirror", "extend")
 
         fun fromJson(value: JSONObject): WebRtcRemoteSessionControlMessage {
             val kind = WebRtcRemoteSessionControlKind.fromWireName(value.getString("kind"))
@@ -262,6 +270,8 @@ data class WebRtcRemoteSessionControlMessage(
                 sampleRate = value.takeIf { it.has("sampleRate") }?.getInt("sampleRate"),
                 channels = value.takeIf { it.has("channels") }?.getInt("channels"),
                 value = value.takeIf { it.has("value") }?.getInt("value"),
+                display = value.optString("display").takeIf(String::isNotEmpty),
+                scale = value.takeIf { it.has("scale") }?.getDouble("scale"),
             )
         }
     }

@@ -156,6 +156,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_live_sound">phone sound to the computer</string>
     <string name="remote_sound_on">Play its sound here</string>
     <string name="remote_sound_off">Stop its sound</string>
+    <string name="remote_display_mirror">Mirror</string>
+    <string name="remote_display_extend">Extend</string>
+    <string name="remote_extend_unsupported">%1$s can\'t add a display — showing a mirror</string>
     <string name="home_live_hearing">computer sound playing here</string>
     <string name="settings_desk_may_play">Let %1$s play sound here</string>
     <string name="settings_desk_may_play_summary">%1$s can send its sound to this phone without asking first. End it from Home</string>

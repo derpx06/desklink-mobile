@@ -157,6 +157,11 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             "view" -> controlMode = ControlMode.View
         }
         fillScreen = prefs.getBoolean(getString(R.string.remote_pref_edge_to_edge), false)
+        displayMode = org.desklink.mobile.plugins.screen.ScreenDisplay.requested(this, deviceId.orEmpty())
+        if (displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND) {
+            controlMode = ControlMode.Touch
+            fillScreen = false
+        }
         // A rotation recreates this activity but must not stop/re-request the
         // same authenticated desktop view. The process-level WebRTC peer and
         // renderer keep their session; an explicit refresh remains available
@@ -236,6 +241,25 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             }
         }
         LaunchedEffect(live) { SessionLiveNotification.refresh(this@MousePadActivity, deviceId) }
+        // F2: the desk could not extend — say so once; the screen now mirrors.
+        val notice = plugin?.extendNotice
+        LaunchedEffect(notice) {
+            if (notice != null) {
+                displayMode = org.desklink.mobile.plugins.screen.ScreenDisplay.MIRROR
+                android.widget.Toast.makeText(this@MousePadActivity, notice, android.widget.Toast.LENGTH_LONG).show()
+                plugin.extendNotice = null
+            }
+        }
+        // F2: an extended display follows this view's size (a fold, multi-window): ask again.
+        val area = org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea
+        var askedArea by remember { mutableStateOf(area) }
+        LaunchedEffect(area, displayMode, live) {
+            if (displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND && live && area != null && askedArea != null && area != askedArea) {
+                kotlinx.coroutines.delay(500)
+                requestDesktopScreen()
+            }
+            if (live) askedArea = area
+        }
         ImmersiveDesktop(controlEnabled, live)
         if (plugin != null && prompt != null) {
             SessionPasswordDialog(
@@ -387,7 +411,11 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 .clip(RoundedCornerShape(if (rounded) 12.dp else 0.dp))
                 .background(Color.Black)
                 .clipToBounds()
-                .onSizeChanged { size = it }
+                .onSizeChanged {
+                    size = it
+                    // F2: Extend sizes the desk's virtual monitor to this view.
+                    org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea = it.width to it.height
+                }
                 .pointerInput(controlEnabled, desktopWidth, desktopHeight, size) {
                     detectDesktopGestures(sink)
                 },
@@ -644,6 +672,20 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 keys = { if (keyboardUp) KeyBar(input, onUsed = touch) },
                 onMore = { touch(); more = true },
                 reason = ScreenControlPlugin.latestStatus.takeUnless { it in progressStages() },
+                display = displayMode,
+                onDisplay = { mode ->
+                    touch()
+                    if (mode != displayMode) {
+                        displayMode = mode
+                        org.desklink.mobile.plugins.screen.ScreenDisplay.choose(this@MousePadActivity, deviceId.orEmpty(), mode)
+                        if (mode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND) {
+                            // A monitor of its own: touch where you mean, 1:1, no crop.
+                            controlMode = ControlMode.Touch
+                            fillScreen = false
+                        }
+                        requestDesktopScreen()
+                    }
+                },
                 moreMenu = {
                     androidx.compose.material3.DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
                         androidx.compose.material3.DropdownMenuItem(
@@ -696,6 +738,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             }
         }
     }
+
+    /** F2: what this screen asks the desk for (the switch shows it; a refusal falls back to mirror). */
+    private var displayMode by mutableStateOf(org.desklink.mobile.plugins.screen.ScreenDisplay.MIRROR)
 
     /** "Edge to edge": fill the phone, cropping a little — never stretching.
      * Off by default: the whole desktop is visible at its true aspect. */

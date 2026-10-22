@@ -514,6 +514,16 @@ class WebRtcSessionCoordinator(
                     }
                     val remoteSessionId = remoteSession.beginView(direction)
                     val ask = if (direction == WebRtcScreenDirection.DESKTOP_TO_PHONE) viewRequestForThisDisplay() else null
+                    // F2 (D1): Mirror or Extend, with this view's pixels and density for Extend.
+                    val display = if (direction == WebRtcScreenDirection.DESKTOP_TO_PHONE) {
+                        org.desklink.mobile.plugins.screen.ScreenDisplay.ask(
+                            org.desklink.mobile.plugins.screen.ScreenDisplay.requested(context, device.deviceId),
+                            org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea,
+                            context.resources.displayMetrics.density,
+                        )
+                    } else {
+                        null
+                    }
                     sendRemoteSessionControlLocked(
                         binding,
                         attemptId,
@@ -525,7 +535,9 @@ class WebRtcSessionCoordinator(
                             password = sessionPassword.get(),
                             maxDimension = ask?.first,
                             fps = ask?.second,
-                        ),
+                            screenWidth = display?.width,
+                            screenHeight = display?.height,
+                        ).copy(display = display?.display, scale = display?.scale),
                     )
                     publish("RequestingRemoteView", direction.wireName)
                     scheduleRemoteRequestTimeout(control = false, remoteSessionId)
@@ -1879,7 +1891,7 @@ class WebRtcSessionCoordinator(
                     // one-time onAddTrack alone lost it to a plugin reload, and
                     // the desktop's picture decoded but was never shown.
                     transport?.remoteVideoTrack()?.let { track -> screen?.onRemoteVideoTrack(track) }
-                    screen?.onRemoteScreenReady(message.screenWidth, message.screenHeight, message.screenCount)
+                    screen?.onRemoteScreenReady(message.screenWidth, message.screenHeight, message.screenCount, message.display)
                 }
             }
             WebRtcRemoteSessionControlKind.RESUME -> {
@@ -1917,6 +1929,13 @@ class WebRtcSessionCoordinator(
             WebRtcRemoteSessionControlKind.VIEW_DENIED,
             WebRtcRemoteSessionControlKind.SCREEN_ERROR -> {
                 val screen = device.getPlugin(ScreenControlPlugin::class.java)
+                // F2: no virtual monitor on this desk — say so and show a mirror instead.
+                if (message.reason == org.desklink.mobile.plugins.screen.ScreenDisplay.REASON_UNSUPPORTED) {
+                    org.desklink.mobile.plugins.screen.ScreenDisplay.refusedBy(device.deviceId)
+                    screen?.onExtendUnsupported()
+                    requestRemoteView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+                    return@synchronized
+                }
                 passwordDenial(message.reason)?.let { screen?.onPasswordDenied(it, control = false) }
                     ?: screen?.onRemoteViewFailed(message.reason)
             }

@@ -33,6 +33,13 @@ class ScreenControlPlugin : Plugin() {
     /** How many screens the desktop shares; above one, the view can switch. */
     var remoteScreenCount by mutableStateOf(1)
 
+    /** F2: what the desk is showing — "extend" (a virtual monitor of this view's size) or "mirror". */
+    var remoteDisplay by mutableStateOf(ScreenDisplay.MIRROR)
+        private set
+
+    /** F2: the desk could not add a display; a one-off notice for the screen (then cleared). */
+    var extendNotice by mutableStateOf<String?>(null)
+
     /** The desktop reports a text input has keyboard focus: the remote
      * screen raises the phone keyboard, and drops it when this clears. */
     var desktopTextFocused by mutableStateOf(false)
@@ -147,7 +154,13 @@ class ScreenControlPlugin : Plugin() {
 
     /** The desktop reports it has started capturing. This is a control-plane
      * claim, not a picture, and carries the desktop's own coordinate space. */
-    fun onRemoteScreenReady(width: Int?, height: Int?, screenCount: Int? = null) {
+    fun onExtendUnsupported() {
+        remoteDisplay = ScreenDisplay.MIRROR
+        extendNotice = context.getString(R.string.remote_extend_unsupported, device.name)
+    }
+
+    fun onRemoteScreenReady(width: Int?, height: Int?, screenCount: Int? = null, display: String? = null) {
+        remoteDisplay = if (display == ScreenDisplay.EXTEND) ScreenDisplay.EXTEND else ScreenDisplay.MIRROR
         if (width != null && height != null) {
             remoteScreenWidth = width
             remoteScreenHeight = height

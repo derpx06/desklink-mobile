@@ -128,6 +128,7 @@ class DeskLinkApplication : Application() {
         // so a background thread touching them first cannot create state a running composition
         // cannot read (see PluginFactory.instantiatePluginForDevice).
         org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom
+        org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea
         org.desklink.mobile.plugins.screen.ScreenControlPlugin.latestStatus
         org.desklink.mobile.plugins.screen.PhoneScreenCaptureService.sharingDeviceId
         org.desklink.mobile.plugins.share.TransferProgress.current

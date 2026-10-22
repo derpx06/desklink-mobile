@@ -97,6 +97,9 @@ fun DeskControls(
     onMore: () -> Unit,
     /** Why control was refused (the desk's portal, a password), shown inside the amber notice. */
     reason: String? = null,
+    /** F2: "mirror" or "extend", and switching between them (re-asks the desk). */
+    display: String = "mirror",
+    onDisplay: (String) -> Unit = {},
     keys: @Composable () -> Unit = {},
     moreMenu: @Composable () -> Unit = {},
 ) {
@@ -132,6 +135,30 @@ fun DeskControls(
                         rttMs?.let {
                             Spacer(Modifier.width(6.dp))
                             Text(stringResource(R.string.home_meta_rtt, it.toInt()), fontFamily = MonoFamily, fontSize = 11.sp, color = PillText.copy(alpha = 0.7f))
+                        }
+                    }
+                }
+                // F2: Mirror | Extend, under the name (the top centre is the amber notice's).
+                Pill(Modifier.align(Alignment.TopStart).padding(top = 56.dp)) {
+                    Row(Modifier.padding(horizontal = 3.dp).selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
+                        listOf("mirror" to R.string.remote_display_mirror, "extend" to R.string.remote_display_extend).forEach { (value, label) ->
+                            val selected = display == value
+                            Box(
+                                Modifier
+                                    .heightIn(min = 48.dp)
+                                    .selectable(selected = selected, role = Role.RadioButton) { onDisplay(value) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    stringResource(label),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (selected) PillOnSelected else PillText,
+                                    modifier = Modifier
+                                        .background(if (selected) PillSelected else Color.Transparent, RoundedCornerShape(16.dp))
+                                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                                )
+                            }
                         }
                     }
                 }
