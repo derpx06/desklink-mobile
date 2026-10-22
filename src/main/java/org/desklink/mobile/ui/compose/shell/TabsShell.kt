@@ -78,6 +78,7 @@ val MaxContentWidth = 840.dp
 
 val TabBarHeight = 64.dp
 
+@Suppress("ConfigurationScreenWidthHeight") // the one question asked: tab bar or rail
 @Composable
 fun isWide(): Boolean = LocalConfiguration.current.screenWidthDp >= WIDE_DP
 

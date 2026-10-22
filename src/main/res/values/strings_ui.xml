@@ -602,7 +602,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_add_photo">Take photo</string>
     <string name="bucket_add_paste">Paste</string>
     <string name="bucket_no_camera">No camera app is available</string>
-    <string name="bucket_skipped">%1$d could not be added (too large, or the Bucket is full)</string>
+    <string name="bucket_skipped" tools:ignore="PluralsCandidate">%1$d could not be added (too large, or the Bucket is full)</string>
     <string name="bucket_text_added">Saved to the Bucket</string>
     <string name="bucket_text_failed">That text is too long for the Bucket (1 MB at most)</string>
     <string name="bucket_waiting_for">Waiting for %1$s</string>
@@ -707,7 +707,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="tab_terminals">Terminals</string>
     <string name="tab_settings">Settings</string>
     <string name="tab_files_syncing">syncing</string>
-    <string name="tab_files_syncing_percent">syncing, %1$d percent</string>
+    <string name="tab_files_syncing_percent" tools:ignore="PluralsCandidate">syncing, %1$d percent</string>
     <string name="tab_terminals_attention">a command finished or needs you</string>
     <string name="tab_settings_attention">a permission is missing</string>
     <string name="tab_quick_switch">Switch computer</string>

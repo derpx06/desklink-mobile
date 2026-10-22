@@ -58,6 +58,7 @@ class ThreadFileRunner : FileRunner {
  * private transfer root. Neither the peer's filename nor a URI read back from a checkpoint ever
  * selects where bytes are read, written or deleted.
  */
+@Suppress("UsableSpace") // a plain free-space check on the private transfer root: the quota APIs do not apply to it
 class WebRtcFileTransferManager(
     context: Context,
     private val device: Device,

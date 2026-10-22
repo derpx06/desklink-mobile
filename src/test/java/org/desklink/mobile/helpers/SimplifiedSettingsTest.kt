@@ -70,6 +70,12 @@ class SimplifiedSettingsTest {
 
     @Test
     fun runningItTwiceChangesNothingTheSecondTime() {
+        // The application ran this once already, in the background, when the test app started: start from a clean marker.
+        val marker = context.getSharedPreferences(RemovedFeatures.MARKER_PREFS, Context.MODE_PRIVATE)
+        // ...and wait for that run to finish first, or it could set the marker between our setup and our call.
+        val deadline = System.nanoTime() + 10_000_000_000L
+        while (!marker.getBoolean(RemovedFeatures.MARKER_KEY_SETTINGS, false) && System.nanoTime() < deadline) Thread.sleep(20)
+        marker.edit(commit = true) { clear() }
         val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
         prefs.edit(commit = true) { putBoolean("remote_haptics", false); putBoolean("mousepad_scroll_direction", true) }
         RemovedFeatures.runOnce(context)
