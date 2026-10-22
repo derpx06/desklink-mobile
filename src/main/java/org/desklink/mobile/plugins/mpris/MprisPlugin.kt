@@ -114,6 +114,11 @@ class MprisPlugin : Plugin() {
             return getAlbumArt(albumArtUrl, this@MprisPlugin, playerName)
         }
 
+        /** The cover the Home card shows: the desk's inline one, else an http(s) one (fetched in the background). */
+        fun art(): MprisArt.Art? = MprisArt.get(artId)
+            ?: albumArtUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+                ?.let { url -> getAlbumArt()?.let { MprisArt.forUrl(url, it) } }
+
         fun getHttpUrl(): String? {
             return url?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
         }

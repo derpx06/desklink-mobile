@@ -3,6 +3,8 @@
  */
 package org.desklink.mobile.plugins.mpris
 
+import android.support.v4.media.session.PlaybackStateCompat
+
 /** The pure rules behind the media card and player sheet; unit-tested. */
 object MediaControl {
     /** An optimistic play/pause shows this long at most without the desk confirming it. */
@@ -41,4 +43,37 @@ object MediaControl {
         val s = total % 60
         return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
     }
+
+    /** The media session's playback state: what Android draws in the shade, on the lock screen and in Quick Settings. */
+    data class Transport(val state: Int, val positionMs: Long, val speed: Float, val actions: Long)
+
+    /**
+     * The desk's player as a media session. Playing advances by itself (speed 1 from [positionMs]);
+     * stale (no feature link) is paused with no controls, as the Home card shows it. Seeking needs
+     * the desk's canSeek and a known length.
+     */
+    fun transport(
+        playing: Boolean, stale: Boolean, lastPositionMs: Long, lastPositionAt: Long, lengthMs: Long, now: Long,
+        canPlay: Boolean, canPause: Boolean, canPrevious: Boolean, canNext: Boolean, canSeek: Boolean,
+    ): Transport {
+        val live = playing && !stale
+        var actions = 0L
+        if (!stale) {
+            if (canPrevious) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+            if (live && canPause) actions = actions or PlaybackStateCompat.ACTION_PAUSE or PlaybackStateCompat.ACTION_PLAY_PAUSE
+            if (!live && canPlay) actions = actions or PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PLAY_PAUSE
+            if (canNext) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+            if (canSeek && lengthMs > 0) actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
+        }
+        return Transport(
+            state = if (live) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED,
+            positionMs = position(lastPositionMs, lastPositionAt, playing, lengthMs, now),
+            speed = if (live) 1f else 0f,
+            actions = actions,
+        )
+    }
+
+    /** The notification's second line: "Artist — Album", whichever the desk sent, else [fallback]. */
+    fun notificationText(artist: String, album: String, fallback: String): String =
+        listOf(artist, album).filter(String::isNotBlank).joinToString(" — ").ifEmpty { fallback }
 }

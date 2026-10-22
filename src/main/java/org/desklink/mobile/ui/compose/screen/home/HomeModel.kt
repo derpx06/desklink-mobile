@@ -14,7 +14,6 @@ import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.clipboard.ClipboardPlugin
 import org.desklink.mobile.plugins.mpris.MprisPlugin
 import org.desklink.mobile.plugins.mpris.MediaControl as MprisControlState
-import org.desklink.mobile.plugins.mpris.MprisArt
 import org.desklink.mobile.plugins.screen.PhoneScreenCaptureService
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.share.TransferProgress
@@ -91,9 +90,7 @@ object HomeModel {
         val stale = !device.hasActiveWebRtcFeatureTransport
         val reported = player?.isPlaying == true && !stale
         // The desk's inline cover first, then an http(s) one; otherwise the card draws a gradient.
-        val art = MprisArt.get(player?.artId)
-            ?: player?.takeIf { it.albumArtUrl.startsWith("http://") || it.albumArtUrl.startsWith("https://") }
-                ?.let { p -> p.getAlbumArt()?.let { MprisArt.forUrl(p.albumArtUrl, it) } }
+        val art = player?.art()
         return HomeMedia(
             player = name,
             players = plugin.playerList,
