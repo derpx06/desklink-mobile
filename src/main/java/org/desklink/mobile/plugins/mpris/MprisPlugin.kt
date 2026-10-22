@@ -31,7 +31,6 @@ import org.desklink.mobile.plugins.mpris.AlbumArtCache.payloadToDiskCache
 import org.desklink.mobile.plugins.mpris.AlbumArtCache.registerPlugin
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
-import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.R
 import java.net.MalformedURLException
 import java.util.concurrent.ConcurrentHashMap
@@ -275,12 +274,6 @@ class MprisPlugin : Plugin() {
     override val description: String
         get() = context.resources.getString(R.string.pref_plugin_mpris_desc)
 
-    override fun hasSettings(): Boolean = true
-
-    override fun getSettingsFragment(activity: Activity): PluginSettingsFragment {
-        return PluginSettingsFragment.newInstance(pluginKey, R.xml.mprisplugin_preferences)
-    }
-
     override fun onCreate(): Boolean {
         MprisMediaSession.instance.onCreate(context.applicationContext, this, device.deviceId)
 
@@ -465,7 +458,7 @@ class MprisPlugin : Plugin() {
             }
             val prefs = PreferenceManager.getDefaultSharedPreferences(context)
             val httpUrl = playerStatus.getHttpUrl()
-            if (prefs.getBoolean(context.getString(R.string.mpris_keepwatching_key), true) && httpUrl != null) {
+            if (httpUrl != null) {
                 try {
                     val transformedUrl = httpUrl
                         .let { VideoUrlsHelper.convertToAndFromYoutubeTvLinks(it) }

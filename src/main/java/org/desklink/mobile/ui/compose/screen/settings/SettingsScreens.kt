@@ -329,7 +329,7 @@ internal fun PermissionsSection(desk: DeskSettings?) {
     var asked by remember { mutableIntStateOf(0) }
     // Android 10 also wants a folder chosen by hand before received files can be written.
     val folder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) org.desklink.mobile.plugins.share.ShareSettingsFragment.saveStorageLocationPreference(context, uri)
+        if (uri != null) org.desklink.mobile.plugins.share.ShareDestination.saveStorageLocationPreference(context, uri)
     }
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         asked++

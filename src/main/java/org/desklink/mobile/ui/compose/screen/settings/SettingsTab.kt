@@ -565,11 +565,11 @@ private fun FilesGroup(desk: DeskSettings?, actions: SettingsActions, prefs: and
     val context = LocalContext.current
     val folder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            org.desklink.mobile.plugins.share.ShareSettingsFragment.saveStorageLocationPreference(context, uri)
+            org.desklink.mobile.plugins.share.ShareDestination.saveStorageLocationPreference(context, uri)
             changed()
         }
     }
-    val custom = org.desklink.mobile.plugins.share.ShareSettingsFragment.isCustomDestinationEnabled(context)
+    val custom = org.desklink.mobile.plugins.share.ShareDestination.isCustomDestinationEnabled(context)
     val where = if (custom) prefs.getString("share_destination_folder_uri", null)?.let { Uri.parse(it).path } else null
     RowGroup {
         if (desk != null) {
@@ -578,7 +578,7 @@ private fun FilesGroup(desk: DeskSettings?, actions: SettingsActions, prefs: and
         GroupRow(
             stringResource(R.string.share_destination_folder_preference),
             icon = R.drawable.sym_folder_zip,
-            subtitle = where ?: org.desklink.mobile.plugins.share.ShareSettingsFragment.getDefaultDestinationDirectory().absolutePath,
+            subtitle = where ?: org.desklink.mobile.plugins.share.ShareDestination.getDefaultDestinationDirectory().absolutePath,
             monoSubtitle = true,
             onClick = { runCatching { folder.launch(null) } },
         ) { Chevron() }

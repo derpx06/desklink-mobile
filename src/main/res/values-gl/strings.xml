@@ -5,8 +5,6 @@
   <string name="foreground_notification_no_devices">Non conectado a ningún dispositivo</string>
   <string name="foreground_notification_devices">Conectado a: %s</string>
   <string name="foreground_notification_send_clipboard">Enviar o portapapeis</string>
-  <string name="pref_plugin_telephony">Notificador de telefonía</string>
-  <string name="pref_plugin_telephony_desc">Envíe notificacións de chamadas entrantes.</string>
   <string name="pref_plugin_battery">Informe da batería</string>
   <string name="pref_plugin_battery_desc">Informar periodicamente do estado da batería.</string>
   <string name="pref_plugin_clipboard">Sincronización do portapapeis</string>
@@ -27,7 +25,6 @@
   <string name="pref_plugin_sharereceiver_desc">Comparta ficheiros e enderezos URL entre dispositivos</string>
   <string name="device_list_empty">Non hai dispositivos.</string>
   <string name="ok">Aceptar</string>
-  <string name="sad_ok">Vale :(</string>
   <string name="cancel">Cancelar</string>
   <string name="open_settings">Abrir a configuración</string>
   <string name="no_permissions">Debe conceder permisos para acceder ás notificacións</string>
@@ -35,15 +32,7 @@
   <string name="send_ping">Enviar un ping</string>
   <string name="open_mousepad">Entrada remota</string>
   <string name="mousepad_sensitivity_settings_title">Definir a sensibilidade do punteiro táctil</string>
-  <string name="mousepad_acceleration_profile_settings_title">Definir a aceleración do punteiro</string>
   <string name="mousepad_scroll_direction_title">Inverter a dirección de desprazamento</string>
-  <string name="mousepad_scroll_sensitivity_title">Sensibilidade de desprazamento</string>
-  <string-array name="mousepad_tap_entries">
-    <item>Clic esquerdo</item>
-    <item>Clic dereito</item>
-    <item>Clic central</item>
-    <item>Nada</item>
-  </string-array>
   <string-array name="mousepad_sensitivity_entries">
     <item>O máis lento</item>
     <item>Lento</item>
@@ -51,40 +40,19 @@
     <item>Por riba do predeterminado</item>
     <item>O máis rápido</item>
   </string-array>
-  <string-array name="mousepad_acceleration_profile_entries">
-    <item>Ningunha</item>
-    <item>A máis débil</item>
-    <item>Máis débil</item>
-    <item>Media</item>
-    <item>Máis forte</item>
-    <item>A máis forte</item>
-  </string-array>
   <string name="mouse_receiver_plugin_description">Recibir movementos de rato remotos</string>
   <string name="mouse_receiver_plugin_name">Receptor de rato</string>
   <string name="mouse_receiver_no_permissions">Para recibir entrada táctil remota ten que garantir permisos de accesibilidade para controlar completamente o dispositivo.</string>
-  <string name="view_status_title">Estado</string>
-  <string name="battery_status_format">Batería: %d%%</string>
-  <string name="battery_status_low_format">Batería: %d%% (baixa)</string>
-  <string name="battery_status_charging_format">Batería: %d%% (cargando)</string>
-  <string name="category_connected_devices">Dispositivos conectados</string>
-  <string name="category_not_paired_devices">Dispositivos dispoñíbeis</string>
-  <string name="category_remembered_devices">Dispositivos coñecidos</string>
-  <string name="device_menu_plugins">Configuración dos complementos</string>
   <string name="device_menu_unpair">Desemparellarse</string>
-  <string name="pair_new_device">Emparellar cun novo dispositivo</string>
-  <string name="cancel_pairing">Cancelar o emparellamento</string>
-  <string name="unknown_device">Dispositivo descoñecido</string>
   <string name="error_not_reachable">O dispositivo está inaccesíbel.</string>
   <string name="error_already_paired">O dispositivo xa está emparellado.</string>
   <string name="error_timed_out">Esgotouse o tempo límite</string>
   <string name="error_clocks_not_match">Os reloxos do dispositivos non están sincronizados.</string>
   <string name="error_canceled_by_user">Cancelouno a persoa usuaria.</string>
   <string name="error_canceled_by_other_peer">Cancelouse remotamente</string>
-  <string name="encryption_info_title">Información do cifrado</string>
   <string name="my_device_fingerprint">A pegada SHA256 do certificado do seu dispositivo é:</string>
   <string name="remote_device_fingerprint">A pegada SHA256 do certificado do dispositivo remoto é:</string>
   <string name="pair_requested">Solicitude de emparellamento</string>
-  <string name="pair_succeeded">Emparellouse</string>
   <string name="pairing_request_from">Solicitude de emparellamento de «%1s».</string>
   <plurals name="incoming_file_title">
     <item quantity="one">Recibindo %1$d ficheiro de %2$s</item>
@@ -121,37 +89,21 @@
   <string name="tap_to_open">Toque para abrir</string>
   <string name="received_file_text">Toque para abrir «%1s».</string>
   <string name="cannot_create_file">Non é posíbel crear o ficheiro %s</string>
-  <string name="tap_to_answer">Toque para contestar</string>
-  <string name="device_not_paired">O dispositivo non está emparellado</string>
-  <string name="pairing_duplicate_names">Ollo: Hai varios dispositivos co mesmo nome.</string>
   <string name="request_pairing">Solicitar emparellarse</string>
   <string name="pairing_accept">Aceptar</string>
   <string name="pairing_reject">Rexeitar</string>
-  <string name="pairing_explanation">Emparellar dispositivos permítelles acceder o un ao outro. Emparelle só os seus propios dispositivos.</string>
   <string name="settings">Configuración</string>
   <string name="mpris_play">Reproducir</string>
   <string name="mpris_pause">Deter</string>
   <string name="mpris_previous">Anterior</string>
   <string name="mpris_next">Seguinte</string>
   <string name="mpris_volume">Volume</string>
-  <string name="mpris_time_settings_title">Botóns de avanzar e retroceder</string>
-  <string name="mpris_time_settings_summary">Axuste o tempo que avanzar ou retroceder ao premer</string>
-  <string-array name="mpris_time_entries">
-    <item>10 segundos</item>
-    <item>20 segundos</item>
-    <item>30 segundos</item>
-    <item>1 minuto</item>
-    <item>2 minutos</item>
-  </string-array>
   <string name="mpris_notifications_explanation">Necesítase o permiso de notificacións para amosar medios remotos no caixón de notificacións.</string>
-  <string name="mpris_notification_settings_title">Amosar a notificación de control de reprodución.</string>
-  <string name="mpris_notification_settings_summary">Permitir controlar os reprodutores sen abrir DeskLink</string>
   <string name="share_to">Compartir con…</string>
   <string name="unreachable_device_dynamic_shortcut">%s (✕)</string>
   <string name="unreachable_device_url_share_text">Os URL que se compartan cun dispositivo inaccesíbel entregaranse cando o dispositivo estea accesíbel.\n\n</string>
   <string name="protocol_version">Versión do protocolo:</string>
   <string name="protocol_version_newer">Este dispositivo usa unha versión máis nova do protocolo.</string>
-  <string name="plugin_settings_with_name">Configuración de %s</string>
   <string name="invalid_device_name">Nome de dispositivo incorrecto</string>
   <string name="shareplugin_text_saved">Recibiuse un texto e gardouse no portapapeis</string>
   <string name="custom_devices_settings">Lista de dispositivos personalizada</string>
@@ -160,11 +112,6 @@
   <string name="custom_device_deleted">Eliminouse o dispositivo personalizado</string>
   <string name="custom_device_fab_hint">Engadir un dispositivo</string>
   <string name="undo">Desfacer</string>
-  <string name="share_notification_preference">Notificacións sonoras</string>
-  <string name="share_notification_preference_summary">Vibrar e reproducir un son ao recibir un ficheiro.</string>
-  <string name="share_destination_customize">Personalizar o cartafol de destino</string>
-  <string name="share_destination_customize_summary_disabled">Os ficheiros recibidos aparecerán en «Descargas».</string>
-  <string name="share_destination_customize_summary_enabled">Os ficheiros almacenaranse no cartafol de abaixo.</string>
   <string name="share_destination_folder_preference">Cartafol de destino</string>
   <string name="share">Compartir</string>
   <string name="share_received_file">Compartir «%s»</string>
@@ -176,67 +123,31 @@
   <string name="send_files">Enviar ficheiros</string>
   <string name="block_notification_contents">Bloquear o contido das notificacións</string>
   <string name="block_notification_images">Bloquear as imaxes das notificacións</string>
-  <string name="pairing_title">Dispositivos con DeskLink</string>
-  <string name="pairing_description">Outros dispositivos que estean a executar DeskLink na mesma rede deberían aparecer aquí.</string>
   <string name="device_rename_title">Renomear o dispositivo</string>
   <string name="device_rename_confirm">Renomear</string>
   <string name="refresh">Actualizar</string>
-  <string name="unreachable_description">Este dispositivo emparellado está inaccesíbel. Asegúrese de que está conectado á mesma rede.</string>
-  <string name="no_wifi">Non ten conexión a unha rede Wi-Fi así que pode que non vexa ningún dispositivo. Prema aquí para activar a Wi-Fi.</string>
-  <string name="on_non_trusted_message">Non é unha rede de confianza: desactivouse o descubrimento automático.</string>
   <string name="no_file_browser">Non hai navegadores de ficheiros instalados.</string>
-  <string name="pref_plugin_telepathy">Enviar unha mensaxe de texto</string>
-  <string name="pref_plugin_telepathy_desc">Enviar mensaxes de texto desde o seu escritorio</string>
-  <string name="pref_plugin_telepathy_mms">Enviar MMS</string>
-  <string name="pref_plugin_telepathy_mms_desc">Para poder enviar MMS desde DeskLink ten que definila como a aplicación predeterminada de envío de SMS.</string>
   <string name="findmyphone_title">Atopar o móbil</string>
   <string name="findmyphone_title_tablet">Atopar a tableta</string>
   <string name="findmyphone_title_tv">Atopar o meu televisor</string>
   <string name="findmyphone_description">Reproduce un ton de chamada no dispositivo para que poida atopalo.</string>
   <string name="findmyphone_found">Atopeino</string>
-  <string name="open">Abrir</string>
-  <string name="close">Pechar</string>
-  <string name="plugins_need_permission">Algúns complementos necesitan permisos para funcionar (toque para máis información):</string>
   <string name="permission_explanation">Este complemento necesita permisos para funcionar.</string>
-  <string name="all_permissions_granted">Garantíronse todos os permisos 🎉</string>
   <string name="optional_permission_explanation">Ten que conceder permisos adicionais para activar todas as funcións.</string>
-  <string name="plugins_need_optional_permission">Algúns complementos teñen funcionalidades desactivadas por mor dunha falta de permisos (toque para máis información):</string>
   <string name="share_optional_permission_explanation">Para recibir ficheiros ten que permitir acceder ao almacenamento</string>
   <string name="share_notifications_explanation">Para ver o progreso ao enviar ou recibir ficheiros ten que permitir notificacións.</string>
-  <string name="telepathy_permission_explanation">Para ler e escribir SMS desde o escritorio ten que dar permiso de SMS.</string>
-  <string name="telephony_permission_explanation">Para ver as chamadas de teléfono no escritorio ten que dar permiso aos rexistros de chamadas telefónicas e ao estado do teléfono</string>
-  <string name="telephony_optional_permission_explanation">Para ver o nome dun contacto en vez dun número de teléfono ten que dar acceso aos contactos do teléfono.</string>
   <string name="contacts_permission_explanation">Para compartir a axenda de contactos co escritorio ten que dar permiso de contactos</string>
-  <string name="contacts_per_device_confirmation">Os contactos do teléfono copiaranse neste dispositivo para que os poidan usar a aplicación de SMS de DeskLink e outras aplicacións.</string>
   <string name="select_ringtone">Seleccione un ton de chamada</string>
-  <string name="telephony_pref_blocked_title">Números bloqueados</string>
-  <string name="telephony_pref_blocked_dialog_desc">Non amosar chamadas nin SMS destes números. Indique un número por liña.</string>
-  <string name="settings_icon_description">Icona da configuración.</string>
   <string name="pref_plugin_mprisreceiver">Control do reprodutor de multimedia</string>
   <string name="pref_plugin_mprisreceiver_desc">Controlar os reprodutores do seu móbil desde outro dispositivo</string>
-  <string name="notification_channel_default">Outras notificacións</string>
-  <string name="notification_channel_persistent">Indicador persistente</string>
   <string name="notification_channel_media_control">Control de reprodución</string>
-  <string name="notification_channel_filetransfer">Transferencia de ficheiros entrante</string>
-  <string name="notification_channel_filetransfer_upload">Transferencia de ficheiros saíntes</string>
-  <string name="notification_channel_filetransfer_error">Erro de transferencia de ficheiro</string>
-  <string name="notification_channel_high_priority">Prioridade alta</string>
-  <string name="copy_url_to_clipboard">Copiar o URL no portapapeis</string>
-  <string name="clipboard_toast">Copiouse no portapapeis</string>
   <string name="device_not_reachable">O dispositivo está inaccesíbel.</string>
   <string name="pref_plugin_findremotedevice">Atopar un dispositivo remoto</string>
   <string name="pref_plugin_findremotedevice_desc">Facer soar o dispositivo remoto</string>
   <string name="ring">Facer soar</string>
-  <string name="mute">Silenciar</string>
   <string name="all">Todo</string>
-  <string name="devices">Dispositivos</string>
-  <string name="settings_rename">Nome do dispositivo</string>
-  <string name="settings_dark_mode">Tema escuro</string>
   <string name="settings_export_logs">Exportar os rexistros de DeskLink</string>
   <string name="settings_export_logs_text">Xerar un ficheiro con información de execución que pode axudar a solucionar problemas.</string>
-  <string name="settings_more_settings_title">Máis opcións</string>
-  <string name="settings_more_settings_text">As opcións específicas dun dispositivo atópanse en «Configuración dos complementos» no dispositivo.</string>
-  <string name="setting_persistent_notification">Amosar unha notificación persistente</string>
   <string name="setting_persistent_notification_oreo">Notificación persistente</string>
   <string name="setting_persistent_notification_description">Toque para activar ou desactivar na configuración de notificacións</string>
   <string name="extra_options">Opcións adicionais</string>
@@ -244,7 +155,6 @@
   <string name="set_privacy_options">Definir as súas opcións de protección da privacidade.</string>
   <string name="block_contents">Bloquear o contido das notificacións</string>
   <string name="block_images">Bloquear as imaxes nas notificacións</string>
-  <string name="notification_channel_receivenotification">Notificacións desde outros dispositivos</string>
   <string name="no_app_for_opening">Non se atopou ningunha aplicación axeitada para abrir o ficheiro.</string>
   <string name="trusted_networks">Redes de confianza</string>
   <string name="trusted_networks_desc">Restrinxir o descubrimento automático a redes coñecidas</string>
@@ -252,14 +162,7 @@
   <string name="empty_trusted_networks_list_text">Aínda non engadiu ningunha rede de confianza</string>
   <string name="allow_all_networks_text">Permitilas todas</string>
   <string name="location_permission_needed_title">Require permiso</string>
-  <string name="bluetooth_permission_needed_desc">DeskLink require permisos para conectarse a dispositivos próximos para poñer dispositivos emparellados mediante Bluetooth a disposición de DeskLink.</string>
   <string name="location_permission_needed_desc">DeskLink necesita o permiso de localización en segundo planto para saber a que rede WiFi se conectou incluso cando a aplicación está en segundo plano. Isto é porque o nome das redes WiFi ao redor seu podería usarse para descubrir a súa localización, aínda que DeskLink non faga tal cousa.</string>
-  <string name="clipboard_android_x_incompat">Android 10 retirou o acceso ao portapapeis a todas as aplicacións. Desactivarase este complemento.</string>
-  <string name="cant_open_url">Non é posíbel abrir o URL para continuar reproducindo</string>
-  <string name="message_reply_label">RESPONDER</string>
-  <string name="mark_as_read_label">MARCAR COMO LIDO</string>
-  <string name="user_display_name">Vostede</string>
-  <string name="theme_dialog_title">Escoller un tema</string>
   <string-array name="theme_list">
     <item>Definir polo aforrador de batería</item>
     <item>Claro</item>
@@ -274,16 +177,10 @@
   <string name="donate">Doar</string>
   <string name="source_code">Código fonte</string>
   <string name="licenses">Licenzas</string>
-  <string name="website">Sitio web</string>
   <string name="about">Sobre</string>
   <string name="authors">Autoría</string>
-  <string name="thanks_to">Agradecementos</string>
   <string name="easter_egg">Ovo de Pascua</string>
-  <string name="email_contributor">Escribir por correo electrónico á persoa colaboradora\n%s</string>
-  <string name="visit_contributors_homepage">Visitar a páxina persoal da persoa colaboradora\n%s</string>
   <string name="version">Versión %s</string>
-  <string name="rise_up">Ir ao principio</string>
-  <string name="rise_down">Ir ao final</string>
   <string name="click_here_to_type">Toque aquí para escribir</string>
   <string name="maintainer_and_developer">Mantemento e desenvolvemento</string>
   <string name="developer">Desenvolvemento</string>
@@ -298,14 +195,9 @@
   <string name="shellwen_chen_task">Mellorar a seguridade de SFTP, facilitar o mantemento do proxecto, correccións de fallos e melloras xerais.</string>
   <string name="everyone_else">O resto de xente que colaborou en DeskLink ao longo dos anos</string>
   <string name="send_clipboard">Enviar o portapapeis</string>
-  <string name="plugin_stats">Estatísticas do complemento</string>
-  <string name="enable_udp_broadcast">Activar o descubrimento de dispositivos UDP.</string>
-  <string name="enable_bluetooth">Activar o Bluetooth (beta)</string>
   <string name="receive_notifications_permission_explanation">Debe permitir notificacións para recibilas doutros dispositivos.</string>
   <string name="findmyphone_notifications_explanation">Necesita o permiso de notificacións para que o teléfono poda soar cando a aplicación está en segundo plano.</string>
   <string name="mpris_keepwatching">Continuar reproducindo</string>
-  <string name="mpris_keepwatching_settings_title">Continuar reproducindo</string>
-  <string name="mpris_keepwatching_settings_summary">Amosar unha notificación silenciosa para continuar reproducindo neste dispositivo tras pechar o contido multimedia.</string>
   <string name="notification_channel_keepwatching">Continuar reproducindo</string>
   <string name="ping_result">Enviouse un ping en %1$d milisegundos</string>
   <string name="ping_failed">Non foi posíbel enviar un ping ao dispositivo.</string>

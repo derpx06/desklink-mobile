@@ -42,7 +42,7 @@ class RemovedFeaturesTest {
             "commands_preference_abc123", "commands_preference_", "bigscreen_show_home", "pref_sendkeystrokes_enabled",
             "compose_send_input_cache", "digitizer_hide_draw_button",
             // Kept: pairing, the desk screen, scroll, and anything else.
-            "remote_default_mode", "mousepad_scroll_direction", "paired_devices", "commands", "abc_commands_preference_x",
+            "mousepad_scroll_direction", "mousepad_sensitivity_key", "paired_devices", "commands", "abc_commands_preference_x",
         )
         assertEquals(
             listOf(
@@ -55,7 +55,7 @@ class RemovedFeaturesTest {
 
     @Test
     fun noKeptSettingIsListedForDeletion() {
-        val kept = listOf("remote_default_mode", "remote_edge_to_edge", "mousepad_scroll_direction", "mousepad_scroll_sensitivity")
+        val kept = listOf("mousepad_scroll_direction", "mousepad_sensitivity_key", "findmyphone_ringtone", "share_destination_custom", "share_destination_folder_uri")
         assertEquals(emptyList<String>(), RemovedFeatures.staleKeys(kept))
     }
 }

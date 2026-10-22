@@ -84,7 +84,6 @@ import org.desklink.mobile.R
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.screen.ScreenCoordinateMapper
 import org.desklink.mobile.plugins.screen.ScreenPoint
-import org.desklink.mobile.ui.PluginSettingsActivity
 import org.desklink.mobile.ui.compose.DeskLinkDarkTheme
 import androidx.compose.material3.SegmentedButton
 import org.desklink.mobile.ui.compose.components.TabularNumbers
@@ -152,11 +151,8 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         prefs.registerOnSharedPreferenceChangeListener(this)
         applyPrefs()
         // How the screen starts; the top bar changes both for this session.
-        when (prefs.getString(getString(R.string.remote_pref_default_mode), "touch")) {
-            "trackpad" -> controlMode = ControlMode.Trackpad
-            "view" -> controlMode = ControlMode.View
-        }
-        fillScreen = prefs.getBoolean(getString(R.string.remote_pref_edge_to_edge), false)
+        // Fixed defaults: touch mode, the whole desktop shown (no longer settings).
+        fillScreen = false
         displayMode = org.desklink.mobile.plugins.screen.ScreenDisplay.requested(this, deviceId.orEmpty())
         if (displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND) {
             controlMode = ControlMode.Touch
@@ -833,10 +829,12 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     }
 
     private fun openSettings() {
-        val intent = Intent(this, PluginSettingsActivity::class.java)
-            .putExtra(PluginSettingsActivity.EXTRA_DEVICE_ID, deviceId)
-            .putExtra(PluginSettingsActivity.EXTRA_PLUGIN_KEY, MousePadPlugin::class.java.simpleName)
-        startActivity(intent)
+        // Pointer speed and scroll direction live in Settings, Control.
+        startActivity(
+            Intent(this, org.desklink.mobile.ui.MainActivity::class.java)
+                .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_SETTINGS_PAGE, org.desklink.mobile.ui.compose.screen.settings.SettingsPage.CONTROL.route)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+        )
     }
 
     private fun mousePadPlugin(): MousePadPlugin? =
@@ -857,16 +855,12 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         }
 
         // A percentage: 100 moves the content exactly with the fingers.
-        scrollCoefficient = prefs.getInt(getString(R.string.mousepad_scroll_sensitivity), 100)
-            .coerceIn(25, 300) / 100.0
-        autoKeyboard = prefs.getBoolean(getString(R.string.remote_pref_auto_keyboard), true)
-        autoHideControls = prefs.getBoolean(getString(R.string.remote_pref_autohide_controls), true)
-        haptics = prefs.getBoolean(getString(R.string.remote_pref_haptics), true)
-        if (prefs.getBoolean(getString(R.string.remote_pref_keep_screen_on), true)) {
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        } else {
-            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
+        scrollCoefficient = 1.0
+        // Fixed defaults (no longer settings): the keyboard opens for a text field, the controls hide, the screen stays on.
+        autoKeyboard = true
+        autoHideControls = true
+        haptics = true
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val sensitivitySetting = prefs.getString(
             getString(R.string.mousepad_sensitivity_key),
@@ -881,12 +875,8 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             else -> 1.0f
         }
 
-        val accelerationProfileName = prefs.getString(
-            getString(R.string.mousepad_acceleration_profile_key),
-            getString(R.string.mousepad_default_acceleration_profile)
-        )
         accelerationProfile =
-            PointerAccelerationProfileFactory.getProfileWithName(accelerationProfileName ?: "default")
+            PointerAccelerationProfileFactory.getProfileWithName(getString(R.string.mousepad_default_acceleration_profile))
         prefsApplied = true
     }
 

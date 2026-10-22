@@ -5,8 +5,6 @@
   <string name="foreground_notification_no_devices">Nincs csatlakozva egy eszközhöz sem</string>
   <string name="foreground_notification_devices">Csatlakozva ehhez: %s</string>
   <string name="foreground_notification_send_clipboard">Vágólap küldése</string>
-  <string name="pref_plugin_telephony">Telefon értesítő</string>
-  <string name="pref_plugin_telephony_desc">Értesítések küldése bejövő hívásokról</string>
   <string name="pref_plugin_battery">Akkumulátor jelentés</string>
   <string name="pref_plugin_battery_desc">Akkumulátorállapot időszakos jelentése</string>
   <string name="pref_plugin_clipboard">Vágólap szinkronizáció</string>
@@ -27,7 +25,6 @@
   <string name="pref_plugin_sharereceiver_desc">Fájlok és URL-ek megosztása eszközök között</string>
   <string name="device_list_empty">Nincsenek eszközök</string>
   <string name="ok">OK</string>
-  <string name="sad_ok">OK :(</string>
   <string name="cancel">Mégsem</string>
   <string name="open_settings">Beállítások megnyitása</string>
   <string name="no_permissions">Engedélyt kell adnia az értesítésekhez való hozzáféréshez</string>
@@ -35,14 +32,7 @@
   <string name="send_ping">Ping küldése</string>
   <string name="open_mousepad">Távirányítás</string>
   <string name="mousepad_sensitivity_settings_title">Érintőtábla érzékenység beállítása</string>
-  <string name="mousepad_acceleration_profile_settings_title">Mutatógyorsítás beállítása</string>
   <string name="mousepad_scroll_direction_title">Fordított görgetési irány</string>
-  <string-array name="mousepad_tap_entries">
-    <item>Bal gombos kattintás</item>
-    <item>Jobb gombos kattintás</item>
-    <item>Középső gombos kattintás</item>
-    <item>Semmi</item>
-  </string-array>
   <string-array name="mousepad_sensitivity_entries">
     <item>Leglassabb</item>
     <item>Leglassabb felett</item>
@@ -50,33 +40,14 @@
     <item>Alapértelmezett felett</item>
     <item>Leggyorsabb</item>
   </string-array>
-  <string-array name="mousepad_acceleration_profile_entries">
-    <item>Nincs gyorsítás</item>
-    <item>Leggyengébb</item>
-    <item>Gyengébb</item>
-    <item>Közepes</item>
-    <item>Erősebb</item>
-    <item>Legerősebb</item>
-  </string-array>
   <string name="mouse_receiver_plugin_description">Távoli egérmozgások fogadása</string>
   <string name="mouse_receiver_plugin_name">Egérvevő</string>
-  <string name="view_status_title">Állapot</string>
-  <string name="battery_status_format">Akku: %d%%</string>
-  <string name="battery_status_low_format">Akku: %d%% alacsony töltöttség</string>
-  <string name="battery_status_charging_format">Akku: %d%% töltés</string>
-  <string name="category_connected_devices">Csatlakoztatott eszközök</string>
-  <string name="category_not_paired_devices">Elérhető eszközök</string>
-  <string name="category_remembered_devices">Megjegyzett eszközök</string>
-  <string name="device_menu_plugins">Bővítménybeállítások</string>
   <string name="device_menu_unpair">Leválasztás</string>
-  <string name="pair_new_device">Új eszköz párosítása</string>
-  <string name="unknown_device">Ismeretlen eszköz</string>
   <string name="error_not_reachable">Az eszköz nem érhető el</string>
   <string name="error_already_paired">Az eszköz már párosítva van</string>
   <string name="error_timed_out">Időtúllépés</string>
   <string name="error_canceled_by_user">Megszakítva a felhasználó által</string>
   <string name="error_canceled_by_other_peer">A másik partner megszakította</string>
-  <string name="encryption_info_title">Titkosítási információk</string>
   <string name="my_device_fingerprint">Az eszköz tanúsítványának SHA256 ujjlenyomata:</string>
   <string name="remote_device_fingerprint">A távoli eszköz tanúsítványának SHA256 ujjlenyomata:</string>
   <string name="pair_requested">Párosítás kérve</string>
@@ -115,8 +86,6 @@
   <string name="tap_to_open">Koppintson a megnyitáshoz</string>
   <string name="received_file_text">Koppintson a(z) „%1s” megnyitásához</string>
   <string name="cannot_create_file">Nem hozható létre a(z) %s fájl</string>
-  <string name="tap_to_answer">Koppintson válaszhoz</string>
-  <string name="device_not_paired">Az eszköz nincs párosítva</string>
   <string name="request_pairing">Párosítás kérése</string>
   <string name="pairing_accept">Elfogadás</string>
   <string name="pairing_reject">Elutasítás</string>
@@ -126,19 +95,7 @@
   <string name="mpris_previous">Előző</string>
   <string name="mpris_next">Következő</string>
   <string name="mpris_volume">Hangerő</string>
-  <string name="mpris_time_settings_title">Előre/visszatekerő gombok</string>
-  <string name="mpris_time_settings_summary">A gyors előre/visszatekerés idejének beállítása, amikor megnyomják</string>
-  <string-array name="mpris_time_entries">
-    <item>10 másodperc</item>
-    <item>20 másodperc</item>
-    <item>30 másodperc</item>
-    <item>1 perc</item>
-    <item>2 perc</item>
-  </string-array>
-  <string name="mpris_notification_settings_title">Médiavezérlő értesítéseinek megjelenítése</string>
-  <string name="mpris_notification_settings_summary">Lehetővé teszi a médialejátszók vezérlését a DeskLink megnyitása nélkül</string>
   <string name="protocol_version_newer">Ez az eszköz egy újabb protokollverziót használ</string>
-  <string name="plugin_settings_with_name">%s beállításai</string>
   <string name="invalid_device_name">Érvénytelen eszköznév</string>
   <string name="shareplugin_text_saved">Szöveg érkezett, elmentve a vágólapra</string>
   <string name="custom_devices_settings">Saját eszközök listája</string>
@@ -146,11 +103,6 @@
   <string name="custom_device_deleted">Saját eszköz észlelve</string>
   <string name="custom_device_fab_hint">Eszköz hozzáadása</string>
   <string name="undo">Visszavonás</string>
-  <string name="share_notification_preference">Hangos értesítések</string>
-  <string name="share_notification_preference_summary">Rezgés és hanglejátszás fájl fogadásakor</string>
-  <string name="share_destination_customize">Célmappa megadása</string>
-  <string name="share_destination_customize_summary_disabled">A fogadott fájlok a Letöltésekben jelennek meg</string>
-  <string name="share_destination_customize_summary_enabled">A fájlok az alábbi mappában lesznek tárolva</string>
   <string name="share_destination_folder_preference">Célmappa</string>
   <string name="share">Megosztás</string>
   <string name="share_received_file">„%s” megosztása</string>
@@ -160,57 +112,27 @@
   <string name="add_device_dialog_title">Eszköz hozzáadása</string>
   <string name="add_device_hint">Gépnév vagy IP-cím</string>
   <string name="send_files">Fájlok küldése</string>
-  <string name="pairing_title">DeskLink eszközök</string>
-  <string name="pairing_description">Itt kell megjelennie az Ön hálózatában lévő többi, DeskLinket futtató eszköznek.</string>
   <string name="device_rename_title">Eszköz átnevezése</string>
   <string name="device_rename_confirm">Átnevezés</string>
   <string name="refresh">Frissítés</string>
-  <string name="unreachable_description">Ez a párosított eszköz nem érhető el. Ellenőrizze, hogy ugyanarra a hálózatra csatlakozott-e.</string>
-  <string name="no_wifi">Ön nem csatlakozik Wi-Fi hálózathoz, így előfordulhat, hogy nem láthat semmilyen eszközt. Kattintson ide a Wi-Fi bekapcsolásához.</string>
-  <string name="on_non_trusted_message">Nem megbízható hálóat: automatikus felfedezés kikapcsolva.</string>
   <string name="no_file_browser">Nincsenek fájlkezelők telepítve.</string>
-  <string name="pref_plugin_telepathy">SMS küldése</string>
-  <string name="pref_plugin_telepathy_desc">Szöveges üzenetek küldese a számítógépéről</string>
-  <string name="pref_plugin_telepathy_mms">MMS küldése</string>
-  <string name="pref_plugin_telepathy_mms_desc">Ahhoz, hogy MMS-t tudjon küldeni a DeskLinkből, be kell állítania a DeskLinket alapértelmezett SMS alkalmazásként.</string>
   <string name="findmyphone_title">Telefon keresése</string>
   <string name="findmyphone_title_tablet">Tablet keresése</string>
   <string name="findmyphone_title_tv">TV keresése</string>
   <string name="findmyphone_description">Megcsörgeti ezt az eszközt, hogy megtalálhassa</string>
   <string name="findmyphone_found">Megtalálva</string>
-  <string name="open">Megnyitás</string>
-  <string name="close">Bezárás</string>
-  <string name="plugins_need_permission">Néhány bővítménynek engedélyekre van szüksége a működéshez (koppintson további információkért):</string>
   <string name="permission_explanation">Ez a bővítmény engedélyeket kér a működéshez</string>
   <string name="optional_permission_explanation">További engedélyeket kell biztosítania az összes funkció bekapcsolásához</string>
-  <string name="plugins_need_optional_permission">Néhány bővítmény jogosultság hiányában kikapcsolta egyes funkcióit (koppintson további információkért):</string>
-  <string name="telepathy_permission_explanation">Az SMS-ek írásához és olvasásához a számítógépéről engedélyt kell adnia az SMS-nek</string>
-  <string name="telephony_permission_explanation">Ahhoz, hogy a telefonhívásokat a számítógépén láthassa, engedélyt kell adnia a hívásnaplókhoz és a telefon állapotához</string>
-  <string name="telephony_optional_permission_explanation">Ahhoz, hogy a telefonszám helyett a nevet lássa, hozzáférést kell adnia a telefon névjegyeihez</string>
   <string name="contacts_permission_explanation">Ahhoz, hogy megoszthassa a névjegyzékét az asztali számítógépével, meg kell adnia a névjegyek engedélyt</string>
   <string name="select_ringtone">Válasszon csengőhangot</string>
-  <string name="telephony_pref_blocked_title">Blokkolt számok</string>
-  <string name="telephony_pref_blocked_dialog_desc">Ne jelenítsen meg hívásokat és SMS-eket ezekről a számokról. Soronként egy számot adjon meg</string>
-  <string name="settings_icon_description">Beállítások ikon</string>
   <string name="pref_plugin_mprisreceiver">Médialejátszó vezérlés</string>
   <string name="pref_plugin_mprisreceiver_desc">A telefon médialejátszóinak vezérlése egy másik eszközről</string>
-  <string name="notification_channel_default">Egyéb értesítések</string>
   <string name="notification_channel_media_control">Médiavezérlő</string>
-  <string name="notification_channel_high_priority">Magas prioritás</string>
-  <string name="copy_url_to_clipboard">URL másolása a vágólapra</string>
-  <string name="clipboard_toast">Másolva a vágólapra</string>
   <string name="device_not_reachable">Az eszköz nem érhető el</string>
   <string name="pref_plugin_findremotedevice">Távoli eszköz keresése</string>
   <string name="pref_plugin_findremotedevice_desc">Távoli eszköz csörgetése</string>
   <string name="ring">Csörgetés</string>
-  <string name="mute">Némítás</string>
   <string name="all">Összes</string>
-  <string name="devices">Eszközök</string>
-  <string name="settings_rename">Eszköznév</string>
-  <string name="settings_dark_mode">Sötét téma</string>
-  <string name="settings_more_settings_title">További beállítások</string>
-  <string name="settings_more_settings_text">Eszközönkénti beállítások a „Bővítménybeállítások” alatt találhatók egy eszközön belül.</string>
-  <string name="setting_persistent_notification">Állandó értesítések megjelenítése</string>
   <string name="setting_persistent_notification_oreo">Állandó értesítés</string>
   <string name="setting_persistent_notification_description">Koppintson az Értesítésbeállítások bekapcsolásához/kikapcsolásához</string>
   <string name="extra_options">További beállítások</string>
@@ -218,7 +140,6 @@
   <string name="set_privacy_options">Adatvédelmi beállítások megadása</string>
   <string name="block_contents">Értesítések tartalmának blokkolása</string>
   <string name="block_images">Képek blokkolása az értesítésekben</string>
-  <string name="notification_channel_receivenotification">Értesítések más eszközökről</string>
   <string name="no_app_for_opening">Nem található alkalmazás a fájl megnyitásához</string>
   <string name="trusted_networks">Megbízható hálózatok</string>
   <string name="trusted_networks_desc">Automatikus felfedezés korlátozása az ismert hálózatokra</string>
@@ -226,12 +147,6 @@
   <string name="empty_trusted_networks_list_text">Még nem adott hozzá megbízható hálózatot</string>
   <string name="allow_all_networks_text">Összes engedélyezése</string>
   <string name="location_permission_needed_title">Engedély szükséges</string>
-  <string name="clipboard_android_x_incompat">Az Android 10 eltávolította a vágólaphoz való hozzáférést minden alkalmazásból. Ez a bővítmény le lesz tiltva.</string>
-  <string name="cant_open_url">Nem lehet megnyitni az URL-t a lejátszás folytatásához</string>
-  <string name="message_reply_label">VÁLASZ</string>
-  <string name="mark_as_read_label">MEGJELÖLÉS OLVASOTTKÉNT</string>
-  <string name="user_display_name">Ön</string>
-  <string name="theme_dialog_title">Témaválasztás</string>
   <string-array name="theme_list">
     <item>Akkukimélő által beállítva</item>
     <item>Világos</item>
@@ -246,16 +161,10 @@
   <string name="donate">Támogatás</string>
   <string name="source_code">Forráskód</string>
   <string name="licenses">Licencek</string>
-  <string name="website">Weboldal</string>
   <string name="about">Névjegy</string>
   <string name="authors">Szerzők</string>
-  <string name="thanks_to">Köszönet</string>
   <string name="easter_egg">Easter Egg</string>
-  <string name="email_contributor">E-mail a közreműködőnek\n%s</string>
-  <string name="visit_contributors_homepage">Ugrás a közreműködő honlapjára\n%s</string>
   <string name="version">Verzió: %s</string>
-  <string name="rise_up">Felemelés</string>
-  <string name="rise_down">Leereszkedés</string>
   <string name="click_here_to_type">Koppintson a gépeléshez</string>
   <string name="maintainer_and_developer">Karbantartó és fejlesztő</string>
   <string name="developer">Fejlesztő</string>

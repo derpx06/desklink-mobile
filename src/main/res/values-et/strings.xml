@@ -4,8 +4,6 @@
   <string name="foreground_notification_no_devices">Pole ühendatud ühegi seadmega</string>
   <string name="foreground_notification_devices">Ühendatud seadmega: %s</string>
   <string name="foreground_notification_send_clipboard">Saadeti lõikepuhvrisse</string>
-  <string name="pref_plugin_telephony">Telefoni märguanded</string>
-  <string name="pref_plugin_telephony_desc">Sisenevate kõnede märguannete saatmine</string>
   <string name="pref_plugin_battery">Aku aruanne</string>
   <string name="pref_plugin_battery_desc">Perioodiline aku olekust teavitamine</string>
   <string name="pref_plugin_clipboard">Lõikepuhvri sünkroonimine</string>
@@ -26,7 +24,6 @@
   <string name="pref_plugin_sharereceiver_desc">Failide ja URL-ide jagamine seadmete vahel</string>
   <string name="device_list_empty">Seadmed puuduvad</string>
   <string name="ok">OK</string>
-  <string name="sad_ok">OK :(</string>
   <string name="cancel">Loobu</string>
   <string name="open_settings">Ava seadistused</string>
   <string name="no_permissions">Märguannete nägemiseks tuleb anda vastavad õigused</string>
@@ -34,7 +31,6 @@
   <string name="send_ping">Saada ping</string>
   <string name="open_mousepad">Kaugsisestus</string>
   <string name="mousepad_sensitivity_settings_title">Puutepadja tundlikkuse määramine</string>
-  <string name="mousepad_acceleration_profile_settings_title">Osutusseadme kiirenduse määramine</string>
   <string name="mousepad_scroll_direction_title">Vastupidi kerimise suund</string>
   <string-array name="mousepad_sensitivity_entries">
     <item>Kõige aeglasem</item>
@@ -43,27 +39,12 @@
     <item>Keskmisest kiirem</item>
     <item>Kõige kiirem</item>
   </string-array>
-  <string-array name="mousepad_acceleration_profile_entries">
-    <item>Kiirendus puudub</item>
-    <item>Kõige nõrgem</item>
-    <item>Nõrgem</item>
-    <item>Keskmine</item>
-    <item>Tugev</item>
-    <item>Kõige tugevam</item>
-  </string-array>
-  <string name="category_connected_devices">Ühendatud seadmed</string>
-  <string name="category_not_paired_devices">Saadaolevad seadmed</string>
-  <string name="category_remembered_devices">Meeldejäetud seadmed</string>
-  <string name="device_menu_plugins">Plugina seadistused</string>
   <string name="device_menu_unpair">Eemalda paardumine</string>
-  <string name="pair_new_device">Paarita uus seade</string>
-  <string name="unknown_device">Tundmatu seade</string>
   <string name="error_not_reachable">Seade pole saadaval</string>
   <string name="error_already_paired">Seade on juba paaritatud</string>
   <string name="error_timed_out">Ajaületus</string>
   <string name="error_canceled_by_user">Kasutaja katkestas</string>
   <string name="error_canceled_by_other_peer">Teine pool katkestas</string>
-  <string name="encryption_info_title">Krüptimise teave</string>
   <string name="pair_requested">Paardumise soov</string>
   <plurals name="incoming_file_title">
     <item quantity="one">Saadi %1$d fail seadmest %2$s</item>
@@ -100,8 +81,6 @@
   <string name="tap_to_open">Koputa avamiseks</string>
   <string name="received_file_text">Koputa \"%1s\" avamiseks</string>
   <string name="cannot_create_file">Faili %s loomine nurjus</string>
-  <string name="tap_to_answer">Koputa vastamiseks</string>
-  <string name="device_not_paired">Seadmed pole paaritatud</string>
   <string name="request_pairing">Soovi paardumist</string>
   <string name="pairing_accept">Nõustu</string>
   <string name="pairing_reject">Keeldu</string>
@@ -111,19 +90,7 @@
   <string name="mpris_previous">Eelmine</string>
   <string name="mpris_next">Järgmine</string>
   <string name="mpris_volume">Helitugevus</string>
-  <string name="mpris_time_settings_title">Edasi-tagasikerimise nupud</string>
-  <string name="mpris_time_settings_summary">Kiire edasi-tagasikerimise aja kohandamine vajutamisel</string>
-  <string-array name="mpris_time_entries">
-    <item>10 sekundit</item>
-    <item>20 sekundit</item>
-    <item>30 sekundit</item>
-    <item>1 minut</item>
-    <item>2 minutit</item>
-  </string-array>
-  <string name="mpris_notification_settings_title">Meedia juhtimise märguannete näitamine</string>
-  <string name="mpris_notification_settings_summary">Meediamängija juhtimise võimaldamine ilma DeskLinki avamata</string>
   <string name="protocol_version_newer">See seade kasutab uuemat protokolli versiooni</string>
-  <string name="plugin_settings_with_name">%s seadistused</string>
   <string name="invalid_device_name">Vigane seadme nimi</string>
   <string name="shareplugin_text_saved">Saadi tekst, salvestati lõikepuhvrisse</string>
   <string name="custom_devices_settings">Kohandatud seadmete loend</string>
@@ -131,11 +98,6 @@
   <string name="custom_device_deleted">Kohandatud seade kustutati</string>
   <string name="custom_device_fab_hint">Lisa seade</string>
   <string name="undo">Võta tagasi</string>
-  <string name="share_notification_preference">Mürarikkad märguanded</string>
-  <string name="share_notification_preference_summary">Vibreerimine ja heli esitamine faili saamisel</string>
-  <string name="share_destination_customize">Sihtkataloogi kohandamine</string>
-  <string name="share_destination_customize_summary_disabled">Saadud failid salvestatakse kataloogi Allalaaditud</string>
-  <string name="share_destination_customize_summary_enabled">Failid salvestatakse allmääratud kataloogi</string>
   <string name="share_destination_folder_preference">Sihtkataloog</string>
   <string name="share">Jaga</string>
   <string name="share_received_file">Jaga \"%s\"</string>
@@ -144,57 +106,27 @@
   <string name="add_device_dialog_title">Seadme lisamine</string>
   <string name="add_device_hint">Masinanimi või IP-aadress</string>
   <string name="send_files">Saada faile</string>
-  <string name="pairing_title">DeskLinki seadmed</string>
-  <string name="pairing_description">Siin näeb teisi seadmeid samas võrgus, kus töötab DeskLink</string>
   <string name="device_rename_title">Seadme nime muutmine</string>
   <string name="device_rename_confirm">Nime muutmine</string>
   <string name="refresh">Värskenda</string>
-  <string name="unreachable_description">See paardunud seade pole saadaval. Kontrolli, kas see on ikka ühendatud sinuga samasse võrku.</string>
-  <string name="no_wifi">Sul puudub ühendus Wi-Fi võrguga, mistõttu sa ei näe ühtegi seadet. Klõpsa siia Wi-Fi sisselülitamiseks.</string>
-  <string name="on_non_trusted_message">See ei ole usaldusväärne võrk: automaatne tuvastamine on keelatud.</string>
   <string name="no_file_browser">Ühtegi failisirvijat pole paigaldatud</string>
-  <string name="pref_plugin_telepathy">SMS-ide saatmine</string>
-  <string name="pref_plugin_telepathy_desc">Tekstisõnumite saatmine oma töölaualt</string>
-  <string name="pref_plugin_telepathy_mms">MMS-ide saatmine</string>
-  <string name="pref_plugin_telepathy_mms_desc">DeskLinki kaudu MMS-ide saatmiseks tuleb see määrata SMS-ide vaikerakenduseks.</string>
   <string name="findmyphone_title">Leia mu telefon</string>
   <string name="findmyphone_title_tablet">Leia mu tahvel</string>
   <string name="findmyphone_title_tv">Leia mu teler</string>
   <string name="findmyphone_description">Seadmele helistamine, et see üles leida</string>
   <string name="findmyphone_found">Leitud</string>
-  <string name="open">Ava</string>
-  <string name="close">Sulge</string>
-  <string name="plugins_need_permission">Mõned pluginad vajavad töötamiseks õigusi (koputa rohkema teabe saamiseks);</string>
   <string name="permission_explanation">See plugin vajab töötamiseks õigusi</string>
   <string name="optional_permission_explanation">Kõigi funktsioonide lubamiseks tuleb sul anda lisaõigusi</string>
-  <string name="plugins_need_optional_permission">Mõne plugina osa omadusi on keelatud õiguste puudumise tõttu (koputa rohkema teabe saamiseks):</string>
-  <string name="telepathy_permission_explanation">SMS-ide lugemiseks ja kirjutamiseks töölaual tuleb anda õigused SMS-ile</string>
-  <string name="telephony_permission_explanation">Kõnede nägemiseks töölaual tuleb anda õigused telefonikõnede logile ja telefoni olekule</string>
-  <string name="telephony_optional_permission_explanation">Telefoninumbri asemel kontakti nime nägemiseks tuleb anda õigused telefoni kontaktidele</string>
   <string name="contacts_permission_explanation">Oma kontaktide jagamiseks töölauaga tuleb anda õigused kontaktidele</string>
   <string name="select_ringtone">Vali helin</string>
-  <string name="telephony_pref_blocked_title">Blokitud numbrid</string>
-  <string name="telephony_pref_blocked_dialog_desc">Neilt numbritelt tulevaid kõnesid ja SMS-e ei näidata. Palun pane iga number kirja eraldi reale</string>
-  <string name="settings_icon_description">Seadistuste ikoon</string>
   <string name="pref_plugin_mprisreceiver">Meediafailide mängija juhtimine</string>
   <string name="pref_plugin_mprisreceiver_desc">Telefoni meediamängijate juhtimine teisest seadmest</string>
-  <string name="notification_channel_default">Muud märguanded</string>
   <string name="notification_channel_media_control">Meedia juhtimine</string>
-  <string name="notification_channel_high_priority">Kõrge prioriteediga</string>
-  <string name="copy_url_to_clipboard">Kopeeri URL lõikepuhvrisse</string>
-  <string name="clipboard_toast">Kopeeriti lõikepuhvrisse</string>
   <string name="device_not_reachable">Seade pole saadaval</string>
   <string name="pref_plugin_findremotedevice">Kaugseadme leidmine</string>
   <string name="pref_plugin_findremotedevice_desc">Helistamine kaugseadmesse</string>
   <string name="ring">Helista</string>
-  <string name="mute">Tumm</string>
   <string name="all">Kõik</string>
-  <string name="devices">Seadmed</string>
-  <string name="settings_rename">Seadme nimi</string>
-  <string name="settings_dark_mode">Tume teema</string>
-  <string name="settings_more_settings_title">Rohkem seadistusi</string>
-  <string name="settings_more_settings_text">Seadmekaupa seadistusi leiab seadme \"Pluginate seadistuste \" all.</string>
-  <string name="setting_persistent_notification">Püsimärguannete näitamine</string>
   <string name="setting_persistent_notification_oreo">Püsimärguanded</string>
   <string name="setting_persistent_notification_description">Koputa märguannete seadistuste lubamiseks/keelamiseks</string>
   <string name="extra_options">Erivalikud</string>
@@ -202,7 +134,6 @@
   <string name="set_privacy_options">Privaatsusvalikute määramine</string>
   <string name="block_contents">Märguannete sisu blokkimine</string>
   <string name="block_images">Märguannete piltide blokkimine</string>
-  <string name="notification_channel_receivenotification">Märguanded teistest seadmetest</string>
   <string name="no_app_for_opening">Selle faili avamiseks ei leitud sobivat rakendust</string>
   <string name="trusted_networks">Usaldusväärsed võrgud</string>
   <string name="trusted_networks_desc">Automaatset tuvastamist kasutatakse ainult tuntud võrkudes</string>
@@ -210,11 +141,6 @@
   <string name="empty_trusted_networks_list_text">Sa ei ole veel lisanud ühtegi usaldusväärset võrku</string>
   <string name="allow_all_networks_text">Luba kõik</string>
   <string name="location_permission_needed_title">Õigusenõue</string>
-  <string name="clipboard_android_x_incompat">Android 10 eemaldas lõikepuhvri kasutamise võimaluse kõigilt rakendustelt. See plugin enam ei tööta.</string>
-  <string name="cant_open_url">URL-i avamine esitamise jätkamiseks nurjus</string>
-  <string name="message_reply_label">VASTA</string>
-  <string name="mark_as_read_label">MÄRGI LOETUKS</string>
-  <string name="theme_dialog_title">Teema valimine</string>
   <string-array name="theme_list">
     <item>Määratud akusäästja poolt</item>
     <item>Hele</item>

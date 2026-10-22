@@ -96,11 +96,6 @@ class ReceiveNotification {
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setAutoCancel(true)
                 .setOngoing(false);
-
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(device.getContext());
-        if (prefs.getBoolean("share_notification_preference", true)) {
-            builder.setDefaults(Notification.DEFAULT_ALL);
-        }
     }
 
     public void setFailed(String message) {

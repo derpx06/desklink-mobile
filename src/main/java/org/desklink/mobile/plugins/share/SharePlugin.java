@@ -40,7 +40,6 @@ import org.desklink.mobile.NetworkPacket;
 import org.desklink.mobile.plugins.Plugin;
 import org.desklink.mobile.plugins.PluginFactory;
 import org.desklink.mobile.ui.MainActivity;
-import org.desklink.mobile.ui.PluginSettingsFragment;
 import org.desklink.mobile.async.BackgroundJob;
 import org.desklink.mobile.async.BackgroundJobHandler;
 import org.desklink.mobile.R;
@@ -194,11 +193,6 @@ public class SharePlugin extends Plugin {
         }));
     }
 
-    @Override
-    public boolean hasSettings() {
-        return true;
-    }
-
     private static void closeUnusedPayload(@NonNull NetworkPacket np) {
         if (np.getPayload() != null) {
             np.getPayload().close();
@@ -302,11 +296,6 @@ public class SharePlugin extends Plugin {
             }
             backgroundJobHandler.runJob(job);
         }
-    }
-
-    @Override
-    public PluginSettingsFragment getSettingsFragment(Activity activity) {
-        return ShareSettingsFragment.newInstance(getPluginKey(), R.xml.shareplugin_preferences);
     }
 
     void sendUriList(final ArrayList<Uri> uriList) {

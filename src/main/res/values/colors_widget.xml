@@ -5,7 +5,6 @@
     <color name="widget_button_bg">#0D000000</color>
     <color name="widget_text">#FF18181B</color>
     <color name="widget_text_dim">#FF5F5F67</color>
-    <color name="widget_accent">#FF3256D6</color>
     <color name="widget_mint">#FF0F9B72</color>
     <color name="widget_amber">#FF9A6412</color>
     <color name="widget_faint">#FF8F8F97</color>

@@ -5,8 +5,6 @@
   <string name="foreground_notification_no_devices">Niciun dispozitiv conectat</string>
   <string name="foreground_notification_devices">Conectat la: %s</string>
   <string name="foreground_notification_send_clipboard">Trimite clipboard</string>
-  <string name="pref_plugin_telephony">Notificator de telefonie</string>
-  <string name="pref_plugin_telephony_desc">Trimite notificări pentru apeluri de intrare</string>
   <string name="pref_plugin_battery">Raport acumulator</string>
   <string name="pref_plugin_battery_desc">Raportează periodic starea acumulatorului</string>
   <string name="pref_plugin_clipboard">Sincronizare clipboard</string>
@@ -28,7 +26,6 @@
   <string name="pref_plugin_sharereceiver_desc">Partajează fișiere și URL-uri între dispozitive</string>
   <string name="device_list_empty">Niciun dispozitiv</string>
   <string name="ok">Bine</string>
-  <string name="sad_ok">Bine :(</string>
   <string name="cancel">Renunță</string>
   <string name="open_settings">Deschide configurările</string>
   <string name="no_permissions">Trebuie să acordați permisiunea pentru accesarea notificărilor</string>
@@ -36,15 +33,7 @@
   <string name="send_ping">Trimite ping</string>
   <string name="open_mousepad">Introducere de la distanță</string>
   <string name="mousepad_sensitivity_settings_title">Stabilește sensibilitatea zonei tactile</string>
-  <string name="mousepad_acceleration_profile_settings_title">Stabilește accelerația indicatorului</string>
   <string name="mousepad_scroll_direction_title">Inversează direcția derulării</string>
-  <string name="mousepad_scroll_sensitivity_title">Sensibilitatea derulării</string>
-  <string-array name="mousepad_tap_entries">
-    <item>Clic stâng</item>
-    <item>Clic drept</item>
-    <item>Clic mijlociu</item>
-    <item>Nimic</item>
-  </string-array>
   <string-array name="mousepad_sensitivity_entries">
     <item>Cea mai lentă</item>
     <item>Mai puțin lentă</item>
@@ -52,40 +41,19 @@
     <item>Peste implicită</item>
     <item>Cea mai rapidă</item>
   </string-array>
-  <string-array name="mousepad_acceleration_profile_entries">
-    <item>Fără accelerație</item>
-    <item>Cea mai slabă</item>
-    <item>Mai slabă</item>
-    <item>Medie</item>
-    <item>Mai puternică</item>
-    <item>Cea mai puternică</item>
-  </string-array>
   <string name="mouse_receiver_plugin_description">Primește mișcări de maus de la distanță</string>
   <string name="mouse_receiver_plugin_name">Receptor pentru maus</string>
   <string name="mouse_receiver_no_permissions">Pentru a primi atingeri de la distanță, trebuie să acordați permisiunile de accesibilitate ce permit controlul deplin asupra dispozitivului</string>
-  <string name="view_status_title">Stare</string>
-  <string name="battery_status_format">Acumulator: %d%%</string>
-  <string name="battery_status_low_format">Acumulator: %d%% Acumulator scăzut</string>
-  <string name="battery_status_charging_format">Acumulator: %d%% se încarcă</string>
-  <string name="category_connected_devices">Dispozitive conectate</string>
-  <string name="category_not_paired_devices">Dispozitive disponibile</string>
-  <string name="category_remembered_devices">Dispozitive memorizate</string>
-  <string name="device_menu_plugins">Configurare extensii</string>
   <string name="device_menu_unpair">Dezasociază</string>
-  <string name="pair_new_device">Asociază dispozitiv nou</string>
-  <string name="cancel_pairing">Abandonează asocierea</string>
-  <string name="unknown_device">Dispozitiv necunoscut</string>
   <string name="error_not_reachable">Dispozitivul nu e accesibil</string>
   <string name="error_already_paired">Dispozitiv asociat deja</string>
   <string name="error_timed_out">A expirat</string>
   <string name="error_clocks_not_match">Ceasurile dispozitivelor nu se potrivesc</string>
   <string name="error_canceled_by_user">Anulat de către utilizator</string>
   <string name="error_canceled_by_other_peer">Anulat de către partener</string>
-  <string name="encryption_info_title">Informații despre criptare</string>
   <string name="my_device_fingerprint">Amprenta SHA256 a certificatului acestui dispozitiv e:</string>
   <string name="remote_device_fingerprint">Amprenta SHA256 a certificatului dispozitivului distant e:</string>
   <string name="pair_requested">Asociere cerută</string>
-  <string name="pair_succeeded">Asociere reușită</string>
   <string name="pairing_request_from">Cerere de asociere de la „%1s”</string>
   <plurals name="incoming_file_title">
     <item quantity="one">Se primește %1$d fișier de la %2$s</item>
@@ -130,38 +98,22 @@
   <string name="tap_to_open">Atingeți pentru a deschide</string>
   <string name="received_file_text">Atingeți pentru a deschide „%1s”</string>
   <string name="cannot_create_file">Nu se poate crea fișierul %s</string>
-  <string name="tap_to_answer">Atingeți pentru a răspunde</string>
-  <string name="device_not_paired">Dispozitiv neasociat</string>
-  <string name="pairing_duplicate_names">Atenție: Există mai multe dispozitive cu aceeași denumire.</string>
   <string name="request_pairing">Cere asocierea</string>
   <string name="pairing_accept">Acceptă</string>
   <string name="pairing_reject">Respinge</string>
-  <string name="pairing_explanation">Asocierea a două dispozitive le va face reciproc accesibile. Asociați doar dispozitive proprii.</string>
   <string name="settings">Configurări</string>
   <string name="mpris_play">Redă</string>
   <string name="mpris_pause">Întrerupe</string>
   <string name="mpris_previous">Precedent</string>
   <string name="mpris_next">Următor</string>
   <string name="mpris_volume">Volum</string>
-  <string name="mpris_time_settings_title">Butoane pentru derulare/rebobinare</string>
-  <string name="mpris_time_settings_summary">Ajustează durata de derulat/rebobinat rapid la apăsare</string>
-  <string-array name="mpris_time_entries">
-    <item>10 secunde</item>
-    <item>20 de secunde</item>
-    <item>30 de secunde</item>
-    <item>1 minut</item>
-    <item>2 minute</item>
-  </string-array>
   <string name="mpris_notifications_explanation">Permisiunea pentru notificări e necesară pentru a arăta piesele distante în sertarul cu notificări</string>
-  <string name="mpris_notification_settings_title">Arată notificare cu control multimedia</string>
-  <string name="mpris_notification_settings_summary">Permite controlul lectorilor multimedia fără a deschide DeskLink</string>
   <string name="share_to">Partajează cu…</string>
   <string name="unreachable_device_dynamic_shortcut">%s (✕)</string>
   <string name="unreachable_device_url_share_text">URL-urile partajate cu un dispozitiv inaccesibil vor fi livrate acestuia când devine accesibil.\n\n</string>
   <string name="unreachable_share_toast">URL-ul va fi partajat la următoarea conectare a dispozitivului.</string>
   <string name="protocol_version">Versiune protocol:</string>
   <string name="protocol_version_newer">Acest dispozitiv folosește o versiune mai nouă a protocolului</string>
-  <string name="plugin_settings_with_name">Configurări „%s”</string>
   <string name="invalid_device_name">Denumire nevalidă a dispozitivului</string>
   <string name="shareplugin_text_saved">S-a primit text, salvat în clipboard</string>
   <string name="custom_devices_settings">Listă de dispozitive personalizate</string>
@@ -171,11 +123,6 @@
   <string name="custom_device_list_help">Dacă dispozitivul nu e detectat automat, îi puteți adăuga adresa IP sau numele de gazdă apăsând butonul de mai jos</string>
   <string name="custom_device_fab_hint">Adaugă dispozitiv</string>
   <string name="undo">Desfă</string>
-  <string name="share_notification_preference">Notificări zgomotoase</string>
-  <string name="share_notification_preference_summary">Vibrează și redă un sunet la primirea unui fișier</string>
-  <string name="share_destination_customize">Specifică dosarul destinație</string>
-  <string name="share_destination_customize_summary_disabled">Fișierele primite vor apărea în Descărcări</string>
-  <string name="share_destination_customize_summary_enabled">Fișierele vor fi stocate în dosarul de mai jos</string>
   <string name="share_destination_folder_preference">Dosar destinație</string>
   <string name="share">Partajează</string>
   <string name="share_received_file">Partajează „%s”</string>
@@ -187,68 +134,31 @@
   <string name="send_files">Trimite fișiere</string>
   <string name="block_notification_contents">Blochează conținutul notificărilor</string>
   <string name="block_notification_images">Blochează imaginile notificărilor</string>
-  <string name="pairing_title">Dispozitive DeskLink</string>
-  <string name="pairing_description">Aici ar trebui să apară alte dispozitive ce rulează DeskLink în aceeași rețea.</string>
   <string name="device_rename_title">Redenumește dispozitivul</string>
   <string name="device_rename_confirm">Redenumește</string>
   <string name="refresh">Reîmprospătează</string>
-  <string name="unreachable_description">Acest dispozitiv asociat nu e disponibil. Asigurați-vă că e conectat la aceeași rețea.</string>
-  <string name="no_wifi">Nu v-ați conectat la o rețea Wi-Fi, așa că s-ar putea să nu vedeți niciun dispozitiv.Apăsați aici pentru a activa Wi-Fi.</string>
-  <string name="on_non_trusted_message">În afara unei rețele de încredere: descoperirea automată e dezactivată.</string>
   <string name="no_file_browser">Nu e niciun navigator de fișiere instalat.</string>
-  <string name="pref_plugin_telepathy">Expediază SMS</string>
-  <string name="pref_plugin_telepathy_desc">Trimite mesaje textuale de pe calculatorul de birou</string>
-  <string name="pref_plugin_telepathy_mms">Expediază MMS</string>
-  <string name="pref_plugin_telepathy_mms_desc">Pentru a putea trimite MMS-uri din DeskLink, trebuie să-l indicați ca aplicație implicită de SMS.</string>
   <string name="findmyphone_title">Găsește-mi telefonul</string>
   <string name="findmyphone_title_tablet">Găsește-mi tableta</string>
   <string name="findmyphone_title_tv">Găsește-mi televizorul</string>
   <string name="findmyphone_description">Sună acest dispozitiv ca să-l puteți găsi</string>
   <string name="findmyphone_found">L-am găsit</string>
-  <string name="open">Deschide</string>
-  <string name="close">Închide</string>
-  <string name="plugins_need_permission">Unele extensii necesită permisiuni pentru a funcționa (atingeți pentru informații suplimentare):</string>
   <string name="permission_explanation">Această extensie are nevoie de permisiuni ca să lucreze</string>
-  <string name="all_permissions_granted">Toate permisiunile au fost acordate 🎉</string>
   <string name="optional_permission_explanation">Trebuie să acordați permisiuni suplimentare pentru activarea tuturor funcțiilor</string>
-  <string name="plugins_need_optional_permission">Unele extensii au caracteristici dezactivate din cauza lipsei permisiunilor (atingeți pentru informații suplimentare):</string>
   <string name="share_optional_permission_explanation">Pentru a primi fișiere, trebuie să permiteți accesul la stocare</string>
   <string name="share_notifications_explanation">Pentru a vedea progresul transferurilor de fișiere, trebuie să permiteți notificările</string>
-  <string name="telepathy_permission_explanation">Pentru a citi și scrie SMS de pe calculatorul de birou, trebuie să acordați permisiuni asupra SMS-urilor</string>
-  <string name="telephony_permission_explanation">Pentru a vedea apelurile pe calculatorul de birou, trebuie să acordați permisiuni asupra jurnalului de apeluri și stării telefonului</string>
-  <string name="telephony_optional_permission_explanation">Pentru a vedea numele contactului în locul numărului de telefon, trebuie să permiteți accesul la contactele telefonului.</string>
   <string name="contacts_permission_explanation">Pentru a vă partaja agenda de contacte cu biroul, trebuie să permiteți accesul la contacte</string>
-  <string name="contacts_per_device_confirmation">"Contactele de pe telefon vor fi copiate pe acest dispozitiv, astfel încât să poată fi folosite de aplicația DeskLink pentru SMS și alte aplicații. "</string>
   <string name="select_ringtone">Alegeți tonul de apel</string>
-  <string name="telephony_pref_blocked_title">Numere blocate</string>
-  <string name="telephony_pref_blocked_dialog_desc">Nu arăta apeluri și SMS de la aceste numere. Specificați un număr pe linie</string>
-  <string name="settings_icon_description">Pictogramă configurări</string>
   <string name="pref_plugin_mprisreceiver">Control lector multimedia</string>
   <string name="pref_plugin_mprisreceiver_desc">Controlați programele multimedia din telefon de pe alt dispozitiv</string>
-  <string name="notification_channel_default">Alte notificări</string>
-  <string name="notification_channel_persistent">Indicator persistent</string>
   <string name="notification_channel_media_control">Control multimedia</string>
-  <string name="notification_channel_filetransfer">Transfer de fișiere de intrare</string>
-  <string name="notification_channel_filetransfer_complete">Transfer de fișiere de intrare încheiat</string>
-  <string name="notification_channel_filetransfer_upload">Transfer de fișiere de ieșire</string>
-  <string name="notification_channel_filetransfer_error">Eroare la transferul fișierului</string>
-  <string name="notification_channel_high_priority">Prioritate ridicată</string>
-  <string name="copy_url_to_clipboard">Copiază URL în clipboard</string>
-  <string name="clipboard_toast">Copiat în clipboard</string>
   <string name="device_not_reachable">Dispozitivul nu e accesibil</string>
   <string name="pref_plugin_findremotedevice">Găsește dispozitivul distant</string>
   <string name="pref_plugin_findremotedevice_desc">Sună dispozitivul distant</string>
   <string name="ring">Sună</string>
-  <string name="mute">Muțește</string>
   <string name="all">Toate</string>
-  <string name="devices">Dispozitive</string>
-  <string name="settings_rename">Denumire dispozitiv</string>
-  <string name="settings_dark_mode">Tematică întunecată</string>
   <string name="settings_export_logs">Exportă jurnale DeskLink</string>
   <string name="settings_export_logs_text">Generează un fișier cu informații despre execuție ce pot ajuta la depanarea defectelor.</string>
-  <string name="settings_more_settings_title">Mai multe configurări</string>
-  <string name="settings_more_settings_text">Configurările fiecărui dispozitiv le puteți găsi în „Configurare extensii” dintr-un dispozitiv.</string>
-  <string name="setting_persistent_notification">Arată notificare persistentă</string>
   <string name="setting_persistent_notification_oreo">Notificare persistentă</string>
   <string name="setting_persistent_notification_description">Atingeți pentru a activa/dezactiva în configurările notificării</string>
   <string name="extra_options">Opțiuni suplimentare</string>
@@ -256,8 +166,6 @@
   <string name="set_privacy_options">Stabiliți opțiunile de intimitate</string>
   <string name="block_contents">Blochează conținutul notificărilor</string>
   <string name="block_images">Blochează imaginile din notificări</string>
-  <string name="notification_channel_receivenotification">Notificări de pe alte dispozitive</string>
-  <string name="findmyphone_preference_title_flashlight">Clipește lanterna</string>
   <string name="no_app_for_opening">Nu a fost găsită nicio aplicație care să deschidă acest fișier</string>
   <string name="trusted_networks">Rețele de încredere</string>
   <string name="trusted_networks_desc">Restricționează descoperirea automată la rețele de încredere</string>
@@ -265,14 +173,7 @@
   <string name="empty_trusted_networks_list_text">Încă nu ați adăugat nicio rețea de încredere</string>
   <string name="allow_all_networks_text">Permite toate</string>
   <string name="location_permission_needed_title">Permisiune cerută</string>
-  <string name="bluetooth_permission_needed_desc">DeskLink necesită permisiunea de a se conecta la dispozitive din apropiere pentru a face dispozitivele asociate prin Bluetooth disponibile în DeskLink.</string>
   <string name="location_permission_needed_desc">DeskLink necesită permisiunea de localizare în fundal pentru a ști rețeaua WiFi la care v-ați conectat chiar și atunci când aplicația e în fundal. Aceasta se datorează faptului că denumirile rețelelor din jur ar putea fi folosite pentru a vă localiza, chiar dacă aceasta nu e ceva ce face DeskLink.</string>
-  <string name="clipboard_android_x_incompat">Android 10 a eliminat accesul la clipboard pentru toate aplicațiile. Această extensie va fi dezactivată.</string>
-  <string name="cant_open_url">URL-ul nu poate fi deschis pentru a continua redarea</string>
-  <string name="message_reply_label">RĂSPUNDE</string>
-  <string name="mark_as_read_label">MARCHEAZĂ CA CITIT</string>
-  <string name="user_display_name">Tu</string>
-  <string name="theme_dialog_title">Alege tematica</string>
   <string-array name="theme_list">
     <item>Stabilită de economizorul de acumulator</item>
     <item>Luminoasă</item>
@@ -287,16 +188,10 @@
   <string name="donate">Donează</string>
   <string name="source_code">Codul sursă</string>
   <string name="licenses">Licențe</string>
-  <string name="website">Sait</string>
   <string name="about">Despre</string>
   <string name="authors">Autori</string>
-  <string name="thanks_to">Mulțumiri</string>
   <string name="easter_egg">Surpriză</string>
-  <string name="email_contributor">Trimite mesaj contribuitorului\n%s</string>
-  <string name="visit_contributors_homepage">Vizitează pagina contribuitorului\n%s</string>
   <string name="version">Versiunea %s</string>
-  <string name="rise_up">Ridică</string>
-  <string name="rise_down">Coboară</string>
   <string name="click_here_to_type">Atingeți aici pentru a tasta</string>
   <string name="maintainer_and_developer">Responsabil și dezvoltator</string>
   <string name="developer">Dezvoltator</string>
@@ -311,22 +206,13 @@
   <string name="shellwen_chen_task">Îmbunătățiri de securitate pentru SFTP, îmbunătățirea structurii proiectului, corecții de defecte și îmbunătățiri generale</string>
   <string name="everyone_else">Toți cei care au contribuit la DeskLink de-a lungul anilor</string>
   <string name="send_clipboard">Trimite clipboard</string>
-  <string name="plugin_stats">Statistici pentru extensii</string>
-  <string name="enable_udp_broadcast">Activează descoperirea UDP</string>
-  <string name="enable_bluetooth">Activează Bluetooth (beta)</string>
   <string name="receive_notifications_permission_explanation">Notificările trebuiesc permise pentru a le primi de pe alte dispozitive</string>
   <string name="findmyphone_notifications_explanation">Permisiunea pentru notificări e necesară pentru ca telefonul să poată suna când aplicația e în fundal</string>
-  <string name="findmyphone_camera_explanation">Permisiunea pentru cameră permite clipirea lanternei când căutați telefonul</string>
-  <string name="findmyphone_open_settings_for_camera">Acordați permisiunea pentru cameră în configurările aplicației pentru a putea folosi lanterna</string>
-  <string name="no_notifications">Notificările sunt dezactivate, nu veți primi notificări pentru cererile de asociere.</string>
   <string name="mpris_keepwatching">Continuă redarea</string>
-  <string name="mpris_keepwatching_settings_title">Continuă redarea</string>
-  <string name="mpris_keepwatching_settings_summary">Arată o notificare silențioasă pentru a continua redarea pe acest dispozitiv după închiderea piesei</string>
   <string name="notification_channel_keepwatching">Continuă redarea</string>
   <string name="ping_result">A răspuns în %1$d milisecunde</string>
   <string name="ping_failed">Dispozitivul nu a răspuns</string>
   <string name="ping_in_progress">Se interoghează…</string>
   <string name="device_host_invalid">Gazda nu e validă. Folosiți un nume de gazdă, IPv4 sau IPv6 valid</string>
   <string name="device_host_duplicate">Gazda e în listă deja</string>
-  <string name="enable_fullscreen">Activează ecranul complet</string>
 </resources>

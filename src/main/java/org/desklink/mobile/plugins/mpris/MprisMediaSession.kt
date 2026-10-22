@@ -191,8 +191,7 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
             Log.i(TAG, "No permission to post notifications, closed.")
             return false
         }
-        // The person may have turned the media notification off
-        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(context.getString(R.string.mpris_notification_key), true)
+        return true
     }
 
     /**

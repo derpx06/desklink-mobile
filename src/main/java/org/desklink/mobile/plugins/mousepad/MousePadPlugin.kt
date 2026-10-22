@@ -14,8 +14,6 @@ import android.view.Choreographer
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
-import org.desklink.mobile.ui.PluginSettingsFragment
-import org.desklink.mobile.ui.PluginSettingsFragment.Companion.newInstance
 import org.desklink.mobile.R
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 
@@ -46,12 +44,6 @@ class MousePadPlugin : Plugin() {
 
     override val description: String
         get() = context.getString(R.string.pref_plugin_mousepad_desc_nontv)
-
-    override fun hasSettings(): Boolean = true
-
-    override fun getSettingsFragment(activity: Activity): PluginSettingsFragment? {
-        return newInstance(pluginKey, R.xml.mousepadplugin_preferences)
-    }
 
     /** Replaced by tests; the app sends motion on the next vsync. */
     internal var frameScheduler: (Runnable) -> Unit = ::onNextFrame

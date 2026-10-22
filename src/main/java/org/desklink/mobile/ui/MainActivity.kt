@@ -94,7 +94,7 @@ import org.desklink.mobile.ui.compose.screen.transfers.ImageViewer
 import org.desklink.mobile.ui.compose.screen.transfers.LiveTransfer
 import org.desklink.mobile.ui.compose.screen.transfers.TransferActions
 import org.desklink.mobile.ui.compose.screen.transfers.VideoViewer
-import org.desklink.mobile.plugins.share.ShareSettingsFragment
+import org.desklink.mobile.plugins.share.ShareDestination
 import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.ui.about.EasterEggActivity
 import org.desklink.mobile.ui.about.LicensesActivity
@@ -1050,7 +1050,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 DeskLinkApplication.getInstance().devices.values.forEach(Device::reloadPluginsFromSettings)
             }
             requestCode == STORAGE_LOCATION_CONFIGURED && resultCode == RESULT_OK && data != null ->
-                ShareSettingsFragment.saveStorageLocationPreference(this, data.data)
+                ShareDestination.saveStorageLocationPreference(this, data.data)
             else -> @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
         }
     }

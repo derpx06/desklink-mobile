@@ -5,6 +5,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import java.io.File
@@ -37,6 +38,29 @@ object RemovedFeatures {
         "clipboard_auto_sync",
     )
 
+    /** 2.0 made one marker of its own: the settings that became fixed defaults. */
+    internal const val MARKER_KEY_SETTINGS = "simplified_2_0"
+
+    /**
+     * 2.0 removed the per-plugin settings screens. These options became fixed defaults (the desk screen's
+     * start mode and controls, scroll and trackpad tuning, the media notification, "noisy" file
+     * notifications, the flashlight), so what was stored is dropped and the default applies.
+     */
+    internal val SIMPLIFIED_KEYS = setOf(
+        "remote_default_mode", "remote_edge_to_edge", "remote_auto_keyboard", "remote_autohide_controls",
+        "remote_keep_screen_on", "remote_haptics", "mousepad_scroll_sensitivity", "mousepad_acceleration_profile_key",
+        "mpris_interval_time", "mpris_notification_enabled", "mpris_keepwatching_enabled",
+        "findmyphone_flashlight", "share_notification_preference",
+    )
+
+    /**
+     * Plugins that still have a switch in Settings (clipboard, notifications, calls, this phone's media, the desk's
+     * notifications, contacts). Every other plugin runs at its default now: its stored switch is dropped.
+     */
+    internal val PLUGINS_WITH_A_SWITCH = setOf(
+        "ClipboardPlugin", "NotificationsPlugin", "TelephonyPlugin", "MprisReceiverPlugin", "ReceiveNotificationsPlugin", "ContactsPlugin",
+    )
+
     /** Per-desk command lists saved by the Run Command screen: `commands_preference_<device id>`. */
     internal const val COMMANDS_PREFIX = "commands_preference_"
 
@@ -46,6 +70,20 @@ object RemovedFeatures {
 
     /** The preference keys among [all] that a removed feature wrote. */
     fun staleKeys(all: Collection<String>): List<String> = all.filter { it in KEYS || it.startsWith(COMMANDS_PREFIX) }
+
+    /** The preference keys among [all] that 2.0 turned into fixed defaults. */
+    fun simplifiedKeys(all: Collection<String>): List<String> = all.filter { it in SIMPLIFIED_KEYS }
+
+    /**
+     * Drops the stored on/off switch of every plugin in [pluginKeys] that has no switch in Settings any more,
+     * from one computer's settings file. Only a boolean under a plugin's own key is touched: the pairing
+     * record (certificate, name, anything else) in the same file is never read or changed.
+     */
+    fun dropPluginSwitches(devicePrefs: SharedPreferences, pluginKeys: Collection<String>): List<String> {
+        val stale = pluginKeys.filter { it !in PLUGINS_WITH_A_SWITCH && devicePrefs.all[it] is Boolean }
+        if (stale.isNotEmpty()) devicePrefs.edit(commit = true) { stale.forEach(::remove) }
+        return stale
+    }
 
     /** Deletes the removed features' files under [filesDir]; the names deleted. Never throws. */
     fun deleteFiles(filesDir: File): List<String> = FILES.filter { name ->
@@ -57,6 +95,7 @@ object RemovedFeatures {
     fun runOnce(context: Context) {
         val app = context.applicationContext
         val marker = app.getSharedPreferences(MARKER_PREFS, Context.MODE_PRIVATE)
+        runCatching { runSimplification(app, marker) }
         if (marker.getBoolean(MARKER_KEY, false)) return
         runCatching { deleteFiles(app.filesDir) }
         runCatching { cancelStaleAlarm(app) }
@@ -72,6 +111,20 @@ object RemovedFeatures {
             if (stale.isNotEmpty()) prefs.edit { stale.forEach(::remove) }
         }
         marker.edit { putBoolean(MARKER_KEY, true) }
+    }
+
+    private fun runSimplification(app: Context, marker: SharedPreferences) {
+        if (marker.getBoolean(MARKER_KEY_SETTINGS, false)) return
+        runCatching {
+            val prefs = PreferenceManager.getDefaultSharedPreferences(app)
+            val stale = simplifiedKeys(prefs.all.keys)
+            if (stale.isNotEmpty()) prefs.edit(commit = true) { stale.forEach(::remove) }
+        }
+        runCatching {
+            val plugins = org.desklink.mobile.plugins.PluginFactory.availablePlugins
+            TrustedDevices.getAllTrustedDevices(app).forEach { id -> dropPluginSwitches(TrustedDevices.getDeviceSettings(app, id), plugins) }
+        }
+        marker.edit(commit = true) { putBoolean(MARKER_KEY_SETTINGS, true) }
     }
 
     /**

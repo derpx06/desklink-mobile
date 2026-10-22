@@ -38,7 +38,6 @@ import org.desklink.mobile.helpers.AppsHelper.appNameLookup
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
 import org.desklink.mobile.ui.MainActivity
-import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.ui.StartActivityAlertDialogFragment
 import org.desklink.mobile.R
 import java.io.ByteArrayOutputStream

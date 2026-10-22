@@ -5,8 +5,6 @@
   <string name="foreground_notification_no_devices">Ez dago ezein gailuetara konektaturik</string>
   <string name="foreground_notification_devices">Honetara konektatua: %s</string>
   <string name="foreground_notification_send_clipboard">Bidali arbelekoa</string>
-  <string name="pref_plugin_telephony">Telefonia jakinarazlea</string>
-  <string name="pref_plugin_telephony_desc">Bidali jakinarazpenak sarrerako deietarako</string>
   <string name="pref_plugin_battery">Bateriaren txostena</string>
   <string name="pref_plugin_battery_desc">Bidali bateriaren egoera aldiro</string>
   <string name="pref_plugin_clipboard">Arbelaren sinkronizazioa</string>
@@ -30,7 +28,6 @@
   <string name="pref_plugin_inputdevicesreceiver_desc">Partekatu sagua eta teklatua urrutiko gailuekin</string>
   <string name="device_list_empty">Gailurik ez</string>
   <string name="ok">Ados</string>
-  <string name="sad_ok">Ados :(</string>
   <string name="cancel">Utzi</string>
   <string name="open_settings">Ireki ezarpenak</string>
   <string name="no_permissions">Jakinarazpenak atzitzeko baimena eman behar duzu</string>
@@ -38,15 +35,7 @@
   <string name="send_ping">Bidali ping</string>
   <string name="open_mousepad">Urruneko sarrera</string>
   <string name="mousepad_sensitivity_settings_title">Ezarri ukimen-saguaren sentikortasuna</string>
-  <string name="mousepad_acceleration_profile_settings_title">Ezarri erakuslearen azelerazio</string>
   <string name="mousepad_scroll_direction_title">Alderantzikatu korritzearen norabidea</string>
-  <string name="mousepad_scroll_sensitivity_title">Kiribiltze sentikortasuna</string>
-  <string-array name="mousepad_tap_entries">
-    <item>Ezkerreko klik</item>
-    <item>Eskuineko klik</item>
-    <item>Erdiko klik</item>
-    <item>Ezer ez</item>
-  </string-array>
   <string-array name="mousepad_sensitivity_entries">
     <item>Motelena</item>
     <item>Motelena baino azkarrago</item>
@@ -54,29 +43,10 @@
     <item>Batezbestekoa baino azkarrago</item>
     <item>Azkarrena</item>
   </string-array>
-  <string-array name="mousepad_acceleration_profile_entries">
-    <item>Azeleraziorik ez</item>
-    <item>Ahulena</item>
-    <item>Ahulagoa</item>
-    <item>Ertaina</item>
-    <item>Sendoagoa</item>
-    <item>Sendoena</item>
-  </string-array>
   <string name="mouse_receiver_plugin_description">Jaso urrutiko saguaren mugimenduak</string>
   <string name="mouse_receiver_plugin_name">Sagu jasotzailea</string>
   <string name="mouse_receiver_no_permissions">Urrutiko ukipen sarrerak jasotzeko, zure gailua erabat agintzeko Irisgarritasun baimenak eman behar dituzu</string>
-  <string name="view_status_title">Egoera</string>
-  <string name="battery_status_format">Bateria: %%%d</string>
-  <string name="battery_status_low_format">Bateria: %%%d bateria baxu</string>
-  <string name="battery_status_charging_format">Bateria: %%%d kargatzen</string>
-  <string name="category_connected_devices">Konektatutako gailuak</string>
-  <string name="category_not_paired_devices">Gailu eskuragarriak</string>
-  <string name="category_remembered_devices">Gogoratutako gailuak</string>
-  <string name="device_menu_plugins">Pluginen ezarpenak</string>
   <string name="device_menu_unpair">Desparekatu</string>
-  <string name="pair_new_device">Parekatu gailu berria</string>
-  <string name="cancel_pairing">Ezeztatu parekatzea</string>
-  <string name="unknown_device">Gailu ezezaguna</string>
   <string name="unknown_sender">Igorle ezezaguna</string>
   <string name="error_not_reachable">Gailua ez dago eskuragarri</string>
   <string name="error_already_paired">Gailua dagoeneko parekatuta</string>
@@ -84,11 +54,9 @@
   <string name="error_clocks_not_match">Gailuetako erlojuak ez daude sinkronizatuta</string>
   <string name="error_canceled_by_user">Erabiltzaileak utzita</string>
   <string name="error_canceled_by_other_peer">Beste kideak utzita</string>
-  <string name="encryption_info_title">Zifratze informazioa</string>
   <string name="my_device_fingerprint">Zure gailuaren ziurtagiriaren SHA256 hatz-marka:</string>
   <string name="remote_device_fingerprint">Urruneko gailuaren ziurtagiriaren SHA256 hatz-marka hau da:</string>
   <string name="pair_requested">Parekatzea eskatu da</string>
-  <string name="pair_succeeded">Parekatze arrakastatsua</string>
   <string name="pairing_request_from">\'%1s\'(e)ren parekatzeko eskaria</string>
   <plurals name="incoming_file_title">
     <item quantity="one">%2$s(e)tik fitxategi %1$d jasotzen</item>
@@ -125,38 +93,22 @@
   <string name="tap_to_open">Tak egin irekitzeko</string>
   <string name="received_file_text">Tak egin \'%1s\' irekitzeko</string>
   <string name="cannot_create_file">Ezin da sortu %s fitxategia</string>
-  <string name="tap_to_answer">Tak egin erantzuteko</string>
-  <string name="device_not_paired">Gailua parekatu gabe</string>
-  <string name="pairing_duplicate_names">Kontuz: Izen bereko hainbat gailu daude.</string>
   <string name="request_pairing">Eskatu parekatzea</string>
   <string name="pairing_accept">Onartu</string>
   <string name="pairing_reject">Errefusatu</string>
-  <string name="pairing_explanation">Bi gailu parekatzea elkarren sarbidea emango die. Zure gailu propioak baino ez parekatu.</string>
   <string name="settings">Ezarpenak</string>
   <string name="mpris_play">Jo</string>
   <string name="mpris_pause">Eten</string>
   <string name="mpris_previous">Aurrekoa</string>
   <string name="mpris_next">Hurrengoa</string>
   <string name="mpris_volume">Bolumena</string>
-  <string name="mpris_time_settings_title">Atzera eraman / Aurrera eraman botoiak</string>
-  <string name="mpris_time_settings_summary">Doitu sakatzean aurrera/atzera azkar egin beharreko denbora</string>
-  <string-array name="mpris_time_entries">
-    <item>10 segundo</item>
-    <item>20 segundo</item>
-    <item>30 segundo</item>
-    <item>minutu 1</item>
-    <item>2 minutu</item>
-  </string-array>
   <string name="mpris_notifications_explanation">Urruneko euskarria jakinarazpen tiraderan erakusteko jakinarazpen-baimena behar da</string>
-  <string name="mpris_notification_settings_title">Erakutsi euskarri kontrolaren jakinarazpena</string>
-  <string name="mpris_notification_settings_summary">Utzi zure euskarri-jotzaileak kontrolatzen DeskLink ireki gabe</string>
   <string name="share_to">Partekatu honekin…</string>
   <string name="unreachable_device_dynamic_shortcut">%s (✕)</string>
   <string name="unreachable_device_url_share_text">Gailu eskuraezinekin partekatutako URLak, hartara bidaliko dira eskuragarri dagoenean.\n\n</string>
   <string name="unreachable_share_toast">URLa gailua konektatuta dagoen hurrengo aldian partekatuko da.</string>
   <string name="protocol_version">Protokoloaren bertsioa:</string>
   <string name="protocol_version_newer">Gailu honek protokoloaren bertsio berriago bat erabiltzen du</string>
-  <string name="plugin_settings_with_name">%s ezarpenak</string>
   <string name="invalid_device_name">Gailuaren izen baliogabea</string>
   <string name="shareplugin_text_saved">Testua jaso da, arbelean kopiatu da</string>
   <string name="custom_devices_settings">Gailuen zerrenda pertsonalizatua</string>
@@ -166,11 +118,6 @@
   <string name="custom_device_list_help">Zure gailua automatikoki detektatzen ez bada, beko botoian klik eginez IP helbidea edo ostalari-izena gehitu dezakezu</string>
   <string name="custom_device_fab_hint">Gehitu gailu bat</string>
   <string name="undo">Desegin</string>
-  <string name="share_notification_preference">Jakinarazpen zaratatsuak</string>
-  <string name="share_notification_preference_summary">Bibratu eta jo soinua fitxategia jasotzean</string>
-  <string name="share_destination_customize">Pertsonalizatu direktorio xedea</string>
-  <string name="share_destination_customize_summary_disabled">Jasotako fitxategiak Deskargak karpetan agertuko dira</string>
-  <string name="share_destination_customize_summary_enabled">Fitxategiak beheko direktorioan gordeko dira</string>
   <string name="share_destination_folder_preference">Direktorio xedea</string>
   <string name="share">Partekatu</string>
   <string name="share_received_file">Partekatu \"%s\"</string>
@@ -182,68 +129,31 @@
   <string name="send_files">Bidali fitxategiak</string>
   <string name="block_notification_contents">Oztopatu jakinarazpenen edukia</string>
   <string name="block_notification_images">Oztopatu jakinarazpenen irudiak</string>
-  <string name="pairing_title">DeskLink gailuak</string>
-  <string name="pairing_description">DeskLink darabilten sareko beste gailuak hemen agertu beharko lirateke.</string>
   <string name="device_rename_title">Aldatu izena gailuari</string>
   <string name="device_rename_confirm">Aldatu izena</string>
   <string name="refresh">Freskatu</string>
-  <string name="unreachable_description">Parekatutako gailu hau ez dago eskuragarri. Egiaztatu sare berera konektatuta dagoela.</string>
-  <string name="no_wifi">Ez zaude Wi-Fi sare batera konektatuta, baliteke gailurik ez ikustea. Egin klik hemen Wi-Fia gaitzeko.</string>
-  <string name="on_non_trusted_message">Ez dago konfiantza duen sare batean: aurkitze automatikoa desgaituta dago.</string>
   <string name="no_file_browser">Ez dago fitxategi arakatzailerik instalatuta.</string>
-  <string name="pref_plugin_telepathy">Bidali SMS</string>
-  <string name="pref_plugin_telepathy_desc">Bidali testu-mezuak zure mahaigainetik</string>
-  <string name="pref_plugin_telepathy_mms">Bidali MMS</string>
-  <string name="pref_plugin_telepathy_mms_desc">DeskLink bidez MMSak bidali ahal izateko, SMS aplikazio lehenetsi gisa ezarri behar duzu.</string>
   <string name="findmyphone_title">Bilatu nire telefonoa</string>
   <string name="findmyphone_title_tablet">Bilatu nire tableta</string>
   <string name="findmyphone_title_tv">Aurkitu nire TB</string>
   <string name="findmyphone_description">Gailuaren dei-doinua jotzen du aurki dezazun</string>
   <string name="findmyphone_found">Aurkitu du</string>
-  <string name="open">Ireki</string>
-  <string name="close">Itxi</string>
-  <string name="plugins_need_permission">Plugin batzuek jarduteko baimenak behar dituzte (tak egin informazio gehiagorako):</string>
   <string name="permission_explanation">Plugin honek baimena behar du funtzionatzeko</string>
-  <string name="all_permissions_granted">Baimen guztiak eman dira 🎉</string>
   <string name="optional_permission_explanation">Baimen gehiago eman behar dituzu funtzio guztiak gaitzeko</string>
-  <string name="plugins_need_optional_permission">Plugin batzuek desgaitutako eginbideak dituzte baimenak faltan dituztelako (tak egin informazio gehiagorako):</string>
   <string name="share_optional_permission_explanation">Fitxategiak jasotzeko biltegiratze sarbidea baimendu behar duzu</string>
   <string name="share_notifications_explanation">Fitxategiak bidaltzean eta jasotzean aurrerapena ikusteko, jakinarazpenak baimendu behar dituzu</string>
-  <string name="telepathy_permission_explanation">SMSak zure mahaigainetik bidali ahal izateko, SMSak erabiltzeko baimena eman behar duzu</string>
-  <string name="telephony_permission_explanation">Telefono deiak zure mahaigainetik ikusteko, telefono deien egunkarira eta telefonoaren egoerara baimena eman behar duzu</string>
-  <string name="telephony_optional_permission_explanation">Telefono zenbakiaren ordez kontaktuaren izena ikusteko telefonoko kontaktuak atzitzeko baimena eman behar duzu</string>
   <string name="contacts_permission_explanation">Zure kontaktuen liburuak mahaigainarekin partekatzeko, kontaktuetara baimena eman behar duzu</string>
-  <string name="contacts_per_device_confirmation">Zure telefonoko kontaktuak gailu honetara kopiatuko dira, «DeskLink SMS» aplikazioak eta beste aplikazio batzuek erabili ahal ditzaten.</string>
   <string name="select_ringtone">Hautatu dei-tonu bat</string>
-  <string name="telephony_pref_blocked_title">Blokeatutako zenbakiak</string>
-  <string name="telephony_pref_blocked_dialog_desc">Ez erakutsi zenbaki hauen deiak eta SMSak. Zehaztu zenbaki bat lerroko</string>
-  <string name="settings_icon_description">Ezarpenen ikonoa</string>
   <string name="pref_plugin_mprisreceiver">Euskarri-jotzailearen kontrola</string>
   <string name="pref_plugin_mprisreceiver_desc">Kontrolatu zure telefonoaren euskarri-jotzaileak beste gailu batetik</string>
-  <string name="notification_channel_default">Beste jakinarazpen batzuk</string>
-  <string name="notification_channel_persistent">Adierazle iraunkorra</string>
   <string name="notification_channel_media_control">Euskarrien kontrola</string>
-  <string name="notification_channel_filetransfer">Sarrerako fitxategi transmisioa</string>
-  <string name="notification_channel_filetransfer_complete">Sarrerako fitxategi transmisioa osatu da</string>
-  <string name="notification_channel_filetransfer_upload">Irteerako fitxategi transmisioa</string>
-  <string name="notification_channel_filetransfer_error">Fitxategi transmisio errorea</string>
-  <string name="notification_channel_high_priority">Lehentasun handia</string>
-  <string name="copy_url_to_clipboard">Kopiatu URLa arbelera</string>
-  <string name="clipboard_toast">Arbelera kopiatua</string>
   <string name="device_not_reachable">Gailua ez dago eskuragarri</string>
   <string name="pref_plugin_findremotedevice">Aurkitu urruneko gailua</string>
   <string name="pref_plugin_findremotedevice_desc">Jo zure urruneko gailuaren tonua</string>
   <string name="ring">Tonua jo</string>
-  <string name="mute">Isilarazi</string>
   <string name="all">Guztiak</string>
-  <string name="devices">Gailuak</string>
-  <string name="settings_rename">Gailuaren izena</string>
-  <string name="settings_dark_mode">Gai iluna</string>
   <string name="settings_export_logs">Esportatu DeskLink-en egunkariak</string>
   <string name="settings_export_logs_text">Sortu arazoak konpontzen lagun dezakeen exekuzio informazioa duen fitxategi bat.</string>
-  <string name="settings_more_settings_title">Ezarpen gehiago</string>
-  <string name="settings_more_settings_text">Gailu-bakoitzeko ezarpenak aurki daitezke \'Pluginen ezarpenak\' barruan.</string>
-  <string name="setting_persistent_notification">Erakutsi jakinarazpen iraunkorra</string>
   <string name="setting_persistent_notification_oreo">Jakinarazpen iraunkorra</string>
   <string name="setting_persistent_notification_description">Tak egin jakinarazpen ezarpenetan gaitzeko/ezgaitzeko</string>
   <string name="extra_options">Aukera gehigarriak</string>
@@ -251,8 +161,6 @@
   <string name="set_privacy_options">Ezarri zure pribatutasun aukerak</string>
   <string name="block_contents">Oztopatu jakinarazpenen edukiak</string>
   <string name="block_images">Oztopatu jakinarazpenen irudiak</string>
-  <string name="notification_channel_receivenotification">Beste gailu batzuen jakinarazpenak</string>
-  <string name="findmyphone_preference_title_flashlight">Esku-argia keinuka piztu</string>
   <string name="no_app_for_opening">Ez da fitxategi hau irekitzeko aplikazio egokirik aurkitu</string>
   <string name="trusted_networks">Konfiantza duten sareak</string>
   <string name="trusted_networks_desc">Mugatu aurkitze automatikoa sare ezagunetara</string>
@@ -260,14 +168,7 @@
   <string name="empty_trusted_networks_list_text">Oraindik ez duzu gehitu konfiantza duen sarerik</string>
   <string name="allow_all_networks_text">Baimendu guztiak</string>
   <string name="location_permission_needed_title">Baimena beharrezkoa da</string>
-  <string name="bluetooth_permission_needed_desc">DeskLink-ek hurbileko gailuetara konektatzeko baimena behar du, Bluetooth bidez parekatutako gailuak DeskLink-en erabilgarri ipintzeko.</string>
   <string name="location_permission_needed_desc">DeskLink-ek konektatuta zauden Wi-Fi sarea zein den jakiteko atzeko planoko kokapen baimena behar du, baita aplikazioa atzeko planoan dagoenean ere. Hori horrela da, zure inguruko Wi-Fi sareen izenak zure kokalekua aurkitzeko erabil daitezkeelako, nahiz eta hori ez izan DeskLink-ek egiten duena.</string>
-  <string name="clipboard_android_x_incompat">Android 10ek arbela atzitzeko aukera kendu die aplikazio guztiei. Plugin hau desgaitu egingo da.</string>
-  <string name="cant_open_url">Ezin da ireki URLa jotzen jarraitzeko</string>
-  <string name="message_reply_label">ERANTZUN</string>
-  <string name="mark_as_read_label">MARKATU IRAKURRITAKO GISA</string>
-  <string name="user_display_name">Zu</string>
-  <string name="theme_dialog_title">Aukeratu gaia</string>
   <string-array name="theme_list">
     <item>Ezarri bateria aurrezteko</item>
     <item>Argia</item>
@@ -282,16 +183,10 @@
   <string name="donate">Egin dohaintza</string>
   <string name="source_code">Sorburu kodea</string>
   <string name="licenses">Lizentziak</string>
-  <string name="website">Webgunea</string>
   <string name="about">Honi buruz</string>
   <string name="authors">Egileak</string>
-  <string name="thanks_to">Eskerrak ondokoei</string>
   <string name="easter_egg">Pazkoko arrautza</string>
-  <string name="email_contributor">Bidali e-posta kolaboratzaileari\n%s</string>
-  <string name="visit_contributors_homepage">Bisitatu kolaboratzailearen orri nagusia\n%s</string>
   <string name="version">%s bertsioa</string>
-  <string name="rise_up">Goratu</string>
-  <string name="rise_down">Beheratu</string>
   <string name="click_here_to_type">Tak egin hemen tekleatzeko</string>
   <string name="maintainer_and_developer">Arduraduna eta garatzailea</string>
   <string name="developer">Garatzailea</string>
@@ -306,22 +201,13 @@
   <string name="shellwen_chen_task">SFTPren segurtasuna hobetu, proiektu honen mantentze-gaitasuna hobetu, akatsak konpondu eta hobekuntza orokorrak</string>
   <string name="everyone_else">Urteetan DeskLink-ekin lagundu duten gainerako guztiak</string>
   <string name="send_clipboard">Bidali arbelekoa</string>
-  <string name="plugin_stats">Pluginaren estatistikak</string>
-  <string name="enable_udp_broadcast">Gaitu UDP bidez gailua aurkitzea</string>
-  <string name="enable_bluetooth">Gaitu bluetooth (beta)</string>
   <string name="receive_notifications_permission_explanation">Jakinarazpenak baimendu behar dira beste gailuetatik haiek jasotzeko</string>
   <string name="findmyphone_notifications_explanation">Aplikazioa atzeko planoan dagoenean telefonoak jo dezan jakinarazpen-baimena behar da</string>
-  <string name="findmyphone_camera_explanation">Kameraren baimenak telefonoa bilatzean esku-argia keinuka pizteko aukera ematen du</string>
-  <string name="findmyphone_open_settings_for_camera">Eman esku-argia erabiltzeko kameraren baimena aplikazioaren ezarpenetan</string>
-  <string name="no_notifications">Jakinarazpenak ezgaituta daude, ez duzu parekatzeko sarrerako eskaera-jakinarazpenik jasoko.</string>
   <string name="mpris_keepwatching">Jarraitu jotzen</string>
-  <string name="mpris_keepwatching_settings_title">Jarraitu jotzen</string>
-  <string name="mpris_keepwatching_settings_summary">Hedabidea itxi ondoren, gailu honetan jotzen jarraitzeko jakinarazpen ixil bat erakutsi.</string>
   <string name="notification_channel_keepwatching">Jarraitu jotzen</string>
   <string name="ping_result">«Ping» %1$d milisegundotan egin da</string>
   <string name="ping_failed">Ezin izan dio gailuari «ping» egin</string>
   <string name="ping_in_progress">«Ping» egiten…</string>
   <string name="device_host_invalid">Ostalaria baliogabea da. Erabili balio duen ostalari-izen bat, IPv4, edo IPv6</string>
   <string name="device_host_duplicate">Ostalaria jada zerrendan dago</string>
-  <string name="enable_fullscreen">Gaitu pantaila osoa</string>
 </resources>

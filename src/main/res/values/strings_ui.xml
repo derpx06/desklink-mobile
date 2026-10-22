@@ -6,7 +6,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 -->
 <!-- Strings of the redesigned screens. The device states, paths and feature names are the shared
      vocabulary of both apps (desktop in Title Case, Android in sentence case). -->
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- Device states and paths -->
     <string name="connection_connected">Connected</string>
     <string name="connection_connecting">Connecting…</string>
@@ -27,7 +27,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="navigate_up">Back</string>
 
     <!-- Device -->
-    <string name="device_features">Features</string>
     <string name="device_encryption">Encryption</string>
     <string name="device_tap_permission">Tap to grant</string>
     <string name="device_unpair_title">Unpair %1$s?</string>
@@ -53,7 +52,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="remote_connecting_to">Connecting to %1$s…</string>
 
     <!-- Settings -->
-    <string name="settings_category_general">General</string>
     <string name="settings_category_connection">Connection</string>
     <string name="settings_category_away">Away from home</string>
     <string name="settings_category_notifications">Notifications</string>
@@ -69,8 +67,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_unavailable_unreachable">Can\'t set up the connection to %1$s yet. DeskLink keeps trying.</string>
     <string name="home_unavailable_offline">%1$s is offline</string>
     <string name="home_switch_computer">%1$s, %2$s. Switch computer</string>
-    <string name="home_open_on">Open on %1$s</string>
-    <string name="home_quick_actions">Quick actions</string>
     <string name="home_connected_wifi">Connected over Wi‑Fi</string>
     <string name="home_connected_relay">Connected through the relay</string>
     <string name="home_connected_turn">Connected through a relay server</string>
@@ -91,12 +87,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="other">%1$d terminals open</item>
     </plurals>
     <string name="home_live_phone_screen">the desk sees your screen</string>
-    <plurals name="home_terminals_tile">
-        <item quantity="one">Terminals, %1$d open</item>
-        <item quantity="other">Terminals, %1$d open</item>
-    </plurals>
     <string name="home_desk_screen">Desk screen</string>
-    <string name="home_desk_screen_sub">View or control</string>
     <string name="home_send_files">Send files</string>
     <string name="home_send_link">Send a link</string>
     <string name="home_lock_desk">Lock desk</string>
@@ -107,7 +98,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_rang">Ringing %1$s</string>
     <string name="home_send_clipboard">Send clipboard to %1$s</string>
     <string name="home_clipboard_sent">Clipboard sent to %1$s</string>
-    <string name="home_clipboard_sync">Clipboard sync</string>
     <string name="home_clipboard_on">Copies on either side arrive on the other at once</string>
     <string name="home_clipboard_on_auto">Both ways at once: %1$s\'s copies and this phone\'s (automatic sync)</string>
     <string name="home_clipboard_on_q">%1$s\'s copies arrive at once. This phone\'s go when you open DeskLink, tap Send clipboard or use the tile</string>
@@ -124,7 +114,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="link_from_desk">Open link from %1$s</string>
     <string name="link_open">Open</string>
     <string name="link_copy">Copy</string>
-    <string name="open_on_desk">Open on computer</string>
     <string name="audio_tap_answer">Tap to answer</string>
     <string name="audio_allow">Allow</string>
     <string name="audio_deny">Don\'t allow</string>
@@ -193,8 +182,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_pair_another">Pair another computer</string>
     <string name="home_send_link_title">Send a link</string>
     <string name="home_send">Send</string>
-    <string name="home_media_playing_on">playing on %1$s</string>
-    <string name="home_media_paused_on">paused on %1$s</string>
     <string name="home_transfer_sending">Sending</string>
     <string name="home_transfer_receiving">Receiving</string>
     <string name="home_transfer_sent">Sent</string>
@@ -265,22 +252,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="accessibility_setup_done">DeskLink\'s accessibility service is on</string>
     <string name="accessibility_setup_ask">%1$s wants to control this phone</string>
     <string name="accessibility_setup_ask_text">Tap to turn on DeskLink in Accessibility</string>
-    <string name="settings_desk_notifications">Show notifications on desk</string>
     <string name="settings_desk_notifications_summary">Reply from the computer</string>
-    <string name="settings_reach_anywhere">Reach from anywhere</string>
     <string name="settings_relay_not_set_up">No relay server set up. Enter one in More → Advanced network</string>
     <string name="settings_reach_anywhere_summary">Encrypted relay when off Wi‑Fi</string>
-    <string name="settings_more">More</string>
-    <string name="settings_more_summary">Network, quick tiles, help</string>
-    <string name="settings_more_extras">Extras</string>
-    <string name="settings_more_turn_on">Off for this computer. Turn it on in Features</string>
     <string name="settings_paired_key">Paired · key %1$s</string>
-    <string name="settings_clipboard_tile">Clipboard tile</string>
-    <string name="settings_clipboard_tile_summary">Send the clipboard from Quick Settings</string>
-    <string name="settings_clipboard_tile_manual">Edit Quick Settings and drag in the Send clipboard tile</string>
-    <string name="settings_features_summary">Turn features on or off for this computer</string>
-    <string name="more_desk_controls">Desk controls this phone</string>
-    <string name="more_desk_controls_summary">Pointer and taps, through Accessibility</string>
 
     <!-- UI v4: live sessions -->
     <string name="screen_share_live_title">%1$s sees your screen</string>
@@ -322,8 +297,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="remote_key_super">Super key</string>
     <string name="remote_zoom_reset">Reset zoom</string>
     <!-- UI v4: transfers -->
-    <string name="transfers_title">Transfers</string>
-    <string name="transfers_subtitle">Files with %1$s, last 30 days</string>
     <string name="transfers_speed">%1$s/s</string>
     <string name="transfers_empty_title">No files yet</string>
     <string name="transfers_empty_body">Files you send or receive show up here.</string>
@@ -338,10 +311,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="transfers_yesterday">Yesterday</string>
     <string name="transfers_cancelled">Transfer cancelled</string>
     <string name="transfers_no_app">No app here opens this file</string>
-    <plurals name="home_transfers_count">
-        <item quantity="one">%1$d file in the last 30 days</item>
-        <item quantity="other">%1$d files in the last 30 days</item>
-    </plurals>
 
     <!-- Stage D: desk features from the phone -->
     <string name="pref_plugin_desk_settings">Desk settings</string>
@@ -418,13 +387,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_media_close">Close the player</string>
 
     <!-- Phase 1: one writer per setting -->
-    <string name="settings_this_phone">This phone</string>
     <string name="settings_phone_clipboard">Share this phone\'s clipboard</string>
     <string name="settings_phone_notifications">Send this phone\'s notifications to %1$s</string>
     <string name="settings_phone_relay">Use the relay from this phone</string>
     <string name="settings_desk_relay">%1$s reachable from anywhere</string>
     <string name="settings_desk_clipboard_summary">%1$s shares its clipboard with this phone</string>
-    <string name="settings_desk_shows_notifications">%1$s shows this phone\'s notifications</string>
     <string name="settings_waiting_for">Waiting for %1$s…</string>
     <string name="settings_saving">Saving…</string>
     <string name="settings_session_password">Session password</string>
@@ -484,7 +451,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="pref_plugin_calls">Calls on the computer</string>
     <string name="pref_plugin_calls_desc">See, answer and place this phone\'s calls from the computer</string>
     <string name="telephony_answered_on">Answered on %1$s</string>
-    <string name="settings_calls">Calls</string>
     <string name="settings_calls_on">Calls on %1$s</string>
     <string name="settings_calls_on_summary">Ringing, answer, decline and dial from %1$s</string>
     <string name="settings_show_caller">Show caller on %1$s</string>
@@ -521,7 +487,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="notes_saved_shared">Saved to notes</string>
     <string name="notes_too_long">Too long to sync: a note holds 20 KB at most. Shorten it to save.</string>
     <string name="notes_full">Too many notes (2,000 at most)</string>
-    <string name="notes_share_label">Save to DeskLink notes</string>
+    <string name="notes_share_label">Save to notes</string>
     <string name="snippets_tab_label">Snippet</string>
     <string name="snippets_pin_clipboard">Pin clipboard</string>
     <string name="snippets_empty_title">No snippets yet</string>
@@ -532,8 +498,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="snippets_pinned">Pinned as a snippet</string>
     <string name="snippets_clipboard_empty">The clipboard has no text</string>
     <string name="snippets_too_long">Too long for a snippet (16 KB at most)</string>
-    <string name="more_notes">Notes and snippets</string>
-    <string name="more_notes_summary">Synced with your computer, encrypted on this phone</string>
     <string name="terminal_insert_snippet">Insert snippet %1$s</string>
     <!-- F4: glide -->
     <string name="session_live_glide">Controlled by %1$s</string>
@@ -593,7 +557,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_skip_invalid" formatted="false">%1$d with names the computer cannot hold</string>
     <string name="bucket_skip_case" formatted="false">%1$d differing only in capital letters</string>
     <string name="bucket_skip_large" formatted="false">%1$d over 1 GB</string>
-    <string name="bucket_changed_sending_again" formatted="false">changed, sending again</string>
     <plurals name="bucket_selected">
         <item quantity="one">%1$d selected</item>
         <item quantity="other">%1$d selected</item>
@@ -644,7 +607,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_text_failed">That text is too long for the Bucket (1 MB at most)</string>
     <string name="bucket_waiting_for">Waiting for %1$s</string>
     <string name="bucket_syncing">Syncing…</string>
-    <string name="bucket_last_synced">Last synced %1$s</string>
     <string name="bucket_with">With %1$s</string>
     <string name="bucket_adding">Adding %1$d of %2$d…</string>
     <string name="bucket_held_empty">The Bucket folder looks empty here. Nothing was deleted on %1$s. If you emptied it on purpose, confirm.</string>
@@ -657,7 +619,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_empty_title">Drop anything here</string>
     <string name="bucket_empty_body">It shows up on %1$s too.</string>
     <string name="bucket_ways_in">Share from any app to “DeskLink Bucket”, or tap Add for files, a photo or what you copied.</string>
-    <string name="bucket_not_synced_folders">Not synced: folders (%1$s). The Bucket holds files for now.</string>
     <string name="bucket_rename">Rename</string>
     <string name="bucket_rename_failed">That name cannot be used, or it is taken</string>
     <string name="bucket_remove">Remove from both</string>
@@ -739,7 +700,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminals_subtitle_none">No terminals on %1$s yet</string>
     <string name="terminals_unavailable">Terminals are not available right now. Open them to unlock or retry.</string>
     <string name="terminals_open">Open terminals</string>
-    <string name="terminals_needs_attention">Needs you</string>
     <!-- W5: the tab bar -->
     <string name="tab_home">Home</string>
     <string name="tab_files">Files</string>

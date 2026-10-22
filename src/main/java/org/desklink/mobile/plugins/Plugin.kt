@@ -20,7 +20,6 @@ import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.ui.AlertDialogFragment
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.ui.PermissionsAlertDialogFragment
-import org.desklink.mobile.ui.PluginSettingsFragment
 import org.desklink.mobile.R
 
 abstract class Plugin {
@@ -60,9 +59,6 @@ abstract class Plugin {
         get() {
             if (isDeviceInitialized.not()) {
                 throw RuntimeException("You have to call setContext() before you can call getSharedPreferencesName()")
-            }
-            if (this.supportsDeviceSpecificSettings()) {
-                return device.deviceId + "_" + this.pluginKey + "_preferences"
             }
             return pluginKey + "_preferences"
         }
@@ -121,31 +117,6 @@ abstract class Plugin {
      * sends the empty form here, before it is unloaded, so the desk clears it (contract S2).
      */
     open fun onTurnedOff() {}
-
-    /**
-     * Return true if this plugin needs a specific UI settings.
-     */
-    open fun hasSettings(): Boolean = false
-
-    /**
-     * Called to find out if a plugin supports device-specific settings.
-     * If you return `true` your PluginSettingsFragment will use the device
-     * specific SharedPreferences to store the settings.
-     *
-     * @return true if this plugin supports device-specific settings
-     */
-    open fun supportsDeviceSpecificSettings(): Boolean = false
-
-    /**
-     * If hasSettings returns true, this will be called when the user
-     * wants to access this plugin's preferences. The default implementation
-     * will return a PluginSettingsFragment with content from "yourplugin"_preferences.xml
-     *
-     * @return The PluginSettingsFragment used to display this plugin's settings
-     */
-    open fun getSettingsFragment(activity: Activity): PluginSettingsFragment? {
-        throw RuntimeException("Plugin doesn't reimplement getSettingsFragment: $pluginKey")
-    }
 
     @get:CallSuper
     open val isCompatible: Boolean

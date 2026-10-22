@@ -310,11 +310,11 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
         final DocumentFile destinationFolderDocument;
 
         // If the file should be opened immediately store it in the standard location to avoid the FileProvider trouble (See ReceiveNotification::setURI)
-        if (open || !ShareSettingsFragment.isCustomDestinationEnabled(getDevice().getContext())) {
-            final String defaultPath = ShareSettingsFragment.getDefaultDestinationDirectory().getAbsolutePath();
+        if (open || !ShareDestination.isCustomDestinationEnabled(getDevice().getContext())) {
+            final String defaultPath = ShareDestination.getDefaultDestinationDirectory().getAbsolutePath();
             destinationFolderDocument = DocumentFile.fromFile(new File(defaultPath));
         } else {
-            destinationFolderDocument = ShareSettingsFragment.getDestinationDirectory(getDevice().getContext());
+            destinationFolderDocument = ShareDestination.getDestinationDirectory(getDevice().getContext());
         }
 
         currentFinalFileName = FilesHelper.findValidNonExistingFileName(destinationFolderDocument, filename);
@@ -449,7 +449,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
     }
 
     private void publishFile(DocumentFile fileDocument, long size) {
-        if (!ShareSettingsFragment.isCustomDestinationEnabled(getDevice().getContext())) {
+        if (!ShareDestination.isCustomDestinationEnabled(getDevice().getContext())) {
             Log.i("SharePlugin", "Adding to downloads");
             DownloadManager manager = ContextCompat.getSystemService(getDevice().getContext(),
                     DownloadManager.class);

@@ -5,8 +5,6 @@
   <string name="foreground_notification_no_devices">Niet verbonden met enig apparaat</string>
   <string name="foreground_notification_devices">Verbonden met: %s</string>
   <string name="foreground_notification_send_clipboard">Klembord verzenden</string>
-  <string name="pref_plugin_telephony">Telefoniemelder</string>
-  <string name="pref_plugin_telephony_desc">Stuur meldingen voor inkomende oproepen</string>
   <string name="pref_plugin_battery">Batterijrapportage</string>
   <string name="pref_plugin_battery_desc">Rapporteer periodiek de status van de batterij</string>
   <string name="pref_plugin_clipboard">Klembordsynchronisatie</string>
@@ -30,7 +28,6 @@
   <string name="pref_plugin_inputdevicesreceiver_desc">Muis en toetsenbord delen met het apparaat op afstand</string>
   <string name="device_list_empty">Geen apparaten</string>
   <string name="ok">OK</string>
-  <string name="sad_ok">OK :(</string>
   <string name="cancel">Annuleren</string>
   <string name="open_settings">Instellingen openen</string>
   <string name="no_permissions">U moet toestemming geven voor toegang tot meldingen</string>
@@ -38,15 +35,7 @@
   <string name="send_ping">Ping verzenden</string>
   <string name="open_mousepad">Invoer op afstand</string>
   <string name="mousepad_sensitivity_settings_title">Gevoeligheid van touchpad instellen</string>
-  <string name="mousepad_acceleration_profile_settings_title">Aanwijzerversnelling instellen</string>
   <string name="mousepad_scroll_direction_title">Schuifrichting omdraaien</string>
-  <string name="mousepad_scroll_sensitivity_title">Gevoeligheid voor schuiven</string>
-  <string-array name="mousepad_tap_entries">
-    <item>Linker muisklik</item>
-    <item>Rechter muisklik</item>
-    <item>Middelste muisklik</item>
-    <item>Niets</item>
-  </string-array>
   <string-array name="mousepad_sensitivity_entries">
     <item>Langzaamst</item>
     <item>Langzaam</item>
@@ -54,29 +43,10 @@
     <item>Boven standaard</item>
     <item>Snelste</item>
   </string-array>
-  <string-array name="mousepad_acceleration_profile_entries">
-    <item>Geen versnelling</item>
-    <item>Zwakste</item>
-    <item>Zwakker</item>
-    <item>Middel</item>
-    <item>Sterker</item>
-    <item>Sterkst</item>
-  </string-array>
   <string name="mouse_receiver_plugin_description">Muisbewegingen van afstand ontvangen</string>
   <string name="mouse_receiver_plugin_name">Muisontvanger</string>
   <string name="mouse_receiver_no_permissions">Om aanraakinvoer op afstand te ontvangen moet u toegangsrechten toekennen om uw apparaat volledig te besturen</string>
-  <string name="view_status_title">Status</string>
-  <string name="battery_status_format">Batterij: %d%%</string>
-  <string name="battery_status_low_format">Batterij: %d%% lage batterij</string>
-  <string name="battery_status_charging_format">Batterij: %d%% opladen</string>
-  <string name="category_connected_devices">Verbonden apparaten</string>
-  <string name="category_not_paired_devices">Beschikbare apparaten</string>
-  <string name="category_remembered_devices">Onthouden apparaten</string>
-  <string name="device_menu_plugins">Plugin-instellingen</string>
   <string name="device_menu_unpair">Paar uit elkaar halen</string>
-  <string name="pair_new_device">Nieuw apparaat paren</string>
-  <string name="cancel_pairing">Paren annuleren</string>
-  <string name="unknown_device">Onbekend apparaat</string>
   <string name="unknown_sender">Onbekende verzender</string>
   <string name="error_not_reachable">Apparaat niet bereikbaar</string>
   <string name="error_already_paired">Apparaat is al gepaard</string>
@@ -84,11 +54,9 @@
   <string name="error_clocks_not_match">Klokken op apparaten lopen niet gelijk</string>
   <string name="error_canceled_by_user">Geannuleerd door gebruiker</string>
   <string name="error_canceled_by_other_peer">Geannuleerd door andere kant</string>
-  <string name="encryption_info_title">Versleutelde informatie</string>
   <string name="my_device_fingerprint">De SHA256 vingerafdruk van het certificaat van uw apparaat is:</string>
   <string name="remote_device_fingerprint">De SHA256 vingerafdruk van het certificaat van het apparaat op afstand is:</string>
   <string name="pair_requested">Paarvorming gevraagd</string>
-  <string name="pair_succeeded">Paarvorming is gelukt</string>
   <string name="pairing_request_from">Verzoek om een paar te maken van \'%1s\'</string>
   <plurals name="incoming_file_title">
     <item quantity="one">%1$d bestand wordt ontvangen vanaf %2$s</item>
@@ -125,38 +93,22 @@
   <string name="tap_to_open">Tik om te openen</string>
   <string name="received_file_text">Tap om \'%1s\' te openen</string>
   <string name="cannot_create_file">Kan bestand %s niet aanmaken</string>
-  <string name="tap_to_answer">Tap om te antwoorden</string>
-  <string name="device_not_paired">Apparaat is niet gepaard</string>
-  <string name="pairing_duplicate_names">Voorzichtig: er zijn meerdere apparaten met dezelfde naam.</string>
   <string name="request_pairing">Verzoek voor maken van paar</string>
   <string name="pairing_accept">Accepteren</string>
   <string name="pairing_reject">Afwijzen</string>
-  <string name="pairing_explanation">Twee apparaten paren zal ze toegang geven tot elkaar. Paar alleen uw eigen apparaten.</string>
   <string name="settings">Instellingen</string>
   <string name="mpris_play">Afspelen</string>
   <string name="mpris_pause">Pauzeren</string>
   <string name="mpris_previous">Vorige</string>
   <string name="mpris_next">Volgende</string>
   <string name="mpris_volume">Volume</string>
-  <string name="mpris_time_settings_title">Knoppen vooruit/terug</string>
-  <string name="mpris_time_settings_summary">Pas de tijd aan om snel voorwaarts/terug te gaan bij indrukken</string>
-  <string-array name="mpris_time_entries">
-    <item>10 seconden</item>
-    <item>20 seconden</item>
-    <item>30 seconden</item>
-    <item>1 minuut</item>
-    <item>2 minuten</item>
-  </string-array>
   <string name="mpris_notifications_explanation">Het recht op meldingen is nodig om media op afstand te tonen in de meldingenschuiflade</string>
-  <string name="mpris_notification_settings_title">Mediabesturingsmelding tonen</string>
-  <string name="mpris_notification_settings_summary">Staat besturing van uw mediaspelers toe zonder DeskLink te openen</string>
   <string name="share_to">Delen met…</string>
   <string name="unreachable_device_dynamic_shortcut">%s (✕)</string>
   <string name="unreachable_device_url_share_text">URL\'s gedeeld met een niet bereikbaar apparaat zullen er afgeleverd worden wanneer deze bereikbaar wordt.\n\n</string>
   <string name="unreachable_share_toast">De URL zal gedeeld worden de volgende keer dat het apparaat wordt verbonden.</string>
   <string name="protocol_version">Protocolversie:</string>
   <string name="protocol_version_newer">Dit apparaat gebruikt een nieuwere protocolversie</string>
-  <string name="plugin_settings_with_name">Instellingen van %s</string>
   <string name="invalid_device_name">Ongeldige apparaatnaam</string>
   <string name="shareplugin_text_saved">Oontvangen tekst, opgeslagen op klembord</string>
   <string name="custom_devices_settings">Aangepaste lijst apparaten</string>
@@ -166,11 +118,6 @@
   <string name="custom_device_list_help">Als uw apparaat niet automatisch wordt gedetecteerd kunt u zijn IP-adres of hostnaam toevoegen door te klikken op de onderstaande knop</string>
   <string name="custom_device_fab_hint">Een apparaat toevoegen</string>
   <string name="undo">Ongedaan maken</string>
-  <string name="share_notification_preference">Luidruchtige meldingen</string>
-  <string name="share_notification_preference_summary">Vibreer en speel een geluidje bij ontvangen van een bestand</string>
-  <string name="share_destination_customize">De bestemmingsmap aanpassen</string>
-  <string name="share_destination_customize_summary_disabled">Ontvangen bestanden zullen in Downloads verschijnen</string>
-  <string name="share_destination_customize_summary_enabled">Bestanden zullen opgeslagen worden in de onderstaande map</string>
   <string name="share_destination_folder_preference">Bestemmingsmap</string>
   <string name="share">Delen</string>
   <string name="share_received_file">\"%s\" delen</string>
@@ -182,68 +129,31 @@
   <string name="send_files">Bestanden verzenden</string>
   <string name="block_notification_contents">Inhoud van meldingen blokkeren</string>
   <string name="block_notification_images">Afbeeldingen van meldingen blokkeren</string>
-  <string name="pairing_title">Apparaten van DeskLink</string>
-  <string name="pairing_description">Andere apparaten met DeskLink in uw zelfde netwerk zouden hier moeten verschijnen.</string>
   <string name="device_rename_title">Apparaat hernoemen</string>
   <string name="device_rename_confirm">Hernoemen</string>
   <string name="refresh">Vernieuwen</string>
-  <string name="unreachable_description">Dit gepaarde apparaat is niet bereikbaar. Ga na dat het is verbonden met uw zelfde netwerk.</string>
-  <string name="no_wifi">U bent niet verbonden met een Wi-Fi-netwerk, u zou dus niet in staat kunnen zijn om apparaten te zien. Klik hier om Wi-Fi in te schakelen.</string>
-  <string name="on_non_trusted_message">Niet op een vertrouwd netwerk: automatisch ontdekken is uitgeschakeld.</string>
   <string name="no_file_browser">Er zijn geen bestandsbrowsers geïnstalleerd.</string>
-  <string name="pref_plugin_telepathy">SMS verzenden</string>
-  <string name="pref_plugin_telepathy_desc">Stuur tekstberichten van uw bureaublad</string>
-  <string name="pref_plugin_telepathy_mms">MMS verzenden</string>
-  <string name="pref_plugin_telepathy_mms_desc">Om MMS te kunnen verzenden vanuit DeskLink moet u het als de standaard SMS-app instellen.</string>
   <string name="findmyphone_title">Zoek mijn telefoon</string>
   <string name="findmyphone_title_tablet">Zoek mijn tablet</string>
   <string name="findmyphone_title_tv">Zoek mijn tv</string>
   <string name="findmyphone_description">Laat dit apparaat bellen zodat u het kunt vinden</string>
   <string name="findmyphone_found">Gevonden</string>
-  <string name="open">Openen</string>
-  <string name="close">Sluiten</string>
-  <string name="plugins_need_permission">Sommige plug-ins hebben toestemming nodig om te werken (tik voor meer informatie):</string>
   <string name="permission_explanation">Deze plug-in heeft toestemming nodig om te werken</string>
-  <string name="all_permissions_granted">Alle toegangsrechten toegekend 🎉</string>
   <string name="optional_permission_explanation">U moet toestemming geven om alle functies in te schakelen</string>
-  <string name="plugins_need_optional_permission">Sommige plug-ins hebben functies uitgeschakeld vanwege ontbrekende toestemming (tik voor meer informatie):</string>
   <string name="share_optional_permission_explanation">Om bestanden te ontvangen die u nodig hebt voor toegang tot opslag</string>
   <string name="share_notifications_explanation">Om de voortgang te zien bij verzenden en ontvangen van bestanden moet u meldingen toestaan</string>
-  <string name="telepathy_permission_explanation">Om een SMS te lezen of te schrijven vanaf uw bureaublad moet u toestemming geven tot SMS</string>
-  <string name="telephony_permission_explanation">Om telefoonoproepen te zien op het bureaublad moet u toestemming geven tot telefoonoproeplogs en telefoonstatus</string>
-  <string name="telephony_optional_permission_explanation">Om een naam van een contactpersoon te zien in plaats van een telefoonnummer moet u toegang geven tot de contacten in uw telefoon</string>
   <string name="contacts_permission_explanation">Om uw contactpersoennboek te delen met het bureaublad moet u contacten rechten geven</string>
-  <string name="contacts_per_device_confirmation">Uw telefooncontacten zullen gekopieerd worden naar dit apparaat, ze kunnen dus gebruikt worden door de toepassing DeskLink SMS en andere toepassingen.</string>
   <string name="select_ringtone">Selecteer een ringtone</string>
-  <string name="telephony_pref_blocked_title">Geblokkeerde nummers</string>
-  <string name="telephony_pref_blocked_dialog_desc">Geen oproepen en SMSen vanaf deze nummers tonen. Specificeer één nummer per regel</string>
-  <string name="settings_icon_description">Pictogram voor instellingen</string>
   <string name="pref_plugin_mprisreceiver">Besturing van mediaspeler</string>
   <string name="pref_plugin_mprisreceiver_desc">Uw mediaspelers op uw telefoon besturen vanaf een andere apparaat</string>
-  <string name="notification_channel_default">Overige meldingen</string>
-  <string name="notification_channel_persistent">Blijvende indicator</string>
   <string name="notification_channel_media_control">Besturing van media</string>
-  <string name="notification_channel_filetransfer">Inkomende bestandsoverdracht</string>
-  <string name="notification_channel_filetransfer_complete">Overdracht van inkomende bestand voltooid</string>
-  <string name="notification_channel_filetransfer_upload">Uitgaande bestandsoverdracht</string>
-  <string name="notification_channel_filetransfer_error">Bestandsoverdrachtfout</string>
-  <string name="notification_channel_high_priority">Hoge prioriteit</string>
-  <string name="copy_url_to_clipboard">URL-adres kopiëren naar klembord</string>
-  <string name="clipboard_toast">Gekopieerd naar klembord</string>
   <string name="device_not_reachable">Apparaat is niet bereikbaar</string>
   <string name="pref_plugin_findremotedevice">Apparaat op afstand zoeken</string>
   <string name="pref_plugin_findremotedevice_desc">Maak een oproep naar uw apparaat op afstand</string>
   <string name="ring">Oproep doen</string>
-  <string name="mute">Dempen</string>
   <string name="all">Alles</string>
-  <string name="devices">Apparaten</string>
-  <string name="settings_rename">Apparaatnaam</string>
-  <string name="settings_dark_mode">Donker thema</string>
   <string name="settings_export_logs">Logs van DeskLink exporteren</string>
   <string name="settings_export_logs_text">Genereert een bestand met uitvoeringsinformatie die kan helpen problemen op te lossen.</string>
-  <string name="settings_more_settings_title">Meer instellingen</string>
-  <string name="settings_more_settings_text">Instellingen per apparaat kunnen gevonden worden onder \'Plug-in-instellingen\' vanuit een apparaat.</string>
-  <string name="setting_persistent_notification">Blijvende melding tonen</string>
   <string name="setting_persistent_notification_oreo">Blijvende melding</string>
   <string name="setting_persistent_notification_description">Tik om instellingen van meldingen in/uit te schakelen</string>
   <string name="extra_options">Extra opties</string>
@@ -251,8 +161,6 @@
   <string name="set_privacy_options">Stel uw privacyopties in</string>
   <string name="block_contents">Inhoud van meldingen blokkeren</string>
   <string name="block_images">Afbeeldingen in meldingen blokkeren</string>
-  <string name="notification_channel_receivenotification">Meldingen van andere apparaten</string>
-  <string name="findmyphone_preference_title_flashlight">Flitslamp laten flitsen</string>
   <string name="no_app_for_opening">Geen geschikte toepassing gevonden om dit bestand te openen</string>
   <string name="trusted_networks">Vertrouwde netwerken</string>
   <string name="trusted_networks_desc">Automatisch ontdekken beperken tot bekende netwerken</string>
@@ -260,14 +168,7 @@
   <string name="empty_trusted_networks_list_text">U hebt nog geen vertrouwd netwerk toegevoegd</string>
   <string name="allow_all_networks_text">Allen toestaan</string>
   <string name="location_permission_needed_title">Toestemming vereist</string>
-  <string name="bluetooth_permission_needed_desc">DeskLink heeft rechten nodig om te verbinden met apparaten dichtbij om apparaten te laten paren met Bluetooth beschikbaar in DeskLink.</string>
   <string name="location_permission_needed_desc">DeskLink heeft de permissie achtergrondlocatie nodig om het WiFi-netwerk te weten waarmee u bent verbonden zelfs wanneer de toepassing in de achtergrond is. Dit vanwege dat de naam van de WiFi-netwerken om u heen gebruikt zouden kunnen worden om uw locatie te vinden, zelfs wanneer dit niet is wat DeskLink doet.</string>
-  <string name="clipboard_android_x_incompat">Android 10 heeft toegang tot het klembord naar alle toepassingen verwijderd. Deze plug-in zal uitgeschakeld worden.</string>
-  <string name="cant_open_url">Kan URL niet openen om door te gaan met afspelen</string>
-  <string name="message_reply_label">BEANTWOORDEN</string>
-  <string name="mark_as_read_label">MARKEREN ALS GELEZEN</string>
-  <string name="user_display_name">U</string>
-  <string name="theme_dialog_title">Thema kiezen</string>
   <string-array name="theme_list">
     <item>Op batterijbesparing instellen</item>
     <item>Licht</item>
@@ -282,16 +183,10 @@
   <string name="donate">Doneren</string>
   <string name="source_code">Broncode</string>
   <string name="licenses">Licenties</string>
-  <string name="website">Website</string>
   <string name="about">Info over</string>
   <string name="authors">Auteurs</string>
-  <string name="thanks_to">Met dank aan</string>
   <string name="easter_egg">Paasei</string>
-  <string name="email_contributor">E-mail medewerkers\n%s</string>
-  <string name="visit_contributors_homepage">Homepage van medewerker bezoeken\n%s</string>
   <string name="version">Versie %s</string>
-  <string name="rise_up">Opkomen</string>
-  <string name="rise_down">Neergaan</string>
   <string name="click_here_to_type">Tik hier om te typen</string>
   <string name="maintainer_and_developer">Onderhouder en ontwikkelaar</string>
   <string name="developer">Ontwikkelaar</string>
@@ -306,22 +201,13 @@
   <string name="shellwen_chen_task">Verbeter de beveiliging van SFTP, verbeter de onderhoudbaarheid van dit project, reparaties van bugs en algemene verbeteringen</string>
   <string name="everyone_else">Ieder ander die over de jaren heeft bijgedragen aan DeskLink</string>
   <string name="send_clipboard">Klembord verzenden</string>
-  <string name="plugin_stats">Plug-in-statistieken</string>
-  <string name="enable_udp_broadcast">Ontdekken van UDP-apparaat inschakelen</string>
-  <string name="enable_bluetooth">Bluetooth inschakelen (beta)</string>
   <string name="receive_notifications_permission_explanation">Meldingen moeten toegestaan worden om ze te ontvangen van andere apparaten</string>
   <string name="findmyphone_notifications_explanation">Het recht op meldingen is nodig zodat de telefoon af kan gaan wanneer de toepassing in de achtergrond is</string>
-  <string name="findmyphone_camera_explanation">Met de cameratoestemming kan de flitslamp flitsen wanneer u uw telefoon zoekt.</string>
-  <string name="findmyphone_open_settings_for_camera">Geef in de toepassingsinstellingen toestemming voor het gebruik van de camera om de flitslamp te kunnen gebruiken.</string>
-  <string name="no_notifications">Meldingen zijn uitgeschakeld, u zult geen inkomende meldingen van paringsverzoeken ontvangen.</string>
   <string name="mpris_keepwatching">Doorgaan met afspelen</string>
-  <string name="mpris_keepwatching_settings_title">Doorgaan met afspelen</string>
-  <string name="mpris_keepwatching_settings_summary">Een stille melding tonen om door te gaan met afspelen op dit apparaat na sluiten van het medium</string>
   <string name="notification_channel_keepwatching">Doorgaan met afspelen</string>
   <string name="ping_result">Ping verkregen in %1$d milliseconden</string>
   <string name="ping_failed">Kreeg geen antwoord op ping van apparaat</string>
   <string name="ping_in_progress">Ping wordt verstuurt</string>
   <string name="device_host_invalid">Host is ongeldig. Gebruik een geldige hostnaam, IPv4 of IPv6</string>
   <string name="device_host_duplicate">Host bestaat al in de lijst</string>
-  <string name="enable_fullscreen">Volledig scherm inschakelen</string>
 </resources>

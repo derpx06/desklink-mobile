@@ -35,7 +35,6 @@ import org.desklink.mobile.helpers.NotificationHelper;
 import org.desklink.mobile.NetworkPacket;
 import org.desklink.mobile.plugins.Plugin;
 import org.desklink.mobile.plugins.PluginFactory;
-import org.desklink.mobile.ui.PluginSettingsFragment;
 import org.desklink.mobile.R;
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol;
 
@@ -243,16 +242,6 @@ public class FindMyPhonePlugin extends Plugin {
         return ArrayUtils.EMPTY_STRING_ARRAY;
     }
 
-    @Override
-    public boolean hasSettings() {
-        return true;
-    }
-
-    @Override
-    public PluginSettingsFragment getSettingsFragment(Activity activity) {
-        return FindMyPhoneSettingsFragment.newInstance(getPluginKey(), R.xml.findmyphoneplugin_preferences);
-    }
-
     @NonNull
     @Override
     protected String[] getRequiredPermissions() {
@@ -268,8 +257,8 @@ public class FindMyPhonePlugin extends Plugin {
         return R.string.findmyphone_notifications_explanation;
     }
 
+    /** The flashlight is a fixed default (off); with no sound it still flashes, see {@link #startPlaying}. */
     private boolean isFlashlightEnabledInSettings() {
-       SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-       return prefs.getBoolean(context.getString(R.string.findmyphone_preference_key_flashlight), false);
+       return false;
     }
 }

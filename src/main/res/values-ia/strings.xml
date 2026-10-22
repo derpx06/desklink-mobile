@@ -5,8 +5,6 @@
   <string name="foreground_notification_no_devices">Non connectite a ulle dispositivo</string>
   <string name="foreground_notification_devices">Connectite : %s</string>
   <string name="foreground_notification_send_clipboard">Invia Area de transferentia</string>
-  <string name="pref_plugin_telephony">Notificator de telephonia</string>
-  <string name="pref_plugin_telephony_desc">Invia notificationes per appellos in arrivata</string>
   <string name="pref_plugin_battery">Reporto de batteria</string>
   <string name="pref_plugin_battery_desc">Periodicamente reporta stato de batteria</string>
   <string name="pref_plugin_clipboard">Sync de area de transferentia</string>
@@ -21,17 +19,10 @@
   <string name="pref_plugin_inputdevicesreceiver">"Comparti  dispositivos de entrata"</string>
   <string name="pref_plugin_inputdevicesreceiver_desc">Comparti mus e claviero con le dispositivo remote</string>
   <string name="ok">OK</string>
-  <string name="sad_ok">OK :(</string>
   <string name="cancel">Cancella</string>
   <string name="open_settings">Aperi Preferentias</string>
   <string name="send_ping">Invia Ping</string>
   <string name="open_mousepad">Entrata remote</string>
-  <string-array name="mousepad_tap_entries">
-    <item>Click sinistre</item>
-    <item>Click dextere</item>
-    <item>Click in medio</item>
-    <item>Nihil</item>
-  </string-array>
   <string-array name="mousepad_sensitivity_entries">
     <item>Slowest</item>
     <item>Above Slowest</item>
@@ -39,26 +30,12 @@
     <item>Above Default</item>
     <item>le Plus veloce</item>
   </string-array>
-  <string-array name="mousepad_acceleration_profile_entries">
-    <item>No Acceleration</item>
-    <item>Weakest</item>
-    <item>Weaker</item>
-    <item>Medie</item>
-    <item>Stronger</item>
-    <item>Strongest</item>
-  </string-array>
-  <string name="view_status_title">Stato</string>
-  <string name="category_connected_devices">Dispositivos connectite</string>
-  <string name="category_not_paired_devices">Dispositivos disponibile</string>
-  <string name="device_menu_plugins">"Preferentias de plugin "</string>
   <string name="device_menu_unpair">De-Associa</string>
-  <string name="unknown_device">Dispositivo incognite</string>
   <string name="error_not_reachable">Dispositivo non attingibile</string>
   <string name="error_timed_out">Expirate</string>
   <string name="error_clocks_not_match">Horologios de dispositivo es foras de synchronisation</string>
   <string name="error_canceled_by_other_peer">Cancellate per altere pare</string>
   <string name="pair_requested">Coppiar requirite</string>
-  <string name="pair_succeeded">"Coppiar  succedite"</string>
   <plurals name="outgoing_file_title">
     <item quantity="one">"Inviante file %1$d   a  %2$s"</item>
     <item quantity="other">Invia %1$d files %2$s</item>
@@ -76,13 +53,6 @@
   <string name="mpris_previous">Precedente</string>
   <string name="mpris_next">Proxime</string>
   <string name="mpris_volume">Volumine</string>
-  <string-array name="mpris_time_entries">
-    <item>10 secundas</item>
-    <item>20 secundas</item>
-    <item>30 secundas</item>
-    <item>1 minuta</item>
-    <item>2 minutas</item>
-  </string-array>
   <string name="share_to">Comparti a…</string>
   <string name="unreachable_device_dynamic_shortcut">%s (✕)</string>
   <string name="protocol_version">Version de protocollo :</string>
@@ -97,35 +67,15 @@
   <string name="block_notification_images">Bloca imagines de notification</string>
   <string name="device_rename_confirm">Renomina</string>
   <string name="refresh">Refresca</string>
-  <string name="pref_plugin_telepathy">Invia SMS</string>
-  <string name="pref_plugin_telepathy_mms">Invia MMS</string>
-  <string name="open">Aperi</string>
-  <string name="close">Claude</string>
-  <string name="settings_icon_description">Icone de Preferentias</string>
   <string name="notification_channel_media_control">Controlo de multimedia</string>
-  <string name="notification_channel_filetransfer">Transferimento de file in arrivata</string>
-  <string name="notification_channel_filetransfer_complete">Transferimento de file in arrivata complete</string>
-  <string name="notification_channel_filetransfer_upload">Transferimento de file in partita</string>
-  <string name="notification_channel_high_priority">Prioritate alte</string>
-  <string name="copy_url_to_clipboard">Copia URL a area de transferentia</string>
-  <string name="mute">Surdina</string>
   <string name="all">Omne</string>
-  <string name="devices">Dispositivos</string>
-  <string name="settings_rename">Nomine de dispositivo</string>
-  <string name="settings_dark_mode">Thema obscur</string>
   <string name="settings_export_logs">Exporta registros (log) de DeskLink</string>
-  <string name="settings_more_settings_title">Altere preferentias</string>
   <string name="extra_options">Optiones extra</string>
   <string name="privacy_options">Optiones de confidentialitate</string>
   <string name="trusted_networks">Retes digne de fide</string>
   <string name="add_trusted_network">Adde %1s</string>
   <string name="allow_all_networks_text">Permitte toto</string>
   <string name="location_permission_needed_title">Permission requirite</string>
-  <string name="cant_open_url">Non pote aperir URL per continuar a executar</string>
-  <string name="message_reply_label">RESPONSA</string>
-  <string name="mark_as_read_label">MARCA COMO LEGITE</string>
-  <string name="user_display_name">Tu</string>
-  <string name="theme_dialog_title">Selige thema</string>
   <string-array name="theme_list">
     <item>Fixate per le sparnio de batteria</item>
     <item>Legier</item>
@@ -140,13 +90,10 @@
   <string name="donate">Dona</string>
   <string name="source_code">Codice fonte</string>
   <string name="licenses">Licentias</string>
-  <string name="website">Sito Web</string>
   <string name="about">A proposito</string>
   <string name="authors">Autores</string>
-  <string name="thanks_to">Gratias a</string>
   <string name="easter_egg">Ovo de Pascha</string>
   <string name="version">Version %s</string>
-  <string name="rise_down">Leva a basso</string>
   <string name="click_here_to_type">Tocca hic pro typar</string>
   <string name="maintainer_and_developer">Mantenitor e developpator</string>
   <string name="developer">Disveloppator</string>
@@ -154,12 +101,8 @@
   <string name="holger_kaelberer_task">Plugin de claviero remote e correctiones de falta</string>
   <string name="everyone_else">Alcun altere qui ha contribuite a DeskLink durante le annos</string>
   <string name="send_clipboard">Invia Area de transferentia</string>
-  <string name="plugin_stats">"Statisticas de plugin "</string>
   <string name="receive_notifications_permission_explanation">Notificationes necessita esser permettite a reciper los ex altere dispositivos</string>
   <string name="findmyphone_notifications_explanation">Le permission de notificationes es necessari assi que le telephono pote sonar quando le app es in le fundo</string>
-  <string name="no_notifications">Notificationes es dishabilitate, tu non recipera requesta de notificationes de association in arrivata.</string>
   <string name="mpris_keepwatching">"Continua a executar "</string>
-  <string name="mpris_keepwatching_settings_title">Continua a executar</string>
   <string name="notification_channel_keepwatching">Continua a executar</string>
-  <string name="enable_fullscreen">Habilita Schermo plen</string>
 </resources>
