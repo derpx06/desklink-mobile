@@ -194,6 +194,9 @@ dependencies {
     testImplementation(libs.slf4j.simple) // do not try to use the Android logger backend in tests
     testImplementation(libs.jsonassert)
     testImplementation(libs.robolectric)
+    // The screenshot harness: Compose rendered by Robolectric (debug and test only).
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(libs.androidx.junit)
 
     // For device controls
