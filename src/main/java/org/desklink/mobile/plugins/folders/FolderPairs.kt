@@ -70,6 +70,14 @@ object FolderPairs {
     private fun store(context: Context, list: List<FolderPair>) {
         pairs = list
         val plain = JSONObject().put("version", STORED_VERSION).put("pairs", JSONArray().apply { list.forEach { put(toJson(it)) } }).toString()
+        writer.execute { write(context, plain) }
+        _revision.value++
+    }
+
+    /** Writes in order, off the main thread. */
+    private val writer = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    private fun write(context: Context, plain: String) {
         runCatching {
             val f = file(context)
             val out = f.startWrite()
@@ -81,7 +89,6 @@ object FolderPairs {
                 throw e
             }
         }.onFailure { Log.e(TAG, "Could not save the synced folders", it) }
-        _revision.value++
     }
 
     /** Adds a picked tree for [deviceId], keeping its grant; false at [FolderSync.MAX_PAIRS] or when it cannot be kept. */

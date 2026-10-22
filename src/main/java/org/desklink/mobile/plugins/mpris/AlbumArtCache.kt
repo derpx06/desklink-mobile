@@ -85,6 +85,9 @@ internal object AlbumArtCache {
     /** Largest album art this will store. Comfortably above any real cover. */
     private const val MAX_ALBUM_ART_BYTES = 8L * 1024 * 1024
 
+    /** Cover art is shown at most notification/card size: decoded no larger than this side. */
+    private const val MAX_DECODED_SIDE = 1024
+
     private val cacheScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     /**
@@ -164,8 +167,16 @@ internal object AlbumArtCache {
         try {
             val item = diskCache[urlToDiskCacheKey(albumUrl)]
             if (item != null) {
-                val result = BitmapFactory.decodeStream(item.getInputStream(0).buffered())
+                // Bounded like every other decode: a cached file may be any size up to 8 MB.
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                item.getInputStream(0).buffered().use { BitmapFactory.decodeStream(it, null, bounds) }
                 item.close()
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / sample > MAX_DECODED_SIDE) sample *= 2
+                val result = diskCache[urlToDiskCacheKey(albumUrl)]?.let { again ->
+                    again.getInputStream(0).buffered().use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
+                        .also { again.close() }
+                }
                 val memItem = MemoryCacheItem()
                 if (result != null) {
                     memItem.failedFetch = false

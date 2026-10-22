@@ -67,6 +67,9 @@ class ReceiveNotificationsPlugin : Plugin() {
         return sampleSize
     }
 
+    /** A desk's notifications posted here, a minute at most (updates and cancels are not counted). */
+    private val posts = org.desklink.mobile.helpers.RateLimiter(org.desklink.mobile.helpers.InboundLimits.MAX_DESK_NOTIFICATIONS_PER_MINUTE, 60_000, "DeskLink/Notifications")
+
     override fun onPacketReceived(np: NetworkPacket): Boolean {
         // Both of these returned without touching the payload. Over WebRTC a
         // payload is a FileInputStream over a temp file whose deletion happens
@@ -93,6 +96,11 @@ class ReceiveNotificationsPlugin : Plugin() {
             return true
         }
 
+        if (!posts.allow(device.deviceId)) {
+            np.payload?.close()
+            return true
+        }
+
         val resultPendingIntent = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         var largeIcon: Bitmap? = null
@@ -109,7 +117,8 @@ class ReceiveNotificationsPlugin : Plugin() {
             // bounded by the transfer layer) so the bounds pass and the real
             // decode can both see them without a second stream.
             val encoded = try {
-                payload.inputStream?.use { it.readBytes() } ?: ByteArray(0)
+                if (payload.payloadSize > org.desklink.mobile.helpers.InboundLimits.MAX_NOTIFICATION_ICON_BYTES) ByteArray(0)
+                else payload.inputStream?.use { it.readBytes() } ?: ByteArray(0)
             } catch (error: Exception) {
                 Log.w("NotificationsPlugin", "Could not read a notification icon", error)
                 ByteArray(0)

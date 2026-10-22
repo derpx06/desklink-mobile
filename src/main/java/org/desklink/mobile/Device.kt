@@ -1003,7 +1003,14 @@ class Device : PacketReceiver {
         notifyPluginPacketReceived(np)
     }
 
+    /** Per type, under every plugin: a flood is dropped (counted, one log line a window), never dispatched. */
+    private val inboundLimits = org.desklink.mobile.helpers.InboundLimits.ForDesk()
+
     private fun notifyPluginPacketReceived(np: NetworkPacket) {
+        if (!inboundLimits.allow(np.type)) {
+            np.payload?.close()
+            return
+        }
         // Type only, never the body. tools/device_e2e.sh asserts on this line.
         Log.i("DeskLink/Feature", "Received ${np.type} from $deviceId")
         val targetPlugins = pluginsByIncomingInterface[np.type] // Returns an empty collection if the key doesn't exist

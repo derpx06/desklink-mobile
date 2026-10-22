@@ -28,9 +28,18 @@ object CrashReporter {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
             runCatching { file.writeText(report(thread, error)) }
-            previous?.uncaughtException(thread, error)
+            if (survivable(thread, error, android.os.Looper.getMainLooper().thread)) {
+                // A worker thread's bug: that thread ends, the app keeps running (and the report is
+                // still offered at the next start), instead of a crash that restarts into the same bug.
+                runCatching { android.util.Log.e("DeskLink/Crash", "Uncaught on ${thread.name}; the thread ends, the app goes on", error) }
+            } else {
+                previous?.uncaughtException(thread, error)
+            }
         }
     }
+
+    /** Off the main thread an Exception (not an Error such as OutOfMemoryError) only ends that thread. */
+    internal fun survivable(thread: Thread, error: Throwable, main: Thread): Boolean = thread !== main && error is Exception
 
     internal fun report(thread: Thread, error: Throwable): String =
         "DeskLink ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
