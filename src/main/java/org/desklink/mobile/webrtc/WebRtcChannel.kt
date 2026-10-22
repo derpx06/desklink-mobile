@@ -14,7 +14,8 @@ enum class WebRtcChannel(
     INPUT_RELIABLE("desklink-input-reliable-v1", true, null),
     INPUT_REALTIME("desklink-input-realtime-v1", false, 0),
     FILE_CONTROL("desklink-file-control-v1", true, null),
-    FILE_DATA("desklink-file-data-v1", true, null),
+    /** Transfers v2: raw binary frames, no JSON envelope (W3). */
+    FILE_DATA("desklink-file-data-v2", true, null),
     TERMINAL("desklink-terminal-v1", true, null),
 
     /** W2: only `desklink.heartbeat` (probes, replies, doze reports), so a feature burst cannot delay them. */

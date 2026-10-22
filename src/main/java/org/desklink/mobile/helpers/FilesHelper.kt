@@ -177,7 +177,10 @@ object FilesHelper {
                 Log.w(LOG_TAG, "Unable to read file last modified time")
             }
 
-            packet.payload = NetworkPacket.Payload(inputStream, size)
+            packet.payload = NetworkPacket.Payload(inputStream, size).also {
+                // Sent in place, block by block, never copied first (and re-read after a lost link).
+                it.source = org.desklink.mobile.webrtc.UriFileSource(context, uri)
+            }
 
             return packet
         }

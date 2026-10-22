@@ -185,6 +185,12 @@ class WebRtcTransport(
         fun onScreenCaptureStopped(reason: String)
         fun onConnectionStateChanged(state: WebRtcPeerHealth)
         fun onFailure(error: Throwable)
+
+        /** A binary frame of the file channel, on libwebrtc's thread: queue it, do no work here. */
+        fun onFileFrame(frame: ByteArray) {}
+
+        /** The file channel's buffered amount fell: the sender may have room again. */
+        fun onFileBufferedLow() {}
     }
 
     private val stateRef = AtomicReference(TransportState.CONNECTING)
@@ -300,7 +306,11 @@ class WebRtcTransport(
         channels[channel.label()] = channel
         channel.registerObserver(object : DataChannel.Observer {
             override fun onBufferedAmountChange(previousAmount: Long) {
-                if (channel.label() == WebRtcChannel.EVENTS.label) eventsSender.onBufferedAmountChange()
+                when (channel.label()) {
+                    WebRtcChannel.EVENTS.label -> eventsSender.onBufferedAmountChange()
+                    WebRtcChannel.FILE_DATA.label ->
+                        if (channel.bufferedAmount() <= FileV2.IN_FLIGHT_LOW) observer.onFileBufferedLow()
+                }
             }
             override fun onStateChange() {
                 if (channel.state() == DataChannel.State.CLOSED && channel.label() == WebRtcChannel.EVENTS.label) {
@@ -312,6 +322,12 @@ class WebRtcTransport(
                 }
             }
             override fun onMessage(buffer: DataChannel.Buffer) {
+                if (channel.label() == WebRtcChannel.FILE_DATA.label) {
+                    // Raw binary frames: no envelope, no JSON. Copied once and queued; nothing else happens here.
+                    val frame = ByteArray(buffer.data.remaining()).also { buffer.data.get(it) }
+                    runCatching { observer.onFileFrame(frame) }.onFailure(observer::onFailure)
+                    return
+                }
                 // Everything stays inside the runCatching. `Result.onSuccess`
                 // is inline and does **not** catch, so the require and the
                 // validate below used to throw straight out of onMessage into
@@ -344,7 +360,11 @@ class WebRtcTransport(
     override fun send(channel: LogicalChannel, payload: ByteArray, callback: TransportCallback) {
         val webRtcChannel = when (channel) {
             LogicalChannel.CONTROL -> WebRtcChannel.CONTROL
-            LogicalChannel.PAYLOAD -> WebRtcChannel.FILE_DATA
+            // File bytes are binary frames sent by the file manager ([sendFileFrame]), never envelopes.
+            LogicalChannel.PAYLOAD -> {
+                callback.onFailure(TransportError(TransportErrorCode.UNSUPPORTED_CHANNEL, "Files travel as binary frames"))
+                return
+            }
             LogicalChannel.STREAM -> WebRtcChannel.EVENTS
         }
         sendEnvelope(webRtcChannel, "desklink.raw.v1", payload, System.currentTimeMillis(), callback)
@@ -406,6 +426,20 @@ class WebRtcTransport(
         ).toJson().toString().toByteArray(Charsets.UTF_8)
         sendOn(channel, encoded, callback)
     }
+
+    /** One binary frame of the file channel; throws a CLOSED `TransportError` when the channel is not open. */
+    fun sendFileFrame(frame: ByteArray) {
+        val dataChannel = channels[WebRtcChannel.FILE_DATA.label]
+        if (dataChannel == null || dataChannel.state() != DataChannel.State.OPEN) {
+            throw TransportError(TransportErrorCode.CLOSED, "WebRTC file channel is not open")
+        }
+        if (!dataChannel.send(DataChannel.Buffer(ByteBuffer.wrap(frame), true))) {
+            throw TransportError(TransportErrorCode.SEND_FAILED, "WebRTC file channel rejected a frame")
+        }
+    }
+
+    /** Bytes queued on the file channel: the sender's window is driven by this. */
+    fun fileBufferedAmount(): Long = channels[WebRtcChannel.FILE_DATA.label]?.bufferedAmount() ?: 0L
 
     fun isReadyForPackets(): Boolean =
         state == TransportState.CONNECTED &&

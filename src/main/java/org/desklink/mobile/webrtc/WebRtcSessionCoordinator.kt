@@ -120,10 +120,8 @@ class WebRtcSessionCoordinator(
         Log.w(TAG, "Remote session action failed", error)
         publish("RemoteSessionFailed", error.message)
     }
-    private val fileExecutor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "DeskLink-WebRTC-File-${device.deviceId}").apply { isDaemon = true }
-    }
-    private val fileTransfers = WebRtcFileTransferManager(context, device, ::sendFileMessage)
+    private val fileRunner = ThreadFileRunner()
+    private val fileTransfers = WebRtcFileTransferManager(context, device, CoordinatorFileLink(), fileRunner)
 
     /** Link up/down events for [terminal], queued here so they are never delivered under [lock]. */
     private val terminalLink = DeferredTaskExecutor(
@@ -865,7 +863,7 @@ class WebRtcSessionCoordinator(
             recoveryInProgress = false
         }
         recoveryExecutor.shutdownNow()
-        fileExecutor.shutdownNow()
+        fileRunner.shutdown()
         transportCleanup.close()
         remoteActionExecutor.close()
         peerEvents.close()
@@ -888,7 +886,7 @@ class WebRtcSessionCoordinator(
             }
         }
         recoveryExecutor.shutdownNow()
-        fileExecutor.shutdownNow()
+        fileRunner.shutdown()
         transportCleanup.close()
         remoteActionExecutor.close()
         peerEvents.close()
@@ -987,6 +985,14 @@ class WebRtcSessionCoordinator(
                 }.onFailure { Log.w(TAG, "Rejected a liveness message: ${it.message}") }
             }
 
+            override fun onFileFrame(frame: ByteArray) {
+                // Any inbound data is proof of life; the manager only queues the frame.
+                peerLiveness.onInbound(SystemClock.elapsedRealtime())
+                fileTransfers.handleFrame(frame)
+            }
+
+            override fun onFileBufferedLow() = fileTransfers.onBufferedAmountLow()
+
             override fun onEnvelope(envelope: WebRtcEnvelope) {
                 runCatching {
                     require(sessions.isCurrent(binding)) { "Stale DeskLink session" }
@@ -1032,44 +1038,16 @@ class WebRtcSessionCoordinator(
                         handleRemoteSessionMessage(binding, attemptId, envelope)
                         return@runCatching
                     }
-                    if (
-                        envelope.messageType == WebRtcFileControl.CONTROL_MESSAGE_TYPE ||
-                        envelope.messageType == WebRtcFileControl.CHUNK_MESSAGE_TYPE
-                    ) {
+                    if (envelope.messageType == WebRtcFileControl.CONTROL_MESSAGE_TYPE) {
                         val wire = requireNotNull(activeWireBinding) {
                             "No active DeskLink WebRTC wire binding"
                         }
-                        val payload = envelope.validate(
-                            wire.peerDeviceId,
-                            wire.sessionId,
-                            wire.generation,
-                        )
-                        fileExecutor.execute {
-                            runCatching {
-                                when (envelope.messageType) {
-                                    WebRtcFileControl.CONTROL_MESSAGE_TYPE -> {
-                                        require(envelope.channel == WebRtcChannel.FILE_CONTROL.label) {
-                                            "WebRTC file control arrived on the wrong channel"
-                                        }
-                                        fileTransfers.handleControl(
-                                            wire,
-                                            WebRtcFileControl.fromJson(
-                                                JSONObject(String(payload, Charsets.UTF_8)),
-                                            ),
-                                        )
-                                    }
-                                    WebRtcFileControl.CHUNK_MESSAGE_TYPE -> {
-                                        require(envelope.channel == WebRtcChannel.FILE_DATA.label) {
-                                            "WebRTC file chunk arrived on the wrong channel"
-                                        }
-                                        fileTransfers.handleChunk(wire, payload)
-                                    }
-                                }
-                            }.onFailure { error ->
-                                Log.w(TAG, "Rejected WebRTC file message", error)
-                                publish("Failed", error.message)
-                            }
+                        require(envelope.channel == WebRtcChannel.FILE_CONTROL.label) {
+                            "WebRTC file control arrived on the wrong channel"
                         }
+                        val payload = envelope.validate(wire.peerDeviceId, wire.sessionId, wire.generation)
+                        // Parsed here (small), handled on the file thread.
+                        fileTransfers.handleControl(wire, WebRtcFileControl.fromJson(JSONObject(String(payload, Charsets.UTF_8))))
                         return@runCatching
                     }
                     val packet = WebRtcPacketBridge.decode(
@@ -1377,10 +1355,8 @@ class WebRtcSessionCoordinator(
                     device.setWebRtcRecoveryPending(false)
                     recoveryInProgress = false
                     val wire = requireNotNull(activeWireBinding)
-                    fileExecutor.execute {
-                        runCatching { fileTransfers.resumeSends(wire) }
-                            .onFailure { publish("Failed", it.message) }
-                    }
+                    runCatching { fileTransfers.resumeSends(wire) }
+                        .onFailure { publish("Failed", it.message) }
                     terminalLinkEvent { terminal.onLinkReady(wire) }
                     // Not a reset: only 60 s of healthy feature-ready starts the ladder over.
                     recovery.markReady()
@@ -2063,46 +2039,42 @@ class WebRtcSessionCoordinator(
         }
     }
 
-    private fun sendFileMessage(message: OutboundWebRtcFileMessage) {
-        // CLOSED, so the transfer pauses and resumes on the next connection instead of failing.
-        val activeTransport = synchronized(lock) { transport?.takeIf { it.isReadyForPackets() } }
+    /** The file engines' view of the connection: control messages as envelopes, frames raw. */
+    private inner class CoordinatorFileLink : FileLink {
+        private fun ready(): WebRtcTransport = synchronized(lock) { transport?.takeIf { it.isReadyForPackets() } }
+            // CLOSED, so the transfer pauses and resumes on the next connection instead of failing.
             ?: throw org.desklink.mobile.transport.TransportError(
                 org.desklink.mobile.transport.TransportErrorCode.CLOSED,
                 "WebRTC file transport is not ready",
             )
-        val (channel, messageType, payload) = when (message) {
-            is OutboundWebRtcFileMessage.Control -> Triple(
+
+        override fun sendControl(control: WebRtcFileControl) {
+            val completion = CompletableFuture<Unit>()
+            ready().sendEnvelope(
                 WebRtcChannel.FILE_CONTROL,
                 WebRtcFileControl.CONTROL_MESSAGE_TYPE,
-                message.value.toJson().toString().toByteArray(Charsets.UTF_8),
-            )
-            is OutboundWebRtcFileMessage.Chunk -> Triple(
-                WebRtcChannel.FILE_DATA,
-                WebRtcFileControl.CHUNK_MESSAGE_TYPE,
-                message.value,
-            )
-        }
-        val completion = CompletableFuture<Unit>()
-        activeTransport.sendEnvelope(
-            channel,
-            messageType,
-            payload,
-            System.currentTimeMillis(),
-            object : org.desklink.mobile.transport.TransportCallback {
-                override fun onSuccess() {
-                    completion.complete(Unit)
-                }
+                control.toJson().toString().toByteArray(Charsets.UTF_8),
+                System.currentTimeMillis(),
+                object : org.desklink.mobile.transport.TransportCallback {
+                    override fun onSuccess() {
+                        completion.complete(Unit)
+                    }
 
-                override fun onFailure(error: org.desklink.mobile.transport.TransportError) {
-                    completion.completeExceptionally(error)
-                }
-            },
-        )
-        try {
-            completion.get(10, TimeUnit.SECONDS)
-        } catch (error: java.util.concurrent.ExecutionException) {
-            throw error.cause ?: error // the TransportError itself, not "ExecutionException: …"
+                    override fun onFailure(error: org.desklink.mobile.transport.TransportError) {
+                        completion.completeExceptionally(error)
+                    }
+                },
+            )
+            try {
+                completion.get(10, TimeUnit.SECONDS)
+            } catch (error: java.util.concurrent.ExecutionException) {
+                throw error.cause ?: error // the TransportError itself, not "ExecutionException: …"
+            }
         }
+
+        override fun sendFrame(message: ByteArray) = ready().sendFileFrame(message)
+
+        override fun bufferedAmount(): Long = synchronized(lock) { transport }?.fileBufferedAmount() ?: 0L
     }
 
     private fun controlMessage(

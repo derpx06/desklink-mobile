@@ -1,6 +1,7 @@
 package org.desklink.mobile.plugins.capture
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.desklink.mobile.webrtc.FileV2
 import org.desklink.mobile.webrtc.WebRtcFileAction
 import org.desklink.mobile.webrtc.WebRtcFileControl
 import org.desklink.mobile.webrtc.WebRtcRemoteSessionControlKind
@@ -43,9 +44,9 @@ class InsertFromPhoneTest {
     @Test
     fun aCapturedFilesOfferNamesItsCapture() {
         val offer = WebRtcFileControl(
-            protocolVersion = 1, action = WebRtcFileAction.OFFER, transferId = "t1", deviceId = "desk", sessionId = 1,
-            connectionGeneration = 1, transferToken = "token", filename = "scan.pdf", totalSize = 3, sha256 = "a".repeat(64),
-            offset = 0, chunkSize = WebRtcFileControl.LEGACY_CHUNK_BYTES, mimeType = "application/pdf", captureId = "c1",
+            action = WebRtcFileAction.OFFER, transferId = "00000000-0000-4000-8000-000000000001", deviceId = "desk", sessionId = 1,
+            connectionGeneration = 1, transferToken = "token", filename = "scan.pdf", totalSize = 3, mtime = 1,
+            blockSize = FileV2.BLOCK_BYTES, maxFrameBytes = FileV2.FRAME_BYTES_DEFAULT, mimeType = "application/pdf", captureId = "c1",
         )
         assertEquals(offer, WebRtcFileControl.fromJson(JSONObject(offer.toJson().toString())))
     }

@@ -713,14 +713,15 @@ object BucketEngine {
             val item = tree.find(path)
             // A file that changed while queued restarts through the next scan ("changed, sending again").
             if (item == null || !unchanged(item, entry)) { live.sending.remove(path); live.dirtyAt = SystemClock.elapsedRealtime(); continue }
-            val input = runCatching { tree.open(item) }.getOrNull() ?: continue
             live.sendActive += path
             device.sendBulk(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
                 this["filename"] = path.substringAfterLast('/')
                 this["folder"] = FolderSync.BUCKET_ID
                 this["relpath"] = path
                 this["mtime"] = entry.mtime
-                payload = NetworkPacket.Payload(input, entry.size)
+                this["contentSha256"] = entry.sha256
+                // Read in place from the Bucket folder, a block at a time (no copy, re-read after a lost link).
+                payload = NetworkPacket.Payload(entry.size).also { it.source = org.desklink.mobile.webrtc.UriFileSource(app, tree.uri(item)) }
             }, object : Device.SendPacketStatusCallback() {
                 override fun onPayloadProgressChanged(percent: Int) = progress(deviceId, path, entry.size * percent.coerceIn(0, 100) / 100, entry.size, sending = true)
 

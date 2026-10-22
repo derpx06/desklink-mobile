@@ -251,6 +251,15 @@ class NetworkPacket private constructor(
         private val closeAction: (() -> Unit)?
         val payloadSize: Long
 
+        /**
+         * Where a file payload can be read **in place** (and re-read at a block boundary after a
+         * lost link). Set by whoever knows the file's URI; a stream-only payload has none and is
+         * spooled by the file manager.
+         */
+        @JvmField
+        @Volatile
+        var source: org.desklink.mobile.webrtc.FileSource? = null
+
         constructor(payloadSize: Long) : this(null, payloadSize)
 
         constructor(data: ByteArray) : this(ByteArrayInputStream(data), data.size.toLong())

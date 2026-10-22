@@ -72,4 +72,9 @@ internal class OffThreadObserver(
         post { target.onConnectionStateChanged(state) }
 
     override fun onFailure(error: Throwable) = post { target.onFailure(error) }
+
+    // File frames are queued by the target itself (to its own file thread); a hop through the
+    // event thread would put every frame behind unrelated callbacks.
+    override fun onFileFrame(frame: ByteArray) = target.onFileFrame(frame)
+    override fun onFileBufferedLow() = target.onFileBufferedLow()
 }
