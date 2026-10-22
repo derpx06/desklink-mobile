@@ -20,6 +20,15 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.ui.compose.screen.home.MediaCardPreviewActivity"
             android:exported="true"
             android:theme="@style/Theme.AppCompat.DayNight.NoActionBar" />
+        <!-- F1 negotiation and idle-audio check with real libwebrtc, in-process. -->
+        <activity
+            android:name="org.desklink.mobile.webrtc.AudioSelfTestActivity"
+            android:exported="true" />
+        <!-- F3: a made-up capture request, for screenshots. -->
+        <activity
+            android:name="org.desklink.mobile.plugins.capture.CaptureDemoActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay" />
     </application>
 
 </manifest>

@@ -189,6 +189,9 @@ class WebRtcTransport(
         it.setIsScreencast(true)
     }
     private val videoTrack: VideoTrack = factory.createVideoTrack("desklink-screen", videoSource)
+    /** F1: the one audio track, in every negotiation from the first; silent until a session starts. */
+    private val audioSource: org.webrtc.AudioSource = factory.createAudioSource(MediaConstraints())
+    private val audioTrack: org.webrtc.AudioTrack = factory.createAudioTrack("desklink-audio", audioSource)
     private var screenCapturer: ScreenCapturerAndroid? = null
     private var screenTextureHelper: SurfaceTextureHelper? = null
     private var nextScreenCaptureEpoch = 0L
@@ -235,6 +238,12 @@ class WebRtcTransport(
             val sender = peer.addTrack(videoTrack, listOf("desklink-screen"))
             preferHardwareH264(sender)
         }
+        // F1 (A1): one sendrecv Opus section after the video, in both roles, so it is in the first
+        // (signed, never renegotiated) offer/answer. An offer without audio leaves it unused.
+        // Nothing records or plays until an audio session asks: no microphone, no indicator.
+        peer.setAudioRecording(false)
+        peer.setAudioPlayout(false)
+        peer.addTrack(audioTrack, listOf("desklink-audio"))
     }
 
     /**
@@ -407,12 +416,13 @@ class WebRtcTransport(
         Log.i(TAG, "Creating WebRTC offer")
         try {
         peer.createOffer(object : SdpObserverAdapter() {
-            override fun onCreateSuccess(description: SessionDescription) {
+            override fun onCreateSuccess(created: SessionDescription) {
                 if (!offerOperation.beginSettingLocalDescription()) {
                     Log.w(TAG, "Ignoring stale WebRTC offer creation callback")
                     return
                 }
-                Log.i(TAG, "WebRTC offer created (${description.description.length} bytes); setting local description")
+                Log.i(TAG, "WebRTC offer created (${created.description.length} bytes); setting local description")
+                val description = SessionDescription(created.type, WebRtcAudioSdp.withOpusParameters(created.description))
                 peer.setLocalDescription(object : SdpObserverAdapter() {
                     override fun onSetSuccess() {
                         if (!offerOperation.complete()) {
@@ -457,7 +467,8 @@ class WebRtcTransport(
 
     fun createAnswer() {
         peer.createAnswer(object : SdpObserverAdapter() {
-            override fun onCreateSuccess(description: SessionDescription) {
+            override fun onCreateSuccess(created: SessionDescription) {
+                val description = SessionDescription(created.type, WebRtcAudioSdp.withOpusParameters(created.description))
                 peer.setLocalDescription(object : SdpObserverAdapter() {
                     override fun onSetSuccess() {
                         observer.onSignalingNeeded(
@@ -656,6 +667,52 @@ class WebRtcTransport(
 
     fun remoteVideoTrack(): org.webrtc.VideoTrack? = announcedRemoteTrack
 
+    // ---- F1 audio --------------------------------------------------------------------------------
+
+    @Volatile private var remoteAudioTrack: org.webrtc.AudioTrack? = null
+    @Volatile private var playoutGain = 1.0
+
+    @Volatile private var audioSessionStarted = false
+
+    /** The desk's sound plays here (USAGE_MEDIA, Android's current route) only while on. */
+    fun setAudioPlayout(on: Boolean) {
+        if (on) audioSessionStarted = true
+        peer.setAudioPlayout(on)
+    }
+
+    /** This phone's audio track carries sound (microphone or phone sound) only while on. */
+    fun setAudioRecording(on: Boolean) {
+        if (on) audioSessionStarted = true
+        peer.setAudioRecording(on)
+    }
+
+    /**
+     * Changes what the audio module records from, then records. The module chooses microphone or
+     * stand-in at initialisation, and libwebrtc may already have initialised it (with no microphone)
+     * during negotiation: starting it after only flipping the switch hit WebRtcAudioRecord's
+     * "no AudioRecord" assertion and aborted the process. So recording is first brought fully
+     * down (an on→off edge stops and uninitialises it), the source changed, then started fresh.
+     * setAudioRecording blocks on the worker thread, so the three steps happen in this order.
+     */
+    @Synchronized
+    fun restartRecording(change: () -> Unit) {
+        audioSessionStarted = true
+        peer.setAudioRecording(true)
+        peer.setAudioRecording(false)
+        change()
+        peer.setAudioRecording(true)
+    }
+
+    /** 0..100 % of the desk's sound. */
+    fun setPlayoutVolume(percent: Int) {
+        playoutGain = percent.coerceIn(0, 100) / 100.0
+        remoteAudioTrack?.setVolume(playoutGain)
+    }
+
+    /** The running screen share's projection, which phone-sound capture may reuse (no second consent). */
+    @Synchronized
+    fun screenProjection(): android.media.projection.MediaProjection? = screenCapturer?.mediaProjection
+
     private var screenStatsTimer: java.util.Timer? = null
     private var inboundStatsTimer: java.util.Timer? = null
     private val debugFramesAtTrack = java.util.concurrent.atomic.AtomicLong()
@@ -810,6 +867,8 @@ class WebRtcTransport(
         cameraTextureHelper = helper
         captureFps = fps
         configureScreenSender(fps)
+        // Debug: the same 2 s encoder/sender line as the screen share, so "no frames" can be placed.
+        if (org.desklink.mobile.BuildConfig.DEBUG) startScreenStatsLog()
         return if (enumerator.isFrontFacing(name)) "front" else "back"
     }
 
@@ -829,6 +888,10 @@ class WebRtcTransport(
     private fun stopCameraCaptureLocked() {
         val capturer = cameraCapturer ?: return
         val helper = cameraTextureHelper
+        if (activeScreenCaptureEpoch == null) {
+            screenStatsTimer?.cancel()
+            screenStatsTimer = null
+        }
         cameraCapturer = null
         cameraTextureHelper = null
         runCatching { capturer.stopCapture() }
@@ -895,8 +958,11 @@ class WebRtcTransport(
         stopCameraCapture()
         pathExecutor.shutdownNow()
         inboundStatsTimer?.cancel()
+        PhoneAudioEngine.reset()
         videoTrack.dispose()
         videoSource.dispose()
+        audioTrack.dispose()
+        audioSource.dispose()
         channels.values.forEach(DataChannel::dispose)
         channels.clear()
         peer.close()
@@ -946,6 +1012,7 @@ class WebRtcTransport(
         override fun onAddTrack(receiver: org.webrtc.RtpReceiver, mediaStreams: Array<out org.webrtc.MediaStream>) {
             Log.i(TAG, "onAddTrack ${receiver.track()?.kind()} streams=${mediaStreams.size}")
             (receiver.track() as? VideoTrack)?.let(::announceRemoteTrack)
+            (receiver.track() as? org.webrtc.AudioTrack)?.let(::announceRemoteAudio)
         }
 
         // Unified Plan's callback. The legacy onAddTrack is not reliably
@@ -954,6 +1021,13 @@ class WebRtcTransport(
         override fun onTrack(transceiver: org.webrtc.RtpTransceiver) {
             Log.i(TAG, "onTrack ${transceiver.mediaType} mid=${transceiver.mid}")
             (transceiver.receiver.track() as? VideoTrack)?.let(::announceRemoteTrack)
+            (transceiver.receiver.track() as? org.webrtc.AudioTrack)?.let(::announceRemoteAudio)
+        }
+
+        private fun announceRemoteAudio(track: org.webrtc.AudioTrack) {
+            if (remoteAudioTrack?.id() == track.id()) return
+            remoteAudioTrack = track
+            track.setVolume(playoutGain)
         }
 
         private fun announceRemoteTrack(track: VideoTrack) {
@@ -966,6 +1040,12 @@ class WebRtcTransport(
             observer.onRemoteVideoTrack(track)
         }
         override fun onConnectionChange(newState: PeerConnection.PeerConnectionState) {
+            // Negotiation can start recording/playout despite the switches set at creation: idle
+            // again once connected, until an audio session turns them on.
+            if (newState == PeerConnection.PeerConnectionState.CONNECTED && !audioSessionStarted) {
+                peer.setAudioRecording(false)
+                peer.setAudioPlayout(false)
+            }
             if (newState == PeerConnection.PeerConnectionState.FAILED) {
                 stateRef.set(TransportState.FAILED)
                 observer.onConnectionStateChanged(WebRtcPeerHealth.FAILED)

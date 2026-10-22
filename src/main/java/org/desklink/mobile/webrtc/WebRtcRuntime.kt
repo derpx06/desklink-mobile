@@ -46,6 +46,9 @@ object WebRtcRuntime {
         // only says so in logcat.
         return PeerConnectionFactory.builder()
             .setOptions(iceNetworkOptions())
+            // F1: media playout in stereo, VOICE_COMMUNICATION mic, and the phone's own sound as a
+            // stand-in source. Nothing opens until a peer turns recording/playout on.
+            .setAudioDeviceModule(PhoneAudioEngine.create(context))
             .setVideoEncoderFactory(
                 // libwebrtc's encoders, with hardware ones in low-latency mode.
                 org.webrtc.DeskLinkVideoEncoderFactories.create(

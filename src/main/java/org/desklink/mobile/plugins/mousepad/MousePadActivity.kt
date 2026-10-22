@@ -662,6 +662,16 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                                 onClick = { more = false; DeskLinkApplication.getInstance().switchRemoteScreen(deviceId) },
                             )
                         }
+                        // F1: the desk's sound here, the same switch as Settings → "Play <desk>'s sound here".
+                        val sound = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this@MousePadActivity, deviceId.orEmpty())
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(stringResource(if (sound) R.string.remote_sound_off else R.string.remote_sound_on)) },
+                            onClick = {
+                                more = false
+                                org.desklink.mobile.plugins.audio.PhoneAudio.setPlayDeskSound(this@MousePadActivity, deviceId.orEmpty(), !sound)
+                                DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.let { if (sound) it.stopDeskSound() else it.requestDeskSound() }
+                            },
+                        )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(stringResource(R.string.remote_screen_retry)) },
                             onClick = { more = false; requestDesktopScreen() },

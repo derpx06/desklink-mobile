@@ -86,6 +86,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <!-- "Phone as webcam" (C4): the camera service, started only from a visible DeskLink window. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- F1: the phone's microphone for the desk, started only from a visible DeskLink window. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Calls: mute the microphone on the desk's request (setMicrophoneMute needs it). -->
@@ -116,7 +118,32 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <service
             android:name="org.desklink.mobile.plugins.camera.CameraService"
             android:exported="false"
-            android:foregroundServiceType="camera" />
+            android:foregroundServiceType="camera|microphone" />
+        <!-- F1: this phone's microphone or sound while a desk hears it. -->
+        <service
+            android:name="org.desklink.mobile.plugins.audio.PhoneAudioService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|mediaProjection" />
+        <activity
+            android:name="org.desklink.mobile.plugins.audio.PhoneAudioActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Transparent" />
+        <activity
+            android:name="org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Transparent" />
+        <!-- F3 "Insert from phone": the photo, scan, text or QR code a desk asked for. -->
+        <activity
+            android:name="org.desklink.mobile.plugins.capture.CaptureActivity"
+            android:configChanges="uiMode|orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTop"
+            android:taskAffinity="" />
         <!-- "<desk> wants to use this phone's camera": asked once per desk, then remembered. -->
         <activity
             android:name="org.desklink.mobile.plugins.camera.CameraConsentActivity"
@@ -189,6 +216,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
                 android:value="org.desklink.mobile.ui.MainActivity" />
         </activity>
 
+        <receiver
+            android:name="org.desklink.mobile.plugins.mousereceiver.TypeOnPhoneAllowReceiver"
+            android:exported="false" />
         <receiver android:name="org.desklink.mobile.DeskLinkBroadcastReceiver"
             android:exported="true">
             <intent-filter>

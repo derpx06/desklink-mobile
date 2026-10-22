@@ -1342,6 +1342,8 @@ class WebRtcSessionCoordinator(
                     // Every owner sends its full snapshot (battery, phone media, clipboard,
                     // notifications…); the desk replaces its copy (contract Phase 1).
                     device.onFeatureReady()
+                    // F1: "Play <desk>'s sound here" asks again on every link (sessions end with the peer).
+                    if (org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(context, device.deviceId)) requestDeskSoundLocked()
                     // The person was watching the desktop when the old peer went:
                     // ask again. Control follows the picture in MousePadActivity,
                     // and the session password is offered again with the request.
@@ -1420,6 +1422,21 @@ class WebRtcSessionCoordinator(
         facing: String? = null,
         width: Int? = null,
         height: Int? = null,
+    ): Boolean = sendSessionControlLocked(kind, remoteSessionId) {
+        copy(
+            reason = reason,
+            facing = facing,
+            width = width,
+            height = height,
+            audio = (cameraAudioLive && !PhoneAudioEngine.muted).takeIf { kind == WebRtcRemoteSessionControlKind.CAMERA_READY },
+        )
+    }
+
+    /** A camera or audio control message (their own sequence, beside the screen's). Caller holds `lock`. */
+    private fun sendSessionControlLocked(
+        kind: WebRtcRemoteSessionControlKind,
+        remoteSessionId: String,
+        fill: WebRtcRemoteSessionControlMessage.() -> WebRtcRemoteSessionControlMessage,
     ): Boolean {
         val binding = activeBinding ?: return false
         val attemptId = activeAttemptId ?: return false
@@ -1438,15 +1455,203 @@ class WebRtcSessionCoordinator(
                 remoteSessionId = remoteSessionId,
                 sequence = ++cameraSequence,
                 timestamp = System.currentTimeMillis(),
-                reason = reason,
-                facing = facing,
-                width = width,
-                height = height,
-                // Mic audio needs an audio m-line this peer does not negotiate: never sent yet.
-                audio = false.takeIf { kind == WebRtcRemoteSessionControlKind.CAMERA_READY },
-            ),
+            ).fill(),
         )
         return true
+    }
+
+    // ---- sound both ways (F1, A2) ------------------------------------------------------------------
+
+    private val audioSessions = org.desklink.mobile.plugins.audio.AudioSessions()
+    /** The webcam's microphone (C4 `audio:true`), which rides on the phone-to-desk audio session. */
+    @Volatile private var cameraAudioLive = false
+
+    private fun sendAudioLocked(
+        kind: WebRtcRemoteSessionControlKind,
+        session: org.desklink.mobile.plugins.audio.AudioSessions.Session,
+        reason: String? = null,
+    ) = sendSessionControlLocked(kind, session.remoteSessionId) {
+        copy(
+            audioDirection = session.direction.takeIf { kind == WebRtcRemoteSessionControlKind.AUDIO_REQUEST || kind == WebRtcRemoteSessionControlKind.AUDIO_READY },
+            source = session.source.takeIf { kind == WebRtcRemoteSessionControlKind.AUDIO_REQUEST || kind == WebRtcRemoteSessionControlKind.AUDIO_READY },
+            sampleRate = AUDIO_SAMPLE_RATE.takeIf { kind == WebRtcRemoteSessionControlKind.AUDIO_READY },
+            channels = AUDIO_CHANNELS.takeIf { kind == WebRtcRemoteSessionControlKind.AUDIO_READY },
+            reason = reason,
+        )
+    }
+
+    /** "Play <desk>'s sound here": ask the desk to send its sound (this phone hears, so it asks). */
+    fun requestDeskSound() = synchronized(lock) { requestDeskSoundLocked() }
+
+    private fun requestDeskSoundLocked() {
+        val session = org.desklink.mobile.plugins.audio.AudioSessions.Session(
+            java.util.UUID.randomUUID().toString(), WebRtcRemoteSessionControlMessage.DESK_TO_PHONE, "system",
+        )
+        audioSessions.open(session)?.let { sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_STOP, it, reason = "replaced") }
+        if (!sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_REQUEST, session)) audioSessions.end(session.remoteSessionId)
+    }
+
+    fun stopDeskSound() = synchronized(lock) {
+        val session = audioSessions.hearing ?: return@synchronized
+        audioSessions.end(session.remoteSessionId)
+        transport?.setAudioPlayout(false)
+        if (org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom == device.deviceId) org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom = null
+        sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_STOP, session)
+    }
+
+    fun setDeskSoundVolume(percent: Int) = synchronized(lock) { transport?.setPlayoutVolume(percent) }
+
+    private fun handleAudioMessageLocked(message: WebRtcRemoteSessionControlMessage) {
+        val audio = org.desklink.mobile.plugins.audio.PhoneAudio
+        when (message.kind) {
+            WebRtcRemoteSessionControlKind.AUDIO_REQUEST -> {
+                val source = message.source ?: "system"
+                val session = org.desklink.mobile.plugins.audio.AudioSessions.Session(
+                    message.remoteSessionId, message.audioDirection ?: WebRtcRemoteSessionControlMessage.PHONE_TO_DESK, source,
+                )
+                // The requester hears. A desk asking to hear the phone is the only request it may send;
+                // the desk's own sound is asked for by this phone.
+                if (session.direction != WebRtcRemoteSessionControlMessage.PHONE_TO_DESK ||
+                    (source == "system" && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q)
+                ) {
+                    sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = "unsupported")
+                    return
+                }
+                if (cameraAudioLive) {
+                    sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = "busy")
+                    return
+                }
+                audioSessions.open(session)?.let { replaced ->
+                    if (replaced.live) stopSendingLocked(replaced, "replaced", notifyPeer = true)
+                }
+                // Phone sound while this phone's screen is already shared: same projection, no new consent.
+                val projection = transport?.screenProjection()
+                if (source == "system" && projection != null && audio.hasMicPermission(context)) {
+                    startAudioSendingLocked(projection)
+                } else {
+                    audio.ask(context, device.name, org.desklink.mobile.plugins.audio.PhoneAudio.Pending(device.deviceId, session.remoteSessionId, source))
+                }
+            }
+            WebRtcRemoteSessionControlKind.AUDIO_READY -> {
+                val session = audioSessions.ready(message.remoteSessionId)
+                    // A2 lets the desk start its sound here unasked ("Play on <phone>"): taken when
+                    // "Let <desk> play sound here" is on (default), refused otherwise.
+                    ?: message.takeIf { it.audioDirection == WebRtcRemoteSessionControlMessage.DESK_TO_PHONE }?.let { pushed ->
+                        val offered = org.desklink.mobile.plugins.audio.AudioSessions.Session(
+                            pushed.remoteSessionId, WebRtcRemoteSessionControlMessage.DESK_TO_PHONE, pushed.source ?: "system", live = true,
+                        )
+                        if (!audio.deskMayPlay(context, device.deviceId)) {
+                            sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, offered, reason = "declined")
+                            return
+                        }
+                        audioSessions.open(offered)?.let { sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_STOP, it, reason = "replaced") }
+                        offered
+                    }
+                    ?: return
+                if (session.direction == WebRtcRemoteSessionControlMessage.DESK_TO_PHONE) {
+                    transport?.setPlayoutVolume(audio.volume(context, device.deviceId))
+                    transport?.setAudioPlayout(true)
+                    audio.hearingFrom = device.deviceId
+                    publish("AudioHearing", session.source)
+                }
+            }
+            WebRtcRemoteSessionControlKind.AUDIO_CONTROL -> {
+                val sending = audioSessions.sending?.takeIf { it.remoteSessionId == message.remoteSessionId } ?: return
+                when (message.action) {
+                    "mute" -> PhoneAudioEngine.muted = true
+                    "unmute" -> PhoneAudioEngine.muted = false
+                    else -> Log.d(TAG, "audio-control ${message.action} for ${sending.source} ignored")
+                }
+            }
+            WebRtcRemoteSessionControlKind.AUDIO_STOP,
+            WebRtcRemoteSessionControlKind.AUDIO_DENIED -> {
+                val ended = audioSessions.end(message.remoteSessionId) ?: return
+                if (ended.direction == WebRtcRemoteSessionControlMessage.DESK_TO_PHONE) {
+                    transport?.setAudioPlayout(false)
+                    if (audio.hearingFrom == device.deviceId) audio.hearingFrom = null
+                    publish("AudioStopped", message.reason)
+                } else {
+                    stopSendingLocked(ended, message.reason ?: "stopped", notifyPeer = false)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    /**
+     * The person allowed it (from a visible activity, or the running screen share): this phone's
+     * microphone, or its sound through [projection], goes to the desk.
+     */
+    fun startAudioSending(projection: android.media.projection.MediaProjection?): Boolean = synchronized(lock) { startAudioSendingLocked(projection) }
+
+    private fun startAudioSendingLocked(projection: android.media.projection.MediaProjection?): Boolean {
+        val session = audioSessions.sending ?: return false
+        org.desklink.mobile.plugins.audio.PhoneAudio.clearAsk(context, device.deviceId)
+        if (session.source == "system") requireNotNull(projection) { "phone sound needs a projection" }
+        val active = transport ?: return false
+        PhoneAudioEngine.muted = false
+        active.restartRecording {
+            if (session.source == "system") PhoneAudioEngine.usePhoneSound(projection!!) else PhoneAudioEngine.useMicrophone()
+        }
+        audioSessions.ready(session.remoteSessionId)
+        org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo = device.deviceId
+        org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource = session.source
+        sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_READY, session)
+        publish("AudioSending", session.source)
+        return true
+    }
+
+    /** Phone sound through the running screen share's projection, if there is one. */
+    fun startAudioSendingWithScreen(): Boolean = synchronized(lock) {
+        val projection = transport?.screenProjection() ?: return@synchronized false
+        startAudioSendingLocked(projection)
+    }
+
+    /**
+     * This phone stops sending (Stop, the desk, a replacement). Idempotent. With [onlySessionId] only
+     * that session: a service ending late must not stop the session that replaced its own.
+     */
+    fun stopAudioSending(reason: String, notifyPeer: Boolean, onlySessionId: String? = null) = synchronized(lock) {
+        audioSessions.sending
+            ?.takeIf { onlySessionId == null || it.remoteSessionId == onlySessionId }
+            ?.let { stopSendingLocked(it, reason, notifyPeer) }
+    }
+
+    /** The phone-to-desk session now sending, if any. */
+    fun sendingSessionId(): String? = synchronized(lock) { audioSessions.sending?.remoteSessionId }
+
+    /** The person said no, or Android did. */
+    fun denyAudio(reason: String) = synchronized(lock) {
+        val session = audioSessions.sending ?: return@synchronized
+        audioSessions.end(session.remoteSessionId)
+        sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = reason)
+    }
+
+    private fun stopSendingLocked(session: org.desklink.mobile.plugins.audio.AudioSessions.Session, reason: String, notifyPeer: Boolean) {
+        audioSessions.end(session.remoteSessionId)
+        transport?.setAudioRecording(false)
+        PhoneAudioEngine.reset()
+        if (org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo == device.deviceId) {
+            org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo = null
+            org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource = null
+        }
+        if (notifyPeer) sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_STOP, session, reason = reason)
+        context.stopService(Intent(context, org.desklink.mobile.plugins.audio.PhoneAudioService::class.java))
+        publish("AudioSendStopped", reason)
+    }
+
+    /** The peer went: every audio session ends with it, silently (there is no one to tell). */
+    private fun endAudioWithPeerLocked() {
+        cameraAudioLive = false
+        if (org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom == device.deviceId) org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom = null
+        if (audioSessions.clear().any { it.direction == WebRtcRemoteSessionControlMessage.PHONE_TO_DESK }) {
+            PhoneAudioEngine.reset()
+            if (org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo == device.deviceId) {
+                org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo = null
+                org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource = null
+            }
+            context.stopService(Intent(context, org.desklink.mobile.plugins.audio.PhoneAudioService::class.java))
+        }
     }
 
     private fun handleCameraMessageLocked(message: WebRtcRemoteSessionControlMessage) {
@@ -1474,8 +1679,11 @@ class WebRtcSessionCoordinator(
                 when (message.action) {
                     "flip" -> flipCameraLocked()
                     "stop" -> stopCameraLocked("stopped", notifyPeer = true)
-                    // No audio m-line on this peer: the mic stays off, and camera-ready says so.
-                    else -> sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_READY, live.remoteSessionId, facing = liveFacing, width = live.width, height = live.height)
+                    // The camera's microphone (when it has one): muted or not, and camera-ready says which.
+                    else -> {
+                        if (cameraAudioLive) PhoneAudioEngine.muted = message.action == "mic-off"
+                        sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_READY, live.remoteSessionId, facing = liveFacing, width = live.width, height = live.height)
+                    }
                 }
             }
             WebRtcRemoteSessionControlKind.CAMERA_STOPPED -> {
@@ -1504,6 +1712,15 @@ class WebRtcSessionCoordinator(
             return@synchronized false
         }
         liveFacing = facing
+        // C4 + F1: `audio:true` opens this phone's microphone as the camera's phone-to-desk audio
+        // session (same remoteSessionId), when the person granted it with the camera.
+        if (request.audio && org.desklink.mobile.plugins.audio.PhoneAudio.hasMicPermission(context) && !cameraAudioLive) {
+            val session = org.desklink.mobile.plugins.audio.AudioSessions.Session(
+                request.remoteSessionId, WebRtcRemoteSessionControlMessage.PHONE_TO_DESK, "mic",
+            )
+            audioSessions.open(session)?.let { replaced -> if (replaced.live) stopSendingLocked(replaced, "replaced", notifyPeer = true) }
+            cameraAudioLive = startAudioSendingLocked(null)
+        }
         sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_READY, request.remoteSessionId, facing = facing, width = request.width, height = request.height)
         publish("CameraLive", facing)
         true
@@ -1523,12 +1740,20 @@ class WebRtcSessionCoordinator(
     }
 
     /** Ends this desk's camera, pending or live; tells the desk when [notifyPeer]. Idempotent. */
-    fun stopCamera(reason: String, notifyPeer: Boolean) = synchronized(lock) { stopCameraLocked(reason, notifyPeer) }
+    fun stopCamera(reason: String, notifyPeer: Boolean, onlySessionId: String? = null) = synchronized(lock) {
+        val camera = org.desklink.mobile.plugins.camera.PhoneCamera.state
+        val current = (camera.live ?: camera.pending)?.takeIf { it.deviceId == device.deviceId }?.remoteSessionId
+        if (onlySessionId == null || onlySessionId == current) stopCameraLocked(reason, notifyPeer)
+    }
 
     private fun stopCameraLocked(reason: String, notifyPeer: Boolean) {
         val camera = org.desklink.mobile.plugins.camera.PhoneCamera
         val ended = camera.state.end(device.deviceId) ?: return
         transport?.stopCameraCapture()
+        if (cameraAudioLive) {
+            cameraAudioLive = false
+            audioSessions.sending?.takeIf { it.remoteSessionId == ended.remoteSessionId }?.let { stopSendingLocked(it, reason, notifyPeer) }
+        }
         liveFacing = null
         camera.clearAsk(context, device.deviceId)
         if (notifyPeer) sendCameraLocked(WebRtcRemoteSessionControlKind.CAMERA_STOPPED, ended.remoteSessionId, reason = reason)
@@ -1562,9 +1787,19 @@ class WebRtcSessionCoordinator(
     ) = synchronized(lock) {
         val wire = requireNotNull(activeWireBinding) { "No active DeskLink WebRTC wire binding" }
         val payload = envelope.validate(wire.peerDeviceId, wire.sessionId, wire.generation)
-        val message = WebRtcRemoteSessionControlMessage.fromJson(
-            JSONObject(String(payload, Charsets.UTF_8)),
-        )
+        val json = JSONObject(String(payload, Charsets.UTF_8))
+        // A kind from a newer build is ignored, never an error: an old peer must keep working.
+        if (WebRtcRemoteSessionControlKind.fromWireNameOrNull(json.optString("kind")) == null) {
+            Log.i(TAG, "Ignoring unsupported remote-session kind ${json.optString("kind").take(40)}")
+            return@synchronized
+        }
+        val message = WebRtcRemoteSessionControlMessage.fromJson(json)
+        // Audio (F1) has its own sessions too.
+        if (message.kind.isAudio) {
+            message.validate(wire, attemptId, System.currentTimeMillis())
+            handleAudioMessageLocked(message)
+            return@synchronized
+        }
         // The camera (C4) is its own session beside the screen's: it never touches that controller.
         if (message.kind in CAMERA_KINDS) {
             message.validate(wire, attemptId, System.currentTimeMillis())
@@ -2275,6 +2510,7 @@ class WebRtcSessionCoordinator(
         remoteSession.stop()
         // The camera goes with the peer that carried it; the desk asks again on the next link.
         org.desklink.mobile.plugins.camera.PhoneCamera.onPeerGone(context, device.deviceId)
+        endAudioWithPeerLocked()
         device.getPlugin(ScreenControlPlugin::class.java)?.let { screen ->
             screen.clearRemoteVideoTrack()
             if (transport != null) screen.onCapturePeerClosed()
@@ -2412,6 +2648,9 @@ class WebRtcSessionCoordinator(
 
     companion object {
         private const val TAG = "DeskLink/WebRTC"
+        /** A1/A2: what this phone's audio track carries (the module's input: 48 kHz mono). */
+        private const val AUDIO_SAMPLE_RATE = 48_000
+        private const val AUDIO_CHANNELS = 1
         private val CAMERA_KINDS = setOf(
             WebRtcRemoteSessionControlKind.CAMERA_REQUEST,
             WebRtcRemoteSessionControlKind.CAMERA_READY,

@@ -115,6 +115,9 @@ object SessionLiveNotification {
         if (PhoneScreenCaptureService.sharingDeviceId == deviceId) {
             context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
         }
+        // F1: this phone's microphone or sound to that desk ends too, and the desk's sound here.
+        app.webRtcCoordinator(deviceId)?.stopAudioSending("stopped", notifyPeer = true)
+        app.webRtcCoordinator(deviceId)?.stopDeskSound()
         update(context, deviceId, screen = false, terminals = 0)
     }
 

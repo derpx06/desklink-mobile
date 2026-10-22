@@ -416,6 +416,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 }
             },
             onClipboard = { on -> setPluginEnabled(device, HomeModel.clipboardKey, on) },
+            onDeskSound = { on -> setDeskSound(id, on) },
             onUnlockDesk = {
                 val unlock = device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java)
                 when {
@@ -733,6 +734,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 callsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)),
                 showCaller = org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(this, it.deviceId),
                 typeOnPhoneOn = org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.allowed(this, it.deviceId),
+                deskSoundOn = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this, it.deviceId),
+                deskSoundVolume = org.desklink.mobile.plugins.audio.PhoneAudio.volume(this, it.deviceId),
+                deskMayPlay = org.desklink.mobile.plugins.audio.PhoneAudio.deskMayPlay(this, it.deviceId),
                 accessibilityOn = org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance != null,
                 deskNotificationsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java)),
                 ready = it.hasActiveWebRtcFeatureTransport,
@@ -777,6 +781,23 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     device?.let { setPluginEnabled(it, Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java), on) }
                     if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) requestMissing(listOf(Manifest.permission.POST_NOTIFICATIONS))
                 },
+                onDeskSound = { on -> device?.let { setDeskSound(it.deviceId, on) } },
+                onDeskSoundVolume = { percent ->
+                    device?.let {
+                        org.desklink.mobile.plugins.audio.PhoneAudio.setVolume(this, it.deviceId, percent)
+                        DeskLinkApplication.getInstance().webRtcCoordinator(it.deviceId)?.setDeskSoundVolume(percent)
+                    }
+                },
+                onDeskMayPlay = { on ->
+                    device?.let {
+                        org.desklink.mobile.plugins.audio.PhoneAudio.setDeskMayPlay(this, it.deviceId, on)
+                        // Turned off while it plays: it stops now.
+                        if (!on && org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom == it.deviceId && !org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this, it.deviceId)) {
+                            DeskLinkApplication.getInstance().webRtcCoordinator(it.deviceId)?.stopDeskSound()
+                        }
+                    }
+                    tick++
+                },
                 onTypeOnPhone = { on ->
                     device?.let { org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.setAllowed(this, it.deviceId, on) }
                     // The accessibility service is asked for only now, when the person turns this on.
@@ -797,6 +818,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 onMessage = ::showMessage,
             ),
         )
+    }
+
+    /** F1: "Play <desk>'s sound here" — remembered, and asked for (or stopped) on the live link now. */
+    private fun setDeskSound(deviceId: String, on: Boolean) {
+        org.desklink.mobile.plugins.audio.PhoneAudio.setPlayDeskSound(this, deviceId, on)
+        DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.let { if (on) it.requestDeskSound() else it.stopDeskSound() }
+        tick++
     }
 
     private fun showEncryptionInfo(device: Device) {

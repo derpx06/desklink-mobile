@@ -104,8 +104,16 @@ data class HomeTransfer(val name: String, val label: String, val progress: Float
 
 /** What is running between the two right now: the coral row and the session-live notification. */
 @Immutable
-data class LiveSessions(val screen: Boolean = false, val terminals: Int = 0, val phoneScreen: Boolean = false) {
-    val any get() = screen || terminals > 0 || phoneScreen
+data class LiveSessions(
+    val screen: Boolean = false,
+    val terminals: Int = 0,
+    val phoneScreen: Boolean = false,
+    /** F1: this phone's "mic" or "system" sound going to the desk (the coral chip). */
+    val audio: String? = null,
+    /** F1: the desk's sound is playing on this phone. */
+    val hearing: Boolean = false,
+) {
+    val any get() = screen || terminals > 0 || phoneScreen || audio != null || hearing
 }
 
 @Immutable
@@ -124,6 +132,8 @@ data class HomeState(
     val terminalNewest: String? = null,
     val transfer: HomeTransfer? = null,
     val clipboardOn: Boolean = false,
+    /** F1: "Play <desk>'s sound here" (phone setting, off by default). */
+    val deskSoundOn: Boolean = false,
     /** A relay is set up, turned on and online: only then is it mentioned while connecting. */
     val relayAvailable: Boolean = false,
     /** Files sent or received with this computer in the last 30 days. */
@@ -164,6 +174,7 @@ class HomeActions(
     val onRunCommand: () -> Unit,
     /** An action was tapped while the computer cannot take it; the message says why. */
     val onUnavailable: (String) -> Unit,
+    val onDeskSound: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -352,6 +363,8 @@ private fun LiveRow(live: LiveSessions, onEnd: () -> Unit) {
         if (live.screen) add(stringResource(R.string.home_live_screen))
         if (live.terminals > 0) add(pluralStringResource(R.plurals.home_live_terminals, live.terminals, live.terminals))
         if (live.phoneScreen) add(stringResource(R.string.home_live_phone_screen))
+        live.audio?.let { add(stringResource(if (it == "mic") R.string.home_live_mic else R.string.home_live_sound)) }
+        if (live.hearing) add(stringResource(R.string.home_live_hearing))
     }
     Row(
         Modifier
@@ -569,6 +582,19 @@ private fun TransferAndClipboard(state: HomeState, actions: HomeActions) {
                 )
             }
             Switch(checked = state.clipboardOn, onCheckedChange = null, colors = deskSwitchColors())
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(t.hairline))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .toggleable(value = state.deskSoundOn, role = Role.Switch, onValueChange = actions.onDeskSound)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            IconCircle(R.drawable.sym_volume_up, 36.dp, 20.dp)
+            Text(stringResource(R.string.settings_desk_sound, state.name), fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Switch(checked = state.deskSoundOn, onCheckedChange = null, colors = deskSwitchColors())
         }
         // Android 10+ lets only the app in front read the clipboard: the phone's side is a tap.
         if (state.clipboardOn && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {

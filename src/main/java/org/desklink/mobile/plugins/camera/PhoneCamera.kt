@@ -113,9 +113,6 @@ object PhoneCamera {
         val open = Intent(context, CameraConsentActivity::class.java)
             .putExtra(CameraConsentActivity.EXTRA_DEVICE, request.deviceId)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (LifecycleHelper.isInForeground) {
-            runCatching { context.startActivity(open) }.onSuccess { return }
-        }
         val remembered = consented(context, request.deviceId)
         val tap = PendingIntent.getActivity(context, NOTIFICATION_ASK, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
@@ -135,6 +132,9 @@ object PhoneCamera {
         } else {
             Log.w(TAG, "camera request for ${request.deviceId} not shown: notifications are off")
         }
+        // The heads-up always goes up (a background start may be silently refused); in front the
+        // screen opens at once too, and takes the heads-up down.
+        if (LifecycleHelper.isInForeground) runCatching { context.startActivity(open) }
     }
 
     fun clearAsk(context: Context, deviceId: String) =

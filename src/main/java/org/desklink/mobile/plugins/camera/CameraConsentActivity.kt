@@ -38,8 +38,13 @@ class CameraConsentActivity : AppCompatActivity() {
     }
 
     private fun allowed() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), REQUEST_CAMERA)
+        // The camera, and the microphone when the desk asked for sound (C4 `audio:true`).
+        val wanted = listOfNotNull(
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO.takeIf { PhoneCamera.state.pending?.audio == true },
+        ).filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        if (wanted.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, wanted.toTypedArray(), REQUEST_CAMERA)
             return
         }
         CameraService.start(this, deviceId)
@@ -55,7 +60,9 @@ class CameraConsentActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != REQUEST_CAMERA) return
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+        // The camera must be granted; a refused microphone only means video without sound.
+        val camera = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (camera) {
             CameraService.start(this, deviceId)
             finish()
         } else {

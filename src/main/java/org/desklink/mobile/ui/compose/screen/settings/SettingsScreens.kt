@@ -56,6 +56,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +71,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -147,6 +150,11 @@ data class DeskSettings(
     /** "Let <desk> type on this phone" (phone-owned, off by default), and whether the service is on. */
     val typeOnPhoneOn: Boolean = false,
     val accessibilityOn: Boolean = false,
+    /** F1: "Play <desk>'s sound here" and its volume (phone settings). */
+    val deskSoundOn: Boolean = false,
+    val deskSoundVolume: Int = 100,
+    /** F1: the desk may start its sound here unasked (on by default). */
+    val deskMayPlay: Boolean = true,
 )
 
 class SettingsActions(
@@ -161,6 +169,9 @@ class SettingsActions(
     val onShowCaller: (Boolean) -> Unit = {},
     val onDeskNotifications: (Boolean) -> Unit = {},
     val onTypeOnPhone: (Boolean) -> Unit = {},
+    val onDeskSound: (Boolean) -> Unit = {},
+    val onDeskSoundVolume: (Int) -> Unit = {},
+    val onDeskMayPlay: (Boolean) -> Unit = {},
     val onQuickCommands: () -> Unit,
     val onMore: () -> Unit,
     val onUnpair: () -> Unit,
@@ -199,6 +210,25 @@ private fun rememberResumeTick(): Int {
  * "Automatic sync (advanced)", KDE Connect's way: READ_LOGS, granted only over adb, lets DeskLink
  * see Android refuse it a new copy and read it for a moment. Never required.
  */
+/** The desk's sound here: 0–100 %, applied as the slider moves. */
+@Composable
+private fun DeskSoundVolume(volume: Int, onChange: (Int) -> Unit) {
+    var value by remember(volume) { mutableFloatStateOf(volume.toFloat()) }
+    val label = stringResource(R.string.settings_desk_sound_volume)
+    androidx.compose.foundation.layout.Row(
+        Modifier.fillMaxWidth().padding(start = 56.dp, end = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, fontSize = 13.sp, color = tokens.textDim)
+        androidx.compose.material3.Slider(
+            value = value,
+            onValueChange = { value = it; onChange(it.toInt()) },
+            valueRange = 0f..100f,
+            modifier = Modifier.weight(1f).padding(start = 12.dp).semantics { contentDescription = label },
+        )
+    }
+}
+
 /** Brands whose adb `pm grant` needs a developer-options switch first. */
 private fun needsOemSwitch(): Boolean =
     Build.MANUFACTURER.lowercase() in setOf("oppo", "realme", "oneplus", "xiaomi", "redmi", "poco")
@@ -354,6 +384,21 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                     checked = desk.deskNotificationsOn,
                     onClick = { actions.onDeskNotifications(!desk.deskNotificationsOn) },
                 )
+                GroupRow(
+                    stringResource(R.string.settings_desk_sound, desk.name),
+                    icon = R.drawable.sym_volume_up,
+                    subtitle = stringResource(R.string.settings_desk_sound_summary, desk.name),
+                    checked = desk.deskSoundOn,
+                    onClick = { actions.onDeskSound(!desk.deskSoundOn) },
+                )
+                GroupRow(
+                    stringResource(R.string.settings_desk_may_play, desk.name),
+                    icon = R.drawable.sym_volume_up,
+                    subtitle = stringResource(R.string.settings_desk_may_play_summary, desk.name),
+                    checked = desk.deskMayPlay,
+                    onClick = { actions.onDeskMayPlay(!desk.deskMayPlay) },
+                )
+                if (desk.deskSoundOn || desk.deskMayPlay) DeskSoundVolume(desk.deskSoundVolume, actions.onDeskSoundVolume)
                 GroupRow(
                     stringResource(R.string.settings_type_on_phone, desk.name),
                     icon = R.drawable.sym_keyboard,

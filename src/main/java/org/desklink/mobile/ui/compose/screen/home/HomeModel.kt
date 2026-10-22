@@ -43,6 +43,9 @@ object HomeModel {
                 screen = device.getPlugin(ScreenControlPlugin::class.java)?.remoteLive == true,
                 terminals = terminal?.sessions?.count { it.attached && !it.gone } ?: 0,
                 phoneScreen = PhoneScreenCaptureService.sharingDeviceId == id,
+                audio = org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource
+                    .takeIf { org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo == id },
+                hearing = org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom == id,
             ),
             media = media(context, device),
             terminalCount = terminal?.sessions?.count { !it.gone } ?: 0,
@@ -62,6 +65,7 @@ object HomeModel {
                 )
             },
             clipboardOn = device.isPluginEnabled(clipboardKey),
+            deskSoundOn = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(context, id),
             historyCount = org.desklink.mobile.plugins.share.TransferHistory.store(context).forDevice(id).size,
             canUnlock = connection == DeviceConnection.LOCAL &&
                 device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby == true &&

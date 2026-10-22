@@ -127,6 +127,7 @@ class DeskLinkApplication : Application() {
         // Objects holding Compose state are made here, on the main thread before any composition,
         // so a background thread touching them first cannot create state a running composition
         // cannot read (see PluginFactory.instantiatePluginForDevice).
+        org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom
         org.desklink.mobile.plugins.screen.ScreenControlPlugin.latestStatus
         org.desklink.mobile.plugins.screen.PhoneScreenCaptureService.sharingDeviceId
         org.desklink.mobile.plugins.share.TransferProgress.current

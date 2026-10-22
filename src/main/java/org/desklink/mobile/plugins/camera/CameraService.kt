@@ -21,12 +21,14 @@ import org.desklink.mobile.plugins.screen.SessionLiveNotification
  */
 class CameraService : Service() {
     private var deviceId: String? = null
+    /** The camera session this service carries: its late end never stops a newer one. */
+    private var sessionId: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = DeskLinkApplication.getInstance()
         when (intent?.action) {
             ACTION_STOP -> {
-                app.webRtcCoordinator(deviceId)?.stopCamera("stopped", notifyPeer = true)
+                app.webRtcCoordinator(deviceId)?.stopCamera("stopped", notifyPeer = true, onlySessionId = sessionId)
                 stopSelf()
             }
             ACTION_FLIP -> app.webRtcCoordinator(deviceId)?.flipCamera()
@@ -34,7 +36,10 @@ class CameraService : Service() {
                 val id = intent?.getStringExtra(EXTRA_DEVICE) ?: return stop()
                 deviceId = id
                 val desk = app.getDevice(id)?.name.orEmpty()
-                startForegroundCompat(notification(desk))
+                // `audio:true` with the microphone granted: the service holds the microphone too.
+                sessionId = PhoneCamera.state.pending?.takeIf { it.deviceId == id }?.remoteSessionId
+                val withMic = PhoneCamera.state.pending?.audio == true && org.desklink.mobile.plugins.audio.PhoneAudio.hasMicPermission(this)
+                startForegroundCompat(notification(desk), withMic)
                 if (app.webRtcCoordinator(id)?.startCamera() != true) {
                     Log.w(TAG, "camera did not start for $id")
                     stopSelf()
@@ -67,9 +72,10 @@ class CameraService : Service() {
             .build()
     }
 
-    private fun startForegroundCompat(notification: android.app.Notification) {
+    private fun startForegroundCompat(notification: android.app.Notification, withMic: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+            val mic = if (withMic) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or mic)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
@@ -77,7 +83,7 @@ class CameraService : Service() {
 
     override fun onDestroy() {
         // However it ends (Stop, the desk, a lost link), the camera is released and the desk told.
-        DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.stopCamera("stopped", notifyPeer = true)
+        sessionId?.let { DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.stopCamera("stopped", notifyPeer = true, onlySessionId = it) }
         super.onDestroy()
     }
 
