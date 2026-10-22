@@ -103,7 +103,7 @@ public class LanLinkProvider extends BaseLinkProvider {
         // A replaced socket can finish its reader after the replacement has
         // already been installed. Do not let that stale callback remove the
         // current bootstrap link from discovery state.
-        visibleDevices.remove(deviceId, link);
+        if (visibleDevices.remove(deviceId, link)) linkRace.forget(deviceId);
         super.onConnectionLost(link);
         if (listening) {
             ThreadHelper.execute(() -> {
@@ -287,6 +287,49 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
     }
 
+    private final DialBackoff dialBackoff = new DialBackoff();
+    private final LinkRace linkRace = new LinkRace();
+    private final java.util.Set<String> dialsInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Paired desks with no link: dial each one's last known addresses ourselves (at most three per
+     * desk) instead of only announcing and waiting for the desk to dial back. An address that did
+     * not answer is backed off ({@link DialBackoff}), so a desk that moved is not hammered.
+     */
+    @WorkerThread
+    private void dialKnownAddresses() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        for (LastLanAddress.Dial dial : LastLanAddress.INSTANCE.dialTargets(context, new java.util.HashSet<>(visibleDevices.keySet()), dialBackoff, now)) {
+            final String key = LastLanAddress.INSTANCE.key(dial);
+            if (!dialsInFlight.add(key)) continue;
+            ThreadHelper.execute(() -> {
+                Socket socket = null;
+                try {
+                    if (visibleDevices.containsKey(dial.getDeviceId())) return;
+                    socket = SocketFactory.getDefault().createSocket();
+                    socket.connect(new java.net.InetSocketAddress(dial.getAddress(), dial.getPort()), 3000);
+                    dialBackoff.succeeded(key);
+                    configureSocket(socket);
+                    NetworkPacket myIdentity = DeviceHelper.getDeviceInfo(context).toIdentityPacket();
+                    myIdentity.set("targetDeviceId", dial.getDeviceId());
+                    myIdentity.set("targetProtocolVersion", String.valueOf(DeviceHelper.PROTOCOL_VERSION));
+                    OutputStream out = socket.getOutputStream();
+                    out.write(myIdentity.serialize().getBytes());
+                    out.flush();
+                    identityPacketReceived(qrIdentity(dial.getDeviceId(), dial.getPort()), socket, LanLink.ConnectionStarted.Remotely,
+                            TrustedDevices.isTrustedDevice(context, dial.getDeviceId()));
+                } catch (IOException | CertificateException | JSONException e) {
+                    // Not on the dead address's account: only a failed connect backs it off.
+                    if (socket != null && !socket.isConnected()) dialBackoff.failed(key, android.os.SystemClock.elapsedRealtime());
+                    Log.i("DeskLink/LanLinkProvider", "Dial to a known address failed: " + e.getClass().getSimpleName());
+                    if (socket != null) closeQuietly(socket);
+                } finally {
+                    dialsInFlight.remove(key);
+                }
+            });
+        }
+    }
+
     /** What the QR code says about the desk, standing in for its unencrypted announcement. */
     private static NetworkPacket qrIdentity(String desktopId, int port) {
         NetworkPacket identity = new NetworkPacket(NetworkPacket.PACKET_TYPE_IDENTITY);
@@ -389,6 +432,7 @@ public class LanLinkProvider extends BaseLinkProvider {
             socket = SocketFactory.getDefault().createSocket();
             socket.connect(new java.net.InetSocketAddress(address, tcpPort), 3000);
             configureSocket(socket);
+            LastLanAddress.INSTANCE.remember(context, deviceId, address, tcpPort);
 
             DeviceInfo myDeviceInfo = DeviceHelper.getDeviceInfo(context);
             NetworkPacket myIdentity = myDeviceInfo.toIdentityPacket();
@@ -505,7 +549,7 @@ public class LanLinkProvider extends BaseLinkProvider {
                     Certificate certificate = event.getPeerCertificates()[0];
                     DeviceInfo deviceInfo = DeviceInfo.fromIdentityPacketAndCert(secureIdentityPacket, certificate);
                     Log.i("DeskLink/LanLinkProvider", "Handshake as " + mode + " successful with " + deviceInfo.name + " secured with " + event.getCipherSuite());
-                    addOrUpdateLink(sslSocket, deviceInfo);
+                    addOrUpdateLink(sslSocket, deviceInfo, !clientMode);
                 } catch (JSONException e) {
                     Log.e("DeskLink/LanLinkProvider", "Remote device doesn't correctly implement protocol version 8", e);
                     try { sslSocket.close(); } catch (IOException ignored) { }
@@ -535,8 +579,16 @@ public class LanLinkProvider extends BaseLinkProvider {
      * @throws IOException if an exception is thrown by {@link LanLink#reset(SSLSocket, DeviceInfo)}
      */
     @WorkerThread
-    private void addOrUpdateLink(SSLSocket socket, DeviceInfo deviceInfo) throws IOException {
+    private void addOrUpdateLink(SSLSocket socket, DeviceInfo deviceInfo, boolean weDialed) throws IOException {
         LanLink link = visibleDevices.get(deviceInfo.id);
+        // An inbound dial and our own redial within a second are one reconnection: both sides keep
+        // the link dialed by the lower device id, so neither closes the socket the other kept.
+        if (link != null && !linkRace.arrive(deviceInfo.id, DeviceHelper.getDeviceId(context), weDialed, android.os.SystemClock.elapsedRealtime())) {
+            Log.i("DeskLink/LanLinkProvider", "Dropping the duplicate link to " + deviceInfo.id + " (dialed within 1 s of the kept one)");
+            closeQuietly(socket);
+            return;
+        }
+        if (link == null) linkRace.arrive(deviceInfo.id, DeviceHelper.getDeviceId(context), weDialed, android.os.SystemClock.elapsedRealtime());
         if (link != null) {
             if (!link.getDeviceInfo().certificate.equals(deviceInfo.certificate)) {
                 Log.e("LanLinkProvider", "LanLink was asked to replace a socket but the certificate doesn't match, aborting");
@@ -696,6 +748,7 @@ public class LanLinkProvider extends BaseLinkProvider {
 
             sendUdpIdentityPacket(ipList, network);
         });
+        ThreadHelper.execute(this::dialKnownAddresses);
     }
 
     @WorkerThread
@@ -789,6 +842,7 @@ public class LanLinkProvider extends BaseLinkProvider {
             link.disconnect();
         }
         visibleDevices.clear();
+        dialBackoff.reset();
 
         announceBurst(network);
     }
