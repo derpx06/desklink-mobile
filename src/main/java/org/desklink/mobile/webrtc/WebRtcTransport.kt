@@ -16,6 +16,7 @@ import org.desklink.mobile.transport.TransportErrorCode
 import org.desklink.mobile.transport.TransportState
 import org.desklink.mobile.transport.TransportType
 import org.desklink.mobile.NetworkPacket
+import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.webrtc.DataChannel
 import org.webrtc.DeskLinkVideoEncoderFactories
 import org.webrtc.IceCandidate
@@ -417,6 +418,15 @@ class WebRtcTransport(
 
     fun handoverState(): WebRtcHandoverState = handoverRef.get()
 
+    /**
+     * The liveness channel carries heartbeats only when it is open and the desk is a build that
+     * reads it (one that takes part in delta resync): an older desk ignores an unknown channel, and
+     * would hear no heartbeat at all.
+     */
+    private fun livenessChannelUsable(): Boolean =
+        channels[WebRtcChannel.LIVENESS.label]?.state() == DataChannel.State.OPEN &&
+            WebRtcFeatureProfile.peerAccepts(wireBinding.peerDeviceId, DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE)
+
     fun sendPacket(packet: NetworkPacket, callback: TransportCallback) {
         if (!handoverRef.get().featuresAllowed) {
             callback.onFailure(
@@ -429,7 +439,7 @@ class WebRtcTransport(
         }
         // A heartbeat goes on the liveness channel; a peer without one (a mixed build) gets it on `events`.
         var target = WebRtcPacketBridge.channelFor(packet)
-        if (target == WebRtcChannel.LIVENESS && channels[target.label]?.state() != DataChannel.State.OPEN) target = WebRtcChannel.EVENTS
+        if (target == WebRtcChannel.LIVENESS && !livenessChannelUsable()) target = WebRtcChannel.EVENTS
         val envelope = try {
             WebRtcPacketBridge.encode(wireBinding, packet, System.currentTimeMillis(), target)
         } catch (error: Throwable) {
