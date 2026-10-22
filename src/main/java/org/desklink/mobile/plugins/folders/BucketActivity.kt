@@ -209,12 +209,17 @@ class BucketActivity : AppCompatActivity() {
                         }
                         DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
                             DropdownMenuItem(text = { Text(stringResource(R.string.bucket_sync_now)) }, onClick = { overflow = false; BucketEngine.syncNow(deviceId) })
+                            DropdownMenuItem(
+                                text = { Text(stringResource(if (view?.userPaused == true) R.string.bucket_resume else R.string.bucket_pause)) },
+                                onClick = { overflow = false; BucketEngine.setPaused(deviceId, view?.userPaused != true) },
+                            )
                             DropdownMenuItem(text = { Text(stringResource(R.string.bucket_turn_off)) }, onClick = { overflow = false; BucketEngine.turnOff(deviceId) })
                         }
                     }
                 }
             }
-            LargeTitle(stringResource(R.string.bucket_title), subtitle = if (on) status(view!!, desk) else stringResource(R.string.bucket_subtitle, desk))
+            LargeTitle(stringResource(R.string.bucket_title), subtitle = if (on && view!!.summary == null) status(view, desk) else if (!on) stringResource(R.string.bucket_subtitle, desk) else null)
+            view?.summary?.takeIf { on }?.let { SyncHeader(it, view.userPaused, desk) }
             Box(Modifier.weight(1f)) {
                 when {
                     view?.phase == Phase.ASKING -> Hero(desk, waiting = true, offered = false, onTurnOn = {}, onDecline = {})
@@ -266,10 +271,31 @@ class BucketActivity : AppCompatActivity() {
         val sync = when {
             !connected -> stringResource(R.string.bucket_waiting_for, desk)
             view.phase == Phase.SYNCING || view.phase == Phase.SCANNING -> stringResource(R.string.bucket_syncing)
-            view.lastSync != null -> stringResource(R.string.bucket_last_synced, DateUtils.getRelativeTimeSpanString(view.lastSync).toString())
+            view.userPaused -> stringResource(R.string.bucket_paused_by_you)
+            view.lastSync != null -> stringResource(R.string.bucket_up_to_date, DateUtils.getRelativeTimeSpanString(view.lastSync, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString())
             else -> stringResource(R.string.bucket_with, desk)
         }
         return "$sync · ${Formatter.formatShortFileSize(LocalContext.current, view.bytes)}"
+    }
+
+    /** While files move: "Syncing 3 files · 1.1 GB of 2.4 GB · about 4 min left", a thin bar and the speed. */
+    @Composable
+    private fun SyncHeader(summary: ProgressSummary, userPaused: Boolean, desk: String) {
+        val t = tokens
+        val line = summaryLine(summary, userPaused, desk)
+        Column(
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 14.dp).semantics(mergeDescendants = true) { contentDescription = line },
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(line, fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
+            LinearProgressIndicator({ summary.fraction }, Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp)
+            if (summary.bytesPerSecond > 0 && !summary.paused) {
+                Text(
+                    BucketSyncNotification.words(this@BucketActivity).perSecond.format(Formatter.formatShortFileSize(this@BucketActivity, summary.bytesPerSecond)),
+                    fontSize = 12.sp, color = t.textFaint, fontFamily = MonoFamily,
+                )
+            }
+        }
     }
 
     /** Off: what the Bucket is, and one button (a single folder pick is all Android needs). */
@@ -470,7 +496,8 @@ class BucketActivity : AppCompatActivity() {
             BucketItem.State.WAITING -> stringResource(R.string.bucket_waiting_for, desk)
             BucketItem.State.CONFLICT -> stringResource(R.string.bucket_state_conflict)
         }
-        val description = listOfNotNull(item.name, size, origin, state).joinToString(", ")
+        val progressLine = item.progress?.let { BucketProgress.line(it, { b -> Formatter.formatShortFileSize(context, b) }, BucketSyncNotification.words(context)) }
+        val description = listOfNotNull(item.name, size, origin, state, progressLine).joinToString(", ")
         val moreLabel = stringResource(R.string.bucket_item_menu, item.name)
         Column(
             Modifier
@@ -501,7 +528,7 @@ class BucketActivity : AppCompatActivity() {
                         else -> TypeIcon(iconFor(kind))
                     }
                 }
-                Badge(item.state, Modifier.align(Alignment.TopEnd).padding(6.dp))
+                Badge(item.state, item.progress, Modifier.align(Alignment.TopEnd).padding(6.dp))
             }
             Row(Modifier.padding(start = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
@@ -510,7 +537,9 @@ class BucketActivity : AppCompatActivity() {
                         listOfNotNull(size, origin).joinToString(" · "),
                         fontSize = 11.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
-                    if (item.state == BucketItem.State.WAITING || item.state == BucketItem.State.CONFLICT) {
+                    if (progressLine != null) {
+                        Text(progressLine, fontSize = 11.sp, color = t.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    } else if (item.state == BucketItem.State.WAITING || item.state == BucketItem.State.CONFLICT) {
                         Text(state, fontSize = 11.sp, color = if (item.state == BucketItem.State.CONFLICT) t.coralText else t.textFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -531,7 +560,7 @@ class BucketActivity : AppCompatActivity() {
 
     /** Synced tick, a ring while it moves, a conflict mark; nothing while it waits (the text says so). */
     @Composable
-    private fun Badge(state: BucketItem.State, modifier: Modifier) {
+    private fun Badge(state: BucketItem.State, progress: Progress?, modifier: Modifier) {
         val t = tokens
         val background = Modifier.size(26.dp).background(t.surface.copy(alpha = 0.92f), CircleShape)
         when (state) {
@@ -539,7 +568,8 @@ class BucketActivity : AppCompatActivity() {
                 Icon(painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = t.mintText, modifier = Modifier.size(18.dp))
             }
             BucketItem.State.SENDING, BucketItem.State.RECEIVING -> Box(modifier.then(background), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(16.dp), color = t.accent, strokeWidth = 2.dp, trackColor = t.fill)
+                // Determinate: how much of this file has moved.
+                CircularProgressIndicator({ progress?.fraction ?: 0f }, Modifier.size(18.dp), color = if (progress?.paused == true) t.textFaint else t.accent, strokeWidth = 2.5.dp, trackColor = t.fill, gapSize = 0.dp)
             }
             BucketItem.State.CONFLICT -> Box(modifier.then(background), contentAlignment = Alignment.Center) {
                 Icon(painterResource(R.drawable.sym_warning), contentDescription = null, tint = t.coralText, modifier = Modifier.size(18.dp))
@@ -613,12 +643,28 @@ class BucketActivity : AppCompatActivity() {
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
 
+    private fun summaryLine(summary: ProgressSummary, userPaused: Boolean, desk: String) = summaryText(this, summary, userPaused, desk)
+
     companion object {
         const val EXTRA_DEVICE = "deviceId"
         /** Files taken from one share. */
         const val MAX_SHARED = 500
 
         fun intent(context: Context, deviceId: String?): Intent = Intent(context, BucketActivity::class.java).apply { deviceId?.let { putExtra(EXTRA_DEVICE, it) } }
+
+        /** "Syncing 3 files · 1.1 GB of 2.4 GB · about 4 min left" (Paused while the link or the person pauses it). */
+        fun summaryText(context: Context, summary: ProgressSummary, userPaused: Boolean, desk: String): String {
+            val w = BucketSyncNotification.words(context)
+            val n = BucketSyncNotification.noteWords(context)
+            val head = if (summary.files == 1) context.getString(R.string.bucket_header_syncing_one) else context.getString(R.string.bucket_header_syncing_many).format(summary.files)
+            val amount = w.ofTotal.format(Formatter.formatShortFileSize(context, summary.done), Formatter.formatShortFileSize(context, summary.total))
+            val tail = when {
+                userPaused -> context.getString(R.string.bucket_paused_by_you)
+                summary.paused -> n.paused.format(desk)
+                else -> summary.etaSeconds?.let { n.about.format(BucketProgress.eta(it, w)) }
+            }
+            return listOfNotNull(head, amount, tail).joinToString(" · ")
+        }
 
         /** Documents on the phone's storage: where the folder picker starts ("Choose or create DeskLink Bucket"). */
         fun documentsUri(): Uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Documents")

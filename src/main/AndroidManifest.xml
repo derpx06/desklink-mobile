@@ -418,6 +418,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:label="@string/bucket_title"
             android:exported="false"
             android:launchMode="singleTop" />
+        <receiver
+            android:name="org.desklink.mobile.plugins.folders.BucketSyncNotification$Receiver"
+            android:exported="false" />
         <activity-alias
             android:name="org.desklink.mobile.plugins.folders.ShareToBucketActivity"
             android:label="@string/bucket_share_label"

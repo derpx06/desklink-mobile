@@ -45,6 +45,8 @@ data class BucketItem(
     val state: State,
     /** The document, once it is on this phone. */
     val uri: Uri?,
+    /** While it is sending or receiving: how far, and the time left. */
+    val progress: Progress? = null,
 ) {
     enum class State { SYNCED, SENDING, RECEIVING, WAITING, CONFLICT }
 }
@@ -66,6 +68,10 @@ data class BucketView(
     val storageFull: Boolean,
     /** Files being copied in: done / total, or null. */
     val adding: Pair<Int, Int>?,
+    /** Everything in flight together (header, Home card, notification); null when nothing moves. */
+    val summary: ProgressSummary? = null,
+    /** "Pause sync" from the notification or the menu. */
+    val userPaused: Boolean = false,
 )
 
 enum class Phase { OFF, ASKING, WAITING, NOT_ON_DESK, SCANNING, SYNCING, UP_TO_DATE, TOO_MANY, NO_ACCESS, HELD_EMPTY }
@@ -118,6 +124,19 @@ object BucketEngine {
         var adding: Pair<Int, Int>? = null
         /** From the last scan: each item's document id, for opening and thumbnails. */
         var documents = emptyMap<String, String>()
+        /** Files moving now (path → how far), kept across a dropped link (they resume). */
+        val tracks = HashMap<String, Track>()
+        /** Files moved since the Bucket was last up to date, for "3 files synced". */
+        val burst = HashSet<String>()
+        var userPaused = false
+    }
+
+    private class Track(val total: Long, val sending: Boolean, startedAt: Long) {
+        var done = 0L
+        var paused = false
+        val meter = SpeedMeter(startedAt)
+
+        fun progress(now: Long) = Progress(done, total, meter.etaSeconds(total - done, now), meter.bytesPerSecond(now), paused)
     }
 
     private val buckets = LinkedHashMap<String, Live>()
@@ -164,6 +183,8 @@ object BucketEngine {
         ready -= deviceId
         buckets[deviceId]?.let {
             it.phase = Phase.WAITING
+            // Shown "Paused": each resumes from its checkpoint on the next connection.
+            it.tracks.values.forEach { track -> track.paused = true }
             it.incoming.clear(); it.toRequest.clear(); it.outstanding.clear(); it.sending.clear()
         }
         synchronized(wanted) { wanted.keys.removeAll { it.first == deviceId } }
@@ -500,6 +521,7 @@ object BucketEngine {
     }
 
     private fun requestMore(live: Live) {
+        if (live.userPaused) return
         val batch = mutableListOf<String>()
         while (live.outstanding.size < FolderSync.MAX_OUTSTANDING && batch.size < FolderSync.REQUEST_PATHS) {
             val path = live.toRequest.removeFirstOrNull() ?: break
@@ -520,7 +542,7 @@ object BucketEngine {
 
     /** P4: the desk asks for files; each is sent unless it changed or vanished meanwhile. */
     private fun onRequest(deviceId: String, packet: NetworkPacket) {
-        val live = buckets[deviceId] ?: return
+        val live = buckets[deviceId]?.takeIf { !it.userPaused } ?: return
         val device = DeskLinkApplication.getInstance().getDevice(deviceId) ?: return
         val tree = tree(live) ?: return
         for (path in packet.getStringList("paths").orEmpty().take(FolderSync.REQUEST_PATHS)) {
@@ -539,13 +561,75 @@ object BucketEngine {
                 this["mtime"] = entry.mtime
                 payload = NetworkPacket.Payload(input, entry.size)
             }, object : Device.SendPacketStatusCallback() {
-                override fun onSuccess() = Unit
+                override fun onPayloadProgressChanged(percent: Int) = progress(deviceId, path, entry.size * percent.coerceIn(0, 100) / 100, entry.size, sending = true)
+
+                override fun onSuccess() = worker.execute { finished(live, path); publish() }
+
                 override fun onFailure(e: Throwable) {
                     Log.w(TAG, "A Bucket file was not sent: ${e.javaClass.simpleName}")
-                    worker.execute { live.sending.remove(path); publish() }
+                    // A dropped link pauses it (it resumes from the checkpoint); anything else ends it.
+                    val resuming = e is org.desklink.mobile.webrtc.TransferResumingException
+                    worker.execute {
+                        if (resuming) live.tracks[path]?.paused = true else { live.sending.remove(path); live.tracks.remove(path) }
+                        publish()
+                    }
                 }
             })
+            progress(deviceId, path, 0, entry.size, sending = true)
         }
+    }
+
+    // ---- progress -------------------------------------------------------------------------------------------------
+
+    private val lastPosted = java.util.concurrent.ConcurrentHashMap<Pair<String, String>, Long>()
+    @Volatile private var publishQueued = false
+    private var lastPublishAt = 0L
+
+    /**
+     * How far a Bucket file has moved (from the transfer manager's chunks and acknowledgements, on
+     * their threads). Posted to the worker at most [BucketProgress.UPDATE_EVERY_MS] apart per file.
+     */
+    fun progress(deviceId: String, path: String, done: Long, total: Long, sending: Boolean) {
+        val now = SystemClock.elapsedRealtime()
+        val key = deviceId to path
+        val last = lastPosted[key]
+        if (last != null && now - last < BucketProgress.UPDATE_EVERY_MS && done < total && done > 0) return
+        lastPosted[key] = now
+        worker.execute {
+            val live = buckets[deviceId] ?: return@execute
+            val track = live.tracks.getOrPut(path) { Track(total, sending, now) }
+            track.done = done.coerceIn(0, total)
+            track.paused = false
+            track.meter.update(track.done, now)
+            live.burst += path
+            publishSoon()
+        }
+    }
+
+    private fun finished(live: Live, path: String) {
+        live.tracks.remove(path)
+        lastPosted.remove(live.deviceId to path)
+        live.burst += path
+    }
+
+    /** At most 4 state emits a second, from the worker. */
+    private fun publishSoon() {
+        val wait = BucketProgress.UPDATE_EVERY_MS - (SystemClock.elapsedRealtime() - lastPublishAt)
+        if (wait <= 0) return publish()
+        if (publishQueued) return
+        publishQueued = true
+        worker.schedule({ publishQueued = false; publish() }, wait, TimeUnit.MILLISECONDS)
+    }
+
+    /** "Pause sync" / "Resume": nothing is requested or sent while paused; what is moving finishes. */
+    fun setPaused(deviceId: String, paused: Boolean) = worker.execute {
+        val live = buckets[deviceId] ?: return@execute
+        live.userPaused = paused
+        if (!paused) {
+            live.dirtyAt = 0
+            requestMore(live)
+        }
+        publish()
     }
 
     // ---- files the desk sends --------------------------------------------------------------------------------
@@ -584,6 +668,7 @@ object BucketEngine {
         val live = buckets[deviceId] ?: return
         if (!entry.sha256.equals(sha256, true) || entry.size != size) return
         live.outstanding -= ref.relpath
+        finished(live, ref.relpath)
         live.storageFull = false
         val tree = tree(live)
         val existing = tree?.find(ref.relpath)
@@ -775,6 +860,7 @@ object BucketEngine {
     }
 
     private fun publish() {
+        lastPublishAt = SystemClock.elapsedRealtime()
         val devices = buckets.keys + asked.keys + offers.keys
         _views.value = devices.associateWith { deviceId ->
             val live = buckets[deviceId]
@@ -786,20 +872,37 @@ object BucketEngine {
                 val items = local.map { (name, e) ->
                     val state = when {
                         name in live.conflicts -> BucketItem.State.CONFLICT
+                        name in live.outstanding || name in live.toRequest -> BucketItem.State.RECEIVING
                         name in live.sending -> BucketItem.State.SENDING
                         live.remote[name] == e.sha256 -> BucketItem.State.SYNCED
                         else -> BucketItem.State.WAITING
                     }
-                    BucketItem(name, e.size, e.mtime, live.from[name], state, live.documents[name]?.let { DocumentsContract.buildDocumentUriUsingTree(tree, it) })
-                } + (live.toRequest + live.outstanding).filter { it !in local }.map { name ->
-                    BucketItem(name, synchronized(wanted) { wanted[deviceId to name]?.size } ?: 0, System.currentTimeMillis(), Side.DESK, BucketItem.State.RECEIVING, null)
+                    BucketItem(
+                        name, e.size, e.mtime, live.from[name], state,
+                        live.documents[name]?.let { DocumentsContract.buildDocumentUriUsingTree(tree, it) },
+                        live.tracks[name]?.progress(lastPublishAt) ?: waiting(live, name, state, e.size),
+                    )
+                } + (live.toRequest + live.outstanding + live.tracks.filterValues { !it.sending }.keys).distinct().filter { it !in local }.map { name ->
+                    val size = synchronized(wanted) { wanted[deviceId to name]?.size } ?: 0
+                    BucketItem(name, size, System.currentTimeMillis(), Side.DESK, BucketItem.State.RECEIVING, null, live.tracks[name]?.progress(lastPublishAt) ?: Progress(0, size, null, 0, deviceId !in ready))
                 }
                 BucketView(
                     deviceId, tree.toString(), live.phase,
                     items.sortedByDescending { it.mtime }, live.notSynced, live.lastSync, local.values.sumOf { it.size },
                     false, live.storageFull, live.adding,
+                    BucketProgress.summary(items.mapNotNull { it.progress }),
+                    live.userPaused,
                 )
             }
         }
+        // The notification: every second at most while files move, then "up to date" once.
+        for ((deviceId, view) in _views.value) {
+            val live = buckets[deviceId] ?: continue
+            if (BucketSyncNotification.update(app, view, deviceId in ready, live.burst.size)) live.burst.clear()
+        }
     }
+
+    /** A file the desk has asked for, or one queued to receive, before bytes move: "Waiting…". */
+    private fun waiting(live: Live, name: String, state: BucketItem.State, size: Long): Progress? =
+        if (state == BucketItem.State.SENDING || state == BucketItem.State.RECEIVING) Progress(0, size, null, 0, live.deviceId !in ready) else null
 }

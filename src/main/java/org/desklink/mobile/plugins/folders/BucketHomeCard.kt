@@ -65,8 +65,10 @@ fun BucketHomeCard(deviceId: String, desk: String, onOpen: () -> Unit) {
             IconCircle(R.drawable.sym_inventory, 36.dp, 20.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(stringResource(R.string.bucket_title), fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.semantics { heading() })
+                val summary = view?.summary
                 Text(
                     when {
+                        summary != null -> BucketActivity.summaryText(context, summary, view.userPaused, desk)
                         !on -> stringResource(R.string.bucket_home_off, desk)
                         items.isEmpty() -> stringResource(R.string.bucket_home_empty, desk)
                         else -> Formatter.formatShortFileSize(context, view!!.bytes)
@@ -75,6 +77,13 @@ fun BucketHomeCard(deviceId: String, desk: String, onOpen: () -> Unit) {
                 )
             }
             Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = t.textDim, modifier = Modifier.size(20.dp))
+        }
+        view?.summary?.let { summary ->
+            androidx.compose.material3.LinearProgressIndicator(
+                { summary.fraction },
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp).height(3.dp),
+                color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp,
+            )
         }
         if (items.isNotEmpty()) {
             val sizePx = with(LocalDensity.current) { 96.dp.roundToPx() }

@@ -334,6 +334,10 @@ class WebRtcFileTransferManager(
             throw error
         }
         receiver.checkpoint = updated
+        // F8b: a Bucket file's progress (the engine throttles it to 4 updates a second).
+        folderOffers[chunk.transferId]?.let { ref ->
+            org.desklink.mobile.plugins.folders.BucketEngine.progress(wire.peerDeviceId, ref.relpath, nextOffset, updated.totalSize, sending = false)
+        }
         send(
             OutboundWebRtcFileMessage.Control(
                 control(wire, WebRtcFileAction.ACKNOWLEDGE, updated, offset = nextOffset),

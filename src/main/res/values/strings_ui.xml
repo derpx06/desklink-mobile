@@ -699,6 +699,34 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="automations_template_night">Quiet nights while charging</string>
     <string name="more_automations">Automations</string>
     <string name="more_automations_summary">When … if … do, on the phone and the computer</string>
+    <!-- F8b: Bucket progress -->
+    <string name="bucket_of_total" formatted="false">%1$s of %2$s</string>
+    <string name="bucket_joined" formatted="false">%1$s · %2$s</string>
+    <string name="bucket_eta_seconds" formatted="false">%d s left</string>
+    <string name="bucket_eta_minutes" formatted="false">%d min left</string>
+    <string name="bucket_eta_hours" formatted="false">%1$d h %2$d min left</string>
+    <string name="bucket_waiting" formatted="false">Waiting…</string>
+    <string name="bucket_paused" formatted="false">Paused</string>
+    <string name="bucket_per_second" formatted="false">%s/s</string>
+    <string name="bucket_about" formatted="false">about %s</string>
+    <string name="bucket_note_title_one" formatted="false">Syncing Bucket · 1 file</string>
+    <string name="bucket_note_title_many" formatted="false">Syncing Bucket · %d files</string>
+    <string name="bucket_note_line" formatted="false">%1$s — %2$s</string>
+    <string name="bucket_note_percent" formatted="false">%1$s · %2$d%%</string>
+    <string name="bucket_note_more" formatted="false">+%d more</string>
+    <string name="bucket_note_paused" formatted="false">Paused · waiting for %s</string>
+    <string name="bucket_note_sending" formatted="false">Sending to %s</string>
+    <string name="bucket_note_receiving" formatted="false">Receiving from %s</string>
+    <string name="bucket_note_both" formatted="false">Sending to and receiving from %s</string>
+    <string name="bucket_done_one" formatted="false">Bucket up to date · 1 file synced</string>
+    <string name="bucket_done_many" formatted="false">Bucket up to date · %d files synced</string>
+    <string name="bucket_open_action" formatted="false">Open Bucket</string>
+    <string name="bucket_pause" formatted="false">Pause sync</string>
+    <string name="bucket_resume" formatted="false">Resume</string>
+    <string name="bucket_header_syncing_one" formatted="false">Syncing 1 file</string>
+    <string name="bucket_header_syncing_many" formatted="false">Syncing %d files</string>
+    <string name="bucket_up_to_date" formatted="false">Up to date · Last synced %1$s</string>
+    <string name="bucket_paused_by_you" formatted="false">Sync paused</string>
     <!-- F8b: the Bucket -->
     <string name="bucket_title">Bucket</string>
     <string name="bucket_subtitle">Anything you put here shows up on %1$s too</string>
