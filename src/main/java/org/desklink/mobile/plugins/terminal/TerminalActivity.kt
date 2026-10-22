@@ -255,6 +255,7 @@ class TerminalActivity : AppCompatActivity() {
         resumed = true
         // Seen: the widget's "finished" badge goes.
         org.desklink.mobile.ui.surfaces.DeskSurfaces.clearFinished(this, deviceId)
+        TerminalAttentionBadge.clear(deviceId)
     }
 
     override fun onPause() {
@@ -325,6 +326,14 @@ class TerminalActivity : AppCompatActivity() {
         val current = openId
 
         LaunchedEffect(Unit) { client.refresh() }
+        // "New terminal" from the Terminals tab: one shell, started as soon as the list is known and open to us.
+        var newRequested by rememberSaveable { mutableStateOf(intent.getBooleanExtra(EXTRA_NEW, false)) }
+        LaunchedEffect(newRequested, state.link, state.listLoaded, state.notAllowed, state.passwordNeeded) {
+            if (newRequested && state.link == TerminalLinkState.CONNECTED && state.listLoaded && !state.notAllowed && state.passwordNeeded == null) {
+                newRequested = false
+                client.create(DEFAULT_ROWS, DEFAULT_COLS, null)
+            }
+        }
         LaunchedEffect(current, resumed) { TerminalForeground.terminalId = if (resumed) current else null }
         // The coral notification with End while this phone has terminals open.
         val attached = state.sessions.count { it.attached && !it.gone }
@@ -1352,6 +1361,9 @@ class TerminalActivity : AppCompatActivity() {
         const val EXTRA_DEVICE_ID = "deviceId"
         const val EXTRA_TERMINAL_ID = "terminalId"
 
+        /** Start one shell as soon as the list is up (the Terminals tab's "New terminal"). */
+        const val EXTRA_NEW = "newTerminal"
+
         private const val STATE_OPEN_ID = "openTerminalId"
         private const val LABEL_PREFS = "desklink_terminal_labels"
         private const val KEY_FULLSCREEN = "/fullscreen"
@@ -1361,8 +1373,8 @@ class TerminalActivity : AppCompatActivity() {
         /** Bigger than any reasonable paste; keeps one tap from queueing megabytes onto the channel. */
         private const val MAX_PASTE_CHARS = 100_000
 
-        fun intent(context: Context, deviceId: String): Intent =
-            Intent(context, TerminalActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId)
+        fun intent(context: Context, deviceId: String, newTerminal: Boolean = false): Intent =
+            Intent(context, TerminalActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId).apply { if (newTerminal) putExtra(EXTRA_NEW, true) }
     }
 }
 

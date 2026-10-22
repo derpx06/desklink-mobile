@@ -54,6 +54,8 @@ class TerminalAttentionNotifier(
     }
 
     internal fun post(attention: TerminalAttention, detail: String, yesNo: Boolean) {
+        // The tab's dot does not depend on the notification being allowed.
+        TerminalAttentionBadge.raise(deviceId)
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
         if (Build.VERSION.SDK_INT >= 33 &&

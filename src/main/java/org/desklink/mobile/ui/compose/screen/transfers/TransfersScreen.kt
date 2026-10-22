@@ -49,6 +49,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -119,49 +121,56 @@ class TransferActions(
 fun speedLabel(bytesPerSecond: Long): String = stringResource(R.string.transfers_speed, Formatter.formatShortFileSize(LocalContext.current, bytesPerSecond))
 
 /**
- * Files with one computer: the running transfer on top, then everything sent and received in the
- * last 30 days, newest first, by day, two to a row.
+ * "Recent transfers", as items of the Files tab's grid: the running transfer first, then everything sent and
+ * received in the last 30 days, newest first, by day. At most [limit] are shown until [onShowAll].
  */
-@Composable
-fun TransfersScreen(deskName: String, live: LiveTransfer?, records: List<TransferRecord>, revision: Int, actions: TransferActions) {
-    val t = tokens
-    val context = LocalContext.current
-    val groups = remember(records) { records.groupBy { dayStart(it.time) }.toList() }
-    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-        ScreenHeader(actions.onBack) {
-            IconButton(onClick = actions.onSendFiles, modifier = Modifier.size(48.dp)) {
-                Icon(painterResource(R.drawable.sym_upload_file), contentDescription = stringResource(R.string.home_send_files), tint = t.text)
-            }
+fun androidx.compose.foundation.lazy.grid.LazyGridScope.recentTransfers(
+    deskName: String,
+    live: LiveTransfer?,
+    records: List<TransferRecord>,
+    revision: Int,
+    actions: TransferActions,
+    limit: Int = RECENT_LIMIT,
+    onShowAll: (() -> Unit)? = null,
+) {
+    val shown = records.take(limit)
+    val groups = shown.groupBy { dayStart(it.time) }.toList()
+    item(span = { GridItemSpan(maxLineSpan) }, key = "recent-title") {
+        val t = tokens
+        Text(
+            stringResource(R.string.files_recent_transfers),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = t.text,
+            modifier = Modifier.padding(start = 4.dp, top = 12.dp).semantics { heading() },
+        )
+    }
+    live?.let { item(span = { GridItemSpan(maxLineSpan) }, key = "recent-live") { LiveCard(it, actions.onCancelLive) } }
+    if (records.isEmpty() && live == null) {
+        item(span = { GridItemSpan(maxLineSpan) }, key = "recent-empty") { Empty(actions.onSendFiles) }
+    }
+    groups.forEach { (day, items) ->
+        item(span = { GridItemSpan(maxLineSpan) }, key = "day$day") {
+            val context = LocalContext.current
+            Text(
+                dayLabel(context, day),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = tokens.textDim,
+                modifier = Modifier.padding(start = 6.dp, top = 8.dp).semantics { heading() },
+            )
         }
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            item(span = { GridItemSpan(2) }) {
-                LargeTitle(stringResource(R.string.transfers_title), Modifier.offset(x = (-16).dp), subtitle = stringResource(R.string.transfers_subtitle, deskName))
-            }
-            live?.let { item(span = { GridItemSpan(2) }) { LiveCard(it, actions.onCancelLive) } }
-            if (records.isEmpty()) {
-                item(span = { GridItemSpan(2) }) { Empty(actions.onSendFiles) }
-            }
-            groups.forEach { (day, items) ->
-                item(span = { GridItemSpan(2) }, key = "day$day") {
-                    Text(
-                        dayLabel(context, day),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = t.textDim,
-                        modifier = Modifier.padding(start = 6.dp, top = 8.dp).semantics { heading() },
-                    )
-                }
-                items(items, key = { it.id }) { record -> FileCard(record, deskName, revision, actions) }
-            }
+        items(items, key = { it.id }) { record -> FileCard(record, deskName, revision, actions) }
+    }
+    if (records.size > limit && onShowAll != null) {
+        item(span = { GridItemSpan(maxLineSpan) }, key = "recent-more") {
+            TextButton(onClick = onShowAll, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.files_show_all, records.size)) }
         }
     }
 }
+
+/** How many recent transfers the Files tab lists before "Show all". */
+const val RECENT_LIMIT = 12
 
 @Composable
 private fun LiveCard(live: LiveTransfer, onCancel: () -> Unit) {
@@ -193,9 +202,9 @@ private fun LiveCard(live: LiveTransfer, onCancel: () -> Unit) {
 @Composable
 private fun Empty(onSendFiles: () -> Unit) {
     val t = tokens
-    Column(Modifier.fillMaxWidth().padding(vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        IconCircle(R.drawable.sym_swap_vert, 64.dp, 30.dp, background = t.accentContainer, tint = t.onAccentContainer)
-        Text(stringResource(R.string.transfers_empty_title), fontSize = 17.sp, fontWeight = FontWeight.Medium)
+    Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        IconCircle(R.drawable.sym_swap_vert, 56.dp, 26.dp, background = t.accentContainer, tint = t.onAccentContainer)
+        Text(stringResource(R.string.transfers_empty_title), fontSize = 16.sp, fontWeight = FontWeight.Medium)
         Text(stringResource(R.string.transfers_empty_body), fontSize = 14.sp, color = t.textDim)
         PillButton(stringResource(R.string.home_send_files), onSendFiles, height = 48.dp, icon = R.drawable.sym_upload_file)
     }

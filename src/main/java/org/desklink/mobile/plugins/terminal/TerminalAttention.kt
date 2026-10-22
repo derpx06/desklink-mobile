@@ -3,6 +3,8 @@
  */
 package org.desklink.mobile.plugins.terminal
 
+import kotlinx.coroutines.flow.update
+
 /** What a terminal's recent output says about whether it needs the person. */
 enum class TerminalAttention { NONE, WAITING, FINISHED }
 
@@ -99,4 +101,19 @@ class AttentionTracker {
 object TerminalForeground {
     @Volatile
     var terminalId: String? = null
+}
+
+/**
+ * Which computers have a terminal that finished or is waiting for the person while it was not on screen: the
+ * coral dot on the Terminals tab. Raised where the notification is raised, cleared when the Terminals tab is
+ * opened (or a terminal is).
+ */
+object TerminalAttentionBadge {
+    private val devices = kotlinx.coroutines.flow.MutableStateFlow<Set<String>>(emptySet())
+    val pending: kotlinx.coroutines.flow.StateFlow<Set<String>> get() = devices
+
+    fun raise(deviceId: String) = devices.update { it + deviceId }
+    fun clear(deviceId: String) = devices.update { it - deviceId }
+    fun clearAll() { devices.value = emptySet() }
+    fun has(deviceId: String): Boolean = deviceId in devices.value
 }

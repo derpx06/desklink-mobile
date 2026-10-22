@@ -140,7 +140,13 @@ class BucketUi(
     private fun <T : Any> getSystemService(cls: Class<T>): T? = host.getSystemService(cls)
 
     @Composable
-    fun Screen(deviceId: String, onBack: () -> Unit, embedded: Boolean = false) {
+    fun Screen(
+        deviceId: String,
+        onBack: () -> Unit,
+        embedded: Boolean = false,
+        /** More grid items after the Bucket's own (the Files tab's "Recent transfers"). */
+        below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null,
+    ) {
         val t = tokens
         val context = LocalContext.current
         val desk = remember(deviceId) { DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty() }
@@ -285,15 +291,16 @@ class BucketUi(
             view?.summary?.takeIf { on }?.let { SyncHeader(it, view.userPaused, desk) }
             Box(Modifier.weight(1f)) {
                 when {
-                    view?.phase == Phase.ASKING -> Hero(desk, waiting = true, offered = false, onTurnOn = {}, onDecline = {})
+                    view?.phase == Phase.ASKING -> Hero(desk, waiting = true, offered = false, onTurnOn = {}, onDecline = {}, below = below)
                     !on -> Hero(
                         desk,
                         waiting = false,
                         offered = view?.offered == true,
                         onTurnOn = { pickFolder.launch(documentsUri()) },
                         onDecline = { BucketEngine.decline(deviceId) },
+                        below = below,
                     )
-                    else -> Content(view!!, desk, deviceId, path, selected, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p })
+                    else -> Content(view!!, desk, deviceId, path, selected, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p }, below = below)
                 }
                 if (on && !selecting) {
                     Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) {
@@ -446,10 +453,29 @@ class BucketUi(
 
     /** Off: what the Bucket is, and one button (a single folder pick is all Android needs). */
     @Composable
-    private fun Hero(desk: String, waiting: Boolean, offered: Boolean, onTurnOn: () -> Unit, onDecline: () -> Unit) {
+    private fun Hero(desk: String, waiting: Boolean, offered: Boolean, onTurnOn: () -> Unit, onDecline: () -> Unit, below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null) {
+        if (below != null) {
+            // In the Files tab the Bucket's invitation is the first item of a scrolling grid, with the recent transfers after it.
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(156.dp),
+                contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) { HeroBody(desk, waiting, offered, onTurnOn, onDecline, scrolling = true) }
+                below()
+            }
+        } else {
+            HeroBody(desk, waiting, offered, onTurnOn, onDecline, scrolling = false)
+        }
+    }
+
+    @Composable
+    private fun HeroBody(desk: String, waiting: Boolean, offered: Boolean, onTurnOn: () -> Unit, onDecline: () -> Unit, scrolling: Boolean) {
         val t = tokens
-        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            DropZone(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 260.dp)) {
+        Column(if (scrolling) Modifier.fillMaxWidth() else Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            DropZone(Modifier.fillMaxWidth().then(if (scrolling) Modifier else Modifier.weight(1f, fill = false)).heightIn(min = 260.dp)) {
                 IconCircle(R.drawable.sym_inventory, 72.dp, 36.dp, background = t.accentContainer, tint = t.onAccentContainer)
                 Spacer(Modifier.height(18.dp))
                 Text(
@@ -466,7 +492,7 @@ class BucketUi(
                 PillButton(stringResource(R.string.bucket_turn_on), onTurnOn, icon = R.drawable.sym_inventory, modifier = Modifier.fillMaxWidth())
                 if (offered) PillButton(stringResource(R.string.bucket_not_now), onDecline, style = PillStyle.Outlined, height = 48.dp, modifier = Modifier.fillMaxWidth())
             }
-            Spacer(Modifier.navigationBarsPadding())
+            if (!scrolling) Spacer(Modifier.navigationBarsPadding())
         }
     }
 
@@ -495,7 +521,7 @@ class BucketUi(
     }
 
     @Composable
-    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onOpen: (String) -> Unit, onSelect: (String) -> Unit) {
+    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onOpen: (String) -> Unit, onSelect: (String) -> Unit, below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null) {
         val t = tokens
         var menuFor by remember { mutableStateOf<BucketItem?>(null) }
         var renaming by remember { mutableStateOf<BucketItem?>(null) }
@@ -565,6 +591,7 @@ class BucketUi(
                     )
                 }
             }
+            below?.invoke(this)
         }
         menuFor?.let { item ->
             ItemMenu(item, onDismiss = { menuFor = null }, onRename = { renaming = item }, onRemove = { removing = item })
