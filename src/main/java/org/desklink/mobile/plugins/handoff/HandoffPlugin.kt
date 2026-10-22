@@ -64,7 +64,7 @@ class HandoffPlugin : Plugin() {
             Intent(context, DismissReceiver::class.java).putExtra(EXTRA_TAG, tag),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.handoff_title, device.name))
             .setContentText(context.getString(R.string.handoff_text, handoff.path))

@@ -221,7 +221,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             val manager = NotificationManagerCompat.from(context)
             if (!manager.areNotificationsEnabled()) return false
             val tap = PendingIntent.getActivity(context, number.hashCode(), compose, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+            val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.CALLS)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(context.getString(R.string.telephony_message_title, number))
                 .setContentText(context.getString(R.string.telephony_message_text, device.name))
@@ -296,7 +296,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
     /** The heads-up that the desk took the call (so the phone ringing then stopping is explained). */
     @SuppressLint("MissingPermission")
     private fun notifyAnswered() {
-        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.CALLS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.telephony_answered_on, device.name))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

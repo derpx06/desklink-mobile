@@ -87,7 +87,7 @@ class AccessibilitySetupActivity : AppCompatActivity() {
             val tap = PendingIntent.getActivity(context, NOTIFICATION_ASK, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             NotificationManagerCompat.from(context).notify(
                 NOTIFICATION_ASK,
-                NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+                NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(context.getString(R.string.accessibility_setup_ask, deskName))
                     .setContentText(context.getString(R.string.accessibility_setup_ask_text))

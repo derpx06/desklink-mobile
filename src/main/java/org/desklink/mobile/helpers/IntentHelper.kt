@@ -27,7 +27,7 @@ object IntentHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isInForeground) {
             val flags = PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
             val pendingIntent = PendingIntent.getActivity(context, 0, intent, flags)
-            val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+            val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
                 .setContentIntent(pendingIntent)
                 .setContentTitle(title)
                 .setContentText(context.getString(R.string.tap_to_open))

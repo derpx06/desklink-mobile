@@ -65,7 +65,7 @@ class PingPlugin : Plugin() {
 
         val notificationManager = context.getSystemService<NotificationManager>()!!
 
-        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.DEFAULT)
+        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
             .setContentTitle(device.name)
             .setContentText(message)
             .setContentIntent(resultPendingIntent)

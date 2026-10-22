@@ -96,7 +96,7 @@ class DeskUnlockPlugin : Plugin() {
             runCatching { context.startActivity(open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
         val pending = PendingIntent.getActivity(context, device.deviceId.hashCode(), open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.unlock_title, device.name))
             .setContentText(context.getString(if (next.reason == UnlockOffer.REASON_BUTTON) R.string.unlock_body_button else R.string.unlock_body_phone))

@@ -69,7 +69,7 @@ object CrashReporter {
             context, NOTIFICATION_ID, chooser,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.DEFAULT)
+        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.DIAGNOSTICS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.crash_report_title))
             .setContentText(context.getString(R.string.crash_report_text))

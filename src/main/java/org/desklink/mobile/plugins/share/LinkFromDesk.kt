@@ -44,7 +44,7 @@ object LinkFromDesk {
             Intent(context, CopyReceiver::class.java).putExtra(EXTRA_URL, url).putExtra(EXTRA_ID, id),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.link_from_desk, deskName))
             .setContentText(url)

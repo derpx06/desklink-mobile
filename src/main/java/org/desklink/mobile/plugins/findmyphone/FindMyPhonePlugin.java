@@ -122,7 +122,7 @@ public class FindMyPhonePlugin extends Plugin {
     }
 
     private void createNotification(PendingIntent pendingIntent) {
-        NotificationCompat.Builder notification = new NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY);
+        NotificationCompat.Builder notification = new NotificationCompat.Builder(context, NotificationHelper.Channels.FIND_PHONE);
         notification
                 .setSmallIcon(R.drawable.ic_notification)
                 .setOngoing(false)

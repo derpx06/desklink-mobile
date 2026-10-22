@@ -71,6 +71,13 @@ android {
         generateLocaleConfig = true
     }
 
+    testOptions {
+        unitTests {
+            // The app's own resources, so a Robolectric test (and the screenshot harness) can read its strings and drawables.
+            isIncludeAndroidResources = true
+        }
+    }
+
     packaging {
         resources {
             merges += listOf("META-INF/DEPENDENCIES", "META-INF/LICENSE", "META-INF/NOTICE")

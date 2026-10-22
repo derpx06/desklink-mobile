@@ -114,7 +114,7 @@ object PhoneAudio {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val tap = PendingIntent.getActivity(context, NOTIFICATION_ASK, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val title = context.getString(if (request.source == "mic") R.string.audio_request_mic else R.string.audio_request_sound, deskName)
-        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(context.getString(R.string.audio_tap_answer))

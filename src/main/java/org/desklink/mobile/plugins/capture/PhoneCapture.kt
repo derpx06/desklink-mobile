@@ -81,7 +81,7 @@ object PhoneCapture {
             }
         }, TIMEOUT_MS)
         val tap = PendingIntent.getActivity(context, NOTIFICATION_ID, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+        val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(titleFor(request.kind), deskName))
             .setContentText(context.getString(R.string.capture_tap))

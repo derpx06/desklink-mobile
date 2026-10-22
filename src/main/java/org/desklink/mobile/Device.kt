@@ -452,7 +452,7 @@ class Device : PacketReceiver {
 
         val notificationManager = ContextCompat.getSystemService(context, NotificationManager::class.java)!!
 
-        val noti = NotificationCompat.Builder(context, NotificationHelper.Channels.DEFAULT)
+        val noti = NotificationCompat.Builder(context, NotificationHelper.Channels.PAIRING)
             .setContentTitle(res.getString(R.string.pairing_request_from, name))
             .setContentText(res.getString(R.string.pairing_verification_code, verificationKey))
             .setTicker(res.getString(R.string.pair_requested))

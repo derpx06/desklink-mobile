@@ -365,7 +365,7 @@ class ScreenControlPlugin : Plugin() {
         )
         val notification = androidx.core.app.NotificationCompat.Builder(
             context,
-            org.desklink.mobile.helpers.NotificationHelper.Channels.HIGHPRIORITY,
+            org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS,
         )
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.screen_share_prompt_title, device.name))

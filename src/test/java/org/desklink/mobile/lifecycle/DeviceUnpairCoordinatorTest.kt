@@ -28,7 +28,7 @@ class DeviceUnpairCoordinatorTest {
         })
         assertFalse(coordinator.beginUnpair(7) { calls.incrementAndGet() })
 
-        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue(done.await(AWAIT_SECONDS, TimeUnit.SECONDS))
         assertEquals(1, calls.get())
         coordinator.close()
     }
@@ -49,7 +49,7 @@ class DeviceUnpairCoordinatorTest {
             done.countDown()
         })
 
-        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue(done.await(AWAIT_SECONDS, TimeUnit.SECONDS))
         assertEquals(2, calls.get())
         coordinator.close()
     }
@@ -57,7 +57,10 @@ class DeviceUnpairCoordinatorTest {
     @Test
     fun failuresDoNotStopTheSerializedQueue() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val coordinator = DeviceUnpairCoordinator(scope)
+        // The failure is reported to the test, not to android.util.Log (which a plain JVM test cannot call):
+        // reaching for it from inside the worker was what made this test depend on timing.
+        val reported = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val coordinator = DeviceUnpairCoordinator(scope, onFailure = { operation, _ -> reported += operation })
         val completed = CountDownLatch(1)
         val calls = AtomicInteger()
 
@@ -70,8 +73,9 @@ class DeviceUnpairCoordinatorTest {
             completed.countDown()
         }
 
-        assertTrue(completed.await(2, TimeUnit.SECONDS))
+        assertTrue(completed.await(AWAIT_SECONDS, TimeUnit.SECONDS))
         assertEquals(2, calls.get())
+        assertEquals(listOf("unpair cleanup generation 1"), reported.toList())
         coordinator.close()
     }
 
@@ -88,8 +92,13 @@ class DeviceUnpairCoordinatorTest {
             done.countDown()
         }
 
-        assertTrue(done.await(2, TimeUnit.SECONDS))
+        assertTrue(done.await(AWAIT_SECONDS, TimeUnit.SECONDS))
         assertNotEquals(caller, worker.get())
         coordinator.close()
+    }
+
+    private companion object {
+        /** Generous: the pool may need a moment to start on a loaded machine. */
+        const val AWAIT_SECONDS = 20L
     }
 }

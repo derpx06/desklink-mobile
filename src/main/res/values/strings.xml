@@ -17,6 +17,16 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="connection_service_name">DeskLink connection service</string>
     <string name="connected_devices_channel">Connected devices</string>
     <string name="pairing_channel">Pairing requests</string>
+    <string name="channel_pairing">Pairing requests</string>
+    <string name="channel_requests">From your computer</string>
+    <string name="channel_calls">Calls</string>
+    <string name="channel_find_phone">Find my phone</string>
+    <string name="channel_files_receiving">Files being received</string>
+    <string name="channel_files_received">Files received</string>
+    <string name="channel_files_sending">Files being sent</string>
+    <string name="channel_files_problems">File problems</string>
+    <string name="channel_bucket">Bucket</string>
+    <string name="channel_diagnostics">Crash reports</string>
     <string name="file_transfer_channel">File transfers</string>
     <string name="screen_sharing_channel">Screen sharing</string>
     <string name="remote_control_channel">Remote control</string>

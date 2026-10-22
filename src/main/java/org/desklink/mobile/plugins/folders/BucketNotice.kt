@@ -24,7 +24,7 @@ object BucketNotice {
         runCatching {
             manager.notify(
                 "bucket:$deviceId", ID,
-                NotificationCompat.Builder(context, NotificationHelper.Channels.HIGHPRIORITY)
+                NotificationCompat.Builder(context, NotificationHelper.Channels.BUCKET)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(context.getString(R.string.bucket_offer_title, desk))
                     .setContentText(context.getString(R.string.bucket_offer_text))

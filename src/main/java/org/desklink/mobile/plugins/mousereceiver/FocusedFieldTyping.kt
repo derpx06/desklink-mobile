@@ -90,7 +90,7 @@ object FocusedFieldTyping {
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP),
             android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.HIGHPRIORITY)
+        val notification = androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS)
             .setSmallIcon(org.desklink.mobile.R.drawable.ic_notification)
             .setContentTitle(context.getString(org.desklink.mobile.R.string.type_on_phone_ask_title, device.name))
             .setContentText(context.getString(org.desklink.mobile.R.string.type_on_phone_ask_text))
