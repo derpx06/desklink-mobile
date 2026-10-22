@@ -147,4 +147,20 @@ class WebRtcEnvelopeTest {
             fixture.validate("phone-test-device", 12, 4)
         }
     }
+
+    /** The data channel takes 64 KiB at most (webrtcbin advertises no max-message-size): larger is refused before it is sent. */
+    @Test
+    fun wireMessagesOverTheDataChannelLimitAreRefused() {
+        assertEquals(null, WebRtcEnvelope.wireRefusal(WebRtcEnvelope.MAX_WIRE_MESSAGE_BYTES))
+        org.junit.Assert.assertNotNull(WebRtcEnvelope.wireRefusal(WebRtcEnvelope.MAX_WIRE_MESSAGE_BYTES + 1))
+        // A packet at the packers' budget fits once enveloped; one well over it does not.
+        val fits = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_PING).apply { this["x"] = "y".repeat(WebRtcEnvelope.FEATURE_PACKET_BUDGET - 200) }
+        assertEquals(null, WebRtcEnvelope.wireRefusal(wireSize(fits)))
+        val tooBig = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_PING).apply { this["x"] = "y".repeat(50 * 1024) }
+        org.junit.Assert.assertNotNull(WebRtcEnvelope.wireRefusal(wireSize(tooBig)))
+        // The largest file chunk fits as well.
+        val chunk = WebRtcFileChunk("t".repeat(36), "k".repeat(64), 0, ByteArray(WebRtcFileControl.MAX_CHUNK_BYTES)).encode()
+        val envelope = WebRtcEnvelope.create("phone", 9, 2, WebRtcChannel.FILE_DATA, WebRtcFileControl.CHUNK_MESSAGE_TYPE, chunk, 1_700_000_000_000)
+        assertEquals(null, WebRtcEnvelope.wireRefusal(envelope.toJson().toString().toByteArray().size))
+    }
 }

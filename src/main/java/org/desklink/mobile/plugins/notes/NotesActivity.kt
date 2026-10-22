@@ -306,7 +306,8 @@ class NotesActivity : AppCompatActivity() {
         var dirty by remember { mutableStateOf(false) }
 
         fun save() {
-            if (!dirty) return
+            // Over the cap: kept in the editor, not saved (the banner says why).
+            if (!dirty || !Shelf.syncable(body)) return
             dirty = false
             val current = id
             if (current == null) {
@@ -344,7 +345,9 @@ class NotesActivity : AppCompatActivity() {
         }
 
         Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().imePadding()) {
-            ScreenHeader({ save(); onDone() }) {
+            val tooLong = !Shelf.syncable(body)
+            BackHandler(tooLong) { Toast.makeText(context, R.string.notes_too_long, Toast.LENGTH_SHORT).show() }
+            ScreenHeader({ if (tooLong) Toast.makeText(context, R.string.notes_too_long, Toast.LENGTH_SHORT).show() else { save(); onDone() } }) {
                 IconButton(onClick = { pinned = !pinned; dirty = true }, modifier = Modifier.size(48.dp)) {
                     Icon(
                         painterResource(if (pinned) R.drawable.sym_keep_filled else R.drawable.sym_keep),
@@ -383,6 +386,14 @@ class NotesActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = titleHint },
                 )
             }
+            if (tooLong) {
+                Text(
+                    stringResource(R.string.notes_too_long),
+                    fontSize = 13.sp,
+                    color = t.coralText,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp).background(t.coralContainer, RoundedCornerShape(12.dp)).padding(10.dp),
+                )
+            }
             Spacer(Modifier.height(12.dp))
             val bodyHint = stringResource(R.string.notes_body_hint)
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
@@ -399,7 +410,7 @@ class NotesActivity : AppCompatActivity() {
                         if (body.isEmpty()) Text(bodyHint, fontSize = 16.sp, color = t.textFaint)
                         BasicTextField(
                             value = body,
-                            onValueChange = { if (it.toByteArray().size <= Shelf.MAX_NOTE_BYTES) { body = it; dirty = true } },
+                            onValueChange = { body = it; dirty = true },
                             textStyle = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, color = t.text),
                             cursorBrush = SolidColor(t.accent),
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),

@@ -337,8 +337,10 @@ class WebRtcTransport(
             callback.onFailure(TransportError(TransportErrorCode.CLOSED, "WebRTC data channel is not open"))
             return
         }
-        if (payload.size > WebRtcEnvelope.MAX_PAYLOAD_BYTES) {
-            callback.onFailure(TransportError(TransportErrorCode.INVALID_PACKET, "WebRTC message is too large"))
+        // Never hand the channel more than it takes: an oversized message closes the association.
+        WebRtcEnvelope.wireRefusal(payload.size)?.let { reason ->
+            Log.w(TAG, reason)
+            callback.onFailure(TransportError(TransportErrorCode.INVALID_PACKET, reason))
             return
         }
         if (!dataChannel.send(DataChannel.Buffer(ByteBuffer.wrap(payload), false))) {

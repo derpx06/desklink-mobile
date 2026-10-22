@@ -122,7 +122,7 @@ object NotesStore {
 
     /** Both indexes, for a desk whose link just became ready. */
     fun indexes(context: Context): List<NetworkPacket> =
-        with(context) { listOf(it.indexPacket(ShelfKind.SNIPPETS), it.indexPacket(ShelfKind.NOTES)) to false }
+        with(context) { it.indexPackets(ShelfKind.SNIPPETS) + it.indexPackets(ShelfKind.NOTES) to false }
 
     private fun push(context: Context, kind: ShelfKind, ids: Collection<String>) {
         val packets = with(context) { Shelf.itemsPackets(kind, it.itemValues(kind, ids)) to false }
@@ -202,7 +202,7 @@ object NotesStore {
         val changed = with(context) { s ->
             val before = s.notes[id] ?: return@with false to false
             var after = change(before).let { it.copy(id = before.id, title = it.title.takeCodePoints(Shelf.MAX_NOTE_TITLE_CHARS)) }
-            if (after.body.toByteArray().size > Shelf.MAX_NOTE_BYTES || after.sameContent(before)) return@with false to false
+            if (!Shelf.syncable(after.body) || after.sameContent(before)) return@with false to false
             if (after.deleted) after = after.copy(title = "", body = "")
             s.notes[id] = after.copy(parent = s.synced[id] ?: 0, modified = later(before.modified))
             true to true
@@ -213,11 +213,11 @@ object NotesStore {
     /** Now, but strictly after [previous] even within one millisecond. */
     private fun later(previous: Long?) = maxOf(System.currentTimeMillis(), (previous ?: 0) + 1)
 
-    /** Cut at [Shelf.MAX_NOTE_BYTES] (a share can be longer), on a character boundary. */
+    /** Cut at [Shelf.MAX_SYNCABLE_NOTE_BYTES] (a share can be longer), on a character boundary. */
     fun clampBody(body: String): String {
-        if (body.toByteArray().size <= Shelf.MAX_NOTE_BYTES) return body
-        var end = minOf(body.length, Shelf.MAX_NOTE_BYTES)
-        while (end > 0 && body.substring(0, end).toByteArray().size > Shelf.MAX_NOTE_BYTES) end -= 1024.coerceAtMost(end)
+        if (body.toByteArray().size <= Shelf.MAX_SYNCABLE_NOTE_BYTES) return body
+        var end = minOf(body.length, Shelf.MAX_SYNCABLE_NOTE_BYTES)
+        while (end > 0 && body.substring(0, end).toByteArray().size > Shelf.MAX_SYNCABLE_NOTE_BYTES) end -= 1024.coerceAtMost(end)
         if (end > 0 && Character.isHighSurrogate(body[end - 1])) end--
         return body.substring(0, end)
     }

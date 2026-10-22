@@ -67,8 +67,8 @@ class ClipboardPlugin : Plugin() {
 
     @VisibleForTesting
     fun propagateClipboard(content: String) {
-        if (content.toByteArray(Charsets.UTF_8).size > maxClipboardBytes) {
-            Log.w(TAG, "clipboard: ${content.length} chars is over 1 MiB, not sent")
+        if (!fitsWire(content)) {
+            Log.w(TAG, "clipboard: ${content.length} chars is too large for one message, not sent")
             return
         }
         val np = NetworkPacket(PACKET_TYPE_CLIPBOARD)
@@ -84,7 +84,7 @@ class ClipboardPlugin : Plugin() {
     fun sendNow(): Boolean = ClipboardListener.instance(context).sync(force = true)
 
     private fun sendConnectPacket() {
-        val content = ClipboardListener.instance(context).currentContent ?: return // Send clipboard only if it had been initialized
+        val content = ClipboardListener.instance(context).currentContent?.takeIf(::fitsWire) ?: return // Send clipboard only if it had been initialized
         val np = NetworkPacket(PACKET_TYPE_CLIPBOARD_CONNECT)
         val timestamp = ClipboardListener.instance(context).updateTimestamp
         np["timestamp"] = timestamp
@@ -111,6 +111,12 @@ class ClipboardPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = arrayOf(PACKET_TYPE_CLIPBOARD, PACKET_TYPE_CLIPBOARD_CONNECT)
 
     companion object {
+        /** Clipboard text shared with the desk, as escaped JSON: one packet must cross the data channel (wire size fix). */
+        const val MAX_SHARED_TEXT_BYTES = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET - 2 * 1024
+
+        /** Too large → not shared (contract "Wire size"). */
+        fun fitsWire(content: String) = org.json.JSONObject.quote(content).toByteArray().size <= MAX_SHARED_TEXT_BYTES
+
         /**
          * Packet containing just clipboard contents, sent when a device updates its clipboard.
          * 

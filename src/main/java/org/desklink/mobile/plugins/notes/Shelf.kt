@@ -131,18 +131,21 @@ class Shelf {
         }
     }
 
-    fun indexPacket(kind: ShelfKind): NetworkPacket {
-        val items = JSONArray()
+    /**
+     * The index, split under [PACKET_BUDGET] (a full shelf's index is far larger than one packet).
+     * Nothing is deleted by absence, so several index packets mean the same as one.
+     */
+    fun indexPackets(kind: ShelfKind): List<NetworkPacket> {
         val all: Collection<Triple<String, Long, Boolean>> = when (kind) {
             ShelfKind.SNIPPETS -> snippets.values.map { Triple(it.id, it.modified, it.deleted) }
             ShelfKind.NOTES -> notes.values.map { Triple(it.id, it.modified, it.deleted) }
         }
-        all.forEach { (id, modified, deleted) ->
-            items.put(JSONObject().put("id", id).put("modified", modified).apply { if (deleted) put("deleted", true) })
-        }
-        return NetworkPacket(kind.packetType).apply {
-            this["op"] = "index"
-            this["items"] = items
+        val summaries = all.map { (id, modified, deleted) -> JSONObject().put("id", id).put("modified", modified).apply { if (deleted) put("deleted", true) } }
+        return chunked(summaries).ifEmpty { listOf(JSONArray()) }.map { items ->
+            NetworkPacket(kind.packetType).apply {
+                this["op"] = "index"
+                this["items"] = items
+            }
         }
     }
 
@@ -228,7 +231,8 @@ class Shelf {
         const val MAX_SNIPPET_TITLE_CHARS = 120
         const val MAX_NOTES = 2000
         const val MAX_NOTE_TITLE_CHARS = 200
-        const val MAX_NOTE_BYTES = 64 * 1024
+        /** Wire size fix: a note body, so its escaped JSON fits one packet (was 64 KiB; over it is dropped on receipt). */
+        const val MAX_NOTE_BYTES = 20 * 1024
         /** Ids per `fetch` (contract). */
         const val FETCH_IDS = 100
 
@@ -248,11 +252,37 @@ class Shelf {
         const val STORED_VERSION = 1
         const val TOMBSTONE_DAYS = 90L
 
+        /** One packet's serialized size (`WebRtcEnvelope.FEATURE_PACKET_BUDGET`: under the data channel's 64 KiB once enveloped). */
+        const val PACKET_BUDGET = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET
+
         /**
-         * One `items` packet's serialized size. The contract says 256 KiB, but a feature packet must
-         * stay under the WebRTC payload bound (`MAX_PAYLOAD_BYTES`, 128 KiB on both apps).
+         * The largest note body this phone writes: one note must fit one packet, so a body past
+         * this could not cross the link (the contract's 64 KiB is still accepted on receipt).
          */
-        const val PACKET_BUDGET = 100 * 1024
+        const val MAX_SYNCABLE_NOTE_BYTES = 34 * 1024
+
+        /** A body this phone may save: as JSON (escapes counted) within [MAX_SYNCABLE_NOTE_BYTES]. */
+        fun syncable(body: String) = body.toByteArray().size <= MAX_NOTE_BYTES && JSONObject.quote(body).toByteArray().size <= MAX_SYNCABLE_NOTE_BYTES
+
+        /** [values] in arrays each under [budget] serialized bytes; a value alone over it is dropped. */
+        fun chunked(values: List<JSONObject>, budget: Int = PACKET_BUDGET): List<JSONArray> {
+            val out = mutableListOf<JSONArray>()
+            var batch = JSONArray()
+            var size = 0
+            for (value in values) {
+                val length = value.toString().toByteArray().size + 1
+                if (length > budget - 256) continue
+                if (size + length > budget - 256 && batch.length() > 0) {
+                    out += batch
+                    batch = JSONArray()
+                    size = 0
+                }
+                batch.put(value)
+                size += length
+            }
+            if (batch.length() > 0) out += batch
+            return out
+        }
 
         fun fromStored(json: JSONObject): Shelf = Shelf().apply {
             require(json.optInt("version", 1) <= STORED_VERSION) { "written by a newer DeskLink" }
@@ -300,30 +330,13 @@ class Shelf {
         }
 
         /** `items` packets for [values], each under [budget] serialized bytes. An item over it alone is dropped. */
-        fun itemsPackets(kind: ShelfKind, values: List<JSONObject>, budget: Int = PACKET_BUDGET): List<NetworkPacket> {
-            val packets = mutableListOf<NetworkPacket>()
-            var batch = JSONArray()
-            var size = 0
-            fun flush() {
-                if (batch.length() == 0) return
-                val items = batch
-                packets += NetworkPacket(kind.packetType).apply {
+        fun itemsPackets(kind: ShelfKind, values: List<JSONObject>, budget: Int = PACKET_BUDGET): List<NetworkPacket> =
+            chunked(values, budget).map { items ->
+                NetworkPacket(kind.packetType).apply {
                     this["op"] = "items"
                     this["items"] = items
                 }
-                batch = JSONArray()
-                size = 0
             }
-            for (value in values) {
-                val length = value.toString().toByteArray().size + 1
-                if (length > budget - 256) continue // ponytail: never happens within the item bounds unless JSON escaping balloons it
-                if (size + length > budget - 256) flush()
-                batch.put(value)
-                size += length
-            }
-            flush()
-            return packets
-        }
 
         /** Rust's `&[u8]` order: UTF-8 bytes compared unsigned. */
         fun compareBytes(a: String, b: String): Int {

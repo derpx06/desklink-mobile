@@ -104,7 +104,8 @@ class RulesTest {
         val many = (0 until Rules.MAX_RULES).map { rule("r$it", Step(Rules.T_NFC), Step(Rules.A_NOTIFY, mapOf("body" to "x".repeat(500))), modified = 1) }
         val packets = Rules.itemsPackets(many)
         assertTrue(packets.size > 1)
-        assertTrue(packets.all { it.serialize().toByteArray().size < 128 * 1024 })
+        org.desklink.mobile.webrtc.assertAllCross(packets)
+        org.desklink.mobile.webrtc.assertAllCross(listOf(Rules.indexPacket(many)))
         assertEquals(Rules.MAX_RULES, packets.sumOf { it.getJSONArray("items")!!.length() })
         assertEquals(2, Rules.fetchPackets((0 until Rules.FETCH_IDS + 1).map { "$it" }).size)
     }

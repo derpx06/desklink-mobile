@@ -552,6 +552,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="notes_title_hint">Title</string>
     <string name="notes_body_hint">Write something…</string>
     <string name="notes_saved_shared">Saved to notes</string>
+    <string name="notes_too_long">Too long to sync: a note holds 20 KB at most. Shorten it to save.</string>
     <string name="notes_full">Too many notes (2,000 at most)</string>
     <string name="notes_share_label">Save to DeskLink notes</string>
     <string name="snippets_tab_label">Snippet</string>

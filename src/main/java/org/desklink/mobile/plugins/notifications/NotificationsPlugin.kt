@@ -338,6 +338,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
                 }
             }
         }
+        fitToWire(np)
         // `sendPacket` only queues work. Its return cannot prove that the
         // authenticated WebRTC event channel accepted the notification. Mark
         // it synchronized only from the completion callback so a failed
@@ -686,10 +687,33 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     companion object {
         /** `desklink.notification {snapshot: true, ids}` (contract S1). */
+        /** A notification's longest texts are cut so its packet crosses the data channel (wire size fix). */
+        const val MAX_TEXT_CHARS = 4_000
+
+        fun fitToWire(np: NetworkPacket) {
+            fun fits() = np.serialize().toByteArray().size <= org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET
+            if (fits()) return
+            for (key in listOf("text", "ticker", "title", "groupName")) {
+                np.getStringOrNull(key)?.takeIf { it.length > MAX_TEXT_CHARS }?.let { np[key] = it.take(MAX_TEXT_CHARS) + "…" }
+            }
+            // The conversation keeps its newest messages that fit.
+            val conversation = np.getJSONArray("conversation")
+            while (!fits() && conversation != null && conversation.length() > 0) {
+                conversation.remove(0)
+                np["conversation"] = conversation
+            }
+            if (!fits()) np["conversation"] = null as org.json.JSONArray?
+        }
+
+        /** S1: every posted id. Ids past [SNAPSHOT_BUDGET] are left out (a packet must cross the data channel). */
         fun snapshotPacket(ids: List<String>) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_NOTIFICATION).apply {
             this["snapshot"] = true
-            this["ids"] = org.json.JSONArray(ids)
+            var size = 0
+            this["ids"] = org.json.JSONArray(ids.takeWhile { id -> (size + org.json.JSONObject.quote(id).length + 1).also { size = it } <= SNAPSHOT_BUDGET })
         }
+
+        /** The snapshot's ids, serialized (about 400 notifications; Android keeps far fewer). */
+        const val SNAPSHOT_BUDGET = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET - 1024
 
         private const val PACKET_TYPE_NOTIFICATION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION
         private const val PACKET_TYPE_NOTIFICATION_REQUEST = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REQUEST

@@ -229,4 +229,32 @@ class DeskFeaturesTest {
         assertEquals(-1L, BatteryPlugin.chargeTimeRemaining(isCharging = true, rawMillis = 0))
         assertEquals(1_800_000L, BatteryPlugin.chargeTimeRemaining(isCharging = true, rawMillis = 1_859_999))
     }
+
+    /** S1 with hundreds of long ids: the snapshot still crosses the data channel. */
+    @Test
+    fun aHugeNotificationSnapshotStillCrosses() {
+        val ids = (0 until 2_000).map { "0|com.example.app|$it|tag-${"t".repeat(80)}|10001" }
+        val packet = org.desklink.mobile.plugins.notifications.NotificationsPlugin.snapshotPacket(ids)
+        org.desklink.mobile.webrtc.assertAllCross(listOf(packet))
+        org.junit.Assert.assertTrue(packet.getStringList("ids")!!.size in 100 until 2_000)
+    }
+
+    /** A huge notification (long text and conversation) is cut to cross; big clipboard text is not shared. */
+    @Test
+    fun bigNotificationsAndClipboardTextStayWithinTheWire() {
+        val np = NetworkPacket(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_NOTIFICATION).apply {
+            this["id"] = "k"
+            this["text"] = "t".repeat(100_000)
+            this["ticker"] = "x".repeat(100_000)
+            this["conversation"] = org.json.JSONArray().apply { repeat(500) { put(org.json.JSONObject().put("text", "m".repeat(500))) } }
+        }
+        org.desklink.mobile.plugins.notifications.NotificationsPlugin.fitToWire(np)
+        org.desklink.mobile.webrtc.assertAllCross(listOf(np))
+        org.junit.Assert.assertTrue(np.getString("text").length <= org.desklink.mobile.plugins.notifications.NotificationsPlugin.MAX_TEXT_CHARS + 1)
+        val clipboard = org.desklink.mobile.plugins.clipboard.ClipboardPlugin
+        org.junit.Assert.assertTrue(clipboard.fitsWire("a".repeat(30_000)))
+        org.junit.Assert.assertFalse(clipboard.fitsWire("a".repeat(60_000)))
+        val longest = "a".repeat(clipboard.MAX_SHARED_TEXT_BYTES - 2)
+        org.desklink.mobile.webrtc.assertAllCross(listOf(NetworkPacket(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_CLIPBOARD).apply { this["content"] = longest }))
+    }
 }

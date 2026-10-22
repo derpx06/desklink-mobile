@@ -127,7 +127,7 @@ class ContactsPlugin : Plugin() {
             return
         }
         if (!force && stamps == lastSent) return
-        device.sendPacket(ContactsBook.snapshotPacket(stamps))
+        ContactsBook.snapshotPackets(stamps).forEach(device::sendPacket)
         lastSent = stamps
     }
 

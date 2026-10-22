@@ -57,23 +57,41 @@ class ContactsBookTest {
 
     @Test
     fun theSnapshotIsCompleteWithTimestampsAsDecimalStrings() {
-        val packet = ContactsBook.snapshotPacket(mapOf("12" to 1_700_000_000_123, "3" to 5))
+        val packet = ContactsBook.snapshotPackets(mapOf("12" to 1_700_000_000_123, "3" to 5)).single()
         assertEquals(DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS, packet.type)
         assertEquals(listOf("12", "3"), packet.getStringList("uids"))
         assertEquals("1700000000123", packet.getString("12"))
         assertEquals("5", packet.getString("3"))
         assertTrue(packet.getBoolean("sharing"))
-        assertTrue(packet.serialize().length < ContactsBook.PACKET_BUDGET)
+        assertFalse("one part says nothing of parts", packet.has("part"))
     }
 
+    /** The owner's 1,456 contacts, and 5,000: split into parts that each cross the data channel, with every uid. */
     @Test
-    fun aBookTooBigForOnePacketKeepsItsMostRecentlyChanged() {
-        val stamps = (1..10_000).associate { it.toString() to 1_700_000_000_000L + it }
-        val packet = ContactsBook.snapshotPacket(stamps)
-        val uids = packet.getStringList("uids")!!
-        assertTrue(uids.size in 2_000 until 10_000)
-        assertEquals("10000", uids.first())
-        assertTrue(packet.serialize().toByteArray().size <= ContactsBook.PACKET_BUDGET)
+    fun aBigBookIsSplitIntoPartsThatEachCross() {
+        for (count in listOf(1_456, 5_000)) {
+            val stamps = (1..count).associate { (it * 37).toString() to 1_700_000_000_000L + it }
+            val packets = ContactsBook.snapshotPackets(stamps)
+            assertTrue(packets.size > 1)
+            org.desklink.mobile.webrtc.assertAllCross(packets)
+            val ids = packets.map { it.getString("snapshot") }.toSet()
+            assertEquals(1, ids.size)
+            assertEquals((1..packets.size).toList(), packets.map { it.getInt("part") })
+            assertTrue(packets.all { it.getInt("parts") == packets.size && it.getBoolean("sharing") })
+            assertEquals(stamps.mapValues { it.value.toString() }, packets.flatMap { p -> p.getStringList("uids")!!.map { it to p.getString(it) } }.toMap())
+        }
+    }
+
+    /** 1,131 cards with photos (the owner's fetch): each reply crosses the data channel. */
+    @Test
+    fun vCardRepliesCrossTheDataChannel() {
+        val photo = ByteArray(6_000) { (it * 31).toByte() }
+        val cards = (1..1_131).associate { uid ->
+            uid.toString() to ContactsBook.vcard(ContactCard(uid.toString(), "Person $uid", phones = listOf("CELL" to "+44 7700 900$uid"), note = "n".repeat(500), photo = photo))
+        }
+        val packets = ContactsBook.vcardPackets(cards)
+        org.desklink.mobile.webrtc.assertAllCross(packets)
+        assertEquals(cards.keys, packets.flatMap { it.getStringList("uids")!! }.toSet())
     }
 
     @Test

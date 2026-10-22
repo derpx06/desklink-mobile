@@ -36,22 +36,41 @@ object ContactsBook {
 
     /** One name part, number, email or organisation: longer is junk, and it keeps cards small. */
     const val MAX_FIELD_CHARS = 256
-    /** One packet's serialized size: the WebRTC payload bound is 128 KiB, with room for the frame. */
-    const val PACKET_BUDGET = 100 * 1024
+    /** One packet's serialized size (see `WebRtcEnvelope.FEATURE_PACKET_BUDGET`). */
+    const val PACKET_BUDGET = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET
 
-    /** K1: the complete snapshot. Most recently changed first, so a book too big for one packet loses its oldest. */
-    fun snapshotPacket(stamps: Map<String, Long>): NetworkPacket {
-        val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS)
-        // ponytail: one packet holds ~3,000 contacts (uid = Contacts._ID); a bigger book needs a
-        // multi-part snapshot, which the contract does not have yet.
-        var size = 64
-        val uids = stamps.entries.sortedByDescending { it.value }
-            .takeWhile { (uid, stamp) -> (size + 2 * uid.length + stamp.toString().length + 12).also { size = it } <= PACKET_BUDGET }
-            .map { it.key }
-        packet["uids"] = uids
-        uids.forEach { packet[it] = stamps.getValue(it).toString() }
-        packet["sharing"] = true
-        return packet
+    private fun quoted(text: String) = org.json.JSONObject.quote(text).toByteArray().size
+
+    /**
+     * K1: the complete snapshot. One packet when it fits; a bigger book is split into parts that
+     * carry `snapshot` (an id), `part` (1-based) and `parts`, and the desk applies them together.
+     */
+    fun snapshotPackets(stamps: Map<String, Long>, budget: Int = PACKET_BUDGET): List<NetworkPacket> {
+        val chunks = mutableListOf(mutableListOf<Map.Entry<String, Long>>())
+        var size = 0
+        for (entry in stamps.entries.sortedByDescending { it.value }) {
+            // In `uids`, and as a key with its value.
+            val cost = 2 * quoted(entry.key) + quoted(entry.value.toString()) + 3
+            if (size + cost > budget - 256 && chunks.last().isNotEmpty()) {
+                chunks += mutableListOf<Map.Entry<String, Long>>()
+                size = 0
+            }
+            chunks.last() += entry
+            size += cost
+        }
+        val id = java.util.UUID.randomUUID().toString()
+        return chunks.mapIndexed { index, chunk ->
+            NetworkPacket(DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS).apply {
+                this["uids"] = chunk.map { it.key }
+                chunk.forEach { (uid, stamp) -> this[uid] = stamp.toString() }
+                this["sharing"] = true
+                if (chunks.size > 1) {
+                    this["snapshot"] = id
+                    this["part"] = index + 1
+                    this["parts"] = chunks.size
+                }
+            }
+        }
     }
 
     /** Sharing is off (or there is no permission): the desk deletes its whole cache for this phone. */
@@ -75,10 +94,10 @@ object ContactsBook {
             size = 0
         }
         for ((uid, card) in cards) {
-            // UTF-8 bytes; JSON escapes CR/LF as two characters each.
-            val cost = 2 * uid.length + card.toByteArray().size + card.count { it == '\n' || it == '\r' } + 16
-            if (cost > budget) continue // ponytail: one oversized card is skipped; the desk asks again after the next snapshot
-            if (size + cost > budget - 64) flush()
+            // As JSON (escapes counted): in `uids`, and as a key with its card.
+            val cost = 2 * quoted(uid) + quoted(card) + 3
+            if (cost > budget - 256) continue // ponytail: one oversized card is skipped; the desk asks again after the next snapshot
+            if (size + cost > budget - 256) flush()
             batch += uid to card
             size += cost
         }

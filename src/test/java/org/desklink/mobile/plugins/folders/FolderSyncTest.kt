@@ -145,6 +145,16 @@ class FolderSyncTest {
         assertTrue(long.endsWith(" (conflict from Pixel 1970-01-01).txt"))
     }
 
+
+    /** A pair at its 20,000-file bound: the manifest splits into parts that each cross the data channel. */
+    @Test
+    fun aFullManifestSplitsIntoPartsThatCross() {
+        val manifest = (0 until FolderSync.MAX_FILES).associate { "folder-$it/${"n".repeat(60)}-$it.jpg" to entry(sha("$it"), it.toLong(), 1) }
+        val packets = FolderEngine.manifestPackets("pair-1", manifest)
+        assertTrue(packets.size in 2..FolderSync.MAX_PARTS)
+        org.desklink.mobile.webrtc.assertAllCross(packets)
+        assertEquals(FolderSync.MAX_FILES, packets.sumOf { it.getJSONArray("entries")!!.length() })
+    }
 }
 
 private fun sha(text: String) = MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }

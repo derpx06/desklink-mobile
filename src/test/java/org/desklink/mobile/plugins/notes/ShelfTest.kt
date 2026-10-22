@@ -105,7 +105,7 @@ class ShelfTest {
     fun anIndexRoundTripBringsAPeerUpToDateAndJunkIsDropped() {
         val desk = Shelf().apply { notes["n"] = note("n", "hello", 10, 0) }
         val phone = Shelf()
-        val (fetches, _) = phone.handle(ShelfKind.NOTES, wire(desk.indexPacket(ShelfKind.NOTES)))
+        val (fetches, _) = phone.handle(ShelfKind.NOTES, wire(desk.indexPackets(ShelfKind.NOTES).single()))
         assertEquals(1, fetches.size)
         assertEquals("fetch", fetches[0].getString("op"))
         val (items, _) = desk.handle(ShelfKind.NOTES, wire(fetches[0]))
@@ -144,8 +144,13 @@ class ShelfTest {
         val values = (0 until 40).map { Shelf.toJson(Note(it.toString(), body = "x".repeat(16 * 1024), created = 1, modified = 1)) }
         val packets = Shelf.itemsPackets(ShelfKind.NOTES, values)
         assertTrue(packets.size >= 6)
-        assertTrue(packets.all { it.serialize().toByteArray().size < 128 * 1024 })
+        org.desklink.mobile.webrtc.assertAllCross(packets)
         assertEquals(40, packets.sumOf { it.getJSONArray("items")!!.length() })
+        // The largest note this phone writes crosses alone, even all newlines (escaped as two bytes).
+        val biggest = "\n".repeat(Shelf.MAX_SYNCABLE_NOTE_BYTES / 2 - 2)
+        assertTrue(Shelf.syncable(biggest))
+        assertFalse(Shelf.syncable(biggest + "\n\n"))
+        org.desklink.mobile.webrtc.assertAllCross(Shelf.itemsPackets(ShelfKind.NOTES, listOf(Shelf.toJson(Note("big", title = "t".repeat(Shelf.MAX_NOTE_TITLE_CHARS), body = biggest, created = 1, modified = 1)))).also { assertEquals(1, it.size) })
 
         val shelf = Shelf()
         shelf.notes["old"] = note("old", "", 1, 0).copy(deleted = true)
@@ -215,6 +220,18 @@ class ShelfTest {
     @Test(expected = IllegalArgumentException::class)
     fun aNewerStoredSchemaIsRefusedNotMisread() {
         Shelf.fromStored(JSONObject().put("version", Shelf.STORED_VERSION + 1))
+    }
+
+    /** A full shelf's index (notes and tombstones at the bound) is split, each part crossing the data channel. */
+    @Test
+    fun aFullIndexIsSplitAndEachPartCrosses() {
+        val shelf = Shelf()
+        (0 until Shelf.MAX_STORED_NOTES).forEach { shelf.notes["${java.util.UUID.randomUUID()}"] = note("n$it", "x", 1_700_000_000_000L + it, 0) }
+        val packets = shelf.indexPackets(ShelfKind.NOTES)
+        assertTrue(packets.size > 1)
+        org.desklink.mobile.webrtc.assertAllCross(packets)
+        assertEquals(Shelf.MAX_STORED_NOTES, packets.sumOf { it.getJSONArray("items")!!.length() })
+        assertEquals(1, Shelf().indexPackets(ShelfKind.SNIPPETS).size)
     }
 
     /** As the peer receives it: serialized and parsed. */

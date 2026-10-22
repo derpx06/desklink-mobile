@@ -64,6 +64,26 @@ data class WebRtcEnvelope(
         const val MAX_PAYLOAD_BYTES = 128 * 1024
         const val MAX_ENVELOPE_BYTES = 256 * 1024
 
+        /**
+         * The largest message ever handed to a data channel. The desk's webrtcbin puts no
+         * `a=max-message-size` in its SDP, so the peer assumes the SCTP default of 64 KiB; a larger
+         * message puts the SCTP association into an error state, which closes every channel and
+         * drops the whole link (and, re-sent after the rebuild, loops forever). Bigger sends fail
+         * here with an ordinary error instead. File chunks are sized to fit (`MAX_CHUNK_BYTES`).
+         */
+        const val MAX_WIRE_MESSAGE_BYTES = 64 * 1024
+
+        /**
+         * What a feature packer may put in one packet (its serialized JSON): base64 makes it 4/3 as
+         * large and the envelope adds a few hundred bytes, so 40 KiB becomes about 55 KiB on the wire,
+         * under [MAX_WIRE_MESSAGE_BYTES].
+         */
+        const val FEATURE_PACKET_BUDGET = 40 * 1024
+
+        /** Why a wire message of [size] bytes may not be sent, or null when it may. */
+        fun wireRefusal(size: Int): String? =
+            if (size > MAX_WIRE_MESSAGE_BYTES) "WebRTC message of $size bytes is over the $MAX_WIRE_MESSAGE_BYTES-byte data-channel limit" else null
+
         fun create(
             deviceId: String,
             sessionId: Long,

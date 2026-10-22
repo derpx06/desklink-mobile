@@ -156,14 +156,30 @@ internal class MprisReceiverCallback : MediaController.Callback {
          * 
          * @return null if no art is available, otherwise a PNG image serialized into a bytearray
          */
-        get() {
-            val displayArt = this.displayArt ?: return null
-            val stream = ByteArrayOutputStream()
-            displayArt.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-            return stream.toByteArray()
-        }
+        get() = displayArt?.let(::cappedJpeg)
 
     companion object {
+        /** Wire size fix: the phone's cover, like the desk's, is a JPEG of at most this, inline in one packet. */
+        const val MAX_ART_BYTES = 24 * 1024
+        /** Its long side. */
+        const val MAX_ART_SIDE = 320
+
+        /** [art] as a JPEG within [MAX_ART_BYTES]: scaled to [MAX_ART_SIDE], then lower quality and smaller until it fits; null if it never does. */
+        fun cappedJpeg(art: Bitmap): ByteArray? {
+            var side = MAX_ART_SIDE
+            while (side >= 64) {
+                val long = maxOf(art.width, art.height).coerceAtLeast(1)
+                val scale = minOf(1f, side.toFloat() / long)
+                val scaled = if (scale < 1f) Bitmap.createScaledBitmap(art, maxOf(1, (art.width * scale).toInt()), maxOf(1, (art.height * scale).toInt()), true) else art
+                for (quality in intArrayOf(85, 70, 55)) {
+                    val bytes = ByteArrayOutputStream().also { scaled.compress(Bitmap.CompressFormat.JPEG, quality, it) }.toByteArray()
+                    if (bytes.isNotEmpty() && bytes.size <= MAX_ART_BYTES) return bytes
+                }
+                side /= 2
+            }
+            return null
+        }
+
         private val PREFERRED_BITMAP_ORDER = arrayOf(MediaMetadata.METADATA_KEY_DISPLAY_ICON, MediaMetadata.METADATA_KEY_ART, MediaMetadata.METADATA_KEY_ALBUM_ART)
 
         private val PREFERRED_URI_ORDER = arrayOf(

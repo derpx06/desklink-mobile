@@ -96,7 +96,7 @@ object Rules {
     /** A2: ids per `fetch`. */
     const val FETCH_IDS = 100
     /** A2: one `items` packet (under the WebRTC payload bound). */
-    const val PACKET_BUDGET = 96 * 1024
+    const val PACKET_BUDGET = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET
     const val TOMBSTONE_DAYS = 30L
     /** A8. */
     const val MAX_HISTORY = 20

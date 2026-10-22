@@ -336,11 +336,12 @@ public class MprisReceiverPlugin extends Plugin {
             Log.w(TAG, "sendAlbumArt: Failed to get art stream");
             return;
         }
+        // Inline, like the desk's covers: payload packets cannot cross the WebRTC feature channel,
+        // and a JPEG of at most 24 KiB keeps the packet inside one 64 KiB message (wire size fix).
         NetworkPacket np = new NetworkPacket(PACKET_TYPE_MPRIS);
-        np.setPayload(new NetworkPacket.Payload(p));
         np.set("player", playerName);
-        np.set("transferringAlbumArt", true);
         np.set("albumArtUrl", artUrl);
+        np.set("albumArtData", android.util.Base64.encodeToString(p, android.util.Base64.NO_WRAP));
         getDevice().sendPacket(np);
     }
 

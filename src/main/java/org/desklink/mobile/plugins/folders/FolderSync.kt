@@ -61,7 +61,7 @@ object FolderSync {
     const val MAX_FILE_BYTES = 4L * 1024 * 1024 * 1024
     const val MAX_NAME_CHARS = 80
     /** P2: one manifest packet, and parts per manifest. */
-    const val PACKET_BUDGET = 96 * 1024
+    const val PACKET_BUDGET = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET
     const val MAX_PARTS = 256
     /** P4. */
     const val REQUEST_PATHS = 64
