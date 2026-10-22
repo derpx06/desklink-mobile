@@ -44,17 +44,13 @@ object WebRtcPacketBridge {
 
     fun channelFor(packet: NetworkPacket): WebRtcChannel = when {
         isReplaceablePointerMotion(packet) -> WebRtcChannel.INPUT_REALTIME
-        packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
-            packet.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER -> WebRtcChannel.INPUT_RELIABLE
+        packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST -> WebRtcChannel.INPUT_RELIABLE
         else -> WebRtcChannel.EVENTS
     }
 
     private fun isReplaceablePointerMotion(packet: NetworkPacket): Boolean {
         val hasMotion = listOf("dx", "dy", "x", "y").any(packet::has)
         if (!hasMotion) return false
-        if (packet.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER) {
-            return !packet.getBoolean("stop", false)
-        }
         if (packet.type != DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST) return false
         val discrete = listOf(
             "singleclick",

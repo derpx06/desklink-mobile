@@ -57,7 +57,6 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_SCREEN_FRAME = "desklink.screen.frame"
     const val PACKET_TYPE_SCREEN_STOP = "desklink.screen.stop"
     const val PACKET_TYPE_SCREEN_ERROR = "desklink.screen.error"
-    const val PACKET_TYPE_PRESENTER = "desklink.presenter"
     const val PACKET_TYPE_CONTACTS_REQUEST = "desklink.contacts.request"
     const val PACKET_TYPE_SMS_REQUEST = "desklink.sms.request"
     const val PACKET_TYPE_TELEPHONY_REQUEST = "desklink.telephony.request"
@@ -65,8 +64,6 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_WEBRTC_SIGNAL_V1 = "desklink.webrtc.signal.v1"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES = "desklink.shareinputdevices"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST = "desklink.shareinputdevices.request"
-    const val PACKET_TYPE_DIGITIZER_SESSION = "desklink.digitizer.session"
-    const val PACKET_TYPE_DIGITIZER = "desklink.digitizer"
 
     /** Desk → phone: the desk's own settings, on feature-ready and on every change. */
     const val PACKET_TYPE_SETTINGS = "desklink.settings"

@@ -1065,10 +1065,7 @@ class WebRtcSessionCoordinator(
                             typing.askToAllow(context, device)
                             return@runCatching
                         }
-                    } else if (
-                        packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
-                        packet.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
-                    ) {
+                    } else if (packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST) {
                         remoteSession.verifyInboundInput(
                             packet,
                             requireNotNull(activeWireBinding) {

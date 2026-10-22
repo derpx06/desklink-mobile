@@ -85,7 +85,7 @@ fun EasterEggScreen() {
             R.drawable.ic_mic_black, R.drawable.ic_pause_black,
             R.drawable.ic_volume_mute, R.drawable.ic_arrow_upward_black_24dp,
             R.drawable.ic_next_black, R.drawable.ic_previous_black,
-            R.drawable.ic_presenter_24dp, R.drawable.ic_key,
+            R.drawable.ic_key,
             R.drawable.ic_keyboard_return_black_24dp, R.drawable.ic_keyboard_hide_36dp,
             R.drawable.desklink_mark, R.drawable.ic_album_art_placeholder,
             R.drawable.ic_arrow_back_black_24dp, R.drawable.share_plugin_action_24dp

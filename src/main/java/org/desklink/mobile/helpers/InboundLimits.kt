@@ -8,7 +8,7 @@ import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
  * their own tighter bounds; this only stops a flood (a bug or a hostile peer) from reaching them.
  */
 object InboundLimits {
-    /** Pointer, pen and presenter streams: a desk sends up to 250 motion packets a second. */
+    /** The pointer stream: a desk sends up to 250 motion packets a second. */
     const val MAX_INPUT_PER_SECOND = 600
 
     /** Every other feature type: 20 a second on average is far above any real feature. */
@@ -20,11 +20,7 @@ object InboundLimits {
     /** A desk notification's icon read into memory (it is shrunk to icon size). */
     const val MAX_NOTIFICATION_ICON_BYTES = 2L * 1024 * 1024
 
-    private val INPUT = setOf(
-        DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST,
-        DeskLinkProtocol.PACKET_TYPE_PRESENTER,
-        DeskLinkProtocol.PACKET_TYPE_DIGITIZER,
-    )
+    private val INPUT = setOf(DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST)
 
     fun isInput(type: String) = type in INPUT
 

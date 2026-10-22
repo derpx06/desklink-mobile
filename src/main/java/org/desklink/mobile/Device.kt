@@ -1193,10 +1193,7 @@ class Device : PacketReceiver {
                 // Remote input is never queued: a stale tap replayed seconds
                 // later is worse than a dropped one, and its lease can only be
                 // minted by the WebRTC coordinator anyway.
-                if (
-                    np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
-                    np.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
-                ) {
+                if (np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST) {
                     callback.onFailure(
                         IllegalStateException(
                             "DeskLink remote control requires the authenticated WebRTC transport",
@@ -1227,8 +1224,7 @@ class Device : PacketReceiver {
                 countSent(deviceId, np.type, false)
                 return false
             }
-            val remoteInput = np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST ||
-                np.type == DeskLinkProtocol.PACKET_TYPE_PRESENTER
+            val remoteInput = np.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST
             if (!remoteInput) {
                 // Ordered against the flush: older queued packets go first, and
                 // no direct send may overtake a batch being flushed. Remote

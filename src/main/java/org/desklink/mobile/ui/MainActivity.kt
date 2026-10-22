@@ -80,11 +80,8 @@ import org.desklink.mobile.R
 import org.desklink.mobile.helpers.DeviceHelper
 import org.desklink.mobile.helpers.security.SslHelper
 import org.desklink.mobile.plugins.Plugin
-import org.desklink.mobile.plugins.digitizer.DigitizerActivity
-import org.desklink.mobile.plugins.mousepad.BigscreenActivity
 import org.desklink.mobile.plugins.mousepad.MousePadActivity
 import org.desklink.mobile.plugins.notifications.NotificationsPlugin
-import org.desklink.mobile.plugins.presenter.PresenterActivity
 import org.desklink.mobile.plugins.screen.PhoneScreenCaptureService
 import org.desklink.mobile.plugins.screen.SessionLiveNotification
 import org.desklink.mobile.plugins.share.SharePlugin
@@ -411,11 +408,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     DeskLinkApplication.getInstance().offerPhoneScreen(id) -> showMessage(getString(R.string.home_share_offered, device.name))
                     else -> onShareInfo()
                 }
-            },
-            onPresenter = {
-                // The presenter closes without its plugin: say why instead of flashing open.
-                if (device.getPlugin(org.desklink.mobile.plugins.presenter.PresenterPlugin::class.java) == null) showMessage(getString(R.string.home_feature_off))
-                else startActivity(Intent(this, PresenterActivity::class.java).putExtra("deviceId", id))
             },
             onPing = { run(menu(R.string.send_ping), R.string.home_pinged) },
             onRing = { run(menu(R.string.ring), R.string.home_rang) },
@@ -895,9 +887,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             add(MoreExtra(R.drawable.sym_mouse, getString(R.string.more_desk_controls), getString(R.string.more_desk_controls_summary)) {
                 startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
             })
-            add(MoreExtra(R.drawable.sym_keyboard, getString(R.string.more_desk_types), getString(R.string.more_desk_types_summary)) {
-                startActivity(Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS))
-            })
             add(MoreExtra(R.drawable.sym_edit_note, getString(R.string.more_notes), getString(R.string.more_notes_summary)) {
                 startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this@MainActivity))
             })
@@ -909,10 +898,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 add(MoreExtra(R.drawable.sym_inventory, getString(R.string.more_bucket), getString(R.string.more_bucket_summary)) {
                     startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this@MainActivity, device.deviceId))
                 })
-                add(MoreExtra(R.drawable.sym_draw, getString(R.string.more_drawing_pad), getString(R.string.feature_desc_digitizer),
-                    open(DigitizerActivity::class.java, org.desklink.mobile.plugins.digitizer.DigitizerPlugin::class.java)))
-                add(MoreExtra(R.drawable.sym_settings_remote, getString(R.string.more_tv_remote), getString(R.string.feature_desc_tv),
-                    open(BigscreenActivity::class.java, org.desklink.mobile.plugins.mousepad.MousePadPlugin::class.java)))
             }
         }
         MoreScreen(

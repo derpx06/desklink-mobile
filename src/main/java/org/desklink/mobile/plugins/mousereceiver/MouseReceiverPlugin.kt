@@ -13,7 +13,6 @@ import androidx.fragment.app.DialogFragment
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
-import org.desklink.mobile.plugins.remotekeyboard.RemoteKeyboardPlugin
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.ui.StartActivityAlertDialogFragment
 import org.desklink.mobile.R
@@ -64,8 +63,8 @@ class MouseReceiverPlugin : Plugin() {
             return AccessibilityTyping.handle(np)
         }
 
-        if (RemoteKeyboardPlugin.getMousePadPacketType(np) != RemoteKeyboardPlugin.MousePadPacketType.Mouse) {
-            return false // This packet will be handled by the remotekeyboard instead, silently ignore
+        if (np.has("key") || np.has("specialKey")) {
+            return false // Keys are typed only into a focused field (above), never moved as a pointer
         }
 
         val dx = np.getDouble("dx", 0.toDouble()).let { if (it < 0) floor(it) else ceil(it) }.toInt()

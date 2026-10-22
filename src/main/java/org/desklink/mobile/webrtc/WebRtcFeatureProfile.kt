@@ -31,8 +31,6 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS,
         DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS,
         DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_VCARDS,
-        DeskLinkProtocol.PACKET_TYPE_DIGITIZER,
-        DeskLinkProtocol.PACKET_TYPE_DIGITIZER_SESSION,
         DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_HANDOFF,
         DeskLinkProtocol.PACKET_TYPE_LOCK,

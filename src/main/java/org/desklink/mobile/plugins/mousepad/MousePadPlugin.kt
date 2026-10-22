@@ -11,9 +11,6 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.Choreographer
-import android.view.KeyEvent
-import androidx.preference.PreferenceManager
-import org.desklink.mobile.DeviceType
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.PluginFactory.LoadablePlugin
@@ -44,26 +41,8 @@ class MousePadPlugin : Plugin() {
             intent.putExtra("deviceId", device.deviceId)
             parentActivity.startActivity(intent)
         }
-        return if (device.deviceType == DeviceType.TV) {
-            val tvInput = PluginUiButton(
-                context.getString(R.string.open_mousepad_tv),
-                R.drawable.tv_remote_24px
-            ) { parentActivity ->
-                val intent = Intent(parentActivity, BigscreenActivity::class.java)
-                intent.putExtra("deviceId", device.deviceId)
-                parentActivity.startActivity(intent)
-            }
-            val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-            if (prefs.getBoolean(context.getString(R.string.pref_bigscreen_hide_mouse_input), false)) {
-                listOf(tvInput)
-            } else {
-                listOf(mouseAndKeyboardInput, tvInput)
-            }
-        } else {
-            listOf(mouseAndKeyboardInput)
-        }
+        return listOf(mouseAndKeyboardInput)
     }
-
 
     override val description: String
         get() = context.getString(R.string.pref_plugin_mousepad_desc_nontv)
@@ -71,11 +50,7 @@ class MousePadPlugin : Plugin() {
     override fun hasSettings(): Boolean = true
 
     override fun getSettingsFragment(activity: Activity): PluginSettingsFragment? {
-        return if (device.deviceType == DeviceType.TV) {
-            newInstance(pluginKey, R.xml.mousepadplugin_preferences, R.xml.mousepadplugin_preferences_tv)
-        } else {
-            newInstance(pluginKey, R.xml.mousepadplugin_preferences)
-        }
+        return newInstance(pluginKey, R.xml.mousepadplugin_preferences)
     }
 
     /** Replaced by tests; the app sends motion on the next vsync. */
@@ -166,49 +141,6 @@ class MousePadPlugin : Plugin() {
         np["scroll"] = true
         np["dx"] = dx
         np["dy"] = dy
-        sendPacket(np)
-    }
-
-    fun sendLeft() {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_DPAD_LEFT)
-        sendPacket(np)
-    }
-
-    fun sendRight() {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_DPAD_RIGHT)
-        sendPacket(np)
-    }
-
-    fun sendUp() {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_DPAD_UP)
-        sendPacket(np)
-    }
-
-    fun sendDown() {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_DPAD_DOWN)
-        sendPacket(np)
-    }
-
-    fun sendSelect() {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_ENTER)
-        sendPacket(np)
-    }
-
-    fun sendHome() {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["alt"] = true
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_F4)
-        sendPacket(np)
-    }
-
-    fun sendBack() {
-        val np = NetworkPacket(PACKET_TYPE_MOUSEPAD_REQUEST)
-        np["specialKey"] = KeyListenerView.SpecialKeysMap.get(KeyEvent.KEYCODE_ESCAPE)
         sendPacket(np)
     }
 

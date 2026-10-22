@@ -156,19 +156,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:theme="@style/Theme.Transparent" />
-        <service
-            android:name="org.desklink.mobile.plugins.remotekeyboard.RemoteKeyboardService"
-            android:label="@string/remote_keyboard_service"
-            android:exported="true"
-            android:permission="android.permission.BIND_INPUT_METHOD">
-            <intent-filter>
-                <action android:name="android.view.InputMethod" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.view.im"
-                android:resource="@xml/remotekeyboardplugin_method" />
-        </service>
 
         <activity
             android:name="org.desklink.mobile.ui.MainActivity"
@@ -313,17 +300,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         </receiver>
 
         <activity
-            android:name="org.desklink.mobile.plugins.mousepad.BigscreenActivity"
-            android:configChanges="orientation|keyboardHidden|screenSize"
-            android:label="@string/pref_plugin_bigscreen"
-            android:exported="true"
-            android:parentActivityName="org.desklink.mobile.ui.MainActivity"
-            android:windowSoftInputMode="stateHidden|adjustResize">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="org.desklink.mobile.ui.MainActivity" />
-        </activity>
-        <activity
             android:name="org.desklink.mobile.plugins.mousepad.MousePadActivity"
             android:label="@string/pref_plugin_mousepad"
             android:exported="false"
@@ -389,41 +365,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity-alias>
-        <activity
-            android:name="org.desklink.mobile.plugins.mousepad.ComposeSendActivity"
-            android:label="@string/compose_send_title"
-            android:exported="false"
-            android:parentActivityName="org.desklink.mobile.plugins.mousepad.MousePadActivity"
-            android:windowSoftInputMode="adjustResize">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="org.desklink.mobile.plugins.mousepad.MousePadActivity" />
-        </activity>
-        <activity
-            android:name="org.desklink.mobile.plugins.mousepad.SendKeystrokesToHostActivity"
-            android:label="@string/pref_plugin_mousepad_send_keystrokes"
-            android:exported="true"
-            android:parentActivityName="org.desklink.mobile.ui.MainActivity">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="org.desklink.mobile.ui.MainActivity" />
-            <intent-filter>
-                <action android:name="android.intent.action.SEND"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <data android:mimeType="text/x-keystrokes"/>
-            </intent-filter>
-        </activity>
-        <activity
-            android:name="org.desklink.mobile.plugins.presenter.PresenterActivity"
-            android:configChanges="orientation|keyboardHidden|screenSize"
-            android:label="@string/pref_plugin_presenter"
-            android:exported="false"
-            android:parentActivityName="org.desklink.mobile.ui.MainActivity"
-            android:windowSoftInputMode="stateHidden|adjustResize">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="org.desklink.mobile.ui.MainActivity" />
-        </activity>
         <activity
             android:name="org.desklink.mobile.plugins.share.ShareActivity"
             android:exported="true"
@@ -516,17 +457,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
                 android:value="org.desklink.mobile.ui.PluginSettingsActivity" />
         </activity>
 
-        <activity
-            android:name="org.desklink.mobile.plugins.digitizer.DigitizerActivity"
-            android:configChanges="orientation|screenSize"
-            android:label="@string/pref_plugin_digitizer"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:parentActivityName="org.desklink.mobile.ui.MainActivity">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="org.desklink.mobile.ui.MainActivity" />
-        </activity>
 
         <activity
             android:name="org.desklink.mobile.ui.TrustedNetworksActivity"
