@@ -162,7 +162,6 @@ data class DeskSettings(
 )
 
 class SettingsActions(
-    val onBack: () -> Unit,
     /** This phone's own clipboard and notifications plugins (phone settings). */
     val onPhoneClipboard: (Boolean) -> Unit,
     val onPhoneNotifications: (Boolean) -> Unit,
@@ -178,7 +177,11 @@ class SettingsActions(
     val onDeskSoundVolume: (Int) -> Unit = {},
     val onDeskMayPlay: (Boolean) -> Unit = {},
     val onContacts: (Boolean) -> Unit = {},
-    val onMore: () -> Unit,
+    val onPairAnother: () -> Unit = {},
+    val onSendClipboard: () -> Unit = {},
+    val onChooseNotificationApps: () -> Unit = {},
+    val onAddTiles: () -> Unit = {},
+    val onOpenBucket: () -> Unit = {},
     val onUnpair: () -> Unit,
     val onEncryptionInfo: () -> Unit,
     /** The theme or wallpaper colours changed: the activity is recreated to apply them. */
@@ -187,10 +190,11 @@ class SettingsActions(
 )
 
 @Composable
-private fun SettingsColumn(title: String, onBack: () -> Unit, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsColumn(title: String, onBack: (() -> Unit)?, subtitle: String? = null, content: @Composable ColumnScope.() -> Unit) {
     val t = tokens
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-        ScreenHeader(onBack)
+        // A tab's first page has no back arrow: the bar below is how you leave it.
+        if (onBack != null) ScreenHeader(onBack) else Spacer(Modifier.height(8.dp))
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             LargeTitle(title, subtitle = subtitle)
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -203,7 +207,7 @@ private fun SettingsColumn(title: String, onBack: () -> Unit, subtitle: String? 
 
 /** Bumps on every resume: permissions and system settings change while the person is away. */
 @Composable
-private fun rememberResumeTick(): Int {
+internal fun rememberResumeTick(): Int {
     var tick by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { tick++ }
     return tick
@@ -211,13 +215,9 @@ private fun rememberResumeTick(): Int {
 
 // ---- settings ------------------------------------------------------------------------------------------------
 
-/**
- * "Automatic sync (advanced)", KDE Connect's way: READ_LOGS, granted only over adb, lets DeskLink
- * see Android refuse it a new copy and read it for a moment. Never required.
- */
 /** The desk's sound here: 0–100 %, applied as the slider moves. */
 @Composable
-private fun DeskSoundVolume(volume: Int, onChange: (Int) -> Unit) {
+internal fun DeskSoundVolume(volume: Int, onChange: (Int) -> Unit) {
     var value by remember(volume) { mutableFloatStateOf(volume.toFloat()) }
     val label = stringResource(R.string.settings_desk_sound_volume)
     androidx.compose.foundation.layout.Row(
@@ -240,7 +240,7 @@ private fun needsOemSwitch(): Boolean =
 
 @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
 @Composable
-private fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.SharedPreferences, onMessage: (String) -> Unit, changed: () -> Unit) {
+internal fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.SharedPreferences, onMessage: (String) -> Unit, changed: () -> Unit) {
     val context = LocalContext.current
     val listener = org.desklink.mobile.plugins.clipboard.ClipboardListener
     val resumed = rememberResumeTick()
@@ -291,342 +291,6 @@ private fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.Share
     }
 }
 
-@Composable
-fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
-    val context = LocalContext.current
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    @Suppress("UNUSED_VARIABLE") val resumed = rememberResumeTick()
-    var revision by remember { mutableIntStateOf(0) }
-    @Suppress("UNUSED_EXPRESSION") revision
-    var editingName by rememberSaveable { mutableStateOf(false) }
-    var choosingTheme by rememberSaveable { mutableStateOf(false) }
-    var confirmUnpair by rememberSaveable { mutableStateOf(false) }
-    val t = tokens
-
-    SettingsColumn(stringResource(R.string.settings), actions.onBack) {
-        SectionLabel(stringResource(R.string.settings_category_general))
-        RowGroup {
-            GroupRow(
-                stringResource(R.string.settings_phone_name),
-                icon = R.drawable.sym_badge,
-                subtitle = DeviceHelper.getDeviceName(context),
-                monoSubtitle = true,
-                onClick = { editingName = true },
-            ) { Icon(painterResource(R.drawable.sym_edit), contentDescription = null, tint = t.textDim, modifier = Modifier.size(20.dp)) }
-            val themeValues = stringArrayResource(R.array.theme_list_values)
-            val themeNames = stringArrayResource(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) R.array.theme_list_v28 else R.array.theme_list)
-            val theme = prefs.getString(KEY_APP_THEME, ThemeUtil.DEFAULT_MODE) ?: ThemeUtil.DEFAULT_MODE
-            GroupRow(
-                stringResource(R.string.settings_theme),
-                icon = R.drawable.sym_dark_mode,
-                subtitle = themeNames.getOrNull(themeValues.indexOf(theme)),
-                onClick = { choosingTheme = true },
-            ) { Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = t.textDim, modifier = Modifier.size(20.dp)) }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                GroupRow(
-                    stringResource(R.string.setting_dynamic_colors),
-                    icon = R.drawable.sym_palette,
-                    subtitle = stringResource(R.string.settings_dynamic_colors_summary),
-                    checked = prefs.getBoolean(ThemeUtil.KEY_DYNAMIC_COLORS, false),
-                    onClick = {
-                        prefs.edit { putBoolean(ThemeUtil.KEY_DYNAMIC_COLORS, !prefs.getBoolean(ThemeUtil.KEY_DYNAMIC_COLORS, false)) }
-                        actions.onRecreate()
-                    },
-                )
-            }
-            GroupRow(
-                stringResource(R.string.settings_connect_on_startup),
-                icon = R.drawable.sym_restart_alt,
-                subtitle = stringResource(R.string.settings_connect_on_startup_summary),
-                checked = prefs.getBoolean(KEY_CONNECT_ON_STARTUP, true),
-                onClick = { prefs.edit { putBoolean(KEY_CONNECT_ON_STARTUP, !prefs.getBoolean(KEY_CONNECT_ON_STARTUP, true)) }; revision++ },
-            )
-            // Phone-only: a fingerprint or screen-lock check before Terminals and the desk screen.
-            val canCheck = org.desklink.mobile.ui.Biometrics.available(context, org.desklink.mobile.ui.Biometrics.STRONG_OR_CREDENTIAL)
-            GroupRow(
-                stringResource(R.string.settings_session_gate),
-                icon = R.drawable.sym_fingerprint,
-                subtitle = stringResource(if (canCheck) R.string.settings_session_gate_summary else R.string.settings_session_gate_no_lock),
-                checked = canCheck && prefs.getBoolean(org.desklink.mobile.ui.SessionGate.KEY_PHONE_GATE, false),
-                enabled = canCheck,
-                onClick = {
-                    prefs.edit { putBoolean(org.desklink.mobile.ui.SessionGate.KEY_PHONE_GATE, !prefs.getBoolean(org.desklink.mobile.ui.SessionGate.KEY_PHONE_GATE, false)) }
-                    revision++
-                },
-            )
-        }
-
-        PermissionsSection(desk)
-
-        if (desk != null) {
-            DeskSection(desk, actions)
-            // Settings of this phone, not of the desk: each written only here.
-            SectionLabel(stringResource(R.string.settings_this_phone))
-            RowGroup {
-                GroupRow(
-                    stringResource(R.string.settings_phone_clipboard),
-                    icon = R.drawable.sym_content_paste,
-                    subtitle = clipboardSummary(desk.name),
-                    checked = desk.clipboardOn,
-                    onClick = { actions.onPhoneClipboard(!desk.clipboardOn) },
-                )
-                if (desk.clipboardOn && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    ClipboardAutoSyncRows(desk.name, prefs, actions.onMessage) { revision++ }
-                }
-                GroupRow(
-                    stringResource(R.string.settings_phone_notifications, desk.name),
-                    icon = R.drawable.sym_notifications,
-                    subtitle = stringResource(R.string.settings_desk_notifications_summary),
-                    checked = desk.notificationsOn,
-                    onClick = { actions.onPhoneNotifications(!desk.notificationsOn) },
-                )
-                GroupRow(
-                    stringResource(R.string.settings_desk_notifications_here, desk.name),
-                    icon = R.drawable.sym_notifications_active,
-                    subtitle = stringResource(R.string.settings_desk_notifications_here_summary, desk.name),
-                    checked = desk.deskNotificationsOn,
-                    onClick = { actions.onDeskNotifications(!desk.deskNotificationsOn) },
-                )
-                GroupRow(
-                    stringResource(R.string.settings_desk_sound, desk.name),
-                    icon = R.drawable.sym_volume_up,
-                    subtitle = stringResource(R.string.settings_desk_sound_summary, desk.name),
-                    checked = desk.deskSoundOn,
-                    onClick = { actions.onDeskSound(!desk.deskSoundOn) },
-                )
-                GroupRow(
-                    stringResource(R.string.settings_desk_may_play, desk.name),
-                    icon = R.drawable.sym_volume_up,
-                    subtitle = stringResource(R.string.settings_desk_may_play_summary, desk.name),
-                    checked = desk.deskMayPlay,
-                    onClick = { actions.onDeskMayPlay(!desk.deskMayPlay) },
-                )
-                if (desk.deskSoundOn || desk.deskMayPlay) DeskSoundVolume(desk.deskSoundVolume, actions.onDeskSoundVolume)
-                GroupRow(
-                    stringResource(R.string.settings_type_on_phone, desk.name),
-                    icon = R.drawable.sym_keyboard,
-                    subtitle = stringResource(
-                        when {
-                            !desk.typeOnPhoneOn -> R.string.settings_type_on_phone_off
-                            !desk.accessibilityOn -> R.string.settings_type_on_phone_service
-                            else -> R.string.settings_type_on_phone_on
-                        },
-                        desk.name,
-                    ),
-                    checked = desk.typeOnPhoneOn,
-                    onClick = {
-                        actions.onTypeOnPhone(!desk.typeOnPhoneOn)
-                        if (!desk.typeOnPhoneOn && !desk.accessibilityOn) AccessibilitySetupActivity.open(context)
-                    },
-                )
-                GroupRow(
-                    stringResource(R.string.settings_glide, desk.name),
-                    icon = R.drawable.sym_mouse,
-                    subtitle = when {
-                        !desk.glideOn -> stringResource(R.string.settings_glide_off, desk.name)
-                        !desk.accessibilityOn -> stringResource(R.string.settings_glide_accessibility, desk.name)
-                        else -> stringResource(R.string.settings_glide_on)
-                    },
-                    checked = desk.glideOn,
-                    onClick = {
-                        actions.onGlide(!desk.glideOn)
-                        // The accessibility service is asked for only now, with the steps past "Restricted setting".
-                        if (!desk.glideOn && !desk.accessibilityOn) AccessibilitySetupActivity.open(context)
-                    },
-                )
-                GroupRow(
-                    stringResource(R.string.settings_phone_media, desk.name),
-                    icon = R.drawable.sym_music_note,
-                    subtitle = stringResource(R.string.settings_phone_media_summary),
-                    checked = desk.phoneMediaOn,
-                    onClick = { actions.onPhoneMedia(!desk.phoneMediaOn) },
-                )
-                // Without a relay address the switch has nothing to turn on: say so, and wait for one.
-                val configured = RelaySettings.configured(context)
-                val relayOn = configured && prefs.getBoolean(RelaySettings.KEY_ENABLED, true)
-                GroupRow(
-                    stringResource(R.string.settings_phone_relay),
-                    icon = R.drawable.sym_public,
-                    subtitle = if (!configured) {
-                        stringResource(R.string.settings_relay_not_set_up)
-                    } else {
-                        listOfNotNull(stringResource(R.string.settings_reach_anywhere_summary), relayStatusText().takeIf { relayOn }).joinToString(" · ")
-                    },
-                    checked = relayOn,
-                    enabled = configured,
-                    onClick = {
-                        prefs.edit { putBoolean(RelaySettings.KEY_ENABLED, !relayOn) }
-                        relaySettingChanged()
-                        revision++
-                    },
-                )
-                GroupRow(
-                    stringResource(R.string.settings_calls_on, desk.name),
-                    icon = R.drawable.sym_call,
-                    subtitle = stringResource(R.string.settings_calls_on_summary, desk.name),
-                    checked = desk.callsOn,
-                    onClick = { actions.onCalls(!desk.callsOn) },
-                )
-                if (desk.callsOn) {
-                    GroupRow(
-                        stringResource(R.string.settings_show_caller, desk.name),
-                        icon = R.drawable.sym_person,
-                        subtitle = stringResource(R.string.settings_show_caller_summary),
-                        checked = desk.showCaller,
-                        onClick = { actions.onShowCaller(!desk.showCaller) },
-                    )
-                }
-                GroupRow(
-                    stringResource(R.string.settings_contacts_share, desk.name),
-                    icon = R.drawable.sym_badge,
-                    subtitle = when {
-                        !desk.contactsOn -> stringResource(R.string.settings_contacts_share_off, desk.name)
-                        !desk.contactsReadable -> stringResource(R.string.settings_contacts_share_permission, desk.name)
-                        else -> stringResource(R.string.settings_contacts_share_on, desk.name)
-                    },
-                    checked = desk.contactsOn,
-                    onClick = { actions.onContacts(!desk.contactsOn) },
-                )
-            }
-        }
-
-        RowGroup {
-            GroupRow(stringResource(R.string.settings_more), icon = R.drawable.sym_tune, subtitle = stringResource(R.string.settings_more_summary), onClick = actions.onMore) { Chevron() }
-        }
-
-        if (desk != null) {
-            RowGroup {
-                Row(
-                    Modifier.fillMaxWidth().background(t.surface).clickable(onClick = actions.onEncryptionInfo).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    LaptopGlyph(t.textDim)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(desk.name, fontFamily = MonoFamily, fontSize = 15.sp)
-                        Text(stringResource(R.string.settings_paired_key, desk.key), fontSize = 13.sp, color = t.textDim)
-                    }
-                }
-                GroupRow(
-                    stringResource(R.string.device_menu_unpair),
-                    icon = R.drawable.sym_link_off,
-                    titleColor = t.red,
-                    iconTint = t.red,
-                    onClick = { confirmUnpair = true },
-                )
-            }
-        }
-    }
-
-    val invalidName = stringResource(R.string.invalid_device_name)
-    if (editingName) {
-        TextDialog(
-            title = stringResource(R.string.device_rename_title),
-            initial = DeviceHelper.getDeviceName(context),
-            confirm = stringResource(R.string.device_rename_confirm),
-            filter = { filterInvalidCharactersFromDeviceName(it).take(DeviceHelper.MAX_DEVICE_NAME_LENGTH) },
-            onDismiss = { editingName = false },
-        ) { name ->
-            editingName = false
-            if (name.isBlank()) {
-                actions.onMessage(invalidName)
-            } else {
-                // MainActivity listens for this key and announces the new name.
-                prefs.edit { putString(DeviceHelper.KEY_DEVICE_NAME_PREFERENCE, name) }
-                revision++
-            }
-        }
-    }
-    if (choosingTheme) {
-        val values = stringArrayResource(R.array.theme_list_values)
-        val names = stringArrayResource(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) R.array.theme_list_v28 else R.array.theme_list)
-        ChoiceDialog(
-            title = stringResource(R.string.settings_theme),
-            options = names.toList(),
-            selected = values.indexOf(prefs.getString(KEY_APP_THEME, ThemeUtil.DEFAULT_MODE)),
-            onDismiss = { choosingTheme = false },
-        ) { index ->
-            choosingTheme = false
-            prefs.edit { putString(KEY_APP_THEME, values[index]) }
-            ThemeUtil.applyTheme(values[index])
-        }
-    }
-    if (confirmUnpair && desk != null) {
-        AlertDialog(
-            onDismissRequest = { confirmUnpair = false },
-            title = { Text(stringResource(R.string.device_unpair_title, desk.name)) },
-            text = { Text(stringResource(R.string.device_unpair_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = { confirmUnpair = false; actions.onUnpair() },
-                    colors = ButtonDefaults.textButtonColors(contentColor = t.red),
-                ) { Text(stringResource(R.string.device_menu_unpair)) }
-            },
-            dismissButton = { TextButton(onClick = { confirmUnpair = false }) { Text(stringResource(R.string.cancel)) } },
-        )
-    }
-}
-
-/**
- * The desk's own settings: the desk is their only writer. A switch here asks it; the row shows the
- * asked value as pending until the desk's next report. Without the feature link (or before the
- * desk's first report) the rows are shown disabled, "Waiting for <desk>…".
- */
-@Composable
-private fun DeskSection(desk: DeskSettings, actions: SettingsActions) {
-    val remote = desk.remote
-    val live = desk.ready && remote != null
-    val waiting = stringResource(R.string.settings_waiting_for, desk.name)
-    val saving = stringResource(R.string.settings_saving)
-    SectionLabel(desk.name)
-    RowGroup {
-        @Composable
-        fun deskRow(key: String, title: String, icon: Int, summary: String, reported: Boolean) {
-            val pending = key in desk.pending
-            val on = org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.shown(key, reported, desk.pending)
-            GroupRow(
-                title,
-                icon = icon,
-                subtitle = when {
-                    !live -> waiting
-                    pending -> saving
-                    else -> summary
-                },
-                checked = on,
-                enabled = live && !pending,
-                onClick = { actions.onDeskSetting(key, !on) },
-            )
-        }
-        val keys = org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin
-        deskRow(keys.CLIPBOARD, stringResource(R.string.home_clipboard_sync), R.drawable.sym_content_paste, stringResource(R.string.settings_desk_clipboard_summary, desk.name), remote?.clipboard == true)
-        deskRow(keys.NOTIFICATIONS, stringResource(R.string.settings_desk_notifications), R.drawable.sym_notifications, stringResource(R.string.settings_desk_shows_notifications, desk.name), remote?.notifications == true)
-        deskRow(keys.KEEP_AWAKE, stringResource(R.string.settings_keep_awake, desk.name), R.drawable.sym_coffee, stringResource(R.string.settings_keep_awake_summary), remote?.keepAwake == true)
-        deskRow(keys.COMMAND_ALERTS, stringResource(R.string.settings_command_alerts), R.drawable.sym_notifications_active, stringResource(R.string.settings_command_alerts_summary), remote?.commandAlerts == true)
-        if (remote?.relayConfigured == true) {
-            deskRow(keys.RELAY, stringResource(R.string.settings_desk_relay, desk.name), R.drawable.sym_public, stringResource(R.string.settings_reach_anywhere_summary), remote.relay)
-        }
-        // Read-only: set at the desk.
-        GroupRow(
-            stringResource(R.string.settings_unlock_nearby),
-            icon = R.drawable.sym_lock_open,
-            subtitle = when {
-                !live -> waiting
-                remote?.unlockNearby == true -> stringResource(R.string.settings_unlock_nearby_on, desk.name)
-                else -> stringResource(R.string.settings_unlock_nearby_off, desk.name)
-            },
-            enabled = live,
-        )
-        remote?.sessionPasswordSet?.let { set ->
-            GroupRow(
-                stringResource(R.string.settings_session_password),
-                icon = R.drawable.sym_fingerprint,
-                subtitle = if (!live) waiting else stringResource(if (set) R.string.settings_session_password_set else R.string.settings_session_password_unset, desk.name),
-                enabled = live,
-            )
-        }
-    }
-}
-
 /** Exactly when the clipboard syncs: Android 10+ keeps background apps off it unless automatic sync is on. */
 @Composable
 fun clipboardSummary(deskName: String): String {
@@ -639,11 +303,11 @@ fun clipboardSummary(deskName: String): String {
 }
 
 @Composable
-private fun Chevron() = Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = tokens.textDim, modifier = Modifier.size(20.dp))
+internal fun Chevron() = Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = tokens.textDim, modifier = Modifier.size(20.dp))
 
 // ---- permissions ------------------------------------------------------------------------------------------------
 
-private class PermissionRow(
+internal class PermissionRow(
     @DrawableRes val icon: Int,
     val title: String,
     val summary: String,
@@ -658,7 +322,7 @@ fun needsOemBackgroundSetting(manufacturer: String): Boolean =
     manufacturer.lowercase() in setOf("oppo", "realme", "oneplus", "xiaomi", "redmi", "poco", "vivo", "iqoo", "huawei", "honor", "meizu", "asus", "tecno", "infinix")
 
 @Composable
-private fun PermissionsSection(desk: DeskSettings?) {
+internal fun PermissionsSection(desk: DeskSettings?) {
     val context = LocalContext.current
     val t = tokens
     val tick = rememberResumeTick()
@@ -701,11 +365,15 @@ private fun PermissionsSection(desk: DeskSettings?) {
     }
 }
 
+/** How many permissions a feature needs that are still missing (the amber dot on the Settings tab). */
+fun waitingPermissions(context: Context, deskName: String, extra: Int = 0): Int =
+    permissionRows(context, deskName) { }.count { !it.granted && !it.unknown } + extra
+
 @Composable
 private fun pluralsString(id: Int, count: Int) = androidx.compose.ui.res.pluralStringResource(id, count, count)
 
 /** The permissions DeskLink uses here, each with the system screen that grants it. */
-private fun permissionRows(context: Context, desk: String, request: (Array<String>) -> Unit): List<PermissionRow> {
+internal fun permissionRows(context: Context, desk: String, request: (Array<String>) -> Unit): List<PermissionRow> {
     fun granted(permission: String) = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
     fun open(intent: Intent) = {
         runCatching { context.startActivity(intent) }.onFailure {
@@ -760,153 +428,6 @@ private fun permissionRows(context: Context, desk: String, request: (Array<Strin
             AccessibilitySetupActivity.running(),
             allow = { AccessibilitySetupActivity.open(context) },
         ))
-    }
-}
-
-// ---- more ----------------------------------------------------------------------------------------------------------
-
-/** One extra a plugin offers on the selected computer; null [open] when that plugin is off. */
-class MoreExtra(@DrawableRes val icon: Int, val title: String, val summary: String, val open: (() -> Unit)?)
-
-@Composable
-fun MoreScreen(
-    extras: List<MoreExtra>,
-    onFeatures: (() -> Unit)?,
-    onNetwork: () -> Unit,
-    onAbout: () -> Unit,
-    onBack: () -> Unit,
-    onMessage: (String) -> Unit,
-) {
-    val context = LocalContext.current
-    val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
-    var revision by remember { mutableIntStateOf(0) }
-    @Suppress("UNUSED_EXPRESSION") revision
-    rememberResumeTick()
-    val btRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        if (result.values.all { it }) {
-            prefs.edit { putBoolean(KEY_BLUETOOTH_ENABLED, true) }
-            revision++
-        }
-    }
-    val exportLogs = rememberLauncherForActivityResult(CreateFileResultContract()) { uri: Uri? ->
-        val output = uri?.let { context.contentResolver.openOutputStream(it) } ?: return@rememberLauncherForActivityResult
-        CoroutineScope(Dispatchers.IO).launch {
-            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d"))
-            val reader = InputStreamReader(process.inputStream)
-            output.use {
-                it.write("DeskLink ${BuildConfig.VERSION_NAME}\n".toByteArray(Charsets.UTF_8))
-                it.write("Android ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})\n".toByteArray(Charsets.UTF_8))
-                IOUtils.copy(reader, it, Charsets.UTF_8)
-            }
-        }
-    }
-    val disabled = stringResource(R.string.settings_more_turn_on)
-    // Back from the trusted networks: discovery re-reads them at once.
-    val trustedNetworks = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        BackgroundService.instance?.onNetworkChange(null)
-    }
-    val customDevices = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { revision++ }
-
-    SettingsColumn(stringResource(R.string.settings_more), onBack) {
-        SectionLabel(stringResource(R.string.settings_more_extras))
-        RowGroup {
-            extras.forEach { extra ->
-                GroupRow(extra.title, icon = extra.icon, subtitle = if (extra.open == null) disabled else extra.summary, enabled = extra.open != null, onClick = extra.open ?: {}) { if (extra.open != null) Chevron() }
-            }
-            GroupRow(
-                stringResource(R.string.settings_clipboard_tile),
-                icon = R.drawable.sym_content_paste,
-                subtitle = stringResource(R.string.settings_clipboard_tile_summary),
-                onClick = { addClipboardTile(context, onMessage) },
-            )
-            onFeatures?.let { GroupRow(stringResource(R.string.device_features), icon = R.drawable.sym_tune, subtitle = stringResource(R.string.settings_features_summary), onClick = it) { Chevron() } }
-        }
-
-        SectionLabel(stringResource(R.string.settings_category_connection))
-        RowGroup {
-            GroupRow(stringResource(R.string.trusted_networks), subtitle = stringResource(R.string.trusted_networks_desc), onClick = { trustedNetworks.launch(Intent(context, TrustedNetworksActivity::class.java)) })
-            GroupRow(
-                stringResource(R.string.custom_device_list),
-                subtitle = stringResource(R.string.custom_devices_settings_summary, CustomDevicesActivity.getCustomDeviceList(context).size),
-                onClick = { customDevices.launch(Intent(context, CustomDevicesActivity::class.java)) },
-            )
-            val bluetooth = prefs.getBoolean(KEY_BLUETOOTH_ENABLED, false)
-            GroupRow(stringResource(R.string.setting_bluetooth), checked = bluetooth, onClick = {
-                val permissions = arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
-                if (!bluetooth && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                    !permissions.all { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
-                ) {
-                    btRequest.launch(permissions)
-                } else {
-                    prefs.edit { putBoolean(KEY_BLUETOOTH_ENABLED, !bluetooth) }
-                    revision++
-                }
-            })
-            GroupRow(stringResource(R.string.setting_advanced_network), subtitle = stringResource(R.string.setting_advanced_network_summary), onClick = onNetwork) { Chevron() }
-        }
-
-        SectionLabel(stringResource(R.string.settings_category_notifications))
-        RowGroup {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                GroupRow(
-                    stringResource(R.string.setting_persistent_notification_oreo),
-                    subtitle = stringResource(R.string.setting_persistent_notification_description),
-                    onClick = {
-                        context.startActivity(
-                            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                .putExtra(Settings.EXTRA_CHANNEL_ID, NotificationHelper.Channels.PERSISTENT),
-                        )
-                    },
-                ) { Icon(painterResource(R.drawable.sym_open_in_new), contentDescription = null, tint = tokens.textDim, modifier = Modifier.size(20.dp)) }
-            } else {
-                GroupRow(stringResource(R.string.setting_persistent_notification), checked = NotificationHelper.isPersistentNotificationEnabled(context), onClick = {
-                    val on = !NotificationHelper.isPersistentNotificationEnabled(context)
-                    NotificationHelper.setPersistentNotificationEnabled(context, on)
-                    BackgroundService.instance?.changePersistentNotificationVisibility(on)
-                    revision++
-                })
-            }
-        }
-
-        SectionLabel(stringResource(R.string.settings_category_help))
-        RowGroup {
-            GroupRow(stringResource(R.string.settings_export_logs), subtitle = stringResource(R.string.settings_export_logs_text), onClick = { exportLogs.launch(CreateFileParams("text/plain", "desklink-log.txt")) })
-            val privacyUrl = stringResource(R.string.privacy_policy_url)
-            GroupRow(stringResource(R.string.privacy_policy), subtitle = stringResource(R.string.privacy_policy_summary), onClick = {
-                context.startActivity(Intent(Intent.ACTION_VIEW, privacyUrl.toUri()))
-            })
-            GroupRow(stringResource(R.string.about), onClick = onAbout) { Chevron() }
-        }
-
-        if (BuildConfig.DEBUG) {
-            SectionLabel(stringResource(R.string.settings_category_debug))
-            RowGroup {
-                for ((key, title, summary) in listOf(
-                    Triple(RelaySettings.KEY_FORCE_RELAY, R.string.setting_relay_force_relay, R.string.setting_relay_force_relay_description),
-                    Triple(RelaySettings.KEY_FORCE_TURN, R.string.setting_relay_force_turn, R.string.setting_relay_force_turn_description),
-                )) {
-                    GroupRow(stringResource(title), subtitle = stringResource(summary), checked = prefs.getBoolean(key, false), onClick = {
-                        prefs.edit { putBoolean(key, !prefs.getBoolean(key, false)) }
-                        revision++
-                    })
-                }
-            }
-        }
-    }
-}
-
-/** Android 13+ adds the tile in one tap; before that the person drags it in from the editor. */
-private fun addClipboardTile(context: Context, onMessage: (String) -> Unit) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        context.getSystemService(StatusBarManager::class.java)?.requestAddTileService(
-            ComponentName(context, ClipboardTileService::class.java),
-            context.getString(R.string.send_clipboard),
-            AndroidIcon.createWithResource(context, R.drawable.ic_baseline_content_paste_24),
-            context.mainExecutor,
-        ) { }
-    } else {
-        onMessage(context.getString(R.string.settings_clipboard_tile_manual))
     }
 }
 
@@ -979,14 +500,14 @@ fun NetworkScreen(onBack: () -> Unit) {
 // ---- shared --------------------------------------------------------------------------------------------------------------------
 
 /** Applies a relay setting once it has been saved. */
-private fun relaySettingChanged() {
+internal fun relaySettingChanged() {
     android.os.Handler(android.os.Looper.getMainLooper()).post {
         BackgroundService.instance?.onRelaySettingsChanged()
     }
 }
 
 @Composable
-private fun relayStatusText(): String? {
+internal fun relayStatusText(): String? {
     val status = RelayLinkProvider.statusLive.value
     return when (status) {
         RelayLinkProvider.Status.CONNECTING -> stringResource(R.string.relay_status_connecting)
@@ -998,7 +519,7 @@ private fun relayStatusText(): String? {
 }
 
 @Composable
-private fun TextDialog(
+internal fun TextDialog(
     title: String,
     initial: String,
     confirm: String,
@@ -1017,7 +538,7 @@ private fun TextDialog(
 }
 
 @Composable
-private fun ChoiceDialog(title: String, options: List<String>, selected: Int, onDismiss: () -> Unit, onChoose: (Int) -> Unit) {
+internal fun ChoiceDialog(title: String, options: List<String>, selected: Int, onDismiss: () -> Unit, onChoose: (Int) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },

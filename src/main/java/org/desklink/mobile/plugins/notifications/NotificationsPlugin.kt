@@ -75,13 +75,11 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     override val description: String
         get() = context.getString(R.string.pref_plugin_notifications_desc)
 
-    override fun hasSettings(): Boolean = true
-
-    override fun getSettingsFragment(activity: Activity): PluginSettingsFragment? {
+    /** Which apps' notifications are shared: its own screen (Settings → Notifications → Choose apps). */
+    fun openAppFilter(activity: Activity) {
         val intent = Intent(activity, NotificationFilterActivity::class.java)
         intent.putExtra(PREFERENCE_KEY, this.sharedPreferencesName)
         activity.startActivity(intent)
-        return null
     }
 
     override fun checkRequiredPermissions(): Boolean {
