@@ -36,7 +36,7 @@ class NotesPlugin : Plugin() {
             // Per index: on a new link the desk may already hold exactly this one.
             NotesStore.indexes(context).groupBy { it.type }.forEach { (type, packets) ->
                 val feature = if (type == DeskLinkProtocol.PACKET_TYPE_NOTES) SyncDigest.NOTES else SyncDigest.SNIPPETS
-                device.sendSnapshot(feature, SyncDigest.rev(packets.map { it.serialize() }), packets)
+                device.sendSnapshot(feature, indexRev(packets), packets)
             }
         }
     }
@@ -52,6 +52,18 @@ class NotesPlugin : Plugin() {
     }
 
     companion object {
+        /**
+         * The index's rev from its content only: every `id@modified@deleted`, sorted. A packet's own
+         * serialization carries a timestamp id, so hashing it would change the rev on every call.
+         */
+        fun indexRev(packets: List<NetworkPacket>): String = SyncDigest.rev(
+            packets.flatMap { packet ->
+                val items = packet.getJSONArray("items") ?: org.json.JSONArray()
+                (0 until items.length()).mapNotNull { items.optJSONObject(it) }
+                    .map { "${it.optString("id")}@${it.optLong("modified")}@${it.optBoolean("deleted", false)}" }
+            }.sorted(),
+        )
+
         /** Per type per desk: a 4,000-note first sync is ~40 fetch replies plus pushes, well under this. */
         const val MAX_PACKETS_PER_MINUTE = 240
     }

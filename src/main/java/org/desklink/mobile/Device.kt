@@ -44,6 +44,7 @@ import org.desklink.mobile.plugins.Plugin.Companion.getPluginKey
 import org.desklink.mobile.plugins.PluginFactory
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.desklink.mobile.webrtc.BoundedPendingQueue
+import org.desklink.mobile.webrtc.SyncDigest
 import org.desklink.mobile.webrtc.WebRtcFeatureProfile
 import org.desklink.mobile.webrtc.WebRtcTransport
 import org.desklink.mobile.session.PairingState
@@ -210,7 +211,10 @@ class Device : PacketReceiver {
     private val pluginsChangedListeners = CopyOnWriteArrayList<PluginsChangedListener>()
 
     /** Interactive packets before bulk ones (contacts, file requests, manifests); a full lane is reported. */
-    private val outbound = OutboundQueue<NetworkPacketWithCallback>()
+    private val outbound = OutboundQueue<NetworkPacketWithCallback>(onExpired = { item ->
+        item.np.payload?.close()
+        failExpired(listOf(QueuedFeature(item.np, item.callback)))
+    })
 
     /** Files in flight (their own threads, [FILE_SENDS_IN_FLIGHT] at a time) and waiting; the rest are refused and reported. */
     private val fileSendPool = java.util.concurrent.ThreadPoolExecutor(
@@ -504,6 +508,10 @@ class Device : PacketReceiver {
     val hasLanLink: Boolean
         get() = links.firstOrNull() is org.desklink.mobile.backends.lan.LanLink
 
+    /** The LAN address of the current link, if there is one. */
+    val lanAddress: String?
+        get() = (links.firstOrNull() as? org.desklink.mobile.backends.lan.LanLink)?.remoteAddress?.hostAddress
+
     /** The verified relay link, if the device is reachable through the relay. */
     val relayLink: org.desklink.mobile.backends.relay.RelayLink?
         get() = links.firstNotNullOfOrNull { it as? org.desklink.mobile.backends.relay.RelayLink }
@@ -550,28 +558,37 @@ class Device : PacketReceiver {
      * [setWebRtcTransport] starts, so a plugin loaded by it is included.
      */
     fun onFeatureReady() {
-        lifecycle.enqueue("feature-ready snapshots") {
+        // Say what this phone already holds of the desk's state. The desk's own `have` may already
+        // be here (it is kept for this connection): then the snapshots go at once; otherwise they
+        // wait at most a second for it, without holding the lifecycle worker.
+        val acceptsHave = WebRtcFeatureProfile.peerAccepts(deviceId, DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE)
+        lifecycle.enqueue("feature-ready doze and have") {
             // B1: the doze state first; the desk keeps its own until the phone says otherwise.
             runCatching { sendDozeState() }
-            // Delta resync: say what this phone already holds of the desk's state, then give the desk
-            // a moment to say the same, so only what differs is sent. A desk that does not take
-            // part in it (not in its handover) is not waited for.
-            sync.beginLink()
-            if (WebRtcFeatureProfile.peerAccepts(deviceId, DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE)) {
-                runCatching { sendPacket(sync.havePacket(peerInstanceId)) }
-                if (WebRtcFeatureProfile.peerSends(deviceId, DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE)) sync.awaitHave()
+            if (acceptsHave) runCatching { sendPacket(sync.havePacket(peerInstanceId)) }
+        }
+        val sendSnapshots: () -> Unit = {
+            lifecycle.enqueue("feature-ready snapshots") {
+                loadedPlugins.values.forEach { plugin ->
+                    runCatching { plugin.onFeatureReady() }
+                        .onFailure { Log.w("DeskLink/Device", "${plugin.pluginKey} failed its feature-ready snapshot", it) }
+                }
+                // A phone-owned feature that is off or has no permission has no plugin to speak for
+                // it: the empty form goes out here, so the desk never keeps a stale copy (S2).
+                emptyStatesFor(this).forEach { runCatching { sendPacket(it) } }
             }
-            loadedPlugins.values.forEach { plugin ->
-                runCatching { plugin.onFeatureReady() }
-                    .onFailure { Log.w("DeskLink/Device", "${plugin.pluginKey} failed its feature-ready snapshot", it) }
-            }
-            // A phone-owned feature that is off or has no permission has no plugin to speak for
-            // it: the empty form goes out here, so the desk never keeps a stale copy (S2).
-            emptyStatesFor(this).forEach { runCatching { sendPacket(it) } }
+        }
+        if (acceptsHave && WebRtcFeatureProfile.peerSends(deviceId, DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE)) {
+            sync.whenHave(SyncDigest.SYNC_WAIT_MS, { delay, task -> expiryHandler.postDelayed(task, delay) }, sendSnapshots)
+        } else {
+            sendSnapshots()
         }
     }
 
     fun setWebRtcTransport(transport: WebRtcTransport?, reloadPlugins: Boolean) {
+        // What the desk said it holds belongs to one connection. Replacing or dropping the transport
+        // ends it; a first transport after none keeps a `have` that arrived a moment early.
+        if (transport == null || (webRtcTransport != null && webRtcTransport !== transport)) sync.endLink()
         if (webRtcTransport === transport) return
         webRtcTransport = transport
         connectionPath = null
@@ -646,7 +663,20 @@ class Device : PacketReceiver {
             object : TransportCallback {
                 override fun onSuccess() = callback.onSuccess()
 
-                override fun onFailure(error: TransportError) = callback.onFailure(error)
+                override fun onFailure(error: TransportError) {
+                    // Held on the events channel when it closed (a Lock, a Ring): it was never sent, so a
+                    // user action goes back to the offline queue, with its 30 s limit, not into the void.
+                    if (error.code == org.desklink.mobile.transport.TransportErrorCode.CLOSED && callback is UserActionCallback) {
+                        synchronized(sendOrderLock) {
+                            pendingFeaturePackets.offerPreferring(QueuedFeature(packet, callback)) { it.callback !is UserActionCallback }
+                                ?.let { dropped -> reportNotSent(dropped.callback, "${dropped.packet.type}: the offline queue is full") }
+                        }
+                        expiryHandler.removeCallbacks(expireTask)
+                        expiryHandler.postDelayed(expireTask, PENDING_FEATURE_MAX_AGE_MS + 1_000)
+                    } else {
+                        callback.onFailure(error)
+                    }
+                }
 
                 override fun onProgress(percent: Int) {
                     callback.onPayloadProgressChanged(percent)
@@ -668,6 +698,10 @@ class Device : PacketReceiver {
             queued.callback.onFailure(IllegalStateException("Device was unpaired"))
         }
         webRtcRecoveryPending = false
+        outbound.close().forEach { queued ->
+            queued.np.payload?.close()
+            queued.callback.onFailure(IllegalStateException("Device was unpaired"))
+        }
         payloadPacketHandler = null
         remoteInputPacketPreparer = null
         val pending = synchronized(controlPacketLock) {
@@ -782,12 +816,13 @@ class Device : PacketReceiver {
 
         synchronized(outbound) {
             if (sendCoroutine == null) {
+                outbound.reopen()
                 sendCoroutine = CoroutineScope(Dispatchers.IO).launch {
                     while (true) {
                         val (np, callback) = runInterruptible { outbound.take() } ?: break
                         // A file blocks until the peer has it, however long that takes: it runs on
                         // its own threads so everything queued behind it keeps flowing.
-                        if (np.payload != null) sendFileAsync(np, callback) else sendPacketBlocking(np, callback)
+                        if (isFileSend(np)) sendFileAsync(np, callback) else sendPacketBlocking(np, callback)
                     }
                 }
             }
@@ -1049,18 +1084,18 @@ class Device : PacketReceiver {
         // The following code when `isPaired == false` is NOT USED.
         // It adds support for receiving packets from not trusted devices,
         // but as of March 2023 no plugin implements "onUnpairedDevicePacketReceived".
-        notifyPluginPacketReceived(np)
-        // Applied: remember the snapshot's rev so the next link can tell the peer it need not resend it.
-        sync.record(peerInstanceId, np)
+        // Remembered only once a plugin has applied the snapshot (see SyncDigest.record).
+        if (notifyPluginPacketReceived(np)) sync.record(peerInstanceId, np)
     }
 
     /** Per type, under every plugin: a flood is dropped (counted, one log line a window), never dispatched. */
     private val inboundLimits = org.desklink.mobile.helpers.InboundLimits.ForDesk()
 
-    private fun notifyPluginPacketReceived(np: NetworkPacket) {
+    /** Whether some plugin handled [np] without failing. */
+    private fun notifyPluginPacketReceived(np: NetworkPacket): Boolean {
         if (!inboundLimits.allow(np.type)) {
             np.payload?.close()
-            return
+            return false
         }
         // Type only, never the body. tools/device_e2e.sh asserts on this line.
         Log.i("DeskLink/Feature", "Received ${np.type} from $deviceId")
@@ -1070,8 +1105,9 @@ class Device : PacketReceiver {
 
             // If there is a payload close it to not leak sockets
             np.payload?.close()
-            return
+            return false
         }
+        var handled = false
         targetPlugins
             .asSequence()
             .mapNotNull { loadedPlugins[it] }
@@ -1082,10 +1118,12 @@ class Device : PacketReceiver {
                     } else {
                         plugin.onUnpairedDevicePacketReceived(np)
                     }
-                }.onFailure { e ->
-                    Log.e("Device", "Exception in ${plugin.pluginKey}'s onPacketReceived()", e)
-                }
+                }.onSuccess { result -> if (isPaired && result == true) handled = true }
+                    .onFailure { e ->
+                        Log.e("Device", "Exception in ${plugin.pluginKey}'s onPacketReceived()", e)
+                    }
             }
+        return handled
     }
 
     private fun deliverControlPacket(handler: ControlPacketHandler, packet: NetworkPacket) {
@@ -1137,7 +1175,21 @@ class Device : PacketReceiver {
     fun sendBulk(np: NetworkPacket, callback: SendPacketStatusCallback = defaultCallback) = enqueue(np, callback, bulk = true)
 
     private fun enqueue(np: NetworkPacket, callback: SendPacketStatusCallback, bulk: Boolean) {
-        if (!outbound.offer(NetworkPacketWithCallback(np, callback), bulk)) reportNotSent(callback, "outbound queue is full")
+        if (!outbound.offer(NetworkPacketWithCallback(np, callback), bulk)) {
+            np.payload?.close() // a SAF stream would otherwise leak
+            reportNotSent(callback, "outbound queue is full")
+            return
+        }
+        // Nobody may be taking (no link): whatever waits past the age limit is reported, not kept for hours.
+        expiryHandler.removeCallbacks(purgeOutboundTask)
+        expiryHandler.postDelayed(purgeOutboundTask, PENDING_FEATURE_MAX_AGE_MS + 1_000)
+    }
+
+    private val purgeOutboundTask: Runnable = object : Runnable {
+        override fun run() {
+            outbound.purgeExpired()
+            if (outbound.size() > 0) expiryHandler.postDelayed(this, PENDING_FEATURE_MAX_AGE_MS / 2)
+        }
     }
 
     private var lastNotSentToastAt = 0L
@@ -1588,6 +1640,9 @@ internal const val PENDING_FEATURE_MAX_AGE_MS = 30_000L
 
 /** At most one "not sent" notice this often. */
 internal const val NOT_SENT_TOAST_INTERVAL_MS = 5_000L
+
+/** Only a real file send (a share or a Bucket file) goes to the file threads; a notification icon is not one. */
+internal fun isFileSend(np: NetworkPacket): Boolean = np.payload != null && np.type == DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST
 
 /** Files being sent to one desk at once, and files waiting for a free slot. */
 internal const val FILE_SENDS_IN_FLIGHT = 2

@@ -960,8 +960,12 @@ object BucketEngine {
 
     private fun packet(op: String) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_FOLDERS).apply { this["op"] = op }
 
+    /**
+     * Every Bucket packet takes the same (bulk) lane, so a `remove` or `decline` can never overtake the
+     * `manifest` queued ahead of it for the same pair.
+     */
     private fun send(deviceId: String, packet: NetworkPacket) {
-        DeskLinkApplication.getInstance().getDevice(deviceId)?.sendPacket(packet)
+        DeskLinkApplication.getInstance().getDevice(deviceId)?.sendBulk(packet)
     }
 
     private fun sendManifest(live: Live) {

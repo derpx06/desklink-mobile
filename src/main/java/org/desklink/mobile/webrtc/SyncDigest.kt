@@ -5,8 +5,6 @@ import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.json.JSONObject
 import java.security.MessageDigest
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
  * Delta resync (W2). On every feature-ready both sides used to send their whole state. Now each
@@ -24,14 +22,39 @@ class SyncDigest(private val myInstance: () -> String) {
     /** What the peer says it holds of ours, for the current link; null until its `have` arrives. */
     private var peerHave: Map<String, String>? = null
     private var peerHaveInstance: String? = null
-    private var latch = CountDownLatch(1)
+    private val waiting = ArrayList<() -> Unit>()
+    private var linkGeneration = 0
 
-    /** A new feature-ready: nothing is known about what the peer holds until its `have` arrives. */
+    /**
+     * The connection ended or was replaced: a `have` belongs to one connection only, so a stale one
+     * can never suppress a snapshot the next connection needs. (A `have` that arrives a moment before
+     * this side's own feature-ready is kept: nothing ends the connection in between.)
+     */
     @Synchronized
-    fun beginLink() {
+    fun endLink() {
         peerHave = null
         peerHaveInstance = null
-        latch = CountDownLatch(1)
+        waiting.clear()
+        linkGeneration++
+    }
+
+    /**
+     * Runs [action] once: at once if the peer's `have` is already here, else when it arrives, else
+     * after [timeoutMs] (scheduled through [schedule]) with everything to be sent. Never blocks.
+     */
+    fun whenHave(timeoutMs: Long, schedule: (Long, Runnable) -> Unit, action: () -> Unit) {
+        val once = java.util.concurrent.atomic.AtomicBoolean(false)
+        val generation = synchronized(this) { linkGeneration }
+        // A wait that outlives its connection does nothing: the next connection has its own feature-ready.
+        val run = { if (synchronized(this) { linkGeneration == generation } && once.compareAndSet(false, true)) action() }
+        val ready = synchronized(this) {
+            if (peerHave != null) true else {
+                waiting.add(run)
+                false
+            }
+        }
+        if (ready) return run()
+        schedule(timeoutMs, Runnable { run() })
     }
 
     /** The peer's `have`. Ignored when it is malformed. */
@@ -39,15 +62,13 @@ class SyncDigest(private val myInstance: () -> String) {
         val instance = packet.getStringOrNull("peerInstance")?.takeIf { it.length <= MAX_REV_LENGTH } ?: return
         val body = packet.getJSONObject("have") ?: return
         val parsed = parseHave(body) ?: return
-        synchronized(this) {
+        val callbacks = synchronized(this) {
             peerHave = parsed
             peerHaveInstance = instance
+            waiting.toList().also { waiting.clear() }
         }
-        latch.countDown()
+        callbacks.forEach { it() }
     }
-
-    /** Waits for the peer's `have`, at most [timeoutMs]; false when it did not come (send everything). */
-    fun awaitHave(timeoutMs: Long = SYNC_WAIT_MS): Boolean = latch.await(timeoutMs, TimeUnit.MILLISECONDS)
 
     /**
      * Whether the snapshot of [feature] with [rev] must be sent: unless the peer has told us it holds
@@ -60,11 +81,16 @@ class SyncDigest(private val myInstance: () -> String) {
         return have[feature] != rev
     }
 
-    /** [packet] of the peer's process [peerInstance] was fully applied: remember its `rev`. */
+    /**
+     * [packet] of the peer's process [peerInstance] was fully applied by a plugin: remember its
+     * `rev`. Only features that arrive as one self-contained packet are remembered ([REPORTED]); notes
+     * and snippets (an index that is followed by a fetch round) and anything multi-part are never
+     * reported, so the desk simply sends them again.
+     */
     @Synchronized
     fun record(peerInstance: String?, packet: NetworkPacket) {
         val instance = peerInstance ?: return
-        val feature = featureOf(packet) ?: return
+        val feature = featureOf(packet)?.takeIf { it in REPORTED } ?: return
         val rev = packet.getStringOrNull("rev")?.takeIf { it.isNotEmpty() && it.length <= MAX_REV_LENGTH } ?: return
         if (received.size >= MAX_PEERS && instance !in received) received.clear()
         received.getOrPut(instance) { HashMap() }[feature] = rev
@@ -85,6 +111,9 @@ class SyncDigest(private val myInstance: () -> String) {
         const val MAX_FEATURES = 8
         const val MAX_FEATURE_LENGTH = 32
         private const val MAX_PEERS = 8
+
+        /** The desk's features this phone reports in its `have`. */
+        val REPORTED = setOf("settings", "media")
 
         const val NOTIFICATIONS = "notifications"
         const val CONTACTS = "contacts"

@@ -59,4 +59,47 @@ class OutboundQueueTest {
         assertEquals(64, OutboundQueue.INTERACTIVE_CAPACITY)
         assertEquals(256, OutboundQueue.BULK_CAPACITY)
     }
+
+    @Test
+    fun anItemOlderThanTheLimitIsReportedNotSentWhenItReachesTheFront() {
+        var now = 0L
+        val expired = mutableListOf<String>()
+        val q = OutboundQueue<String>(clock = { now }, onExpired = { expired += it })
+        q.offer("ring", false)
+        now = OutboundQueue.MAX_AGE_MS + 1
+        q.offer("fresh", false)
+        assertEquals("fresh", q.take())
+        assertEquals(listOf("ring"), expired)
+    }
+
+    @Test
+    fun purgeReportsStaleItemsWhileNobodyIsTaking() {
+        var now = 0L
+        val expired = mutableListOf<String>()
+        val q = OutboundQueue<String>(clock = { now }, onExpired = { expired += it })
+        q.offer("a", false); q.offer("b", true)
+        now = 10_000
+        q.offer("c", false)
+        now = OutboundQueue.MAX_AGE_MS + 1
+        assertEquals(2, q.purgeExpired())
+        assertEquals(listOf("a", "b"), expired)
+        assertEquals(1, q.size())
+    }
+
+    @Test
+    fun anItemExactlyAtTheLimitIsStillSent() {
+        var now = 0L
+        val q = OutboundQueue<String>(clock = { now })
+        q.offer("x", false)
+        now = OutboundQueue.MAX_AGE_MS
+        assertEquals("x", q.take())
+    }
+
+    @Test
+    fun aBulkManifestAndALaterRemoveForTheSamePairStayInOrder() {
+        // The Bucket sends every folders packet through the bulk lane, so one lane's FIFO order is the order.
+        val q = OutboundQueue<String>()
+        q.offer("manifest", true); q.offer("remove", true)
+        assertEquals(listOf("manifest", "remove"), List(2) { q.take() })
+    }
 }
