@@ -72,9 +72,6 @@ object HomeModel {
                 device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby == true &&
                 device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java) != null &&
                 device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST),
-            hasCommands = device.hasActiveWebRtcFeatureTransport &&
-                device.getPlugin(org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)?.commandItems?.isNotEmpty() == true &&
-                device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND_REQUEST),
             relayAvailable = org.desklink.mobile.backends.relay.RelaySettings.enabled(context) &&
                 org.desklink.mobile.backends.relay.RelayLinkProvider.statusLive.value == org.desklink.mobile.backends.relay.RelayLinkProvider.Status.ONLINE,
         )

@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import org.desklink.mobile.MockSharedPreference
-import org.desklink.mobile.plugins.terminal.QuickCommands
 import org.desklink.mobile.ui.compose.DarkTokens
 import org.desklink.mobile.ui.compose.DeskLinkColors
 import org.desklink.mobile.ui.compose.LightTokens
@@ -93,15 +92,4 @@ class UiTokensTest {
         assertEquals(LinkGlyphState.DIRECT, linkGlyphState(DeviceConnection.AWAY, WebRtcConnectionPath.LAN))
     }
 
-    @Test
-    fun quickCommandsArePerComputer() {
-        val prefs = MockSharedPreference()
-        assertEquals(QuickCommands.DEFAULTS, QuickCommands.load(prefs, "desk-a"))
-        QuickCommands.save(prefs, "desk-a", listOf(" make ", "", "make", "npm run\ndev"))
-        assertEquals(listOf("make", "npm run dev"), QuickCommands.load(prefs, "desk-a"))
-        assertEquals(QuickCommands.DEFAULTS, QuickCommands.load(prefs, "desk-b"))
-        // Removing every chip is kept, not replaced by the defaults.
-        QuickCommands.save(prefs, "desk-a", emptyList())
-        assertEquals(emptyList<String>(), QuickCommands.load(prefs, "desk-a"))
-    }
 }

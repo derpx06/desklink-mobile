@@ -92,7 +92,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         sharedPreferences = context.getSharedPreferences(sharedPreferencesName, Context.MODE_PRIVATE)
         keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         mainHandler = Handler(Looper.getMainLooper())
-        NotificationReceiver.RunCommand(context) { service ->
+        NotificationReceiver.WithService(context) { service ->
             service.addListener(this@NotificationsPlugin)
             serviceReady = service.isConnected
         }
@@ -112,7 +112,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             postedNotifications.clear()
         }
 
-        NotificationReceiver.RunCommand(context) { service ->
+        NotificationReceiver.WithService(context) { service ->
             service.removeListener(this@NotificationsPlugin)
         }
     }
@@ -136,7 +136,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             sendSnapshot(emptyList())
             return
         }
-        NotificationReceiver.RunCommand(context) { service ->
+        NotificationReceiver.WithService(context) { service ->
             serviceReady = service.isConnected
             if (serviceReady) sendCurrentNotifications(service)
         }
@@ -615,7 +615,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             PACKET_TYPE_NOTIFICATION_REQUEST -> when {
                 np.has("cancel") -> dismissNotification(np.getString("cancel"))
                 np.getBoolean("request") -> if (serviceReady) {
-                    NotificationReceiver.RunCommand(context) { service ->
+                    NotificationReceiver.WithService(context) { service ->
                         this.sendCurrentNotifications(service)
                     }
                 }
@@ -659,7 +659,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             currentNotifications.remove(dismissedId)
             notificationsIcons.remove(dismissedId)
         }
-        NotificationReceiver.RunCommand(context) { service ->
+        NotificationReceiver.WithService(context) { service ->
             service.cancelNotification(dismissedId)
         }
     }

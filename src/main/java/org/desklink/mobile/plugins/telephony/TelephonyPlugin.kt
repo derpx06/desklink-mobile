@@ -105,7 +105,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             ({ telephony.listen(listener, PhoneStateListener.LISTEN_NONE) })
         }
         if (NotificationReceiver.hasReadNotificationsPermission(context)) {
-            NotificationReceiver.RunCommand(context) { it.addListener(this) }
+            NotificationReceiver.WithService(context) { it.addListener(this) }
         }
         return true
     }
@@ -114,7 +114,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
         unregister?.invoke()
         unregister = null
         restoreRinger()
-        NotificationReceiver.RunCommand(context) { it.removeListener(this) }
+        NotificationReceiver.WithService(context) { it.removeListener(this) }
     }
 
     /** The full snapshot on every new link (Phase 1). */

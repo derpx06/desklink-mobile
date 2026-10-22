@@ -143,7 +143,6 @@ data class HomeState(
     /** The desk lets this phone unlock it and the link is the local network: "Unlock desk" shows. */
     val canUnlock: Boolean = false,
     /** The desk listed commands to run: a Run command tile shows. */
-    val hasCommands: Boolean = false,
 ) {
     val ready get() = connection == DeviceConnection.LOCAL || connection == DeviceConnection.AWAY || connection == DeviceConnection.CONNECTED
 }
@@ -173,7 +172,6 @@ class HomeActions(
     val onSendClipboard: () -> Unit,
     val onClipboard: (Boolean) -> Unit,
     val onUnlockDesk: () -> Unit,
-    val onRunCommand: () -> Unit,
     /** An action was tapped while the computer cannot take it; the message says why. */
     val onUnavailable: (String) -> Unit,
     val onNotes: () -> Unit = {},
@@ -485,7 +483,7 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
         Triple(R.drawable.sym_waving_hand, R.string.home_ping_desk, actions.onPing),
         Triple(R.drawable.sym_vibration, R.string.home_ring_desk, actions.onRing),
         Triple(R.drawable.sym_swap_vert, R.string.transfers_title, actions.onTransfers),
-    ) + if (state.hasCommands) listOf(Triple(R.drawable.sym_terminal, R.string.home_run_command, actions.onRunCommand)) else emptyList()
+    )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tiles.chunked(2).forEach { pair ->
             Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

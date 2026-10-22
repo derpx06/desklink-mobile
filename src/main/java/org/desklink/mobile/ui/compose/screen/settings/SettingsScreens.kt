@@ -102,7 +102,6 @@ import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.plugins.Plugin
 import org.desklink.mobile.plugins.clipboard.ClipboardTileService
 import org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity
-import org.desklink.mobile.plugins.terminal.QuickCommands
 import org.desklink.mobile.ui.CustomDevicesActivity
 import org.desklink.mobile.ui.ThemeUtil
 import org.desklink.mobile.ui.TrustedNetworksActivity
@@ -179,7 +178,6 @@ class SettingsActions(
     val onDeskSoundVolume: (Int) -> Unit = {},
     val onDeskMayPlay: (Boolean) -> Unit = {},
     val onContacts: (Boolean) -> Unit = {},
-    val onQuickCommands: () -> Unit,
     val onMore: () -> Unit,
     val onUnpair: () -> Unit,
     val onEncryptionInfo: () -> Unit,
@@ -491,14 +489,6 @@ fun SettingsScreen(desk: DeskSettings?, actions: SettingsActions) {
                     checked = desk.contactsOn,
                     onClick = { actions.onContacts(!desk.contactsOn) },
                 )
-                val commands = QuickCommands.load(QuickCommands.prefs(context), desk.id)
-                GroupRow(
-                    stringResource(R.string.settings_quick_commands),
-                    icon = R.drawable.sym_terminal,
-                    subtitle = commands.joinToString(" · ").ifEmpty { stringResource(R.string.settings_quick_commands_none) },
-                    monoSubtitle = commands.isNotEmpty(),
-                    onClick = actions.onQuickCommands,
-                ) { Chevron() }
             }
         }
 
@@ -985,57 +975,6 @@ fun NetworkScreen(onBack: () -> Unit) {
             if (key == RelaySettings.KEY_URL) relaySettingChanged()
             revision++
         }
-    }
-}
-
-// ---- quick commands -------------------------------------------------------------------------------------------------------
-
-@Composable
-fun QuickCommandsScreen(deviceId: String, deskName: String, onBack: () -> Unit) {
-    val context = LocalContext.current
-    val prefs = remember { QuickCommands.prefs(context) }
-    val commands = remember(deviceId) { mutableStateListOf<String>().apply { addAll(QuickCommands.load(prefs, deviceId)) } }
-    var draft by rememberSaveable { mutableStateOf("") }
-    val t = tokens
-    fun save() = QuickCommands.save(prefs, deviceId, commands)
-    SettingsColumn(stringResource(R.string.settings_quick_commands), onBack, subtitle = stringResource(R.string.settings_quick_commands_subtitle, deskName)) {
-        if (commands.isNotEmpty()) {
-            RowGroup {
-                commands.toList().forEachIndexed { index, command ->
-                    Row(
-                        Modifier.fillMaxWidth().background(t.surface).heightIn(min = 56.dp).padding(start = 16.dp, end = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(command, fontFamily = MonoFamily, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { commands.removeAt(index); save() }, modifier = Modifier.size(48.dp)) {
-                            Icon(painterResource(R.drawable.sym_delete), contentDescription = stringResource(R.string.settings_quick_commands_remove, command), tint = t.textDim)
-                        }
-                    }
-                }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { draft = it.replace("\n", "").take(QuickCommands.MAX_LENGTH) },
-                singleLine = true,
-                placeholder = { Text(stringResource(R.string.settings_quick_commands_hint)) },
-                textStyle = TextStyle(fontFamily = MonoFamily, fontSize = 14.sp),
-                modifier = Modifier.weight(1f),
-            )
-            PillButton(stringResource(R.string.settings_quick_commands_add), {
-                if (draft.isNotBlank()) {
-                    commands.add(draft.trim())
-                    val cleaned = QuickCommands.clean(commands)
-                    commands.clear(); commands.addAll(cleaned)
-                    save()
-                    draft = ""
-                }
-            }, height = 48.dp, enabled = draft.isNotBlank())
-        }
-        PillButton(stringResource(R.string.settings_quick_commands_reset), {
-            commands.clear(); commands.addAll(QuickCommands.DEFAULTS); save()
-        }, style = PillStyle.Outlined, height = 44.dp)
     }
 }
 

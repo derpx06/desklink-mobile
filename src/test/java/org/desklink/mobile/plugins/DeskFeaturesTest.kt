@@ -12,7 +12,6 @@ import org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin
 import org.desklink.mobile.plugins.deskunlock.UnlockOffer
 import org.desklink.mobile.plugins.handoff.Handoff
 import org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin
-import org.desklink.mobile.plugins.runcommand.RunCommandPlugin
 import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.plugins.terminal.TerminalAttentionNotifier
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
@@ -160,42 +159,6 @@ class DeskFeaturesTest {
         }
         assertEquals(2, org.desklink.mobile.expiredUserActions(listOf(org.desklink.mobile.UserActionCallback(), auto, org.desklink.mobile.UserActionCallback(auto))))
         assertEquals(0, org.desklink.mobile.expiredUserActions(listOf(auto, auto)))
-    }
-
-    @Test
-    fun onlyARefusalNamingTheRecentTapAnswersIt() {
-        // The desk's own push (no key, or another command's) never re-runs the tap.
-        assertFalse(RunCommandPlugin.isTapRefusal(null, "k1", 0, 1_000))
-        assertFalse(RunCommandPlugin.isTapRefusal("k2", "k1", 0, 1_000))
-        assertFalse(RunCommandPlugin.isTapRefusal("k1", null, 0, 1_000))
-        assertFalse(RunCommandPlugin.isTapRefusal("k1", "k1", 0, 60_000))
-        assertTrue(RunCommandPlugin.isTapRefusal("k1", "k1", 0, 1_000))
-    }
-
-    // ---- §2 run command -----------------------------------------------------------------------
-
-    @Test
-    fun aLockedRunIsRetriedOnceAfterThePassword() {
-        assertEquals(RunCommandPlugin.RefusalAction.PROVE_PASSWORD_AND_RETRY, RunCommandPlugin.refusalAction("locked", false))
-        assertEquals(RunCommandPlugin.RefusalAction.TELL_LOCKED, RunCommandPlugin.refusalAction("locked", true))
-        assertEquals(RunCommandPlugin.RefusalAction.TELL_TERMINAL_OFF, RunCommandPlugin.refusalAction("terminal-off", false))
-    }
-
-    private fun session(id: String, title: String, startedAt: Long?, exit: Long? = null, gone: Boolean = false) =
-        TerminalSessionState(id, title, 24, 80, exitStatus = exit, attached = false, wanted = false, gone = gone, startedAt = startedAt)
-
-    @Test
-    fun theRunsTerminalIsTheNewestWithItsName() {
-        val sessions = listOf(
-            session("old", "deploy", startedAt = 100),
-            session("other", "build", startedAt = 2_000),
-            session("ended", "deploy", startedAt = 2_000, exit = 0),
-            session("new", "deploy", startedAt = 1_990),
-        )
-        assertEquals("new", TerminalActivity.pickStartedSession(sessions, "deploy", since = 2_000))
-        assertNull(TerminalActivity.pickStartedSession(sessions.take(1), "deploy", since = 2_000))
-        // An older desk without startedAt: the newest with the name.
-        assertEquals("b", TerminalActivity.pickStartedSession(listOf(session("a", "x", null), session("b", "x", null)), "x", since = 2_000))
     }
 
     // ---- §7 finished --------------------------------------------------------------------------

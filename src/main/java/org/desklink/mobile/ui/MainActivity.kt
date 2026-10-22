@@ -85,7 +85,6 @@ import org.desklink.mobile.plugins.mousepad.BigscreenActivity
 import org.desklink.mobile.plugins.mousepad.MousePadActivity
 import org.desklink.mobile.plugins.notifications.NotificationsPlugin
 import org.desklink.mobile.plugins.presenter.PresenterActivity
-import org.desklink.mobile.plugins.runcommand.RunCommandActivity
 import org.desklink.mobile.plugins.screen.PhoneScreenCaptureService
 import org.desklink.mobile.plugins.screen.SessionLiveNotification
 import org.desklink.mobile.plugins.share.SharePlugin
@@ -122,7 +121,6 @@ import org.desklink.mobile.ui.compose.screen.settings.KEY_BLUETOOTH_ENABLED
 import org.desklink.mobile.ui.compose.screen.settings.MoreExtra
 import org.desklink.mobile.ui.compose.screen.settings.MoreScreen
 import org.desklink.mobile.ui.compose.screen.settings.NetworkScreen
-import org.desklink.mobile.ui.compose.screen.settings.QuickCommandsScreen
 import org.desklink.mobile.ui.compose.screen.settings.SettingsActions
 import org.desklink.mobile.ui.compose.screen.settings.SettingsScreen
 import org.desklink.mobile.ui.compose.screen.settings.showPluginPermission
@@ -334,7 +332,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             route == SETTINGS -> SettingsRoute(device)
             route == MORE -> MoreRoute(device)
             route == NETWORK -> NetworkScreen(onBack = ::pop)
-            route == QUICK && device != null -> QuickCommandsScreen(device.deviceId, device.name, onBack = ::pop)
             route == ABOUT -> AboutRoute()
             route == TRANSFERS && device != null -> TransfersRoute(device)
             route.startsWith(VIEWER_PREFIX) -> ViewerRoute(route.removePrefix(VIEWER_PREFIX))
@@ -445,9 +442,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onNote = { noteId -> startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, noteId = noteId)) },
             onNewNote = { startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, newNote = true)) },
             onBucket = { startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this, id)) },
-            onRunCommand = {
-                startActivity(Intent(this, org.desklink.mobile.plugins.runcommand.RunCommandActivity::class.java).putExtra("deviceId", id))
-            },
             onUnavailable = ::showMessage,
         )
     }
@@ -839,7 +833,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     }
                     tick++
                 },
-                onQuickCommands = { push(QUICK) },
                 onMore = { push(MORE) },
                 onUnpair = {
                     device?.unpair()
@@ -913,9 +906,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 add(MoreExtra(R.drawable.sym_tune, getString(R.string.surfaces_add_tiles), getString(R.string.surfaces_add_tiles_summary)) { offerTiles() })
             }
             if (device != null) {
-                add(MoreExtra(R.drawable.sym_bolt, getString(R.string.feature_run_command), getString(R.string.feature_desc_run_command),
-                    button(R.drawable.run_command_plugin_icon_24dp)?.let { b -> { b.onClick(this@MainActivity) } }
-                        ?: open(RunCommandActivity::class.java, org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)))
                 add(MoreExtra(R.drawable.sym_inventory, getString(R.string.more_bucket), getString(R.string.more_bucket_summary)) {
                     startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this@MainActivity, device.deviceId))
                 })
@@ -1040,7 +1030,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         private const val SETTINGS = "settings"
         private const val MORE = "more"
         private const val NETWORK = "network"
-        private const val QUICK = "quick"
         private const val ABOUT = "about"
         private const val TRANSFERS = "transfers"
         private const val VIEWER_PREFIX = "viewer/"

@@ -42,8 +42,6 @@ import org.desklink.mobile.backends.relay.RelaySettings
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.plugins.clipboard.ClipboardFloatingActivity
 import org.desklink.mobile.plugins.clipboard.ClipboardPlugin
-import org.desklink.mobile.plugins.runcommand.RunCommandActivity
-import org.desklink.mobile.plugins.runcommand.RunCommandPlugin
 import org.desklink.mobile.plugins.share.SendFileActivity
 import org.desklink.mobile.ui.MainActivity
 import org.desklink.mobile.R
@@ -494,15 +492,6 @@ class BackgroundService : Service() {
                     sendFile.putExtra("deviceId", deviceId)
                     val sendPendingFile = PendingIntent.getActivity(this, 1, sendFile, UPDATE_IMMUTABLE_FLAGS)
                     notification.addAction(0, getString(R.string.send_files), sendPendingFile)
-
-                    // Checking if there are registered commands and adding the button.
-                    val plugin = device.getPlugin("RunCommandPlugin") as RunCommandPlugin?
-                    if (plugin != null && plugin.commandList.isNotEmpty()) {
-                        val runCommand = Intent(this, RunCommandActivity::class.java)
-                        runCommand.putExtra("deviceId", connectedDeviceIds[0])
-                        val runPendingCommand = PendingIntent.getActivity(this, 2, runCommand, UPDATE_IMMUTABLE_FLAGS)
-                        notification.addAction(0, getString(R.string.pref_plugin_runcommand), runPendingCommand)
-                    }
                 }
             }
         }

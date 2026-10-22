@@ -52,8 +52,6 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_NOTIFICATION_ACTION = "desklink.notification.action"
     const val PACKET_TYPE_SYSTEMVOLUME = "desklink.systemvolume"
     const val PACKET_TYPE_SYSTEMVOLUME_REQUEST = "desklink.systemvolume.request"
-    const val PACKET_TYPE_RUNCOMMAND = "desklink.runcommand"
-    const val PACKET_TYPE_RUNCOMMAND_REQUEST = "desklink.runcommand.request"
     const val PACKET_TYPE_SCREEN_REQUEST = "desklink.screen.request"
     const val PACKET_TYPE_SCREEN_READY = "desklink.screen.ready"
     const val PACKET_TYPE_SCREEN_FRAME = "desklink.screen.frame"

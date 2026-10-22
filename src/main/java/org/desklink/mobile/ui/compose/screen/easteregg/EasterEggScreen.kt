@@ -77,7 +77,7 @@ fun EasterEggScreen() {
             R.drawable.ic_delete, R.drawable.ic_warning,
             R.drawable.ic_volume, R.drawable.ic_wifi,
             R.drawable.ic_add, R.drawable.touchpad_plugin_action_24dp,
-            R.drawable.desklink_mark, R.drawable.run_command_plugin_icon_24dp,
+            R.drawable.desklink_mark,
             R.drawable.ic_phonelink_36dp, R.drawable.ic_phonelink_off_36dp,
             R.drawable.ic_error_outline_48dp, R.drawable.ic_home_black_24dp,
             R.drawable.ic_settings_white_32dp, R.drawable.ic_stop,

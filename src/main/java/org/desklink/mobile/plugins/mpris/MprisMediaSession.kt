@@ -138,7 +138,7 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
             "media_notification"
         ) { this.updateMediaNotification() }
 
-        NotificationReceiver.RunCommand(context) { service: NotificationReceiver ->
+        NotificationReceiver.WithService(context) { service: NotificationReceiver ->
             service.addListener(this@MprisMediaSession)
             val serviceReady = service.isConnected
             if (serviceReady) {

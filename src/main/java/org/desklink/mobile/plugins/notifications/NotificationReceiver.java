@@ -118,10 +118,10 @@ public class NotificationReceiver extends NotificationListenerService {
 
 
     public static void Start(Context c) {
-        RunCommand(c, null);
+        WithService(c, null);
     }
 
-    public static void RunCommand(Context c, final InstanceCallback callback) {
+    public static void WithService(Context c, final InstanceCallback callback) {
         if (callback != null) {
             mutex.lock();
             try {

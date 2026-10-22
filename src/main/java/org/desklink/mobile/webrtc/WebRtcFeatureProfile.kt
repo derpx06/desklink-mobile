@@ -49,8 +49,6 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REPLY,
         DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_PING,
-        DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND,
-        DeskLinkProtocol.PACKET_TYPE_RUNCOMMAND_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_SETTINGS,
         DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
         DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,

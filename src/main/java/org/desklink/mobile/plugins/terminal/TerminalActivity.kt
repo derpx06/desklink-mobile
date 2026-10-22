@@ -197,18 +197,6 @@ class TerminalActivity : AppCompatActivity() {
     /** Looked up each time: the application owns the client, per device. */
     private val client: TerminalClient? get() = DeskLinkApplication.getInstance().terminalClient(deviceId)
     private var openId by mutableStateOf<String?>(null)
-    private var openTitle by mutableStateOf<String?>(null)
-    private var openSince = 0L
-    private var runKey by mutableStateOf<String?>(null)
-    private var runAfterSerial = Int.MAX_VALUE
-
-    private fun takeRunExtras(intent: Intent) {
-        openTitle = intent.getStringExtra(EXTRA_OPEN_TITLE)
-        openSince = intent.getLongExtra(EXTRA_OPEN_SINCE, 0)
-        runKey = intent.getStringExtra(EXTRA_RUN_KEY)
-        runAfterSerial = client?.state?.value?.listSerial ?: 0
-        if (runKey != null) client?.refresh()
-    }
     private var resumed by mutableStateOf(false)
 
     /** The session screen without the app bar or the phone's status and navigation bars. */
@@ -236,7 +224,6 @@ class TerminalActivity : AppCompatActivity() {
             (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES,
         )
         openId = savedInstanceState?.getString(STATE_OPEN_ID) ?: intent.getStringExtra(EXTRA_TERMINAL_ID)
-        if (savedInstanceState == null) takeRunExtras(intent)
         loadLabels()
         fullscreen = getSharedPreferences(LABEL_PREFS, MODE_PRIVATE).getBoolean(KEY_FULLSCREEN, true)
         SessionGate.check(this, deviceId, onOpen = {
@@ -255,11 +242,6 @@ class TerminalActivity : AppCompatActivity() {
             recreate() // a notification for another device
         } else {
             intent.getStringExtra(EXTRA_TERMINAL_ID)?.let { openId = it }
-            if (intent.hasExtra(EXTRA_OPEN_TITLE)) {
-                openId?.let { current -> client?.leave(current) }
-                openId = null
-                takeRunExtras(intent)
-            }
         }
     }
 
@@ -357,28 +339,6 @@ class TerminalActivity : AppCompatActivity() {
             state.error?.let {
                 snackbar.showSnackbar(if (it == TerminalProtocol.ERROR_BAD_CWD) getString(R.string.terminal_bad_cwd, deskName()) else it)
                 client.clearError()
-            }
-        }
-        // Run command refused "locked": once a list after this screen opened was accepted (the
-        // session password is proven for this connection), run it once more.
-        LaunchedEffect(state.listSerial, state.passwordNeeded, state.notAllowed) {
-            // A list accepted: the desk now also lists its commands to this phone if it held them back.
-            if (state.listLoaded && state.passwordNeeded == null && !state.notAllowed) {
-                DeskLinkApplication.getInstance().getDevicePlugin(deviceId, org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)?.onSessionPasswordProven()
-            }
-            val key = runKey ?: return@LaunchedEffect
-            if (state.listSerial > runAfterSerial && state.passwordNeeded == null && !state.notAllowed) {
-                runKey = null
-                DeskLinkApplication.getInstance().getDevicePlugin(deviceId, org.desklink.mobile.plugins.runcommand.RunCommandPlugin::class.java)?.retryRun(key)
-            }
-        }
-        // Run command: open the shared terminal the desk starts for it, once it is listed.
-        LaunchedEffect(state.sessions, openTitle) {
-            val title = openTitle ?: return@LaunchedEffect
-            if (openId != null) return@LaunchedEffect
-            pickStartedSession(state.sessions, title, openSince)?.let {
-                openTitle = null
-                openId = it
             }
         }
         // Ended from the desk: back to the list, which the client is already refreshing. The
@@ -878,7 +838,6 @@ class TerminalActivity : AppCompatActivity() {
         val imeVisible = WindowInsets.isImeVisible
         val canDictate = remember { SpeechRecognizer.isRecognitionAvailable(context) }
         val resumes = rememberResumes()
-        val quick = remember(resumes) { QuickCommands.load(QuickCommands.prefs(context), deviceId) }
 
         val host = remember(id) {
             object : TerminalView.Host {
@@ -987,7 +946,6 @@ class TerminalActivity : AppCompatActivity() {
                         .padding(horizontal = 8.dp),
                     factory = { ctx -> TerminalView(ctx, host).also { it.attach(screen); viewRef = it } },
                 )
-                if (quick.isNotEmpty()) QuickCommandChips(quick, enabled = connected, onRun = run)
                 if (composing) {
                     // F6: the synced snippets, one tap into the draft.
                     val notesRevision by org.desklink.mobile.plugins.notes.NotesStore.revision.collectAsState()
@@ -1101,71 +1059,6 @@ class TerminalActivity : AppCompatActivity() {
             ) {
                 Box(Modifier.size(32.dp).background(TermChip, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                     Icon(painterResource(R.drawable.sym_add), contentDescription = null, tint = TermText, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-    }
-
-    /** One tap: the command and Enter. Edited per computer in Settings → Quick commands. */
-    @Composable
-    private fun QuickCommandChips(commands: List<String>, enabled: Boolean, onRun: (String) -> Unit) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            commands.forEach { command ->
-                Box(
-                    Modifier
-                        .heightIn(min = 48.dp)
-                        .focusProperties { canFocus = false }
-                        .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.terminal_run_command, command)) { onRun(command) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        command,
-                        fontFamily = MonoFamily,
-                        fontSize = 12.sp,
-                        color = TermText,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        }
-    }
-
-    /** Snippets (F6) above the compose bar: a tap adds one to the draft, which is then read before Send. */
-    @Composable
-    private fun SnippetChips(snippets: List<org.desklink.mobile.plugins.notes.Snippet>, onInsert: (String) -> Unit) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            snippets.forEach { snippet ->
-                Box(
-                    Modifier
-                        .heightIn(min = 48.dp)
-                        .focusProperties { canFocus = false }
-                        .clickable(role = Role.Button, onClickLabel = stringResource(R.string.terminal_insert_snippet, snippet.label)) { onInsert(snippet.text) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        snippet.label,
-                        fontSize = 12.sp,
-                        color = TermText,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .background(TermField, RoundedCornerShape(16.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
                 }
             }
         }
@@ -1426,23 +1319,6 @@ class TerminalActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_DEVICE_ID = "deviceId"
         const val EXTRA_TERMINAL_ID = "terminalId"
-
-        /** Open the session with this title once the desk lists it (a command just run). */
-        const val EXTRA_OPEN_TITLE = "openTitle"
-
-        /** A command the desk refused "locked": run once more after the session password is proven. */
-        const val EXTRA_RUN_KEY = "runKey"
-
-        /** Unix seconds the run was asked for: older sessions with the same title are not it. */
-        const val EXTRA_OPEN_SINCE = "openSince"
-
-        /** The newest running session titled [title] that started at or after [since] (a few seconds of clock skew allowed). */
-        fun pickStartedSession(sessions: List<TerminalSessionState>, title: String, since: Long): String? =
-            sessions.lastOrNull { s ->
-                s.title == title && !s.gone && s.exitStatus == null && (s.startedAt == null || since == 0L || s.startedAt >= since - CLOCK_SKEW_SECS)
-            }?.id
-
-        private const val CLOCK_SKEW_SECS = 30L
 
         private const val STATE_OPEN_ID = "openTerminalId"
         private const val LABEL_PREFS = "desklink_terminal_labels"
