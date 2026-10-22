@@ -621,8 +621,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
                 }
             }
 
-            PACKET_TYPE_NOTIFICATION_CANCEL -> dismissNotification(np.getString("id"))
-
             PACKET_TYPE_NOTIFICATION_REPLY -> {
                 if (np.has("requestReplyId") && np.has("message")) {
                     replyToNotification(np.getString("requestReplyId"), np.getString("message"))
@@ -677,7 +675,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     override val supportedPacketTypes = arrayOf(
             PACKET_TYPE_NOTIFICATION_REQUEST,
-            PACKET_TYPE_NOTIFICATION_CANCEL,
             PACKET_TYPE_NOTIFICATION_REPLY,
             PACKET_TYPE_NOTIFICATION_ACTION
         )
@@ -717,7 +714,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
         private const val PACKET_TYPE_NOTIFICATION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION
         private const val PACKET_TYPE_NOTIFICATION_REQUEST = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REQUEST
-        private const val PACKET_TYPE_NOTIFICATION_CANCEL = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_CANCEL
         private const val PACKET_TYPE_NOTIFICATION_REPLY = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REPLY
         private const val PACKET_TYPE_NOTIFICATION_ACTION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_ACTION
         const val PREFERENCE_KEY = "prefKey"

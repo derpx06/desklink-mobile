@@ -20,14 +20,11 @@ class DeskLinkProtocolTest {
             DeskLinkProtocol.PACKET_TYPE_NOTIFICATION,
             DeskLinkProtocol.PACKET_TYPE_BATTERY,
             DeskLinkProtocol.PACKET_TYPE_MPRIS,
-            DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME,
             DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME,
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST,
-            DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_TELEPHONY_REQUEST,
-            DeskLinkProtocol.PACKET_TYPE_CONNECTIVITY_REPORT,
         )
 
         assertTrue(packetTypes.all { it.startsWith("desklink.") })

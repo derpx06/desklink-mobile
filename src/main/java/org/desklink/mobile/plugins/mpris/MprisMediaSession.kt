@@ -35,10 +35,6 @@ import org.desklink.mobile.R
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.plugins.mpris.MprisPlugin.MprisPlayer
 import org.desklink.mobile.plugins.notifications.NotificationReceiver
-import org.desklink.mobile.plugins.systemvolume.SystemVolumePlugin
-import org.desklink.mobile.plugins.systemvolume.SystemVolumeProvider
-import org.desklink.mobile.plugins.systemvolume.SystemVolumeProvider.Companion.currentProvider
-import org.desklink.mobile.plugins.systemvolume.SystemVolumeProvider.ProviderStateListener
 import org.desklink.mobile.ui.MainActivity
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -48,8 +44,7 @@ import java.util.concurrent.ConcurrentHashMap
  * screen and (Android 13+, drawn from the session) Quick Settings' media controls, with the same
  * player, cover and stale rules as the Home media card. One notification at most, for every desk.
  */
-class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver.NotificationListener,
-    ProviderStateListener {
+class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver.NotificationListener {
     private var spotifyRunning = false
 
     // Holds the device and player displayed in the notification
@@ -163,10 +158,6 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
         plugin.removePlayerListUpdatedHandler("media_notification")
         updateMediaNotification()
 
-        val systemVolumeProvider = SystemVolumeProvider.getInstance()
-        systemVolumeProvider.setPlugin(null)
-        systemVolumeProvider.removeStateListener( this)
-
         if (mprisDevices.isEmpty()) {
             val prefs = PreferenceManager.getDefaultSharedPreferences(context)
             prefs.unregisterOnSharedPreferenceChangeListener(this)
@@ -193,14 +184,6 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
         return !(player.isSpotify && spotifyRunning)
     }
 
-    private fun updateRemoteDeviceVolumeControl() {
-        val plugin = DeskLinkApplication.getInstance().getDevicePlugin(notificationDeviceId, SystemVolumePlugin::class.java)
-            ?: return
-        val systemVolumeProvider = SystemVolumeProvider.getInstance()
-        systemVolumeProvider.setPlugin(plugin)
-        systemVolumeProvider.addStateListener( this)
-    }
-
     private fun mayNotify(context: Context): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -225,7 +208,6 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
         val (device, player) = found
         notificationDeviceId = device.deviceId
         notificationPlayer = player
-        updateRemoteDeviceVolumeControl()
 
         // Without the feature link the desk's report may be out of date: shown paused, without controls.
         val stale = !device.hasActiveWebRtcFeatureTransport
@@ -390,7 +372,6 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
             release()
         }
         mediaSession = null
-        currentProvider?.release()
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, key: String?) {
@@ -429,16 +410,6 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
             }
         } catch (e: SecurityException) {
             Log.w(TAG, "Failed to get active notifications", e)
-        }
-    }
-
-    override fun onProviderStateChanged(systemVolumeProvider: SystemVolumeProvider, isActive: Boolean) {
-        val mediaSession = mediaSession ?: return
-
-        if (isActive) {
-            mediaSession.setPlaybackToRemote(systemVolumeProvider)
-        } else {
-            mediaSession.setPlaybackToLocal(AudioManager.STREAM_MUSIC)
         }
     }
 

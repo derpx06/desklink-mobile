@@ -275,16 +275,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:taskAffinity=""
             android:excludeFromRecents="true"/>
 
-        <activity
-            android:name="org.desklink.mobile.plugins.mpris.MprisActivity"
-            android:label="@string/open_mpris_controls"
-            android:launchMode="singleTop"
-            android:parentActivityName="org.desklink.mobile.ui.MainActivity">
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="org.desklink.mobile.ui.MainActivity" />
-        </activity>
-
         <receiver android:name="org.desklink.mobile.plugins.mpris.MprisMediaNotificationReceiver"
             android:exported="true">
             <intent-filter>

@@ -44,7 +44,6 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
     private final Handler handler;
     private String currentFileName;
     private int currentFileNum;
-    private boolean updatePacketPending;
     private long totalSend;
     private int prevProgressPercentage;
     private final UploadNotification uploadNotification;
@@ -66,7 +65,6 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
         handler = new Handler(Looper.getMainLooper());
         currentFileNum = 0;
         currentFileName = "";
-        updatePacketPending = false;
 
         lock = new Object();
         networkPacketList = new ArrayList<>();
@@ -184,28 +182,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
 
             uploadNotification.setTitle(getDevice().getContext().getResources()
                     .getQuantityString(R.plurals.outgoing_file_title, totalNumFiles, totalNumFiles, getDevice().getName()));
-
-            //Give SharePlugin some time to add more NetworkPackets
-            if (isRunning && !updatePacketPending) {
-                updatePacketPending = true;
-                handler.post(this::sendUpdatePacket);
-            }
         }
-    }
-
-    /**
-     * Use this to send metadata ahead of all the other {@link #networkPacketList packets}.
-     */
-    private void sendUpdatePacket() {
-        NetworkPacket np = new NetworkPacket(SharePlugin.PACKET_TYPE_SHARE_REQUEST_UPDATE);
-
-        synchronized (lock) {
-            np.set("numberOfFiles", totalNumFiles);
-            np.set("totalPayloadSize", totalPayloadSize);
-            updatePacketPending = false;
-        }
-
-        getDevice().sendPacket(np);
     }
 
     @Override

@@ -71,7 +71,6 @@ public class SharePlugin extends Plugin {
     final static String CANCEL_SHARE_BACKGROUND_JOB_ID_EXTRA = "backgroundJobId";
 
     private final static String PACKET_TYPE_SHARE_REQUEST = DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST;
-    final static String PACKET_TYPE_SHARE_REQUEST_UPDATE = DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST_UPDATE;
 
     final static String KEY_NUMBER_OF_FILES = "numberOfFiles";
     final static String KEY_TOTAL_PAYLOAD_SIZE = "totalPayloadSize";
@@ -210,16 +209,6 @@ public class SharePlugin extends Plugin {
     @WorkerThread
     public boolean onPacketReceived(@NonNull NetworkPacket np) {
         try {
-            if (np.getType().equals(PACKET_TYPE_SHARE_REQUEST_UPDATE)) {
-                if (receiveFileJob != null && receiveFileJob.isRunning()) {
-                    receiveFileJob.updateTotals(np.getInt(KEY_NUMBER_OF_FILES), np.getLong(KEY_TOTAL_PAYLOAD_SIZE));
-                } else {
-                    Log.d("SharePlugin", "Received update packet but CompositeUploadJob is null or not running");
-                }
-
-                return true;
-            }
-
             // Only receiveFile consumes a payload. The other three branches used
             // to return with one still open, which over WebRTC leaks a file
             // descriptor and leaves the backing temp file undeleted, because
@@ -409,7 +398,7 @@ public class SharePlugin extends Plugin {
 
     @Override
     public @NonNull String[] getSupportedPacketTypes() {
-        return new String[]{PACKET_TYPE_SHARE_REQUEST, PACKET_TYPE_SHARE_REQUEST_UPDATE};
+        return new String[]{PACKET_TYPE_SHARE_REQUEST};
     }
 
     @Override

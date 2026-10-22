@@ -56,7 +56,7 @@ class WebRtcFeatureProfileTest {
 
     @Test
     fun aPeerMayClaimLessThanItsIdentityButNeverMore() {
-        val identity = listOf(DeskLinkProtocol.PACKET_TYPE_PING, DeskLinkProtocol.PACKET_TYPE_BATTERY, DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST)
+        val identity = listOf(DeskLinkProtocol.PACKET_TYPE_PING, DeskLinkProtocol.PACKET_TYPE_BATTERY, REMOVED_SMS)
         assertTrue(WebRtcFeatureProfile.handoverListIsConsistent(listOf(DeskLinkProtocol.PACKET_TYPE_PING), identity))
         assertTrue(WebRtcFeatureProfile.handoverListIsConsistent(emptyList(), identity))
         // Types outside this profile are filtered from both sides first.
@@ -72,7 +72,7 @@ class WebRtcFeatureProfileTest {
         WebRtcFeatureProfile.recordPeer(
             id,
             incoming = listOf(DeskLinkProtocol.PACKET_TYPE_PING, DeskLinkProtocol.PACKET_TYPE_BATTERY, "desklink.unknown"),
-            outgoing = listOf(DeskLinkProtocol.PACKET_TYPE_BATTERY, DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST),
+            outgoing = listOf(DeskLinkProtocol.PACKET_TYPE_BATTERY, REMOVED_SMS),
         )
         try {
             assertTrue(WebRtcFeatureProfile.peerAccepts(id, DeskLinkProtocol.PACKET_TYPE_PING))
@@ -82,13 +82,13 @@ class WebRtcFeatureProfileTest {
             assertTrue(WebRtcFeatureProfile.peerSends(id, DeskLinkProtocol.PACKET_TYPE_BATTERY))
             assertFalse(WebRtcFeatureProfile.peerSends(id, DeskLinkProtocol.PACKET_TYPE_SETTINGS))
             // Outside this profile, even when the peer claims it.
-            assertFalse(WebRtcFeatureProfile.peerSends(id, DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST))
+            assertFalse(WebRtcFeatureProfile.peerSends(id, REMOVED_SMS))
         } finally {
             WebRtcFeatureProfile.forgetPeer(id)
         }
         // Before a handover only this profile applies.
         assertTrue(WebRtcFeatureProfile.peerAccepts(id, DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST))
-        assertFalse(WebRtcFeatureProfile.peerAccepts(id, DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST))
+        assertFalse(WebRtcFeatureProfile.peerAccepts(id, REMOVED_SMS))
     }
 
     @Test
@@ -124,19 +124,44 @@ class WebRtcFeatureProfileTest {
     /** Signaling is bootstrap transport metadata and is never a feature capability. */
     @Test
     fun featuresWithoutACounterpartStayDisabled() {
-        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME_REQUEST))
         assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST))
-        assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST))
         assertFalse(WebRtcFeatureProfile.allows(DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1))
     }
 
+    /**
+     * 1.3 removed these features. An older peer may still advertise or send them: they are outside
+     * the profile, so they are filtered at the boundary and never reach a handler.
+     */
+    @Test
+    fun removedFeaturesAreOutsideTheProfileAndNeverAdvertised() {
+        REMOVED_TYPES.forEach { assertFalse(it, WebRtcFeatureProfile.allows(it)) }
+        assertEquals(emptyList<String>(), WebRtcFeatureProfile.capabilities(REMOVED_TYPES))
+        val id = "older-peer"
+        WebRtcFeatureProfile.recordPeer(id, incoming = REMOVED_TYPES, outgoing = REMOVED_TYPES)
+        try {
+            REMOVED_TYPES.forEach {
+                assertFalse(it, WebRtcFeatureProfile.peerAccepts(id, it))
+                assertFalse(it, WebRtcFeatureProfile.peerSends(id, it))
+            }
+        } finally {
+            WebRtcFeatureProfile.forgetPeer(id)
+        }
+    }
+
     private companion object {
+        const val REMOVED_SMS = "desklink.sms.request"
+        val REMOVED_TYPES = listOf(
+            "desklink.automations", "desklink.runcommand", "desklink.runcommand.request",
+            "desklink.digitizer", "desklink.digitizer.session", "desklink.presenter",
+            "desklink.mousepad.echo", "desklink.systemvolume", "desklink.systemvolume.request",
+            "desklink.connectivity_report", "desklink.share.request.update",
+            "desklink.notification.cancel", "desklink.telephony.request_mute", REMOVED_SMS,
+        )
         val ALL_PACKET_TYPES = setOf(
             DeskLinkProtocol.PACKET_TYPE_FOLDERS,
             DeskLinkProtocol.PACKET_TYPE_BATTERY,
             DeskLinkProtocol.PACKET_TYPE_CLIPBOARD,
             DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT,
-            DeskLinkProtocol.PACKET_TYPE_CONNECTIVITY_REPORT,
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS,
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS,
@@ -145,7 +170,6 @@ class WebRtcFeatureProfileTest {
             DeskLinkProtocol.PACKET_TYPE_FINDMYPHONE_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_LOCK,
             DeskLinkProtocol.PACKET_TYPE_LOCK_REQUEST,
-            DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_ECHO,
             DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE,
             DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_MPRIS,
@@ -153,7 +177,6 @@ class WebRtcFeatureProfileTest {
             DeskLinkProtocol.PACKET_TYPE_NOTES,
             DeskLinkProtocol.PACKET_TYPE_NOTIFICATION,
             DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_ACTION,
-            DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_CANCEL,
             DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REPLY,
             DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_PING,
@@ -166,10 +189,6 @@ class WebRtcFeatureProfileTest {
             DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES,
             DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_SNIPPETS,
-            DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST_UPDATE,
-            DeskLinkProtocol.PACKET_TYPE_SMS_REQUEST,
-            DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME,
-            DeskLinkProtocol.PACKET_TYPE_SYSTEMVOLUME_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_TELEPHONY,
             DeskLinkProtocol.PACKET_TYPE_TELEPHONY_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1,

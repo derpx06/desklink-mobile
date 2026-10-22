@@ -275,17 +275,6 @@ class MprisPlugin : Plugin() {
     override val description: String
         get() = context.resources.getString(R.string.pref_plugin_mpris_desc)
 
-    override fun getUiButtons(): List<PluginUiButton> = listOf(
-        PluginUiButton(
-            context.getString(R.string.open_mpris_controls),
-            R.drawable.mpris_plugin_action_24dp
-        ) { parentActivity ->
-            val intent = Intent(parentActivity, MprisActivity::class.java)
-            intent.putExtra(DEVICE_ID_KEY, device.deviceId)
-            parentActivity.startActivity(intent)
-        }
-    )
-
     override fun hasSettings(): Boolean = true
 
     override fun getSettingsFragment(activity: Activity): PluginSettingsFragment {
