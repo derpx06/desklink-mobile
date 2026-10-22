@@ -159,6 +159,8 @@ class DeskLinkApplication : Application() {
         org.desklink.mobile.helpers.ThreadHelper.execute {
             org.desklink.mobile.plugins.folders.BucketEngine.start(this)
         }
+        // 1.3 removed several features: what they stored is deleted once, off the main thread.
+        org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.helpers.RemovedFeatures.runOnce(this) }
 
         if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             StrictMode.setVmPolicy(
