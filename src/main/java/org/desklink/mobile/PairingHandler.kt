@@ -233,8 +233,11 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
                 // Requested: We started pairing and got rejected
                 // RequestedByPeer: They stared pairing, then cancelled
                 PairState.Requested, PairState.RequestedByPeer -> {
+                    // A refused QR proof is, in practice, a code that was replaced (it rotates after a few minutes).
+                    val refusedProof = proofSent && state == PairState.Requested
                     state = PairState.NotPaired
-                    callback.pairingFailed(device.context.getString(R.string.error_canceled_by_other_peer))
+                    proofSent = false
+                    callback.pairingFailed(device.context.getString(if (refusedProof) R.string.qr_error_expired else R.string.error_canceled_by_other_peer))
                 }
 
                 PairState.Paired -> {
@@ -343,7 +346,11 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
      * The desktop answers with a plain `pair:true` (handled by the Requested
      * branch of [packetReceived], completing via [pairingDone]) or `pair:false`.
      */
+    /** A QR proof was sent and has not been answered yet: a refusal then means the code is no good any more. */
+    @Volatile private var proofSent = false
+
     fun requestPairingWithProof(mac: String, verifiedCertificate: Certificate) {
+        proofSent = true
         synchronized(stateLock) {
             // Already paired with this very desktop: still send the proof, so a
             // desktop that lost its record is repaired, but leave our state.
@@ -406,6 +413,7 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
 
     @VisibleForTesting
     fun pairingDone() {
+        proofSent = false
         val linkUnchanged = synchronized(stateLock) {
             val expected = negotiatedCertificate
             val unchanged = expected == null ||

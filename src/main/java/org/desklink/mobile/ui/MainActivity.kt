@@ -747,6 +747,23 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 resetTo(HOME)
             }
         }
+        // The desk refused the proof (the code rotated): say so at once, in words, and scan again.
+        androidx.compose.runtime.DisposableEffect(id) {
+            val callback = object : org.desklink.mobile.PairingHandler.PairingCallback {
+                override fun incomingPairRequest() = Unit
+                override fun pairingSuccessful() = Unit
+                override fun pairingFailed(error: String) = runOnUiThread {
+                    if (qrProgress?.first == id) {
+                        qrProgress = null
+                        showMessage(error)
+                        scanAttempt++
+                    }
+                }
+                override fun unpaired(device: Device) = Unit
+            }
+            device?.addPairingCallback(callback)
+            onDispose { device?.removePairingCallback(callback) }
+        }
         // The desk never answered the proof: say so instead of spinning.
         LaunchedEffect(stage) {
             if (stage == QrPairing.Stage.VERIFYING) {
