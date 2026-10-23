@@ -113,7 +113,8 @@ class WebRtcFileTransferManager(
         if (ticking) return
         ticking = true
         runner.tickWhile(TICK_MS) {
-            tick()
+            // A tick that throws must not end the clock for good (the 60 s pause and the checkpoints depend on it).
+            runCatching { tick() }.onFailure { Log.w(TAG, "a transfer tick failed", it) }
             (sends.isNotEmpty() || receives.isNotEmpty()).also { if (!it) ticking = false }
         }
     }
@@ -542,7 +543,12 @@ class WebRtcFileTransferManager(
 
     // ------------------------------------------------------------- lifecycle
 
+    /** Tests: runs inside every tick, to make one fail. */
+    @androidx.annotation.VisibleForTesting
+    internal var tickHook: (() -> Unit)? = null
+
     private fun tick() {
+        tickHook?.invoke()
         val now = clock()
         sends.values.toList().forEach { it.sender.tick(now) }
         receives.values.toList().forEach { it.tick(now) }

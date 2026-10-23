@@ -42,6 +42,8 @@ class FileTransferManagerTest {
 
     /** A file thread whose work the test runs itself. */
     private class ManualRunner : FileRunner {
+        var tickStep: (() -> Boolean)? = null
+        override fun tickWhile(periodMs: Long, step: () -> Boolean) { tickStep = step }
         private val queue = ArrayDeque<Runnable>()
         override fun post(task: Runnable) = synchronized(queue) { queue.add(task); Unit }
         override fun postDelayed(delayMs: Long, task: Runnable) = post(task)
@@ -339,6 +341,18 @@ class FileTransferManagerTest {
         pump(maxMessages = 0)
         assertEquals("the freed slot takes a new file", 3, desk.sent.count { it.action == WebRtcFileAction.ACCEPT })
         assertEquals(0, desk.sent.count { it.action == WebRtcFileAction.ERROR })
+    }
+
+    @Test
+    fun aTickThatThrowsDoesNotEndTheClock() {
+        desk.manager.handleControl(deskWire, offer(size = FileV2.BLOCK_BYTES * 2L))
+        pump(maxMessages = 0)
+        val step = checkNotNull(desk.runner.tickStep) { "a live transfer arms the clock" }
+        var calls = 0
+        desk.manager.tickHook = { calls++; if (calls == 1) error("boom") }
+        assertTrue("the loop goes on after a failed tick", step())
+        assertTrue(step())
+        assertEquals(2, calls)
     }
 
     @Test
