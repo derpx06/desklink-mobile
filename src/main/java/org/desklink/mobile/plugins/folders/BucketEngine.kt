@@ -128,6 +128,8 @@ object BucketEngine {
         val incoming = sortedMapOf<Int, List<Pair<String, Entry>>>()
         val toRequest = ArrayDeque<String>()
         val outstanding = LinkedHashSet<String>()
+        /** Desk files not taken because another name here differs only in capitals. */
+        val remoteClashes = LinkedHashSet<String>()
         val sending = HashMap<String, String>()
         var observer: ContentObserver? = null
         var adding: Pair<Int, Int>? = null
@@ -604,6 +606,7 @@ object BucketEngine {
         val steps = FolderSync.plan(Side.PHONE, live.manifest, remote, DeviceHelper.getDeviceName(app))
         val downloads = mutableListOf<Pair<String, Entry>>()
         var rescan = false
+        val clashing = mutableSetOf<String>()
         for (step in steps) when (step) {
             is Step.Take -> live.manifest[step.path] = step.entry
             is Step.Bump -> live.manifest[step.path]?.let { live.manifest[step.path] = it.copy(vv = step.vv) }
@@ -620,11 +623,11 @@ object BucketEngine {
             }
             is Step.Download -> if (step.entry.dir) {
                 if (tree.mkdirs(step.path) != null) live.manifest[step.path] = step.entry else rescan = true
-            } else downloads += step.path to step.entry
+            } else if (tree.caseVariantOf(step.path) != null) clashing += step.path else downloads += step.path to step.entry
             // A move within the Bucket (a rename on the desk): renamed here, no transfer.
             is Step.Move -> {
                 val item = tree.find(step.from)
-                if (item != null && unchanged(item, live.manifest[step.from]) && tree.find(step.to) == null && tree.move(step.from, step.to)) {
+                if (item != null && unchanged(item, live.manifest[step.from]) && tree.find(step.to) == null && tree.caseVariantOf(step.to) == null && tree.move(step.from, step.to)) {
                     live.manifest[step.from] = step.tombstone
                     tree.find(step.to)?.let { placed -> live.manifest[step.to] = step.entry.copy(size = placed.size, mtime = placed.mtime) }
                     live.from[step.to] = live.from.remove(step.from) ?: Side.DESK
@@ -651,6 +654,14 @@ object BucketEngine {
         synchronized(wanted) {
             downloads.forEach { (path, entry) -> if (wanted.size < FolderSync.MAX_OUTSTANDING * 4) wanted[live.deviceId to path] = entry }
         }
+        // Two names from the desk differing only in capitals: the earlier one syncs, the later ones do not (as for a local scan).
+        val among = FolderSync.caseClashes(downloads.map { it.first })
+        clashing += among
+        downloads.removeAll { it.first in among }
+        val before = live.remoteClashes.toSet()
+        live.remoteClashes.clear()
+        live.remoteClashes += clashing
+        live.notSynced = live.notSynced.filterNot { it.second == Skip.CASE_CLASH && it.first in before } + clashing.sorted().map { it to Skip.CASE_CLASH }
         live.toRequest.clear()
         live.toRequest.addAll(downloads.map { it.first })
         live.outstanding.clear()
@@ -856,6 +867,10 @@ object BucketEngine {
         if (placed != null) {
             live.manifest[ref.relpath] = entry.copy(size = placed.size, mtime = placed.mtime)
             live.from[ref.relpath] = Side.DESK
+        } else if (tree != null && ref.relpath in tree.caseClashes) {
+            // Not synced, and not asked for again: reported as such until the other name goes.
+            live.remoteClashes += ref.relpath
+            live.notSynced = live.notSynced.filter { it.first != ref.relpath } + (ref.relpath to Skip.CASE_CLASH)
         } else {
             live.dirtyAt = SystemClock.elapsedRealtime()
         }
@@ -901,7 +916,7 @@ object BucketEngine {
         }
         // Case clashes (two live names differing only in case): the later ones are not synced.
         val clashes = FolderSync.caseClashes(scan.found.keys)
-        live.notSynced = scan.skipped + clashes.sorted().map { it to Skip.CASE_CLASH }
+        live.notSynced = scan.skipped + clashes.sorted().map { it to Skip.CASE_CLASH } + live.remoteClashes.sorted().map { it to Skip.CASE_CLASH }
         val found = scan.found.filterKeys { it !in clashes }
         live.documents = found.mapValues { it.value.documentId }
         val settling = mutableSetOf<String>()

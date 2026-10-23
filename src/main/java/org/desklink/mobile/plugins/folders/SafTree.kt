@@ -149,12 +149,32 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
         return item
     }
 
+    /** Paths this tree refused because another file there differs only in capital letters (the provider would have renamed ours). */
+    val caseClashes = mutableSetOf<String>()
+
+    /** Tests turn the look-before-creating off to prove the check afterwards also holds. */
+    @androidx.annotation.VisibleForTesting
+    internal var checkBeforeCreating = true
+
+    /** The name already in [path]'s folder that differs from its own only in capital letters, or null. */
+    fun caseVariantOf(path: String): String? {
+        val parent = find(path.substringBeforeLast('/', "")) ?: return null
+        val name = path.substringAfterLast('/')
+        return children(parent.documentId).keys.firstOrNull { it != name && it.equals(name, ignoreCase = true) }
+    }
+
     /** Writes [source] at [path]: a temporary document beside it, then renamed into place. The new stat, or null. */
     fun place(path: String, source: File, replace: Item?): Item? = source.inputStream().use { place(path, it, replace) }
 
     fun place(path: String, source: InputStream, replace: Item?): Item? {
         val parent = mkdirs(path.substringBeforeLast('/', "")) ?: return null
         val name = path.substringAfterLast('/')
+        // Another name differing only in capitals: a provider that ignores case would quietly call ours "name (1)" and
+        // we would upload that back as a new file. Never created.
+        if (checkBeforeCreating && caseVariantOf(path) != null && children(parent.documentId)[name] == null) {
+            caseClashes += path
+            return null
+        }
         val parentUri = DocumentsContract.buildDocumentUriUsingTree(tree, parent.documentId)
         val temp = DocumentsContract.createDocument(resolver, parentUri, "application/octet-stream", ".desklink-${UUID.randomUUID()}.tmp") ?: return null
         val ok = runCatching {
@@ -166,8 +186,19 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
             runCatching { DocumentsContract.deleteDocument(resolver, temp) }
             return null
         }
+        // The provider may have kept our file under another name (it renames on any clash, whatever we asked for): then it
+        // is not the file we meant to create. Removed, and never uploaded back.
+        if (displayName(ok) != name) {
+            runCatching { DocumentsContract.deleteDocument(resolver, ok) }
+            caseClashes += path
+            return null
+        }
         return find(path)
     }
+
+    private fun displayName(document: Uri): String? = runCatching {
+        resolver.query(document, arrayOf(Document.COLUMN_DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
+    }.getOrNull()
 
     /** Deletes a file, or a folder with everything in it (one call: one item). */
     fun delete(item: Item): Boolean = runCatching { DocumentsContract.deleteDocument(resolver, uri(item)) }.getOrDefault(false)
