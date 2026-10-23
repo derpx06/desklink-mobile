@@ -104,6 +104,65 @@ class FolderSyncTest {
         }
     }
 
+    private fun folder(desk: Long, phone: Long) = Entry(0, 1_700_000_000_000, "", false, Vv(desk, phone), dir = true)
+
+    private fun winners(names: List<String>): List<String> {
+        val losers = FolderSync.caseClashes(names)
+        return names.filter { !FolderSync.isLeftOut(it, losers) }
+    }
+
+    /** The vector shared with the computer (its folders.rs test): the same winners on both sides. */
+    @Test
+    fun theSharedCaseClashVectorGivesTheSameWinnersAsTheComputer() {
+        assertEquals(listOf("A.txt", "É", "Dir", "b.txt"), winners(listOf("a.txt", "A.txt", "É", "é", "Dir", "dir", "b.txt")))
+    }
+
+    @Test
+    fun namesAreOrderedByUtf8BytesNotUtf16() {
+        // U+FF5E is one UTF-16 unit above the surrogates; U+1F600 is a surrogate pair. In UTF-8 the first sorts first.
+        assertTrue(FolderSync.utf8Order.compare("\uFF5E", "\uD83D\uDE00") < 0)
+        assertTrue("\uFF5E" > "\uD83D\uDE00")
+        assertTrue(FolderSync.utf8Order.compare("É", "é") < 0)
+        assertTrue(FolderSync.utf8Order.compare("a", "a/b") < 0)
+    }
+
+    /** A scan: files and folders together; the same name in two folders is no clash; nothing below a left-out folder. */
+    @Test
+    fun aScanSyncsTheFirstOfNamesThatDifferOnlyInCase() {
+        val found = listOf(
+            "A.txt", "a.txt", "B.txt", "É.txt", "é.txt", "Dir", "dir", "dir/sub", "Dir/x.txt", "dir/y.txt", "dir/sub/z.txt", "Dir/a.txt", "Dir/A.TXT",
+        )
+        val losers = FolderSync.caseClashes(found)
+        assertEquals(setOf("a.txt", "é.txt", "dir", "Dir/a.txt"), losers)
+        assertEquals(
+            listOf("A.txt", "B.txt", "Dir", "Dir/A.TXT", "Dir/x.txt", "É.txt"),
+            found.filter { !FolderSync.isLeftOut(it, losers) }.sortedWith(FolderSync.utf8Order),
+        )
+    }
+
+    /** The desk's manifest holds two clashing paths: the later is dropped before planning, the tombstone stays, nothing is asked for. */
+    @Test
+    fun aManifestWithTwoPathsThatDifferOnlyInCaseLosesTheLaterAndKeepsTombstones() {
+        val received = mapOf(
+            "A.txt" to entry("a", 0, 1), "a.txt" to entry("b", 0, 1), "Dir" to folder(0, 1), "dir" to folder(0, 1),
+            "dir/y.txt" to entry("y", 0, 1), "Dir/x.txt" to entry("x", 0, 1), "B.txt" to entry("c", 0, 1), "b.txt" to tomb(0, 2),
+        )
+        val (remote, dropped) = FolderSync.guardManifest(received)
+        assertEquals(setOf("a.txt", "dir", "dir/y.txt"), dropped)
+        assertEquals(listOf("A.txt", "B.txt", "Dir", "Dir/x.txt", "b.txt"), remote.keys.sortedWith(FolderSync.utf8Order))
+        assertTrue("the tombstone stays", remote.getValue("b.txt").deleted)
+        val steps = FolderSync.plan(Side.PHONE, emptyMap(), remote, "Phone")
+        assertTrue(steps.none { it is Step.Download && (it.path == "a.txt" || it.path.startsWith("dir")) })
+    }
+
+    @Test
+    fun aPathAlreadySyncedHereIsKeptUntouchedWhenItNowLoses() {
+        val received = mapOf("A.txt" to entry("a", 0, 1), "a.txt" to entry("b", 0, 1))
+        val (remote, dropped) = FolderSync.guardManifest(received) { it == "a.txt" }
+        assertEquals(emptySet<String>(), dropped)
+        assertEquals(setOf("A.txt", "a.txt"), remote.keys)
+    }
+
     private fun sync(desk: Folder, phone: Folder) {
         // The phone acts on the desk's manifest, then the desk on the phone's (as they would exchange them).
         apply(phone, desk)

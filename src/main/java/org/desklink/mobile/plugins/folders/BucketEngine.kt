@@ -130,6 +130,8 @@ object BucketEngine {
         val outstanding = LinkedHashSet<String>()
         /** Desk files not taken because another name here differs only in capitals. */
         val remoteClashes = LinkedHashSet<String>()
+        /** Of the desk's own manifest, the later of two names differing only in capitals (dropped before planning). */
+        var manifestClashes = emptySet<String>()
         val sending = HashMap<String, String>()
         var observer: ContentObserver? = null
         var adding: Pair<Int, Int>? = null
@@ -576,8 +578,13 @@ object BucketEngine {
         if (live.incoming.values.sumOf { it.size } >= FolderSync.MAX_MANIFEST_ENTRIES) return live.incoming.clear()
         live.incoming[part] = entries(packet.getJSONArray("entries") ?: JSONArray(), fromDesk = true)
         if (live.incoming.size != parts) return
-        val remote = FolderSync.takeManifest(live.incoming.values.flatten()).toMap()
+        val received = FolderSync.takeManifest(live.incoming.values.flatten()).toMap()
         live.incoming.clear()
+        // Manifest guard (W3 case clashes): of two live paths differing only in capitals the later one, and what is below it,
+        // is dropped before planning, so nothing is requested, deleted or tombstoned for it. A tombstone stays as it is, and
+        // so does an entry this phone already synced (kept untouched).
+        val (remote, dropped) = FolderSync.guardManifest(received) { path -> live.manifest[path]?.deleted == false }
+        live.manifestClashes = dropped
         if (live.phase == Phase.HELD_EMPTY) return
         live.remote = HashMap(remote.filterValues { !it.deleted && !it.dir }.mapValues { it.value.sha256 })
         live.remoteDirs = remote.filterValues { !it.deleted && it.dir }.keys
@@ -606,7 +613,7 @@ object BucketEngine {
         val steps = FolderSync.plan(Side.PHONE, live.manifest, remote, DeviceHelper.getDeviceName(app))
         val downloads = mutableListOf<Pair<String, Entry>>()
         var rescan = false
-        val clashing = mutableSetOf<String>()
+        val clashing = live.manifestClashes.toMutableSet()
         for (step in steps) when (step) {
             is Step.Take -> live.manifest[step.path] = step.entry
             is Step.Bump -> live.manifest[step.path]?.let { live.manifest[step.path] = it.copy(vv = step.vv) }
@@ -651,13 +658,13 @@ object BucketEngine {
             }
             is Step.Conflict -> Unit
         }
-        synchronized(wanted) {
-            downloads.forEach { (path, entry) -> if (wanted.size < FolderSync.MAX_OUTSTANDING * 4) wanted[live.deviceId to path] = entry }
-        }
-        // Two names from the desk differing only in capitals: the earlier one syncs, the later ones do not (as for a local scan).
+        // Names the plan itself brings (moves, copies) that differ only in capitals: the first syncs, the later ones do not.
         val among = FolderSync.caseClashes(downloads.map { it.first })
         clashing += among
         downloads.removeAll { it.first in among }
+        synchronized(wanted) {
+            downloads.forEach { (path, entry) -> if (wanted.size < FolderSync.MAX_OUTSTANDING * 4) wanted[live.deviceId to path] = entry }
+        }
         val before = live.remoteClashes.toSet()
         live.remoteClashes.clear()
         live.remoteClashes += clashing
@@ -914,10 +921,11 @@ object BucketEngine {
             live.phase = Phase.NO_ACCESS
             return
         }
-        // Case clashes (two live names differing only in case): the later ones are not synced.
+        // W3 case clashes: the first name in UTF-8 byte order syncs; the others, and what is below a left-out folder, never
+        // enter the manifest and are never offered (listed as not synced).
         val clashes = FolderSync.caseClashes(scan.found.keys)
-        live.notSynced = scan.skipped + clashes.sorted().map { it to Skip.CASE_CLASH } + live.remoteClashes.sorted().map { it to Skip.CASE_CLASH }
-        val found = scan.found.filterKeys { it !in clashes }
+        live.notSynced = scan.skipped + clashes.sorted().map { it to Skip.CASE_CLASH } + (live.remoteClashes + live.manifestClashes).sorted().map { it to Skip.CASE_CLASH }
+        val found = scan.found.filterKeys { !FolderSync.isLeftOut(it, clashes) }
         live.documents = found.mapValues { it.value.documentId }
         val settling = mutableSetOf<String>()
         val stats = HashMap<String, Stat>()
@@ -944,7 +952,9 @@ object BucketEngine {
             return
         }
         live.confirmedEmpty = false
-        val keep = live.toRequest.toSet() + live.outstanding + settling.filter { live.manifest[it]?.deleted == false }
+        // A path already synced that now loses a clash is kept as it is, never tombstoned.
+        val leftOutSynced = live.manifest.filter { (path, entry) -> !entry.deleted && path !in found && FolderSync.isLeftOut(path, clashes) }.keys
+        val keep = live.toRequest.toSet() + live.outstanding + settling.filter { live.manifest[it]?.deleted == false } + leftOutSynced
         val before = live.manifest.filterValues { !it.deleted }.keys
         val changed = FolderSync.applyScan(Side.PHONE, live.manifest, stats, { path -> found[path]?.let(tree::sha256) }, System.currentTimeMillis(), keep)
         live.manifest.filterValues { !it.deleted }.keys.filter { it !in before && it !in live.from }.forEach { live.from[it] = Side.PHONE }

@@ -289,9 +289,62 @@ object FolderSync {
      */
     fun takesIncoming(path: String, dir: Boolean): Boolean = skipReason(path, dir) == null && !ignored(path, includeHidden = false)
 
-    /** Live paths that differ only in case from an earlier one (the earlier keeps its name; these are not synced). */
-    fun caseClashes(paths: Collection<String>): Set<String> =
-        paths.sorted().groupBy { it.lowercase() }.values.flatMap { it.drop(1) }.toSet()
+    /** Unicode code point order, which is UTF-8 byte order (not Kotlin's UTF-16 order, which differs above U+E000). */
+    internal val utf8Order = Comparator<String> { a, b ->
+        var i = 0
+        var j = 0
+        while (i < a.length && j < b.length) {
+            val x = a.codePointAt(i)
+            val y = b.codePointAt(j)
+            if (x != y) return@Comparator x.compareTo(y)
+            i += Character.charCount(x)
+            j += Character.charCount(y)
+        }
+        (a.length - i).compareTo(b.length - j)
+    }
+
+    /**
+     * "W3 — case clashes" (docs/protocol/stageD-protocol.md; the computer applies the same rule). Among the LIVE items of one
+     * directory (files and folders together), names equal after `lowercase(Locale.ROOT)` are one name: the one that sorts first
+     * in UTF-8 byte order (so `A.txt` beats `a.txt`, `É` beats `é`) syncs, the others do not, nor does anything below a folder
+     * that is left out. Different directories never clash. Returns the paths left out (not what lies below them; see [isLeftOut]).
+     * Tombstones are not passed in: they never clash.
+     */
+    fun caseClashes(livePaths: Collection<String>): Set<String> {
+        val first = HashSet<Pair<String, String>>()
+        val losers = LinkedHashSet<String>()
+        for (path in livePaths.sortedWith(utf8Order)) {
+            if (underLoser(path, losers)) continue
+            val parent = path.substringBeforeLast('/', "")
+            val name = path.substringAfterLast('/')
+            if (!first.add(parent to name.lowercase(java.util.Locale.ROOT))) losers += path
+        }
+        return losers
+    }
+
+    private fun underLoser(path: String, losers: Set<String>): Boolean {
+        if (losers.isEmpty()) return false
+        var at = path.indexOf('/')
+        while (at >= 0) {
+            if (path.substring(0, at) in losers) return true
+            at = path.indexOf('/', at + 1)
+        }
+        return false
+    }
+
+    /**
+     * The manifest guard: of two live paths in [received] that differ only in capitals the later one, and what is below it, is
+     * dropped before planning. A tombstone is kept as it is, and so is a path [alreadySynced] here (kept untouched). Returns the
+     * manifest to plan with and the paths dropped.
+     */
+    fun guardManifest(received: Map<String, Entry>, alreadySynced: (String) -> Boolean = { false }): Pair<Map<String, Entry>, Set<String>> {
+        val leftOut = caseClashes(received.filterValues { !it.deleted }.keys)
+        val dropped = received.filter { (path, entry) -> !entry.deleted && isLeftOut(path, leftOut) && !alreadySynced(path) }.keys
+        return (received - dropped) to dropped
+    }
+
+    /** [path] is a left-out item or lies below one. */
+    fun isLeftOut(path: String, losers: Set<String>): Boolean = path in losers || underLoser(path, losers)
 
     /** F8b: an incoming file of [size] fits when [free] keeps [MIN_FREE_BYTES] after it. */
     fun enoughSpace(free: Long, size: Long): Boolean = size in 0..MAX_BUCKET_FILE_BYTES && free - size >= MIN_FREE_BYTES
