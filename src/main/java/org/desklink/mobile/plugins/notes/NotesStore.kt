@@ -6,6 +6,7 @@
 package org.desklink.mobile.plugins.notes
 
 import android.content.Context
+import android.os.Looper
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
@@ -60,15 +61,33 @@ object NotesStore {
     /** Bumped on every change, for screens to redraw. */
     val revision: StateFlow<Int> = _revision
 
+    private val _unavailable = MutableStateFlow(false)
+
+    /**
+     * True while the sealed notes cannot be opened for a reason that may pass (the Keystore is not ready, the file is
+     * being read badly): reads then see an empty shelf, edits are not kept, nothing on disk is touched, and the next call
+     * tries again.
+     */
+    val unavailable: StateFlow<Boolean> = _unavailable
+
     /** Runs [job] on the shelf, loading it first; saves when it says it changed it. */
-    fun <T> with(context: Context, job: (Shelf) -> Pair<T, Boolean>): T = synchronized(this) {
-        val current = shelf ?: load(context.applicationContext).also { shelf = it }
-        val (result, changed) = job(current)
-        if (changed) {
-            saveSoon()
-            _revision.value++
+    fun <T> with(context: Context, job: (Shelf) -> Pair<T, Boolean>): T {
+        // Loaded outside the monitor: a Keystore that is slow to answer never holds up everyone else.
+        val loaded = if (synchronized(this) { shelf } == null) load(context.applicationContext) else null
+        return synchronized(this) {
+            val current = shelf ?: loaded?.also { shelf = it }
+            if (current == null) {
+                _unavailable.value = true
+                return@synchronized job(Shelf()).first
+            }
+            _unavailable.value = false
+            val (result, changed) = job(current)
+            if (changed) {
+                saveSoon()
+                _revision.value++
+            }
+            result
         }
-        result
     }
 
     private var saveQueued = false
@@ -91,37 +110,33 @@ object NotesStore {
         worker.execute { with(context) { Unit to false } }
     }
 
-    private fun load(context: Context): Shelf {
+    /** The shelf, or null when it cannot be opened *yet*: then nothing is moved aside and the next call tries again. */
+    private fun load(context: Context): Shelf? {
         file = AtomicFile(File(context.filesDir, FILE).apply { parentFile?.mkdirs() })
-        val shelf = runCatching {
-            if (!file.baseFile.exists()) Shelf() else Shelf.fromStored(JSONObject(String(openWithRetry(file.readFully()), Charsets.UTF_8)))
-        }.getOrElse {
-            // Unreadable (key lost with a backup restore, a newer schema, damage): kept aside, never
-            // overwritten, and this starts empty; a desk still holding the notes sends them back.
-            Log.w(TAG, "Could not open the snippets and notes (${it.javaClass.simpleName}); starting empty")
-            runCatching { file.baseFile.renameTo(File(file.baseFile.path + ".unreadable")) }
-            Shelf()
-        }
-        if (shelf.prune(System.currentTimeMillis())) write(shelf.toStored().toString())
-        return shelf
-    }
-
-    /**
-     * The Keystore can fail for a moment (right after a boot, while the device is still settling) without the key being
-     * lost: that is tried again before the file is judged unreadable and set aside.
-     */
-    private fun openWithRetry(sealed: ByteArray): ByteArray {
-        var last: Throwable? = null
-        repeat(OPEN_ATTEMPTS) { attempt ->
+        val onMain = Looper.myLooper() == Looper.getMainLooper()
+        var attempt = 0
+        while (true) {
             try {
-                return open(sealed)
+                val opened = if (!file.baseFile.exists()) Shelf() else Shelf.fromStored(JSONObject(String(open(file.readFully()), Charsets.UTF_8)))
+                if (opened.prune(System.currentTimeMillis())) write(opened.toStored().toString())
+                return opened
             } catch (e: Exception) {
-                last = e
-                if (!isTransient(e)) throw e
-                if (attempt < OPEN_ATTEMPTS - 1) Thread.sleep(OPEN_RETRY_MS)
+                if (isTransient(e)) {
+                    // Never sleep on the main thread; the start-up preload (a worker) is where this is waited out.
+                    if (!onMain && ++attempt < OPEN_ATTEMPTS) {
+                        Thread.sleep(OPEN_RETRY_MS)
+                        continue
+                    }
+                    Log.w(TAG, "The snippets and notes cannot be opened just now (${e.javaClass.simpleName}); left as they are")
+                    return null
+                }
+                // A key that is gone, a newer schema, damage: kept aside under its own name, never overwritten, and this
+                // starts empty; a desk still holding the notes sends them back.
+                Log.w(TAG, "Could not open the snippets and notes (${e.javaClass.simpleName}); starting empty")
+                runCatching { file.baseFile.renameTo(File(file.baseFile.path + ".unreadable-" + System.currentTimeMillis())) }
+                return Shelf()
             }
         }
-        throw last!!
     }
 
     private fun write(plain: String) {
@@ -254,21 +269,25 @@ object NotesStore {
 
     /** `iv (12) | ciphertext+tag`. */
     private fun seal(plain: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.ENCRYPT_MODE, key()) }
+        val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.ENCRYPT_MODE, key(create = true)) }
         cipher.updateAAD(AAD)
         return cipher.iv + cipher.doFinal(plain)
     }
 
     private fun open(sealed: ByteArray): ByteArray {
         require(sealed.size > 12 + 16) { "too short" }
-        val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, sealed, 0, 12)) }
+        val cipher = Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.DECRYPT_MODE, key(create = false), GCMParameterSpec(128, sealed, 0, 12)) }
         cipher.updateAAD(AAD)
         return cipher.doFinal(sealed, 12, sealed.size - 12)
     }
 
-    private fun key(): SecretKey {
+    /** Reading never makes a key: a missing one means the notes it sealed are gone, not that a new key should be tried. */
+    private class KeyMissing : java.security.GeneralSecurityException("the notes key is not in the Keystore")
+
+    private fun key(create: Boolean): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        if (!create) throw KeyMissing()
         val spec = KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
