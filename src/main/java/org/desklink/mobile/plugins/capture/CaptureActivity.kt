@@ -462,15 +462,21 @@ class CaptureActivity : AppCompatActivity() {
             }
             Stage.PAGE -> {
                 primary = pluralSend(desk) to {
-                    page?.let { pages += it }
+                    page?.let { pages += ScanImage.forPage(it) }
                     page = null
                     sendScan()
                 }
+                val full = pages.size + 1 >= ScanImage.MAX_PAGES
+                val fullMessage = stringResource(R.string.capture_pages_full, ScanImage.MAX_PAGES)
                 secondary = stringResource(R.string.capture_add_page) to {
-                    page?.let { pages += it }
-                    page = null
-                    filter = ScanFilter.COLOUR
-                    shoot()
+                    if (full) {
+                        android.widget.Toast.makeText(this@CaptureActivity, fullMessage, android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        page?.let { pages += ScanImage.forPage(it) }
+                        page = null
+                        filter = ScanFilter.COLOUR
+                        shoot()
+                    }
                 }
             }
             Stage.TEXT -> {

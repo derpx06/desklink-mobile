@@ -30,6 +30,20 @@ object ScanImage {
     /** Long side of every page and photo sent (enough to read, small enough to send). */
     const val MAX_SIDE = 2560
 
+    /** Pages in one scan: each is kept in memory until sent, so the count is bounded. */
+    const val MAX_PAGES = 12
+
+    /** A4 at 200 dpi: all a PDF page of 595 pt can use, and a twelfth of the memory of a full photo. */
+    const val PAGE_SIDE = 1654
+
+    /** The page as it is kept while more are scanned. */
+    fun forPage(bitmap: Bitmap): Bitmap {
+        val scale = minOf(1f, PAGE_SIDE.toFloat() / max(bitmap.width, bitmap.height))
+        if (scale >= 1f) return bitmap
+        return Bitmap.createScaledBitmap(bitmap, max(1, (bitmap.width * scale).toInt()), max(1, (bitmap.height * scale).toInt()), true)
+            .also { if (it !== bitmap) bitmap.recycle() }
+    }
+
     /** A photo from the camera, upright (EXIF) and at most [MAX_SIDE] on its long side. */
     fun load(context: Context, uri: Uri, maxSide: Int = MAX_SIDE): Bitmap? = runCatching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
