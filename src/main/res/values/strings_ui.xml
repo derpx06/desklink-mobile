@@ -545,9 +545,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_move_to" formatted="false">Move to folder…</string>
     <string name="bucket_move_nowhere" formatted="false">There is no other folder these can go in.</string>
     <string name="bucket_share_files_only" formatted="false">Only files can be shared. Pick files, or use Save a copy.</string>
-    <string name="bucket_too_large" formatted="false">Files over 1 GB can\'t go in the Bucket</string>
-    <string name="bucket_full" formatted="false">The Bucket is full (10 GB)</string>
-    <string name="bucket_over_add_limit" formatted="false">%1$d left out: one add takes 500 items or 5 GB at most</string>
+    <string name="bucket_too_large" formatted="false">Files over 1 GiB can\'t go in the Bucket</string>
+    <string name="bucket_full" formatted="false">The Bucket is full (10 GiB)</string>
+    <string name="bucket_over_add_limit" formatted="false">%1$d left out: one add takes 500 items or 5 GiB at most</string>
     <string name="bucket_too_deep_left_out" formatted="false">Some items were more than 2 folders deep and were left out (%1$d)</string>
     <string name="bucket_add_cancelled" formatted="false">Stopped</string>
     <string name="bucket_nothing_added" formatted="false">Nothing was added</string>
@@ -556,7 +556,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_skip_name_long" formatted="false">%1$d with names over 255 bytes</string>
     <string name="bucket_skip_invalid" formatted="false">%1$d with names the computer cannot hold</string>
     <string name="bucket_skip_case" formatted="false">%1$d differing only in capital letters</string>
-    <string name="bucket_skip_large" formatted="false">%1$d over 1 GB</string>
+    <string name="bucket_skip_large" formatted="false">%1$d over 1 GiB</string>
     <plurals name="bucket_selected">
         <item quantity="one">%1$d selected</item>
         <item quantity="other">%1$d selected</item>
@@ -604,7 +604,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_no_camera">No camera app is available</string>
     <string name="bucket_skipped" tools:ignore="PluralsCandidate">%1$d could not be added (too large, or the Bucket is full)</string>
     <string name="bucket_text_added">Saved to the Bucket</string>
-    <string name="bucket_text_failed">That text is too long for the Bucket (1 MB at most)</string>
+    <string name="bucket_text_failed">That text is too long for the Bucket (1 MiB at most)</string>
     <string name="bucket_waiting_for">Waiting for %1$s</string>
     <string name="bucket_syncing">Syncing…</string>
     <string name="bucket_with">With %1$s</string>
@@ -615,7 +615,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_not_on_desk">The Bucket is not set up on %1$s: paused</string>
     <string name="bucket_storage_full">Phone storage is full: files from the computer wait until there is room</string>
     <string name="bucket_too_many">The Bucket holds 10,000 items at most</string>
-    <string name="bucket_large" formatted="false">The Bucket is %1$s of 10 GB: new items stop at 10 GB</string>
+    <string name="bucket_large" formatted="false">The Bucket is %1$s of 10 GiB: new items stop at 10 GiB</string>
     <string name="bucket_empty_title">Drop anything here</string>
     <string name="bucket_empty_body">It shows up on %1$s too.</string>
     <string name="bucket_ways_in">Share from any app to “DeskLink Bucket”, or tap Add for files, a photo or what you copied.</string>

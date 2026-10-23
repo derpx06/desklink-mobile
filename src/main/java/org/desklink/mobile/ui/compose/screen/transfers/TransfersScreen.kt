@@ -9,7 +9,6 @@ package org.desklink.mobile.ui.compose.screen.transfers
 import android.net.Uri
 import android.text.format.DateFormat
 import android.text.format.DateUtils
-import android.text.format.Formatter
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.annotation.DrawableRes
@@ -119,7 +118,7 @@ class TransferActions(
 
 /** "2.4 MB/s" from bytes per second. */
 @Composable
-fun speedLabel(bytesPerSecond: Long): String = stringResource(R.string.transfers_speed, Formatter.formatShortFileSize(LocalContext.current, bytesPerSecond))
+fun speedLabel(bytesPerSecond: Long): String = stringResource(R.string.transfers_speed, org.desklink.mobile.helpers.Sizes.iec(bytesPerSecond))
 
 /**
  * "Recent transfers", as items of the Files tab's grid: the running transfer first, then everything sent and
@@ -219,7 +218,7 @@ private fun FileCard(record: TransferRecord, deskName: String, revision: Int, ac
     val sizePx = with(LocalDensity.current) { 180.dp.roundToPx() }
     val preview by rememberFilePreview(record, sizePx, revision)
     var menu by remember { mutableStateOf(false) }
-    val size = Formatter.formatShortFileSize(context, record.size)
+    val size = org.desklink.mobile.helpers.Sizes.iec(record.size)
     val time = DateFormat.getTimeFormat(context).format(Date(record.time))
     val desk = record.deviceName.ifBlank { deskName }
     val description = stringResource(if (record.sent) R.string.transfers_item_sent else R.string.transfers_item_received, record.name, size, desk, time) +

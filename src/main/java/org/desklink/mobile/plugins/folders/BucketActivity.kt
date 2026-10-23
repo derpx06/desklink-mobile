@@ -14,7 +14,6 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.text.format.DateUtils
-import android.text.format.Formatter
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -190,7 +189,7 @@ class BucketActivity : AppCompatActivity() {
             val w = BucketSyncNotification.words(context)
             val n = BucketSyncNotification.noteWords(context)
             val head = if (summary.files == 1) context.getString(R.string.bucket_header_syncing_one) else context.getString(R.string.bucket_header_syncing_many).format(summary.files)
-            val amount = w.ofTotal.format(Formatter.formatShortFileSize(context, summary.done), Formatter.formatShortFileSize(context, summary.total))
+            val amount = w.ofTotal.format(org.desklink.mobile.helpers.Sizes.iec(summary.done), org.desklink.mobile.helpers.Sizes.iec(summary.total))
             val tail = when {
                 userPaused -> context.getString(R.string.bucket_paused_by_you)
                 summary.paused -> n.paused.format(desk)

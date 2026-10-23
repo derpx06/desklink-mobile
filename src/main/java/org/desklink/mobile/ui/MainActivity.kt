@@ -549,7 +549,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     getString(R.string.files_unsaved_done, result.published.name) +
                         if (result.published.fellBackToDownloads) " " + getString(R.string.files_fell_back) else ""
                 is org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Failed ->
-                    result.freeUpBytes?.let { result.message + " " + getString(R.string.files_storage_free_up, android.text.format.Formatter.formatShortFileSize(this@MainActivity, it)) } ?: result.message
+                    result.freeUpBytes?.let { result.message + " " + getString(R.string.files_storage_free_up, org.desklink.mobile.helpers.Sizes.iec(it)) } ?: result.message
                 else -> null
             }
             if (text != null) runOnUiThread { showMessage(text) }
@@ -847,7 +847,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     private fun liveTransfer(running: TransferProgress.Transfer?): LiveTransfer? {
         running ?: return null
-        val speed = running.bytesPerSecond.takeIf { it > 0 }?.let { getString(R.string.transfers_speed, android.text.format.Formatter.formatShortFileSize(this, it)) }
+        val speed = running.bytesPerSecond.takeIf { it > 0 }?.let { getString(R.string.transfers_speed, org.desklink.mobile.helpers.Sizes.iec(it)) }
         if (running.saving) return LiveTransfer(running.title, running.upload, null, getString(R.string.files_saving_label))
         return LiveTransfer(running.title, running.upload, running.percent?.let { it / 100f }, listOfNotNull(running.percent?.let { "$it%" }, speed).joinToString(" · "))
     }

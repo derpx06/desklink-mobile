@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package org.desklink.mobile.plugins.folders
 
-import android.text.format.Formatter
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -71,7 +70,7 @@ fun BucketHomeCard(deviceId: String, desk: String, onOpen: () -> Unit) {
                         summary != null -> BucketActivity.summaryText(context, summary, view.userPaused, desk)
                         !on -> stringResource(R.string.bucket_home_off, desk)
                         items.isEmpty() -> stringResource(R.string.bucket_home_empty, desk)
-                        else -> Formatter.formatShortFileSize(context, view!!.bytes)
+                        else -> org.desklink.mobile.helpers.Sizes.iec(view!!.bytes)
                     },
                     fontSize = 12.sp, color = t.textDim, maxLines = 2,
                 )

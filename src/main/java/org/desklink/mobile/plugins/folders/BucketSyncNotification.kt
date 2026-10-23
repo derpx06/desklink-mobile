@@ -8,7 +8,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
-import android.text.format.Formatter
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import org.desklink.mobile.DeskLinkApplication
@@ -63,7 +62,7 @@ object BucketSyncNotification {
         if (now - (lastAt[deviceId] ?: 0) < UPDATE_EVERY_MS) return false
         lastAt[deviceId] = now
         if (!manager.areNotificationsEnabled()) return false
-        val note = BucketProgress.note(desk, flights, linkDown = !linkUp, size = { Formatter.formatShortFileSize(context, it) }, w = words(context), n = noteWords(context)) ?: return false
+        val note = BucketProgress.note(desk, flights, linkDown = !linkUp, size = { org.desklink.mobile.helpers.Sizes.iec(it) }, w = words(context), n = noteWords(context)) ?: return false
         val style = NotificationCompat.InboxStyle().also { inbox -> note.lines.forEach(inbox::addLine) }.setSummaryText(note.subText)
         val pause = Intent(context, Receiver::class.java).setAction(if (view.userPaused) ACTION_RESUME else ACTION_PAUSE).putExtra(EXTRA_DEVICE, deviceId)
         runCatching {

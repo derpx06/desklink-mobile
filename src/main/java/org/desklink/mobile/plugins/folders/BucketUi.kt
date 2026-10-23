@@ -15,7 +15,6 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
 import android.text.format.DateUtils
-import android.text.format.Formatter
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -429,7 +428,7 @@ class BucketUi(
             view.lastSync != null -> stringResource(R.string.bucket_up_to_date, DateUtils.getRelativeTimeSpanString(view.lastSync, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString())
             else -> stringResource(R.string.bucket_with, desk)
         }
-        return "$sync · ${Formatter.formatShortFileSize(LocalContext.current, view.bytes)}"
+        return "$sync · ${org.desklink.mobile.helpers.Sizes.iec(view.bytes)}"
     }
 
     /** While files move: "Syncing 3 files · 1.1 GB of 2.4 GB · about 4 min left", a thin bar and the speed. */
@@ -445,7 +444,7 @@ class BucketUi(
             LinearProgressIndicator({ summary.fraction }, Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp)
             if (summary.bytesPerSecond > 0 && !summary.paused) {
                 Text(
-                    BucketSyncNotification.words(host).perSecond.format(Formatter.formatShortFileSize(host, summary.bytesPerSecond)),
+                    BucketSyncNotification.words(host).perSecond.format(org.desklink.mobile.helpers.Sizes.iec(summary.bytesPerSecond)),
                     fontSize = 12.sp, color = t.textFaint, fontFamily = MonoFamily,
                 )
             }
@@ -558,7 +557,7 @@ class BucketUi(
                 item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_too_many), warn = true) }
             }
             if (view.bytes > FolderSync.WARN_BUCKET_BYTES) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(if (view.bytes >= FolderSync.MAX_BUCKET_BYTES) R.string.bucket_full else R.string.bucket_large, Formatter.formatShortFileSize(host, view.bytes)), warn = view.bytes >= FolderSync.MAX_BUCKET_BYTES) }
+                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(if (view.bytes >= FolderSync.MAX_BUCKET_BYTES) R.string.bucket_full else R.string.bucket_large, org.desklink.mobile.helpers.Sizes.iec(view.bytes)), warn = view.bytes >= FolderSync.MAX_BUCKET_BYTES) }
             }
             val tiles = BucketLevel.tiles(view.items, path)
             if (tiles.isEmpty()) {
@@ -666,7 +665,7 @@ class BucketUi(
         val t = tokens
         val context = LocalContext.current
         val sizePx = with(LocalDensity.current) { 180.dp.roundToPx() }
-        val size = if (item.dir) resources.getQuantityString(R.plurals.bucket_folder_count, tile.count, tile.count) + " · " + Formatter.formatShortFileSize(context, tile.bytes) else Formatter.formatShortFileSize(context, item.size)
+        val size = if (item.dir) resources.getQuantityString(R.plurals.bucket_folder_count, tile.count, tile.count) + " · " + org.desklink.mobile.helpers.Sizes.iec(tile.bytes) else org.desklink.mobile.helpers.Sizes.iec(item.size)
         val origin = if (item.dir) null else when (item.from) {
             Side.DESK -> stringResource(R.string.bucket_from, desk)
             Side.PHONE -> stringResource(R.string.bucket_from_this_phone)
@@ -680,7 +679,7 @@ class BucketUi(
             BucketItem.State.CONFLICT -> stringResource(R.string.bucket_state_conflict)
         }
         val progressLine = (item.progress ?: tile.progress?.let { Progress(it.done, it.total, it.etaSeconds, it.bytesPerSecond, it.paused) })
-            ?.let { BucketProgress.line(it, { b -> Formatter.formatShortFileSize(context, b) }, BucketSyncNotification.words(context)) }
+            ?.let { BucketProgress.line(it, { b -> org.desklink.mobile.helpers.Sizes.iec(b) }, BucketSyncNotification.words(context)) }
         val description = listOfNotNull(item.name, size, origin, state, progressLine).joinToString(", ")
         val moreLabel = stringResource(R.string.bucket_item_menu, item.name)
         Column(
