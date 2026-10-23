@@ -175,7 +175,7 @@ object BucketEngine {
             buckets.values.forEach { live -> runCatching { tree(live)?.cleanTemps() } }
             File(app.cacheDir, "bucket-stash").listFiles()?.forEach { it.delete() }
         }
-        worker.scheduleWithFixedDelay({ runCatching { tick() }.onFailure { Log.w(TAG, "Bucket tick failed", it) } }, 5, 5, TimeUnit.SECONDS)
+        worker.scheduleWithFixedDelay({ runCatching { tick() }.onFailure { Log.w(TAG, "Bucket tick failed (${it.javaClass.simpleName})") } }, 5, 5, TimeUnit.SECONDS)
     }
 
     fun link(deviceId: String, up: Boolean) = worker.execute {
@@ -518,7 +518,7 @@ object BucketEngine {
 
     fun onPacket(deviceId: String, packet: NetworkPacket) {
         if (!limiter.allow(deviceId)) return
-        worker.execute { runCatching { handle(deviceId, packet) }.onFailure { Log.w(TAG, "Bucket packet failed", it) } }
+        worker.execute { runCatching { handle(deviceId, packet) }.onFailure { Log.w(TAG, "Bucket packet failed (${it.javaClass.simpleName})") } }
     }
 
     private fun handle(deviceId: String, packet: NetworkPacket) {
@@ -828,10 +828,7 @@ object BucketEngine {
     /** A requested file arrived at [partial]; it is moved aside now and placed on the worker. */
     fun arrived(deviceId: String, ref: FolderRef, partial: File, sha256: String, size: Long) {
         val stash = File(stash(), UUID.randomUUID().toString())
-        if (!partial.renameTo(stash)) {
-            partial.delete()
-            return
-        }
+        setAside(partial, stash)
         worker.execute {
             try {
                 place(deviceId, ref, stash, sha256, size)
@@ -839,6 +836,11 @@ object BucketEngine {
                 stash.delete()
             }
         }
+    }
+
+    /** Thrown, not swallowed: the receiver then tells the sender it failed, instead of `complete` for a file nobody has. */
+    internal fun setAside(partial: File, stash: File) {
+        if (!partial.renameTo(stash)) throw java.io.IOException("The Bucket file could not be set aside")
     }
 
     private fun place(deviceId: String, ref: FolderRef, stash: File, sha256: String, size: Long) {
@@ -1062,7 +1064,7 @@ object BucketEngine {
                 file.failWrite(out)
                 throw e
             }
-        }.onFailure { Log.e(TAG, "Could not save the Bucket's state", it) }
+        }.onFailure { Log.e(TAG, "Could not save the Bucket's state (${it.javaClass.simpleName})") }
     }
 
     private fun publish() {

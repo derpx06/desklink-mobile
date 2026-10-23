@@ -367,4 +367,17 @@ class BucketRulesTest {
         assertTrue(SafTree.folderName("é".repeat(300)).toByteArray().size <= FolderSync.MAX_SEGMENT_BYTES)
         assertEquals("pc", SafTree.folderName("..pc.."))
     }
+
+    @Test
+    fun aFileThatCannotBeSetAsideIsAnErrorNotASilentReturn() {
+        val dir = java.nio.file.Files.createTempDirectory("bucket-stash").toFile()
+        try {
+            org.junit.Assert.assertThrows(java.io.IOException::class.java) { BucketEngine.setAside(java.io.File(dir, "gone"), java.io.File(dir, "stash")) }
+            val part = java.io.File(dir, "part").apply { writeText("x") }
+            BucketEngine.setAside(part, java.io.File(dir, "stash"))
+            org.junit.Assert.assertTrue(java.io.File(dir, "stash").exists())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }
