@@ -656,7 +656,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     </plurals>
     <string name="files_recent_transfers">Recent transfers</string>
     <string name="files_show_all">Show all %1$d</string>
-    <string name="capture_pages_full">A scan holds up to %1$d pages. Send this one, then scan the rest.</string>
+    <string name="capture_pages_full" tools:ignore="PluralsCandidate">A scan holds up to %1$d pages. Send this one, then scan the rest.</string>
+    <string name="capture_no_camera">This phone has no camera DeskLink can use right now.</string>
+    <string name="capture_camera_denied">Camera access is off for DeskLink. Turn it on in Android settings to use this.</string>
     <string name="home_more_actions">More actions</string>
     <!-- W5: Settings, grouped by feature in the desk's order -->
     <string name="sg_connection_summary">This phone\'s name, %1$s, unpairing</string>

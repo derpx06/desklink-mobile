@@ -70,6 +70,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.apache.commons.lang3.ArrayUtils
 import org.desklink.mobile.BackgroundService
+import org.desklink.mobile.BuildConfig
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin
 import org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin
@@ -192,6 +193,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         if (savedInstanceState == null) handleIntent(intent)
 
         setContent { DeskLinkTheme(this) { Root() } }
+        if (BuildConfig.DEBUG && savedInstanceState == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) logFirstFrame()
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -208,6 +210,22 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         ) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), RESULT_NOTIFICATIONS_ENABLED)
         }
+    }
+
+    /** Debug: the time from the process starting to the first frame drawn (the number the W7 target is measured by). */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.N)
+    private fun logFirstFrame() {
+        val decor = window.decorView
+        decor.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                decor.viewTreeObserver.removeOnPreDrawListener(this)
+                decor.post {
+                    val ms = android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime()
+                    Log.i("DeskLink/Startup", "first frame $ms ms after the process started")
+                }
+                return true
+            }
+        })
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -444,11 +462,16 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     @Composable
     private fun HomeTab(device: Device, paired: List<Device>) {
         val stats = rememberConnectionStats(device.deviceId)
-        val state = HomeModel.build(this, device, paired).let { s ->
+        // The history only changes when its revision does: not re-read and re-sorted every second.
+        val history = TransferHistory.revision
+        val historyCount = androidx.compose.runtime.remember(history, device.deviceId) { TransferHistory.store(this).forDevice(device.deviceId).size }
+        val state = HomeModel.build(this, device, paired, historyCount).let { s ->
             if (s.ready && stats != null) s.copy(path = stats.path, rttMs = stats.roundTripTimeMs?.toInt()) else s
         }
         var sharingInfo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-        HomeScreen(state, homeActions(device) { sharingInfo = true })
+        // One actions object per computer: a new one every second would make Home recompose even when nothing changed.
+        val actions = androidx.compose.runtime.remember(device.deviceId, computersRequest) { homeActions(device) { sharingInfo = true } }
+        HomeScreen(state, actions)
         if (sharingInfo) {
             AlertDialog(
                 onDismissRequest = { sharingInfo = false },
@@ -471,7 +494,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             live = liveTransfer(running),
             records = records,
             revision = revision,
-            actions = transferActions(device, running),
+            actions = androidx.compose.runtime.remember(device.deviceId) { transferActions(device) },
         )
     }
 
@@ -770,11 +793,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         return LiveTransfer(running.title, running.upload, running.percent?.let { it / 100f }, listOfNotNull(running.percent?.let { "$it%" }, speed).joinToString(" · "))
     }
 
-    private fun transferActions(device: Device, running: TransferProgress.Transfer?) = TransferActions(
+    /** Read when used, so one object serves for as long as the computer does. */
+    private fun transferActions(device: Device) = TransferActions(
         onBack = {},
         onSendFiles = { sendFiles(device) },
         onCancelLive = {
-            running?.let { sendBroadcast(TransferProgress.cancelIntent(this, it)) }
+            TransferProgress.visibleFor(device.deviceId)?.takeIf { !it.finished }?.let { sendBroadcast(TransferProgress.cancelIntent(this, it)) }
             showMessage(getString(R.string.transfers_cancelled))
         },
         onOpen = { record ->

@@ -147,6 +147,7 @@ data class HomeState(
     val ready get() = connection == DeviceConnection.LOCAL || connection == DeviceConnection.AWAY || connection == DeviceConnection.CONNECTED
 }
 
+@androidx.compose.runtime.Stable
 class HomeActions(
     val onSelectComputer: (String) -> Unit,
     val onPairAnother: () -> Unit,

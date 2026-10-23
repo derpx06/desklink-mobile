@@ -120,6 +120,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.findByName("release")
+            // Phones are ARM: the x86 builds of libwebrtc and ML Kit (about 36 MB) are for emulators, which use debug builds.
+            // (-PallAbis builds every ABI, to measure.)
+            if (!providers.gradleProperty("allAbis").isPresent) ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
     }
     lint {

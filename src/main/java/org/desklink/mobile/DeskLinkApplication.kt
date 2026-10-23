@@ -109,6 +109,10 @@ class DeskLinkApplication : Application() {
 
     private val deviceListChangedCallbacks = ConcurrentHashMap<String, DeviceListChangedCallback>()
 
+    /** Debug: how long after the process started [onCreate] finished (the main thread's share of a cold start). */
+    @Volatile var startupProcessAgeMs = 0L
+        private set
+
     override fun onCreate() {
         super.onCreate()
         _instance = this
@@ -117,10 +121,10 @@ class DeskLinkApplication : Application() {
         Log.d("DeskLink/Application", "onCreate")
         ThemeUtil.setUserPreferredTheme(this)
         DeviceHelper.initializeDeviceId(this)
-        RsaHelper.initialiseRsaKeys(this)
-        SslHelper.initialiseCertificate(this)
-        PluginFactory.initPluginInfo(this)
-        NotificationHelper.initializeChannels(this)
+        step("Rsa keys") { RsaHelper.initialiseRsaKeys(this) }
+        step("TLS certificate") { SslHelper.initialiseCertificate(this) }
+        step("Plugin table") { PluginFactory.initPluginInfo(this) }
+        step("Notification channels") { NotificationHelper.initializeChannels(this) }
         CrashReporter.offerPendingReport(this)
         LifecycleHelper.initializeObserver()
         org.desklink.mobile.plugins.clipboard.ClipboardListener.followForeground(this)
@@ -133,11 +137,12 @@ class DeskLinkApplication : Application() {
         org.desklink.mobile.plugins.screen.ScreenControlPlugin.latestStatus
         org.desklink.mobile.plugins.screen.PhoneScreenCaptureService.sharingDeviceId
         org.desklink.mobile.plugins.share.TransferProgress.current
-        loadRememberedDevicesFromSettings()
+        step("Remembered devices") { loadRememberedDevicesFromSettings() }
         // The transfer history keeps 30 days: prune it once per start, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.plugins.share.TransferHistory.store(this).prune() }
         // Long-press the app icon: "New note" and "Add to Bucket" (added beside the share shortcuts).
-        runCatching {
+        // A binder call to the launcher: off the main thread, so it is not on the way to the first frame.
+        org.desklink.mobile.helpers.ThreadHelper.execute { runCatching {
             listOf(
                 Triple("new_note", R.string.shortcut_new_note, R.drawable.shortcut_new_note) to org.desklink.mobile.ui.MainActivity.ACTION_NEW_NOTE,
                 Triple("add_to_bucket", R.string.shortcut_add_to_bucket, R.drawable.shortcut_bucket) to org.desklink.mobile.ui.MainActivity.ACTION_ADD_TO_BUCKET,
@@ -152,7 +157,7 @@ class DeskLinkApplication : Application() {
                         .build(),
                 )
             }
-        }
+        } }
         // Snippets and notes (F6): opened and pruned off the main thread, before a screen asks.
         org.desklink.mobile.plugins.notes.NotesStore.preload(this)
         // The Bucket's state: read once off the main thread.
@@ -177,14 +182,24 @@ class DeskLinkApplication : Application() {
                     .penaltyLog()
                     .build()
             )
-            StrictMode.setThreadPolicy(
-                ThreadPolicy.Builder(StrictMode.getThreadPolicy())
-                    .detectUnbufferedIo()
-                    .detectResourceMismatches()
-                    .penaltyLog()
-                    .build()
-            )
         }
+        if (BuildConfig.DEBUG) {
+            // Everything that touches the disk or the network on the main thread is logged (tag StrictMode), from
+            // here on: the start-up above is the one place that reads preferences before anything is shown.
+            StrictMode.setThreadPolicy(ThreadPolicy.Builder().detectAll().penaltyLog().build())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                startupProcessAgeMs = android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime()
+                Log.i("DeskLink/Startup", "Application.onCreate done $startupProcessAgeMs ms after the process started")
+            }
+        }
+    }
+
+    /** Debug: what each main-thread step of start-up costs, to find what to move off it (tag DeskLink/Startup). */
+    private inline fun step(name: String, block: () -> Unit) {
+        if (!BuildConfig.DEBUG) return block()
+        val from = android.os.SystemClock.elapsedRealtime()
+        block()
+        Log.i("DeskLink/Startup", "$name ${android.os.SystemClock.elapsedRealtime() - from} ms")
     }
 
     private fun setupSL4JLogging() {

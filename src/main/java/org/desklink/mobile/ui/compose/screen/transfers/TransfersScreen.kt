@@ -106,6 +106,7 @@ import java.util.Date
 @Immutable
 data class LiveTransfer(val name: String, val upload: Boolean, val progress: Float?, val label: String)
 
+@androidx.compose.runtime.Stable
 class TransferActions(
     val onBack: () -> Unit,
     val onSendFiles: () -> Unit,

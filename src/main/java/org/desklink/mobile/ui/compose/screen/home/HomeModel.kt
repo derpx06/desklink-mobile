@@ -28,7 +28,7 @@ object HomeModel {
     fun pairedDevices(): List<Device> =
         DeskLinkApplication.getInstance().devices.values.filter { it.isPaired }.sortedBy { it.name.lowercase() }
 
-    fun build(context: Context, device: Device, paired: List<Device>): HomeState {
+    fun build(context: Context, device: Device, paired: List<Device>, historyCount: Int? = null): HomeState {
         val app = DeskLinkApplication.getInstance()
         val id = device.deviceId
         val connection = device.toUiModel().connection
@@ -67,7 +67,7 @@ object HomeModel {
             },
             clipboardOn = device.isPluginEnabled(clipboardKey),
             deskSoundOn = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(context, id),
-            historyCount = org.desklink.mobile.plugins.share.TransferHistory.store(context).forDevice(id).size,
+            historyCount = historyCount ?: org.desklink.mobile.plugins.share.TransferHistory.store(context).forDevice(id).size,
             canUnlock = connection == DeviceConnection.LOCAL &&
                 device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby == true &&
                 device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java) != null &&

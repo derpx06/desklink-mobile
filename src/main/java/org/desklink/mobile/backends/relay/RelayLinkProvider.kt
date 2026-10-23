@@ -115,7 +115,6 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
             client = OkHttpClient.Builder().pingInterval(PING_SECONDS, TimeUnit.SECONDS).build()
             timers = Executors.newSingleThreadScheduledExecutor { Thread(it, "DeskLink-Relay").apply { isDaemon = true } }
             events = Executors.newSingleThreadExecutor { Thread(it, "DeskLink-Relay-Events").apply { isDaemon = true } }
-            tick = timers.scheduleWithFixedDelay({ synchronized(lock) { restartStalledLocked() } }, 1, 1, TimeUnit.SECONDS)
         }
         reset(reconnect = true)
     }
@@ -411,6 +410,11 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
         peer.lastStart = now
         runCatching { sendDataLocked(ws, fp, peer.session.start()) }
             .onFailure { Log.w(TAG, "Relay link could not start: ${it.javaClass.simpleName}") }
+        // One look when this handshake is due to have finished, not a tick every second for as long as the relay is on.
+        if (peer.session.role == RelayLinkCrypto.Role.INITIATOR && started) {
+            tick?.cancel(false)
+            tick = runCatching { timers.schedule({ synchronized(lock) { restartStalledLocked() } }, HANDSHAKE_TIMEOUT_MS + 250, TimeUnit.MILLISECONDS) }.getOrNull()
+        }
     }
 
     /** An initiator whose handshake has not finished 10 s after its h1 sends a new one (a lost frame). */

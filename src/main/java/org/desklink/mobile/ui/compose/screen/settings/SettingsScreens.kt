@@ -161,6 +161,7 @@ data class DeskSettings(
     val contactsReadable: Boolean = true,
 )
 
+@androidx.compose.runtime.Stable
 class SettingsActions(
     /** This phone's own clipboard and notifications plugins (phone settings). */
     val onPhoneClipboard: (Boolean) -> Unit,

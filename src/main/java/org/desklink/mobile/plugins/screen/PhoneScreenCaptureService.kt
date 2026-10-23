@@ -54,10 +54,18 @@ class PhoneScreenCaptureService : Service() {
             .setOngoing(true)
             .addAction(R.drawable.sym_stop_circle, getString(R.string.screen_share_stop), stop)
             .build()
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        // Android 14/15 refuse this when the start came from the background or the projection grant has lapsed.
+        val started = runCatching {
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        }.onFailure { Log.w(TAG, "foreground start refused", it) }.isSuccess
+        if (!started) {
+            DeskLinkApplication.getInstance().reportWebRtcScreenCaptureFailure(deviceId, "Android did not allow sharing the screen")
+            stopSelf()
+            return
         }
         sharingDeviceId = deviceId
         if (!DeskLinkApplication.getInstance().startWebRtcScreenCapture(deviceId, data)) {

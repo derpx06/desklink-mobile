@@ -27,6 +27,9 @@ interface FileRunner {
     fun post(task: Runnable)
     fun postDelayed(delayMs: Long, task: Runnable)
     fun every(periodMs: Long, task: Runnable)
+
+    /** Runs [step] every [periodMs] for as long as it returns true, then stops (nothing ticks while idle). */
+    fun tickWhile(periodMs: Long, step: () -> Boolean) = Unit
 }
 
 class ThreadFileRunner : FileRunner {
@@ -44,6 +47,15 @@ class ThreadFileRunner : FileRunner {
 
     override fun every(periodMs: Long, task: Runnable) {
         runCatching { executor.scheduleWithFixedDelay(task, periodMs, periodMs, TimeUnit.MILLISECONDS) }
+    }
+
+    override fun tickWhile(periodMs: Long, step: () -> Boolean) {
+        val loop = object : Runnable {
+            override fun run() {
+                if (runCatching(step).getOrDefault(false)) runCatching { executor.schedule(this, periodMs, TimeUnit.MILLISECONDS) }
+            }
+        }
+        runCatching { executor.schedule(loop, periodMs, TimeUnit.MILLISECONDS) }
     }
 
     fun shutdown() = executor.shutdownNow()
@@ -92,7 +104,18 @@ class WebRtcFileTransferManager(
 
     init {
         store.purgeLegacy()
-        runner.every(TICK_MS) { tick() }
+    }
+
+    /** The clock (stalls, checkpoints) runs only while a transfer is live: an idle phone has no timer here. */
+    private var ticking = false
+
+    private fun armTick() {
+        if (ticking) return
+        ticking = true
+        runner.tickWhile(TICK_MS) {
+            tick()
+            (sends.isNotEmpty() || receives.isNotEmpty()).also { if (!it) ticking = false }
+        }
     }
 
     // ------------------------------------------------------------------ send
@@ -155,6 +178,7 @@ class WebRtcFileTransferManager(
             val sender = newSender(wire, id, randomToken(), source, filename, stat.size, stat.mtime, meta, spooled, resumedHashes = emptyList())
             val entry = SendEntry(sender, callback, completion, packet)
             sends[id] = entry
+            armTick()
             TransferHistory.peekSource(packet)?.let { TransferHistory.rememberResumable(appContext, id, it) }
             startSender(entry)
         }
@@ -238,6 +262,7 @@ class WebRtcFileTransferManager(
                 FileSender.Outcome.BUSY -> {
                     // The receiver is full: stay queued, offer again shortly. No deadline.
                     sends[id] = entry
+                    armTick()
                     runner.postDelayed(FileV2.BUSY_RETRY_MS) {
                         if (sends[id] === entry) {
                             entry.sender = cloneSender(entry.sender)
@@ -265,6 +290,7 @@ class WebRtcFileTransferManager(
                     val fresh = newSender(sender.wire, UUID.randomUUID().toString(), randomToken(), source, sender.filename, stat.size, stat.mtime, sender.metaForRestart(), sender.isSpooled(), emptyList())
                     entry.sender = fresh
                     sends[fresh.transferId] = entry
+                    armTick()
                     startSender(entry)
                 }
                 FileSender.Outcome.FAILED, FileSender.Outcome.CANCELLED -> {
@@ -393,6 +419,7 @@ class WebRtcFileTransferManager(
             totalSize <= org.desklink.mobile.plugins.clipboard.ClipboardImages.MAX_BYTES
         ) clipboardOffers.add(id)
         receives[id] = receiver
+        armTick()
         try {
             receiver.start(stored)
         } catch (error: Throwable) {
@@ -576,6 +603,7 @@ class WebRtcFileTransferManager(
             val sender = newSender(wire, id, stored.token, source, stored.filename, stored.totalSize, stored.mtime, stored.meta, stored.spooled, hashes)
             val entry = SendEntry(sender, callback, CompletableFuture(), null)
             sends[id] = entry
+            armTick()
             startSender(entry)
         }
     }

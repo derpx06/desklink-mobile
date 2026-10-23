@@ -185,6 +185,11 @@ class CaptureActivity : AppCompatActivity() {
     }
 
     private fun cancel(reason: String) {
+        // Said here as well as to the computer: a window that just closes leaves the person guessing.
+        when (reason) {
+            "unsupported" -> android.widget.Toast.makeText(this, R.string.capture_no_camera, android.widget.Toast.LENGTH_LONG).show()
+            "permission" -> android.widget.Toast.makeText(this, R.string.capture_camera_denied, android.widget.Toast.LENGTH_LONG).show()
+        }
         PhoneCapture.finish(this, reason)
         cleanUp()
         finish()
@@ -275,7 +280,7 @@ class CaptureActivity : AppCompatActivity() {
                     Stage.PAGE -> PagePreview()
                     Stage.TEXT -> TextPreview()
                     Stage.QR -> Box(Modifier.fillMaxSize().clip(RoundedCornerShape(24.dp))) {
-                        QrCamera { code -> text = code; stage = Stage.QR_RESULT }
+                        QrCamera(onError = { cancel("unsupported") }) { code -> text = code; stage = Stage.QR_RESULT }
                     }
                     Stage.QR_RESULT -> QrResult()
                 }

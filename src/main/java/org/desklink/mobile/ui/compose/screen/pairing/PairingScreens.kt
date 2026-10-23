@@ -174,7 +174,7 @@ fun ScanScreen(
 ) {
     DarkSystemBars()
     Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF2A2C31), Color(0xFF0B0B0C))))) {
-        if (camera) androidx.compose.runtime.key(attempt) { QrCamera(onCode) }
+        if (camera) androidx.compose.runtime.key(attempt) { QrCamera(onCode = onCode) }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
@@ -265,9 +265,10 @@ private fun NearbyRow(computer: NearbyComputer, onPair: () -> Unit) {
 
 /** zxing's camera view, decoding QR codes until one is read; paused with the screen. */
 @Composable
-internal fun QrCamera(onCode: (String) -> Unit) {
+internal fun QrCamera(onError: (() -> Unit)? = null, onCode: (String) -> Unit) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val callback by rememberUpdatedState(onCode)
+    val failed by rememberUpdatedState(onError)
     val density = LocalDensity.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // The whole picture is read, not just the bracketed square: a code anywhere in view pairs.
@@ -281,6 +282,14 @@ internal fun QrCamera(onCode: (String) -> Unit) {
                     decoderFactory = DefaultDecoderFactory(listOf(BarcodeFormat.QR_CODE))
                     framingRectSize = com.journeyapps.barcodescanner.Size(width, height)
                     decodeContinuous { result -> result.text?.let { text -> pause(); callback(text) } }
+                    // No camera, or one another app holds: said at once instead of a black square.
+                    addStateListener(object : com.journeyapps.barcodescanner.CameraPreview.StateListener {
+                        override fun previewSized() = Unit
+                        override fun previewStarted() = Unit
+                        override fun previewStopped() = Unit
+                        override fun cameraError(error: Exception?) { failed?.invoke() }
+                        override fun cameraClosed() = Unit
+                    })
                     view += this
                 }
             },
