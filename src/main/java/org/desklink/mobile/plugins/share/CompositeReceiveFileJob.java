@@ -180,13 +180,9 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                             throw new RuntimeException("Failed to receive: " + currentFileName + " received:" + received + " bytes, expected: " + currentNetworkPacket.getPayloadSize() + " bytes");
                         }
                     } else {
-                        if (expectedSha256 != null && !expectedSha256.isBlank()) {
-                            String actualSha256 = sha256(fileDocument);
-                            if (!expectedSha256.equalsIgnoreCase(actualSha256)) {
-                                fileDocument.delete();
-                                throw new RuntimeException("Received file checksum does not match the sender");
-                            }
-                        }
+                        // (No checksum here: WebRTC files are verified block by block and as a whole by the v2 receiver
+                        // before anything reaches a share job. The `sha256` of a v2 transfer was its hash of block hashes,
+                        // which never equals a SHA-256 of the bytes: comparing them deleted every file.)
                         if (!fileDocument.renameTo(currentFinalFileName)) {
                             fileDocument.delete();
                             throw new RuntimeException("Failed to finalize received file: " + currentFinalFileName);
