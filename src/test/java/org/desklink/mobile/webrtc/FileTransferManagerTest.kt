@@ -426,6 +426,85 @@ class FileTransferManagerTest {
         }
     }
 
+    private fun sha(bytes: ByteArray, from: Int, to: Int) = java.security.MessageDigest.getInstance("SHA-256").digest(bytes.copyOfRange(from, to))
+
+    private fun bucketMeta(path: String, sha: String) = mapOf("folder" to "bucket", "relpath" to path, "contentSha256" to sha)
+
+    @Test
+    fun aBucketFileOfferedAgainUnderANewIdKeepsItsVerifiedBlocksAndRedoesUnderOneBlock() {
+        val block = FileV2.BLOCK_BYTES
+        val bytes = data(10 * block + 100)
+        val oldId = UUID.randomUUID().toString()
+        val newId = UUID.randomUUID().toString()
+        val contentSha = "ab".repeat(32)
+        val store = FileTransferStore(desk.root)
+        // The link was cut after three verified blocks and part of the fourth.
+        store.partial(oldId).writeBytes(bytes.copyOfRange(0, 3 * block + 5000))
+        val hashes = (0 until 3).map { sha(bytes, it * block, (it + 1) * block) }
+        assertTrue(store.writeBlocks(oldId, hashes))
+        assertTrue(store.save(FileCheckpoint(oldId, "receive", "o".repeat(32), deskWire.peerDeviceId, "big.bin", bytes.size.toLong(), 5, 3, meta = bucketMeta("a/big.bin", contentSha))))
+        val offer = desk.control(WebRtcFileAction.OFFER, newId, "n".repeat(32)) {
+            copy(filename = "big.bin", totalSize = bytes.size.toLong(), mtime = 5, blockSize = block, maxFrameBytes = FileV2.FRAME_BYTES_PROVEN,
+                folder = "bucket", relpath = "a/big.bin", contentSha256 = contentSha)
+        }
+        val adopted = desk.manager.adoptBucketCheckpoint(deskWire, offer)!!
+        assertEquals(newId, adopted.transferId)
+        assertNull("nothing left under the old id", store.load(oldId))
+        assertFalse(store.partial(oldId).exists())
+        // The receiver answers from block 3: only the half-written fourth block is sent again.
+        val link = object : FileLink {
+            val out = ArrayList<WebRtcFileControl>()
+            override fun sendControl(control: WebRtcFileControl) { out += control }
+            override fun sendFrame(message: ByteArray) = Unit
+            override fun bufferedAmount() = 0L
+        }
+        val listener = object : FileReceiver.Listener {
+            override fun progress(receiver: FileReceiver, bytesDone: Long) = Unit
+            override fun deliver(receiver: FileReceiver, partial: File, fileHash: String) = Unit
+            override fun ended(receiver: FileReceiver, outcome: FileReceiver.Outcome, message: String?) = Unit
+        }
+        FileReceiver(deskWire, store, link, { 0L }, { Long.MAX_VALUE }, listener, offer).start(adopted)
+        val accept = link.out.single { it.action == WebRtcFileAction.ACCEPT }
+        assertEquals(3, accept.resumeBlock)
+        assertEquals(FileHashes.prefixHash(hashes, 3), accept.prefixSha256)
+        assertEquals("the verified prefix is the file on disk", (3L * block), store.partial(newId).length())
+    }
+
+    @Test
+    fun aBucketFileRequestedAgainAfterALinkCutResumesTheStoredSendInsteadOfStartingOver() {
+        val block = FileV2.BLOCK_BYTES
+        val bytes = data(6 * block + 7)
+        val oldId = UUID.randomUUID().toString()
+        val contentSha = "cd".repeat(32)
+        val store = FileTransferStore(phone.root)
+        assertTrue(store.writeBlocks(oldId, (0 until 3).map { sha(bytes, it * block, (it + 1) * block) }))
+        assertTrue(
+            store.save(
+                FileCheckpoint(oldId, "send", "o".repeat(32), phoneWire.peerDeviceId, "big.bin", bytes.size.toLong(), 77, 3, sourceUri = "file:///x", meta = bucketMeta("big.bin", contentSha) + ("mtime" to "77")),
+            ),
+        )
+        val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
+            this["filename"] = "big.bin"
+            this["folder"] = "bucket"
+            this["relpath"] = "big.bin"
+            this["mtime"] = 77L
+            this["contentSha256"] = contentSha
+            payload = NetworkPacket.Payload(bytes.size.toLong()).also {
+                it.source = object : FileSource {
+                    override fun stat() = FileSource.Stat(bytes.size.toLong(), 77)
+                    override fun open(offset: Long): InputStream = java.io.ByteArrayInputStream(bytes, offset.toInt(), bytes.size - offset.toInt())
+                }
+            }
+        }
+        startSend(packet, Recorder())
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (phone.sent.none { it.action == WebRtcFileAction.OFFER } && System.nanoTime() < deadline) { phone.runner.runPending(); Thread.sleep(2) }
+        val offer = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        assertEquals("the same transfer, not a new one", oldId, offer.transferId)
+        assertEquals("o".repeat(32), offer.transferToken)
+        assertEquals(1, store.list().count { it.direction == "send" })
+    }
+
     @Test
     fun aFileThatIsReadInPlaceIsNeverCopiedFirst() {
         val bytes = data(FileV2.BLOCK_BYTES + 5)

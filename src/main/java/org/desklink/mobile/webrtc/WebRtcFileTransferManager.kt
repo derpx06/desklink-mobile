@@ -97,9 +97,9 @@ class WebRtcFileTransferManager(
 
     private class SendEntry(
         var sender: FileSender,
-        val callback: Device.SendPacketStatusCallback,
-        val completion: CompletableFuture<Boolean>,
-        val packet: NetworkPacket?,
+        var callback: Device.SendPacketStatusCallback,
+        var completion: CompletableFuture<Boolean>,
+        var packet: NetworkPacket?,
         var restarts: Int = 0,
     )
 
@@ -196,11 +196,25 @@ class WebRtcFileTransferManager(
         }
         val completion = CompletableFuture<Boolean>()
         runner.post {
-            val sender = newSender(wire, id, randomToken(), source, filename, stat.size, stat.mtime, meta, spooled, resumedHashes = emptyList())
+            // A synced file is one transfer however often the link drops: found by what it is (peer, folder, path, content),
+            // not by an id, so a new request for it picks up the verified blocks of the one that was cut.
+            val prior = bucketSendKey(meta)?.let { findStoredSend(wire.peerDeviceId, meta, stat.size) }
+            val live = prior?.let { sends[it.transferId] }
+            if (live != null) {
+                live.callback = callback
+                live.completion = completion
+                live.packet = packet
+                return@post
+            }
+            val sendId = prior?.transferId ?: id
+            val sender = newSender(
+                wire, sendId, prior?.token ?: randomToken(), source, filename, stat.size, stat.mtime, meta, spooled,
+                resumedHashes = if (prior != null) store.readBlocks(sendId) else emptyList(),
+            )
             val entry = SendEntry(sender, callback, completion, packet)
-            sends[id] = entry
+            sends[sendId] = entry
             armTick()
-            TransferHistory.peekSource(packet)?.let { TransferHistory.rememberResumable(appContext, id, it) }
+            TransferHistory.peekSource(packet)?.let { TransferHistory.rememberResumable(appContext, sendId, it) }
             startSender(entry)
         }
         while (true) {
@@ -213,6 +227,38 @@ class WebRtcFileTransferManager(
                 // Check cancellation again. There is deliberately no deadline.
             }
         }
+    }
+
+    private fun bucketSendKey(meta: Map<String, String>): Triple<String, String, String>? {
+        val folder = meta["folder"] ?: return null
+        val relpath = meta["relpath"] ?: return null
+        val sha = meta["contentSha256"] ?: return null
+        return Triple(folder, relpath, sha.lowercase())
+    }
+
+    private fun sameBucketFile(meta: Map<String, String>, other: Map<String, String>): Boolean =
+        bucketSendKey(meta) != null && bucketSendKey(meta) == bucketSendKey(other)
+
+    /** A cut send of the same synced file to [deviceId], if one is kept (the newest if several). */
+    private fun findStoredSend(deviceId: String, meta: Map<String, String>, size: Long): FileCheckpoint? =
+        store.list().filter { it.direction == "send" && it.deviceId == deviceId && it.totalSize == size && sameBucketFile(meta, it.meta) }
+            .also { found -> found.dropLast(1).forEach { if (sends[it.transferId] == null) store.remove(it.transferId) } }
+            .lastOrNull()
+
+    /**
+     * An offer of a synced file under a new id while a receive of the same file (peer, folder, path, content) was cut:
+     * what was verified is kept under the new id, so only the unverified part of one block is sent again.
+     */
+    internal fun adoptBucketCheckpoint(wire: WebRtcWireBinding, offer: WebRtcFileControl): FileCheckpoint? {
+        val meta = FileReceiver.offerMeta(offer)
+        val found = store.list().filter {
+            it.direction == "receive" && it.deviceId == wire.peerDeviceId && it.transferId != offer.transferId &&
+                it.totalSize == offer.totalSize && receives[it.transferId] == null && sameBucketFile(meta, it.meta)
+        }
+        found.dropLast(1).forEach { store.remove(it.transferId) }
+        val keep = found.lastOrNull() ?: return null
+        return store.adopt(keep.transferId, offer.transferId, offer.transferToken, offer.mtime ?: keep.mtime)
+            .also { if (it == null) store.remove(keep.transferId) }
     }
 
     private fun spool(id: String, payload: NetworkPacket.Payload): FileSource {
@@ -420,7 +466,7 @@ class WebRtcFileTransferManager(
 
     private fun receiveOffer(wire: WebRtcWireBinding, message: WebRtcFileControl) {
         val id = message.transferId
-        val stored = store.load(id)
+        var stored = store.load(id)
         require(stored?.direction != "send" && !sends.containsKey(id)) { "Incoming file offer collides with an outgoing transfer" }
         val totalSize = requireNotNull(message.totalSize)
         // A synced file is taken only when this phone asked for it, else refused: before anything else, as the desk does,
@@ -453,6 +499,7 @@ class WebRtcFileTransferManager(
             )
             return
         }
+        if (stored == null && ref != null && receives.size < FileV2.ACTIVE_PER_DIRECTION) stored = adoptBucketCheckpoint(wire, message)
         if (receives.size >= FileV2.ACTIVE_PER_DIRECTION) {
             link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.BUSY, message = "The phone is receiving other files."))
             return
@@ -747,7 +794,8 @@ class WebRtcFileTransferManager(
                 store.remove(id)
                 TransferHistory.forgetResumable(appContext, id)
                 TransferProgress.cancel(RESUMED_JOB_BASE + (id.hashCode().toLong() and 0xffffffffL))
-                runCatching {
+                // A synced (Bucket) file is not the person's to share again: the engine sends it again by itself.
+                if (stored.meta["folder"] == null) runCatching {
                     org.desklink.mobile.plugins.share.SendAgain.add(appContext, device, id, wire.peerDeviceId, stored.filename, unreadable = stat == null)
                 }
                 return@forEach

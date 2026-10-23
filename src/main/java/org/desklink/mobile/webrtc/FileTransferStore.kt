@@ -116,6 +116,25 @@ class FileTransferStore(val root: File) {
         List(bytes.size / 32) { bytes.copyOfRange(it * 32, it * 32 + 32) }
     }.getOrDefault(emptyList())
 
+    /**
+     * Moves what a receive kept under [oldId] to [newId] (a Bucket file offered again under a new id after the link was
+     * cut): the verified part, the hashes and a checkpoint naming the new offer. The first [verifiedBlocks] only.
+     * Null if anything could not be moved (the caller then starts from nothing).
+     */
+    fun adopt(oldId: String, newId: String, token: String, mtime: Long): FileCheckpoint? {
+        val old = load(oldId) ?: return null
+        if (oldId == newId) return old
+        return runCatching {
+            if (!partial(oldId).renameTo(partial(newId))) return null
+            val blocks = blocksFile(oldId)
+            if (blocks.isFile && !blocks.renameTo(blocksFile(newId))) { partial(newId).renameTo(partial(oldId)); return null }
+            val moved = old.copy(transferId = newId, token = token, mtime = mtime)
+            if (!save(moved)) return null
+            checkpointFile(oldId).delete()
+            moved
+        }.getOrNull()
+    }
+
     /** Deletes everything kept for [id]. */
     fun remove(id: String) {
         runCatching {
