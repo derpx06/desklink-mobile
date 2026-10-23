@@ -869,6 +869,8 @@ object BucketEngine {
     // ---- scanning ---------------------------------------------------------------------------------------------
 
     private fun tick() {
+        // Nothing to look after (no Bucket, no link, no offer waiting): the 5 s tick costs nothing and publishes nothing.
+        if (buckets.isEmpty() && ready.isEmpty() && offers.isEmpty() && asked.isEmpty()) return
         // A link that dropped: sync stops until the next feature-ready.
         ready.filter { DeskLinkApplication.getInstance().getDevice(it)?.hasActiveWebRtcFeatureTransport != true }.forEach(::down)
         val now = SystemClock.elapsedRealtime()

@@ -39,6 +39,14 @@ object NotesStore {
     private const val KEY_ALIAS = "desklink_notes"
     private const val FILE = "notes/shelf.sealed"
     private const val NOTE_PUSH_DELAY_MS = 2_000L
+    private const val OPEN_ATTEMPTS = 3
+    private const val OPEN_RETRY_MS = 300L
+
+    /** A Keystore or I/O hiccup rather than a key that is gone or a file that is damaged. */
+    internal fun isTransient(error: Throwable): Boolean = generateSequence(error) { it.cause }.any {
+        it is java.security.KeyStoreException || it is java.security.ProviderException ||
+            (it is java.io.IOException && it !is java.io.FileNotFoundException)
+    }
     private val AAD = "desklink-snippets-and-notes".toByteArray()
 
     private var shelf: Shelf? = null
@@ -86,7 +94,7 @@ object NotesStore {
     private fun load(context: Context): Shelf {
         file = AtomicFile(File(context.filesDir, FILE).apply { parentFile?.mkdirs() })
         val shelf = runCatching {
-            if (!file.baseFile.exists()) Shelf() else Shelf.fromStored(JSONObject(String(open(file.readFully()), Charsets.UTF_8)))
+            if (!file.baseFile.exists()) Shelf() else Shelf.fromStored(JSONObject(String(openWithRetry(file.readFully()), Charsets.UTF_8)))
         }.getOrElse {
             // Unreadable (key lost with a backup restore, a newer schema, damage): kept aside, never
             // overwritten, and this starts empty; a desk still holding the notes sends them back.
@@ -96,6 +104,24 @@ object NotesStore {
         }
         if (shelf.prune(System.currentTimeMillis())) write(shelf.toStored().toString())
         return shelf
+    }
+
+    /**
+     * The Keystore can fail for a moment (right after a boot, while the device is still settling) without the key being
+     * lost: that is tried again before the file is judged unreadable and set aside.
+     */
+    private fun openWithRetry(sealed: ByteArray): ByteArray {
+        var last: Throwable? = null
+        repeat(OPEN_ATTEMPTS) { attempt ->
+            try {
+                return open(sealed)
+            } catch (e: Exception) {
+                last = e
+                if (!isTransient(e)) throw e
+                if (attempt < OPEN_ATTEMPTS - 1) Thread.sleep(OPEN_RETRY_MS)
+            }
+        }
+        throw last!!
     }
 
     private fun write(plain: String) {
