@@ -14,7 +14,10 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
+import android.os.Looper;
+
 import java.util.HashSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 class AppDatabase {
 
@@ -45,6 +48,34 @@ class AppDatabase {
 
     private final DbHelper ourHelper;
     private final SharedPreferences prefs;
+
+    // Both tables, in memory: the notification listener asks about every notification on the main thread, where a
+    // database query is a StrictMode violation and a stutter. Loaded once, off that thread (see preload()).
+    private final ConcurrentHashMap<String, Boolean> enabledCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> privacyCache = new ConcurrentHashMap<>();
+    private volatile boolean cacheLoaded = false;
+
+    /** Reads both tables into memory. Call from a worker thread. */
+    void preload() {
+        loadCache();
+        getAllEnabled(); // brings the preferences in as well
+    }
+
+    private synchronized void loadCache() {
+        if (cacheLoaded) return;
+        SQLiteDatabase db = ourHelper.getReadableDatabase();
+        try (Cursor res = db.query(TABLE_ENABLED, new String[]{KEY_PACKAGE_NAME, KEY_IS_ENABLED}, null, null, null, null, null)) {
+            while (res.moveToNext()) enabledCache.put(res.getString(0), res.getInt(1) != 0);
+        }
+        try (Cursor res = db.query(TABLE_PRIVACY, new String[]{KEY_PACKAGE_NAME, KEY_PRIVACY_OPTIONS}, null, null, null, null, null)) {
+            while (res.moveToNext()) privacyCache.put(res.getString(0), res.getInt(1));
+        }
+        cacheLoaded = true;
+    }
+
+    private static boolean onMainThread() {
+        return Looper.myLooper() == Looper.getMainLooper();
+    }
 
     static private AppDatabase _instance = null;
 
@@ -88,6 +119,8 @@ class AppDatabase {
     }
 
     void setEnabled(String packageName, boolean isEnabled) {
+        if (!cacheLoaded) loadCache(); // a write may be the first thing that happens
+        enabledCache.put(packageName, isEnabled);
         String[] columns = new String[]{KEY_IS_ENABLED};
         SQLiteDatabase ourDatabase = ourHelper.getWritableDatabase();
         try (Cursor res = ourDatabase.query(TABLE_ENABLED, columns, KEY_PACKAGE_NAME + " =? ", new String[]{packageName}, null, null, null)) {
@@ -108,24 +141,21 @@ class AppDatabase {
     }
 
     void setAllEnabled(boolean enabled) {
+        if (!cacheLoaded) loadCache();
         prefs.edit().putBoolean(SETTINGS_KEY_ALL_ENABLED, enabled).apply();
         SQLiteDatabase ourDatabase = ourHelper.getWritableDatabase();
         ourDatabase.execSQL("UPDATE " + TABLE_ENABLED + " SET " + KEY_IS_ENABLED + "=" + (enabled? "1" : "0"));
+        for (String key : enabledCache.keySet()) enabledCache.put(key, enabled);
     }
 
     boolean isEnabled(String packageName) {
-        String[] columns = new String[]{KEY_IS_ENABLED};
-        SQLiteDatabase ourDatabase = ourHelper.getReadableDatabase();
-        try (Cursor res = ourDatabase.query(TABLE_ENABLED, columns, KEY_PACKAGE_NAME + " =? ", new String[]{packageName}, null, null, null)) {
-            boolean result;
-            if (res.getCount() > 0) {
-                res.moveToFirst();
-                result = (res.getInt(res.getColumnIndex(KEY_IS_ENABLED)) != 0);
-            } else {
-                result = getDefaultStatus(packageName);
-            }
-            return result;
+        // Until the tables are in memory the main thread answers with the default rather than query the database.
+        if (!cacheLoaded) {
+            if (onMainThread()) return getDefaultStatus(packageName);
+            loadCache();
         }
+        Boolean cached = enabledCache.get(packageName);
+        return cached != null ? cached : getDefaultStatus(packageName);
     }
 
     private boolean getDefaultStatus(String packageName) {
@@ -143,21 +173,16 @@ class AppDatabase {
 
     private int getPrivacyOptionsValue(String packageName)
     {
-        String[] columns = new String[]{KEY_PRIVACY_OPTIONS};
-        SQLiteDatabase ourDatabase = ourHelper.getReadableDatabase();
-        try (Cursor res = ourDatabase.query(TABLE_PRIVACY, columns, KEY_PACKAGE_NAME + " =? ", new String[]{packageName}, null, null, null)) {
-            int result;
-            if (res.getCount() > 0) {
-                res.moveToFirst();
-                result = res.getInt(res.getColumnIndex(KEY_PRIVACY_OPTIONS));
-            } else {
-                result = 0;
-            }
-            return result;
+        if (!cacheLoaded) {
+            if (onMainThread()) return 0;
+            loadCache();
         }
+        Integer cached = privacyCache.get(packageName);
+        return cached != null ? cached : 0;
     }
 
     private void setPrivacyOptionsValue(String packageName, int value) {
+        privacyCache.put(packageName, value);
         String[] columns = new String[]{KEY_PRIVACY_OPTIONS};
         SQLiteDatabase ourDatabase = ourHelper.getWritableDatabase();
         try (Cursor res = ourDatabase.query(TABLE_PRIVACY, columns, KEY_PACKAGE_NAME + " =? ", new String[]{packageName}, null, null, null)) {
@@ -180,6 +205,7 @@ class AppDatabase {
      * @param isBlocked boolean, if user wants to block an option.
      */
     public void setPrivacy(String packageName, PrivacyOptions option, boolean isBlocked) {
+        if (!cacheLoaded) loadCache(); // a write may be the first thing that happens: never start from a blank value
         // Bit, that we want to change
         int curBit = option.ordinal();
         // Current value of privacy options

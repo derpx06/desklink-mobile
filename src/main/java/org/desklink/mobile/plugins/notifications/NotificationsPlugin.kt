@@ -87,6 +87,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     override fun onCreate(): Boolean {
         appDatabase = AppDatabase.getInstance(context)
+        // The per-app tables into memory, off the main thread: the listener asks about every notification there.
+        org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { appDatabase.preload() } }
         sharedPreferences = context.getSharedPreferences(sharedPreferencesName, Context.MODE_PRIVATE)
         keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         mainHandler = Handler(Looper.getMainLooper())

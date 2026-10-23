@@ -111,6 +111,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
     }
 
     override fun onDestroy() {
+        lookups.shutdownNow()
         unregister?.invoke()
         unregister = null
         restoreRinger()
@@ -249,8 +250,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
         dialerNotification = statusBarNotification
         // The dialer names the caller after the line changed: send the names once they are known.
         if (tracker.hasCall() && (showCaller(context, device.deviceId) || sharesContacts())) {
-            identify()
-            sendSnapshot()
+            identify() // its answer sends the snapshot
         }
     }
 
@@ -273,13 +273,22 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             ?.let(CallTracker::plain)?.trim()
             ?.takeIf(String::isNotEmpty) ?: return
         val number = CallTracker.dialable(title)
-        val uid = if (share) ContactsPlugin.uidFor(context, number, title.takeIf { number == null }) else null
-        if (show) {
-            tracker.annotate(if (number != null) contactName(number) else title, number, uid)
-        } else {
-            tracker.annotate(null, null, uid)
-        }
+        // The contacts database is asked on a worker (a query on the main thread stutters and StrictMode flags it); the
+        // answer comes back to the main thread, where the call state lives, and is sent as an updated snapshot.
+        runCatching { lookups.execute {
+            val uid = if (share) ContactsPlugin.uidFor(context, number, title.takeIf { number == null }) else null
+            val name = if (show) (if (number != null) contactName(number) else title) else null
+            mainHandler.post {
+                if (!tracker.hasCall()) return@post
+                if (show) tracker.annotate(name, number, uid) else tracker.annotate(null, null, uid)
+                sendSnapshot()
+            }
+        } }
     }
+
+    /** Contact lookups, one at a time and in order, off the main thread. */
+    private val lookups = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "DeskLink-call-lookup").apply { isDaemon = true } }
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     private fun sharesContacts() = ContactsPlugin.sharesWith(context, device)
 
