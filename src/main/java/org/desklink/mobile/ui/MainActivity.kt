@@ -494,6 +494,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 org.desklink.mobile.plugins.share.UnpublishedFiles.list(this@MainActivity).filter { it.deviceId == device.deviceId }
             }
         }
+        val sendAgain by androidx.compose.runtime.produceState(emptyList<org.desklink.mobile.plugins.share.SendAgain.Item>(), revision, device.deviceId) {
+            value = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                org.desklink.mobile.plugins.share.SendAgain.list(this@MainActivity).filter { it.deviceId == device.deviceId }
+            }
+        }
         val savedIn by androidx.compose.runtime.produceState(getString(R.string.files_saved_in_downloads), revision) {
             value = kotlinx.coroutines.withContext(Dispatchers.IO) { receivedFolderName() }
         }
@@ -507,6 +512,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             actions = androidx.compose.runtime.remember(device) { transferActions(device) },
             savedIn = savedIn,
             unsaved = unsaved,
+            sendAgain = sendAgain,
+            onSendAgain = { id ->
+                lifecycleScope.launch(Dispatchers.IO) { org.desklink.mobile.plugins.share.SendAgain.dismiss(this@MainActivity, id) }
+                sendFiles(device) // the picker
+            },
+            onDismissSendAgain = { id -> lifecycleScope.launch(Dispatchers.IO) { org.desklink.mobile.plugins.share.SendAgain.dismiss(this@MainActivity, id) } },
             retrying = retryingUnsaved,
             onRetryUnsaved = ::retryUnsaved,
             onDiscardUnsaved = { id -> lifecycleScope.launch(Dispatchers.IO) { org.desklink.mobile.plugins.share.UnpublishedFiles.discard(this@MainActivity, id) } },

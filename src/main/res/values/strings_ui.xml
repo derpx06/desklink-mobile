@@ -734,4 +734,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="files_saving_label">Saving…</string>
     <string name="files_unsaved_body_full">There wasn\'t enough space on the phone. Free some up, then try again.</string>
     <string name="send_failed_unknown">The computer did not take the file. Try again.</string>
+    <string name="send_again_title">%1$s couldn\'t be sent again</string>
+    <string name="send_again_body_unreadable">Android no longer lets DeskLink read it. Share it again.</string>
+    <string name="send_again_body_changed">It changed or was removed. Share it again.</string>
+    <string name="send_again_notification_unreadable">%1$s couldn\'t be sent again because Android no longer lets DeskLink read it. Share it again.</string>
+    <string name="send_again_notification_changed">%1$s couldn\'t be sent again because it changed or was removed. Share it again.</string>
+    <string name="send_again_button">Send again</string>
+    <string name="send_again_dismiss">Dismiss</string>
 </resources>

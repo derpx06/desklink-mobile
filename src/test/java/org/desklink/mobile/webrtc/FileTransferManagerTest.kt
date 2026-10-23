@@ -361,6 +361,36 @@ class FileTransferManagerTest {
     }
 
     @Test
+    fun aStoredSendWhoseSourceCannotBeOpenedAfterARestartIsEndedVisiblyNotRetried() {
+        org.robolectric.Robolectric.setupContentProvider(FilesProvider::class.java, "org.desklink.test.files")
+        FilesProvider.files["lost"] = tmp.newFile("lost.bin").apply { writeBytes(data(100)) }
+        val id = UUID.randomUUID().toString()
+        val store = FileTransferStore(phone.root)
+        assertTrue(
+            store.save(
+                FileCheckpoint(id, "send", "t".repeat(32), phoneWire.peerDeviceId, "lost.bin", 100, 5, 0, sourceUri = "content://org.desklink.test.files/lost", spooled = false, meta = emptyMap()),
+            ),
+        )
+        org.desklink.mobile.plugins.share.SendAgain.dismiss(phoneContext, id)
+        FilesProvider.revoked = true // after the restart the share's grant is gone
+        try {
+            phone.manager.resumeSends(phoneWire)
+            pump()
+            assertEquals("no offer goes out for it", emptyList<WebRtcFileControl>(), phone.sent.filter { it.action == WebRtcFileAction.OFFER })
+            assertNull("the stale record is gone, so it never loops", store.load(id))
+            val item = org.desklink.mobile.plugins.share.SendAgain.list(phoneContext).single { it.id == id }
+            assertEquals("lost.bin", item.name)
+            assertTrue("said as: Android no longer lets DeskLink read it", item.unreadable)
+            phone.manager.resumeSends(phoneWire)
+            pump()
+            assertEquals("a second connection does not report it again", 1, org.desklink.mobile.plugins.share.SendAgain.list(phoneContext).count { it.id == id })
+        } finally {
+            FilesProvider.revoked = false
+            org.desklink.mobile.plugins.share.SendAgain.dismiss(phoneContext, id)
+        }
+    }
+
+    @Test
     fun aSourceNotOpenedWhileTheGrantLastedIsReportedInWordsNotSilently() {
         org.robolectric.Robolectric.setupContentProvider(FilesProvider::class.java, "org.desklink.test.files")
         FilesProvider.files["gone"] = tmp.newFile("gone.bin").apply { writeBytes(data(100)) }

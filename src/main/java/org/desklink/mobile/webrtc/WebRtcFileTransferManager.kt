@@ -237,6 +237,7 @@ class WebRtcFileTransferManager(
         wire: WebRtcWireBinding, id: String, token: String, source: FileSource, filename: String, size: Long,
         mtime: Long, meta: Map<String, String>, spooled: Boolean, resumedHashes: List<ByteArray>,
     ) = FileSender(wire, store, link, clock, senderListener, id, token, source, filename, size, mtime, meta, spooled).also {
+        if (!spooled) liveSources[id] = source
         it.restore(resumedHashes)
         currentWire = wire
     }
@@ -333,6 +334,7 @@ class WebRtcFileTransferManager(
     )
 
     private fun cleanupSend(id: String, sender: FileSender, keepSource: Boolean = false) {
+        liveSources.remove(id)
         if (!keepSource) runCatching { sender.sourceForRestart().close() }
         store.remove(id).also { if (keepSource && sender.isSpooled()) Unit }
         TransferHistory.forgetResumable(appContext, id)
@@ -340,6 +342,7 @@ class WebRtcFileTransferManager(
     }
 
     private fun cleanupSource(sender: FileSender) {
+        liveSources.remove(sender.transferId)
         runCatching { sender.sourceForRestart().close() }
         if (sender.isSpooled()) store.spool(sender.transferId).delete()
     }
@@ -737,9 +740,16 @@ class WebRtcFileTransferManager(
             val source = sourceOf(stored)
             val stat = source?.stat()
             if (source == null || stat == null || stat.size != stored.totalSize || stat.mtime != stored.mtime) {
-                // Gone or changed since: nothing to resume. (The person sends it again.)
+                // Cannot be read any more (Android ended the sharing app's permission) or changed: never retried, never silent.
+                // The person is told in the Files tab and a notification, and sends it again.
+                Log.w(TAG, "send $id cannot be resumed: ${if (stat == null) "unreadable" else "changed"}")
+                runCatching { source?.close() }
                 store.remove(id)
                 TransferHistory.forgetResumable(appContext, id)
+                TransferProgress.cancel(RESUMED_JOB_BASE + (id.hashCode().toLong() and 0xffffffffL))
+                runCatching {
+                    org.desklink.mobile.plugins.share.SendAgain.add(appContext, device, id, wire.peerDeviceId, stored.filename, unreadable = stat == null)
+                }
                 return@forEach
             }
             if (sends.size >= FileV2.ACTIVE_PER_DIRECTION) return@forEach
@@ -753,7 +763,11 @@ class WebRtcFileTransferManager(
         }
     }
 
+    /** Sources opened for sends in this process: a link cut resumes from these, not from a fresh ask to the provider. */
+    private val liveSources = java.util.concurrent.ConcurrentHashMap<String, FileSource>()
+
     private fun sourceOf(stored: FileCheckpoint): FileSource? {
+        liveSources[stored.transferId]?.let { return it }
         if (stored.spooled) return PlainFileSource(store.spool(stored.transferId))
         val uri = stored.sourceUri?.let { runCatching { android.net.Uri.parse(it) }.getOrNull() } ?: return null
         return when (uri.scheme) {

@@ -87,6 +87,10 @@ fun FilesTab(
     savedIn: String = "",
     /** Verified files that arrived but could not be saved, kept for a retry. */
     unsaved: List<org.desklink.mobile.plugins.share.UnpublishedFiles.Item> = emptyList(),
+    /** Sends that cannot go on and must be shared again. */
+    sendAgain: List<org.desklink.mobile.plugins.share.SendAgain.Item> = emptyList(),
+    onSendAgain: (String) -> Unit = {},
+    onDismissSendAgain: (String) -> Unit = {},
     /** Ids whose "Try again" is running. */
     retrying: List<String> = emptyList(),
     onRetryUnsaved: (String) -> Unit = {},
@@ -104,6 +108,7 @@ fun FilesTab(
                 Icon(painterResource(R.drawable.sym_upload_file), contentDescription = stringResource(R.string.home_send_files), tint = t.text)
             }
         }
+        sendAgain.forEach { item -> SendAgainCard(item, onSendAgain, onDismissSendAgain) }
         unsaved.forEach { item -> UnsavedCard(item, item.id in retrying, onRetryUnsaved, onDiscardUnsaved) }
         Box(Modifier.weight(1f)) {
             bucket.Screen(deviceId, onBack = {}, embedded = true) {
@@ -114,6 +119,35 @@ fun FilesTab(
 }
 
 /** A file that arrived whole but could not be saved: plain words, and the two things that can be done. */
+@Composable
+private fun SendAgainCard(
+    item: org.desklink.mobile.plugins.share.SendAgain.Item,
+    onSendAgain: (String) -> Unit,
+    onDismiss: (String) -> Unit,
+) {
+    val t = tokens
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(t.coralContainer)
+            .padding(16.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(stringResource(R.string.send_again_title, item.name), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.coralText)
+        Text(
+            stringResource(if (item.unreadable) R.string.send_again_body_unreadable else R.string.send_again_body_changed),
+            fontSize = 13.sp, color = t.text,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PillButton(stringResource(R.string.send_again_button), { onSendAgain(item.id) }, height = 48.dp)
+            PillButton(stringResource(R.string.send_again_dismiss), { onDismiss(item.id) }, style = PillStyle.Outlined, height = 48.dp)
+        }
+    }
+}
+
 @Composable
 private fun UnsavedCard(
     item: org.desklink.mobile.plugins.share.UnpublishedFiles.Item,
