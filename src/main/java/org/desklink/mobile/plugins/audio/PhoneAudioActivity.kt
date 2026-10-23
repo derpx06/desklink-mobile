@@ -2,6 +2,7 @@
 package org.desklink.mobile.plugins.audio
 
 import android.Manifest
+import org.desklink.mobile.helpers.DeskNames
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,7 +42,7 @@ class PhoneAudioActivity : AppCompatActivity() {
         request = PhoneAudio.pending?.takeIf { it.deviceId == deviceId } ?: return finish()
         if (savedInstanceState != null) return
         if (PhoneAudio.consented(this, deviceId)) return allowed()
-        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         val mic = request.source == "mic"
         AlertDialog.Builder(this)
             .setTitle(getString(if (mic) R.string.audio_consent_mic else R.string.audio_consent_sound, desk))

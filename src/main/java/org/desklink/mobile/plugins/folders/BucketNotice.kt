@@ -2,6 +2,7 @@
 package org.desklink.mobile.plugins.folders
 
 import android.app.PendingIntent
+import org.desklink.mobile.helpers.DeskNames
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
@@ -18,7 +19,7 @@ object BucketNotice {
     fun show(context: Context, deviceId: String) {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
-        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         val open = BucketActivity.intent(context, deviceId).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val tap = PendingIntent.getActivity(context, ID, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         runCatching {

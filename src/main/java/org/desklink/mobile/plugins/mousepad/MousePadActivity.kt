@@ -7,6 +7,7 @@
 package org.desklink.mobile.plugins.mousepad
 
 import android.content.Intent
+import org.desklink.mobile.helpers.DeskNames
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.os.SystemClock
@@ -531,7 +532,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         getString(R.string.remote_screen_connected),
     )
 
-    private fun deviceName(): String = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+    private fun deviceName(): String = DeskNames.of(deviceId)
 
     /**
      * Only while the activity is started: a stopped one (screen off, another app) releases its

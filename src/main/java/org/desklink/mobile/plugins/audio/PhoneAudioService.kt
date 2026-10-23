@@ -2,6 +2,7 @@
 package org.desklink.mobile.plugins.audio
 
 import android.app.Activity
+import org.desklink.mobile.helpers.DeskNames
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
@@ -41,7 +42,7 @@ class PhoneAudioService : Service() {
         val id = intent?.getStringExtra(EXTRA_DEVICE) ?: return stop()
         deviceId = id
         val sound = intent.hasExtra(EXTRA_RESULT_DATA)
-        startForegroundCompat(notification(app.getDevice(id)?.name.orEmpty(), sound), sound)
+        startForegroundCompat(notification(DeskNames.of(id), sound), sound)
         if (sound) {
             val data = resultData(intent) ?: return stop()
             val manager = ContextCompat.getSystemService(this, MediaProjectionManager::class.java) ?: return stop()

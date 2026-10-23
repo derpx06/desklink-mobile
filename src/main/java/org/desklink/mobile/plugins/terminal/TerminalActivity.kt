@@ -4,6 +4,7 @@
 package org.desklink.mobile.plugins.terminal
 
 import android.content.ActivityNotFoundException
+import org.desklink.mobile.helpers.DeskNames
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -546,7 +547,7 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
-    private fun deskName(): String = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+    private fun deskName(): String = DeskNames.of(deviceId)
 
     @Composable
     private fun NewTerminalButton(modifier: Modifier, onClick: () -> Unit) {

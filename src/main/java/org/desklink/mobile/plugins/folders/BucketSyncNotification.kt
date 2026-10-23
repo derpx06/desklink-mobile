@@ -2,6 +2,7 @@
 package org.desklink.mobile.plugins.folders
 
 import android.annotation.SuppressLint
+import org.desklink.mobile.helpers.DeskNames
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -38,7 +39,7 @@ object BucketSyncNotification {
         val manager = NotificationManagerCompat.from(context)
         val deviceId = view.deviceId
         val tag = "bucket-sync:$deviceId"
-        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         val flights = view.items.mapNotNull { item -> item.progress?.let { BucketProgress.Flight(item.name, it, item.state == BucketItem.State.SENDING) } }
         if (flights.isEmpty()) {
             if (deviceId !in showing) return false

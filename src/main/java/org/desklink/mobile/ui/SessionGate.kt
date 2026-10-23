@@ -7,6 +7,7 @@
 package org.desklink.mobile.ui
 
 import android.content.Context
+import org.desklink.mobile.helpers.DeskNames
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
@@ -103,7 +104,7 @@ object SessionGate {
             connection?.let { synchronized(passed) { passed[deviceId] = it } }
             onOpen()
         }
-        val desk = app.getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         when (step) {
             Step.OPEN -> onOpen()
             Step.PHONE_CHECK -> Biometrics.prompt(activity, activity.getString(R.string.gate_title, desk), null, Biometrics.STRONG_OR_CREDENTIAL, null) { result ->
@@ -162,7 +163,7 @@ object SessionGate {
             }
             .onFailure { Log.w(TAG, "Could not prepare the session password key", it) }
             .getOrNull() ?: return
-        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         Biometrics.prompt(
             activity,
             activity.getString(R.string.gate_remember_title, desk),

@@ -7,6 +7,7 @@
 package org.desklink.mobile.plugins.screen
 
 import android.app.NotificationChannel
+import org.desklink.mobile.helpers.DeskNames
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -71,7 +72,7 @@ object SessionLiveNotification {
         }
         if (!manager.areNotificationsEnabled()) return
         ensureChannel(context)
-        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         val parts = buildList {
             if (now.screen) add(context.getString(R.string.session_live_screen))
             if (now.glide) add(context.getString(R.string.session_live_glide, desk))

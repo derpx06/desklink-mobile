@@ -6,6 +6,7 @@
 package org.desklink.mobile.plugins.folders
 
 import android.content.ClipData
+import org.desklink.mobile.helpers.DeskNames
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -149,7 +150,7 @@ class BucketUi(
     ) {
         val t = tokens
         val context = LocalContext.current
-        val desk = remember(deviceId) { DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty() }
+        val desk = remember(deviceId) { DeskNames.of(deviceId) }
         val views by BucketEngine.views.collectAsState()
         val view = views[deviceId]
         val on = view?.treeUri != null && view.phase != Phase.ASKING

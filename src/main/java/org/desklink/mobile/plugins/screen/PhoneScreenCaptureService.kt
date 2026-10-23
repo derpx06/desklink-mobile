@@ -1,6 +1,7 @@
 package org.desklink.mobile.plugins.screen
 
 import android.app.Service
+import org.desklink.mobile.helpers.DeskNames
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -38,7 +39,7 @@ class PhoneScreenCaptureService : Service() {
 
     private fun startCapture(resultCode: Int, data: Intent) {
         SessionLiveNotification.ensureChannel(this)
-        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         val stop = android.app.PendingIntent.getService(
             this,
             0,

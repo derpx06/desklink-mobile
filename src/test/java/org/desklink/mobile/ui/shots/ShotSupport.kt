@@ -3,6 +3,7 @@ package org.desklink.mobile.ui.shots
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import org.desklink.mobile.ui.compose.DeskLinkFixedTheme
 import org.junit.Rule
@@ -15,6 +16,9 @@ object ShotDir {
         File(System.getProperty("desklink.shots") ?: (System.getProperty("user.home") + "/.cache/android-ui/shots")).also { it.mkdirs() }
     }
 }
+
+/** Text that gives away a blank where a name should be ("appear on , and", "on ."). */
+val BLANK_NAME = Regex("""\s[,.;:!?]|,\s*,|%\d?\$?[sd]""")
 
 /**
  * Renders a screen to `<name>-light.png` and `<name>-dark.png`, at the size of the test class's Robolectric
@@ -31,6 +35,15 @@ abstract class ShotTest {
         // One composition, switched from light to dark in place (a rule can set its content only once).
         val dark = androidx.compose.runtime.mutableStateOf(false)
         compose.setContent { DeskLinkFixedTheme(compose.activity, dark.value) { content() } }
+        compose.waitForIdle()
+        val texts = compose.onAllNodes(androidx.compose.ui.test.isRoot(), useUnmergedTree = true).fetchSemanticsNodes().flatMap { root ->
+            fun walk(n: androidx.compose.ui.semantics.SemanticsNode): List<String> =
+                n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text).orEmpty().map { it.text } +
+                    listOfNotNull(n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription)?.joinToString(" ")) +
+                    n.children.flatMap(::walk)
+            walk(root)
+        }
+        texts.forEach { t -> check(!BLANK_NAME.containsMatchIn(t)) { "$form $name shows a blank where a name should be: \"$t\"" } }
         for (isDark in listOf(false, true)) {
             dark.value = isDark
             compose.waitForIdle()

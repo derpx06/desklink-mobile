@@ -4,6 +4,7 @@
 package org.desklink.mobile.plugins.terminal
 
 import android.Manifest
+import org.desklink.mobile.helpers.DeskNames
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -63,7 +64,7 @@ class TerminalAttentionNotifier(
         ) {
             return
         }
-        val deviceName = DeskLinkApplication.getInstance().devices[deviceId]?.name.orEmpty()
+        val deviceName = DeskNames.of(deviceId)
         val title = context.getString(
             if (attention == TerminalAttention.WAITING) R.string.terminal_attention_waiting else R.string.terminal_attention_finished,
         )

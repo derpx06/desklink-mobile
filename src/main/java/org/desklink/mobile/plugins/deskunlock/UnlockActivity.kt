@@ -7,6 +7,7 @@
 package org.desklink.mobile.plugins.deskunlock
 
 import android.content.Context
+import org.desklink.mobile.helpers.DeskNames
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -69,7 +70,7 @@ class UnlockActivity : AppCompatActivity() {
             finish()
             return
         }
-        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         // Back is "Not me": the desk stays locked.
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = decline()
@@ -83,7 +84,7 @@ class UnlockActivity : AppCompatActivity() {
     }
 
     private fun authenticate() {
-        val desk = DeskLinkApplication.getInstance().getDevice(deviceId)?.name.orEmpty()
+        val desk = DeskNames.of(deviceId)
         if (!Biometrics.available(this, Biometrics.STRONG_OR_CREDENTIAL)) {
             // No screen lock at all: nothing proves it is the owner holding the phone.
             Toast.makeText(this, R.string.unlock_no_screen_lock, Toast.LENGTH_LONG).show()
