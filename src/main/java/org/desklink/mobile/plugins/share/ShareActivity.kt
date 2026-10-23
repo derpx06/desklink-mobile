@@ -166,30 +166,15 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
         super.onStart()
 
         val intent = intent
-        var deviceId = intent.getStringExtra("deviceId")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && deviceId == null) {
-            deviceId = intent.getStringExtra(Intent.EXTRA_SHORTCUT_ID)
-        }
-
+        // A device named in the intent (a direct-share target, or any app that can address this activity) is only a
+        // suggestion: it is never shared to without the person's "Send" on a sheet that says what and to whom.
+        val deviceId = ShareEntry.suggestedDevice(
+            intent.getStringExtra("deviceId"),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) intent.getStringExtra(Intent.EXTRA_SHORTCUT_ID) else null,
+            DeskLinkApplication.getInstance().devices.values.filter { it.isPaired }.map { it.deviceId }.toSet(),
+        )
         if (deviceId != null) {
-            val plugin: SharePlugin? =
-                DeskLinkApplication.getInstance().getDevicePlugin(deviceId, SharePlugin::class.java)
-            if (plugin != null) {
-                plugin.share(intent)
-            } else {
-                val extras = intent.extras
-                if (extras != null && extras.containsKey(Intent.EXTRA_TEXT)) {
-                    val device = DeskLinkApplication.getInstance().getDevice(id = deviceId)
-                    if (doesIntentContainUrl(intent) && device != null && !device.isReachable) {
-                        val text = extras.getString(Intent.EXTRA_TEXT)
-                        storeUrlForFutureDelivery(
-                            device = device,
-                            url = text
-                        )
-                    }
-                }
-            }
-            finish()
+            if (confirming == null) confirmShare(deviceId, intent)
         } else {
             DeskLinkApplication.getInstance().addDeviceListChangedCallback(key = "ShareActivity") {
                 runOnUiThread { updateDeviceList() }
@@ -198,6 +183,33 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
             updateDeviceList()
         }
     }
+
+    private var confirming: androidx.appcompat.app.AlertDialog? = null
+
+    /** "Send to <desk>?" with what is being sent; nothing leaves before Send. */
+    private fun confirmShare(deviceId: String, intent: Intent) {
+        val device = DeskLinkApplication.getInstance().getDevice(id = deviceId) ?: return finish()
+        val what = ShareEntry.summary(
+            this, intent.getStringExtra(Intent.EXTRA_TEXT),
+            ShareUris.fromOutside(this, streamUris(intent)),
+            if (Intent.ACTION_SEND_MULTIPLE == intent.action) streamUris(intent).size else if (intent.hasExtra(Intent.EXTRA_STREAM)) 1 else 0,
+        )
+        confirming = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.share_confirm_title, device.name))
+            .setMessage(what)
+            .setPositiveButton(R.string.share_confirm_send) { _, _ ->
+                deviceClicked(device = device, intentHasUrl = doesIntentContainUrl(intent), intent = intent)
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun streamUris(intent: Intent): List<android.net.Uri> = runCatching {
+        if (Intent.ACTION_SEND_MULTIPLE == intent.action) intent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM).orEmpty()
+        else listOfNotNull(intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM))
+    }.getOrDefault(emptyList())
 
     override fun onStop() {
         DeskLinkApplication.getInstance().removeDeviceListChangedCallback(key = "ShareActivity")

@@ -378,7 +378,8 @@ public class SharePlugin extends Plugin {
             uriList = new ArrayList<>();
             uriList.add(BundleCompat.getParcelable(extras, Intent.EXTRA_STREAM, Uri.class));
         }
-        uriList.removeAll(Collections.singleton(null));
+        // From another app: content URIs of other apps only (never file: paths or this app's own provider).
+        uriList = new ArrayList<>(ShareUris.INSTANCE.fromOutside(context, uriList));
         if (uriList.isEmpty()) {
             Log.w("SharePlugin", "All streams were null");
         }

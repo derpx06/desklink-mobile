@@ -742,4 +742,12 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="send_again_notification_changed">%1$s couldn\'t be sent again because it changed or was removed. Share it again.</string>
     <string name="send_again_button">Send again</string>
     <string name="send_again_dismiss">Dismiss</string>
+    <string name="share_confirm_title">Send to %1$s?</string>
+    <string name="share_confirm_send">Send</string>
+    <string name="share_confirm_text">%1$s</string>
+    <string name="share_confirm_nothing">Nothing readable was shared.</string>
+    <plurals name="share_confirm_files">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
 </resources>

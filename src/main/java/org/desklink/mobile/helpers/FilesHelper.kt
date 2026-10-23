@@ -110,6 +110,11 @@ object FilesHelper {
     fun uriToNetworkPacket(context: Context, uri: Uri, type: String?): NetworkPacket? {
         try {
             val contentResolver = context.contentResolver
+            // A file: path inside this app's private storage is never read for sending (the pairing key lives there).
+            if (uri.scheme == "file" && org.desklink.mobile.plugins.share.ShareUris.isInsideAppData(context, File(uri.path.orEmpty()))) {
+                Log.w(LOG_TAG, "Refused a file inside the app's own storage")
+                return null
+            }
             val inputStream = contentResolver.openInputStream(uri)
 
             val packet = NetworkPacket(type!!)
