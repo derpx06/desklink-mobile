@@ -84,6 +84,28 @@ class FileReceiver(
     @androidx.annotation.VisibleForTesting
     internal var writeFrame: (FileFrame, RandomAccessFile) -> Unit = { frame, raf -> frame.writeTo(raf) }
 
+    /** Where the time of this receive went, in nanoseconds of the file thread (see [summary]). */
+    private var writeNs = 0L
+    private var hashNs = 0L
+    private var checkpointNs = 0L
+    private var ackNs = 0L
+    private var frames = 0L
+    private val startedAt = System.nanoTime()
+
+    /**
+     * One line for the debug log at the end of a receive: bytes, seconds, MB/s and how much of that time this thread
+     * spent hashing, writing, checkpointing (fsync) and answering. The rest was spent waiting for frames: the network or
+     * the sender, not this phone.
+     */
+    fun summary(): String {
+        val seconds = (System.nanoTime() - startedAt) / 1e9
+        fun ms(ns: Long) = ns / 1_000_000
+        val busy = writeNs + hashNs + checkpointNs + ackNs
+        return "receive-stats $filename bytes=$totalSize seconds=${"%.1f".format(seconds)} MBps=${"%.1f".format(totalSize / 1e6 / seconds.coerceAtLeast(0.001))} " +
+            "frames=$frames hashMs=${ms(hashNs)} writeMs=${ms(writeNs)} checkpointMs=${ms(checkpointNs)} ackMs=${ms(ackNs)} " +
+            "waitingMs=${(seconds * 1000).toLong() - ms(busy)}"
+    }
+
     val verifiedBlocks: Int get() = hashes.size
     val isPaused: String? get() = pausedFor ?: if (noProgress) FileCodes.NO_PROGRESS else null
 
@@ -184,22 +206,33 @@ class FileReceiver(
             noProgress = false
             send(control(WebRtcFileAction.RESUME))
         }
+        val t0 = System.nanoTime()
         try {
             writeFrame(frame, requireNotNull(file))
         } catch (error: IOException) {
             return onWriteFailure(error)
         }
+        val t1 = System.nanoTime()
         frame.updateDigest(digest)
+        frames++
+        writeNs += t1 - t0
+        hashNs += System.nanoTime() - t1
         nextOffset = end
         if (!frame.lastOfBlock) return
+        val t2 = System.nanoTime()
         val computed = digest.digest()
+        hashNs += System.nanoTime() - t2
         digest = MessageDigest.getInstance("SHA-256")
         if (computed.contentEquals(frame.trailer())) {
             hashes.add(computed)
             unsavedBlocks++
+            val t3 = System.nanoTime()
             send(control(WebRtcFileAction.BLOCK_ACK).copy(blockIndex = frame.blockIndex, sha256 = computed.toHex()))
             listener.progress(this, bytesDone())
+            val t4 = System.nanoTime()
             maybeCheckpoint(force = false)
+            ackNs += t4 - t3
+            checkpointNs += System.nanoTime() - t4
         } else {
             rewind(frame.blockIndex)
         }

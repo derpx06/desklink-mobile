@@ -96,6 +96,9 @@ class WebRtcFileTransferManager(
     private val sends = HashMap<String, SendEntry>()
     private val receives = HashMap<String, FileReceiver>()
     private var pausedForBacklog = false
+
+    /** Debug: how many times the file thread fell so far behind that the senders were paused. */
+    private var backlogPauses = 0
     private val folderOffers = HashMap<String, FolderRef>()
     private val clipboardOffers = HashSet<String>()
 
@@ -498,7 +501,10 @@ class WebRtcFileTransferManager(
                         TransferProgress.finish(job, receiver.filename, true)
                         announceReceiveFailed(receiver, message)
                     }
-                    FileReceiver.Outcome.DELIVERED -> TransferProgress.finish(job, receiver.filename, false)
+                    FileReceiver.Outcome.DELIVERED -> {
+                        TransferProgress.finish(job, receiver.filename, false)
+                        if (org.desklink.mobile.BuildConfig.DEBUG) Log.i(TAG, receiver.summary() + " backlogPauses=$backlogPauses")
+                    }
                     // Cancelled or suspended: nothing to show.
                     else -> TransferProgress.cancel(job)
                 }
@@ -547,6 +553,7 @@ class WebRtcFileTransferManager(
             queuedBytes.addAndGet(-message.size.toLong())
             if (backlogged.compareAndSet(false, true)) runner.post {
                 pausedForBacklog = true
+                backlogPauses++
                 receives.values.toList().forEach(FileReceiver::pauseBacklog)
                 resumeIfDrained() // the queue may have emptied while this task waited its turn
             }
