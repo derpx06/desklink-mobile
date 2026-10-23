@@ -6,6 +6,7 @@
 package org.desklink.mobile.plugins.inputdevicesreceiver
 
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
@@ -65,11 +66,6 @@ class InputDevicesReceiverPlugin : Plugin() {
         if (Glide.activeDesk == device.deviceId) stop(release = false)
     }
 
-    /** A new connection: whatever glide the old one had is over on the desk too. */
-    override fun onFeatureReady() {
-        if (Glide.activeDesk == device.deviceId) stop(release = false)
-    }
-
     private fun resolveDisplaySize() {
         @Suppress("DEPRECATION")
         displayManager.getDisplay(Display.DEFAULT_DISPLAY)?.getRealMetrics(metrics)
@@ -88,6 +84,13 @@ class InputDevicesReceiverPlugin : Plugin() {
             val (dx, dy) = Glide.handBack(Glide.enterEdge, Cursor.x, Cursor.y, Glide.edgeLength, metrics.widthPixels, metrics.heightPixels)
             sendRelease(dx, dy)
         }
+        letGoOfThePointer()
+    }
+
+    /** What every way of ending a glide has in common: no drag left held, no pointer on screen, no state. */
+    private fun letGoOfThePointer() {
+        // A drag the desk started with a held button must not outlive the glide: it would swallow the next tap.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) runCatching { MouseReceiverService.instance?.stopSwipe() }
         Glide.end()
         MouseReceiverService.instance?.hide(0)
         SessionLiveNotification.refresh(context, device.deviceId)
@@ -114,8 +117,8 @@ class InputDevicesReceiverPlugin : Plugin() {
         val deltax = np.getDouble("deltax", 0.0)
         val deltay = np.getDouble("deltay", 0.0)
         val length = np.getDouble("edgeLength", 0.0).takeIf { it > 0 && it <= Glide.MAX_DESK_PX }
-        // Not allowed, no accessibility service, or a nonsense edge: hand it straight back (G5).
-        if (!Glide.validEdge(edge) || !Glide.allowed(context, device.deviceId) || MouseReceiverService.instance == null) {
+        // Not allowed, no accessibility service, a dark screen (nobody to see the pointer), or a nonsense edge: hand it straight back (G5).
+        if (!Glide.validEdge(edge) || !Glide.allowed(context, device.deviceId) || MouseReceiverService.instance == null || !screenIsOn()) {
             Log.i(TAG, "Glide refused (allowed=${Glide.allowed(context, device.deviceId)}, service=${MouseReceiverService.instance != null})")
             sendRelease(0, deltay.coerceIn(-Glide.MAX_DESK_PX, Glide.MAX_DESK_PX).toInt())
             return
@@ -131,6 +134,8 @@ class InputDevicesReceiverPlugin : Plugin() {
         SessionLiveNotification.refresh(context, device.deviceId)
     }
 
+    private fun screenIsOn() = context.getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
+
     /** G2 motion: hand back once the pointer reaches the edge it came in by. */
     private fun onMotion(np: NetworkPacket) {
         if (!Glide.isGliding(device.deviceId)) return
@@ -141,9 +146,7 @@ class InputDevicesReceiverPlugin : Plugin() {
         if (!np.has("dx") || np.getBoolean("scroll", false)) return
         Glide.release(Glide.enterEdge, Cursor.x, Cursor.y, Glide.edgeLength, metrics.widthPixels, metrics.heightPixels)?.let { (dx, dy) ->
             sendRelease(dx, dy)
-            Glide.end()
-            MouseReceiverService.instance?.hide(0)
-            SessionLiveNotification.refresh(context, device.deviceId)
+            letGoOfThePointer()
         }
     }
 
