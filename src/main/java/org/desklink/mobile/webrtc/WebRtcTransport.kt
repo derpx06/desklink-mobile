@@ -246,7 +246,6 @@ class WebRtcTransport(
                 peer.createDataChannel(channel.label, init)?.also { installChannel(it) }
             }
         }
-        if (org.desklink.mobile.BuildConfig.DEBUG) startInboundStatsLog()
         if (WebRtcMediaNegotiationPolicy.includeScreenTrackInInitialOffer) {
             val sender = peer.addTrack(videoTrack, listOf("desklink-screen"))
             preferHardwareH264(sender)
@@ -798,14 +797,28 @@ class WebRtcTransport(
     private val debugFramesAtTrack = java.util.concurrent.atomic.AtomicLong()
 
     /** Debug builds: the desktop's screen as this phone receives it, every
-     * 2 s while packets arrive — "waiting for the first picture" otherwise
-     * gives no hint whether nothing arrives or nothing decodes. */
+     * 2 s while pictures arrive (it starts with the first decoded frame and ends when they stop). */
+    /** Started by the first decoded frame, ended by two polls with none: nothing polls `getStats` while no picture arrives. */
+    @Synchronized
+    private fun ensureInboundStatsLog() {
+        if (inboundStatsTimer == null && stateRef.get() != TransportState.CLOSING && stateRef.get() != TransportState.CLOSED) startInboundStatsLog()
+    }
+
     private fun startInboundStatsLog() {
         var lastPackets = -1L
+        var lastFrames = -1L
+        var quiet = 0
         var previous: Map<String, Any?> = emptyMap()
         inboundStatsTimer = java.util.Timer("DeskLink-inbound-stats", true).apply {
             schedule(object : java.util.TimerTask() {
                 override fun run() {
+                    val frames = debugFramesAtTrack.get()
+                    quiet = if (frames == lastFrames) quiet + 1 else 0
+                    lastFrames = frames
+                    if (quiet >= 2) {
+                        synchronized(this@WebRtcTransport) { inboundStatsTimer?.cancel(); inboundStatsTimer = null }
+                        return
+                    }
                     runCatching {
                         peer.getStats { report ->
                             val inbound = report.statsMap.values.firstOrNull {
@@ -1045,7 +1058,7 @@ class WebRtcTransport(
             announcedRemoteTrack = track
             Log.i(TAG, "Remote video track ${track.id()} enabled=${track.enabled()} state=${track.state()}")
             if (org.desklink.mobile.BuildConfig.DEBUG) {
-                runCatching { track.addSink { debugFramesAtTrack.incrementAndGet() } }
+                runCatching { track.addSink { debugFramesAtTrack.incrementAndGet(); ensureInboundStatsLog() } }
             }
             observer.onRemoteVideoTrack(track)
         }
