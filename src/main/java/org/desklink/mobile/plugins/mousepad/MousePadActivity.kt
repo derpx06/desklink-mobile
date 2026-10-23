@@ -163,7 +163,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         // same authenticated desktop view. The process-level WebRTC peer and
         // renderer keep their session; an explicit refresh remains available
         // for a real retry after permission denial or stream loss.
-        if (savedInstanceState == null) {
+        // Recreated (the system restoring the task after the process died) with no live view: the session died with
+        // the process, so it is asked for again; a plain recreation (dark mode, language) keeps the one that is live.
+        if (savedInstanceState == null || screenControlPlugin()?.remoteLive != true) {
             // The phone-side gate first (fingerprint for a remembered password, or the optional
             // phone-only check); the request then carries the password when it is known.
             org.desklink.mobile.ui.SessionGate.check(this, deviceId.orEmpty(), onOpen = ::requestDesktopScreen, onDenied = ::finish)
@@ -181,6 +183,26 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     override fun onResume() {
         super.onResume()
         applyPrefs()
+    }
+
+    /** The view stopped because the screen went dark: nobody is watching, so no video keeps coming. */
+    private var stoppedForScreenOff = false
+
+    override fun onStop() {
+        super.onStop()
+        val interactive = getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
+        if (!interactive && !isFinishing && !isChangingConfigurations && screenControlPlugin()?.remoteLive == true) {
+            stoppedForScreenOff = true
+            sendStopScreen()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (stoppedForScreenOff) {
+            stoppedForScreenOff = false
+            requestDesktopScreen()
+        }
     }
 
     override fun onDestroy() {
