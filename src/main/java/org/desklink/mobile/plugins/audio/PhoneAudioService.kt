@@ -42,7 +42,11 @@ class PhoneAudioService : Service() {
         val id = intent?.getStringExtra(EXTRA_DEVICE) ?: return stop()
         deviceId = id
         val sound = intent.hasExtra(EXTRA_RESULT_DATA)
-        startForegroundCompat(notification(DeskNames.of(id), sound), sound)
+        // Microphone service without RECORD_AUDIO (revoked meanwhile), or a start Android no longer allows.
+        if (runCatching { startForegroundCompat(notification(DeskNames.of(id), sound), sound) }.onFailure { Log.w(TAG, "foreground start refused", it) }.isFailure) {
+            app.webRtcCoordinator(id)?.denyAudio("unavailable")
+            return stop()
+        }
         if (sound) {
             val data = resultData(intent) ?: return stop()
             val manager = ContextCompat.getSystemService(this, MediaProjectionManager::class.java) ?: return stop()
@@ -120,13 +124,16 @@ class PhoneAudioService : Service() {
         private const val EXTRA_RESULT_DATA = "resultData"
 
         /** The microphone, from a visible activity. */
-        fun startMic(context: Context, deviceId: String) =
-            ContextCompat.startForegroundService(context, Intent(context, PhoneAudioService::class.java).putExtra(EXTRA_DEVICE, deviceId))
+        fun startMic(context: Context, deviceId: String): Boolean = startService(context, Intent(context, PhoneAudioService::class.java).putExtra(EXTRA_DEVICE, deviceId))
+
+        /** A refused start (Android 12+ background limits, a revoked permission) is a "no", never a crash. */
+        private fun startService(context: Context, intent: Intent): Boolean =
+            runCatching { ContextCompat.startForegroundService(context, intent) }.onFailure { Log.w(TAG, "the audio service could not start", it) }.isSuccess
 
         /** The phone's sound, with the projection the person just allowed. */
-        fun startSound(context: Context, deviceId: String, resultCode: Int, data: Intent) {
-            if (resultCode != Activity.RESULT_OK) return
-            ContextCompat.startForegroundService(
+        fun startSound(context: Context, deviceId: String, resultCode: Int, data: Intent): Boolean {
+            if (resultCode != Activity.RESULT_OK) return false
+            return startService(
                 context,
                 Intent(context, PhoneAudioService::class.java)
                     .putExtra(EXTRA_DEVICE, deviceId)

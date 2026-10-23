@@ -28,7 +28,7 @@ class PhoneAudioActivity : AppCompatActivity() {
     private val projection = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data
         if (result.resultCode == RESULT_OK && data != null) {
-            PhoneAudioService.startSound(this, deviceId, result.resultCode, data)
+            if (!PhoneAudioService.startSound(this, deviceId, result.resultCode, data)) return@registerForActivityResult deny("unavailable")
             finish()
         } else {
             deny("declined")
@@ -40,7 +40,8 @@ class PhoneAudioActivity : AppCompatActivity() {
         deviceId = intent.getStringExtra(EXTRA_DEVICE) ?: return finish()
         PhoneAudio.clearAsk(this, deviceId)
         request = PhoneAudio.pending?.takeIf { it.deviceId == deviceId } ?: return finish()
-        if (savedInstanceState != null) return
+        // Rotated or recreated after the person answered: that answer is already being acted on.
+        if (savedInstanceState?.getBoolean(STATE_ANSWERED) == true) return
         if (PhoneAudio.consented(this, deviceId)) return allowed()
         val desk = DeskNames.of(deviceId)
         val mic = request.source == "mic"
@@ -48,12 +49,20 @@ class PhoneAudioActivity : AppCompatActivity() {
             .setTitle(getString(if (mic) R.string.audio_consent_mic else R.string.audio_consent_sound, desk))
             .setMessage(getString(if (mic) R.string.audio_consent_mic_text else R.string.audio_consent_sound_text, desk))
             .setPositiveButton(R.string.audio_allow) { _, _ ->
+                answered = true
                 PhoneAudio.rememberConsent(this, deviceId)
                 allowed()
             }
             .setNegativeButton(R.string.audio_deny) { _, _ -> deny("declined") }
             .setOnCancelListener { deny("declined") }
             .show()
+    }
+
+    private var answered = false
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_ANSWERED, answered || PhoneAudio.consented(this, deviceId))
     }
 
     /** Playback capture is an AudioRecord too: both sources need RECORD_AUDIO. */
@@ -64,7 +73,8 @@ class PhoneAudioActivity : AppCompatActivity() {
     private fun proceed() {
         PhoneAudio.pending = null
         if (request.source == "mic") {
-            PhoneAudioService.startMic(this, deviceId)
+            // Android 14+ refuses a microphone service the moment this window is no longer in front.
+            if (!PhoneAudioService.startMic(this, deviceId)) return deny("unavailable")
             finish()
             return
         }
@@ -83,5 +93,6 @@ class PhoneAudioActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_DEVICE = "deviceId"
+        private const val STATE_ANSWERED = "answered"
     }
 }

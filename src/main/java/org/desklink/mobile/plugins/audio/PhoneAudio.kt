@@ -77,6 +77,12 @@ object PhoneAudio {
     /** The desk whose sound is playing here right now (Home's live row, with End). */
     var hearingFrom by mutableStateOf<String?>(null)
 
+    /**
+     * One microphone (or one projection): while this phone sends to one computer, another's request is refused as
+     * busy instead of sharing the audio module, where either one stopping would silence the other.
+     */
+    fun busyWith(sendingTo: String?, requester: String): Boolean = sendingTo != null && sendingTo != requester
+
     private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context)
 
     /** "Play <desk>'s sound here": asked again on every link while on. Off by default. */

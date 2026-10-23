@@ -1519,6 +1519,10 @@ class WebRtcSessionCoordinator(
                     sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = "unsupported")
                     return
                 }
+                if (audio.busyWith(audio.sendingTo, device.deviceId)) {
+                    sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = "busy")
+                    return
+                }
                 audioSessions.open(session)?.let { replaced ->
                     if (replaced.live) stopSendingLocked(replaced, "replaced", notifyPeer = true)
                 }
@@ -1585,6 +1589,12 @@ class WebRtcSessionCoordinator(
     private fun startAudioSendingLocked(projection: android.media.projection.MediaProjection?): Boolean {
         val session = audioSessions.sending ?: return false
         org.desklink.mobile.plugins.audio.PhoneAudio.clearAsk(context, device.deviceId)
+        // Another computer got the microphone while this one's question waited: no sharing.
+        if (org.desklink.mobile.plugins.audio.PhoneAudio.busyWith(org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo, device.deviceId)) {
+            audioSessions.end(session.remoteSessionId)
+            sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = "busy")
+            return false
+        }
         if (session.source == "system") requireNotNull(projection) { "phone sound needs a projection" }
         val active = transport ?: return false
         PhoneAudioEngine.muted = false
@@ -1631,7 +1641,9 @@ class WebRtcSessionCoordinator(
     private fun stopSendingLocked(session: org.desklink.mobile.plugins.audio.AudioSessions.Session, reason: String, notifyPeer: Boolean) {
         audioSessions.end(session.remoteSessionId)
         transport?.setAudioRecording(false)
-        PhoneAudioEngine.reset()
+        // The audio module is the process's one: only the computer it is feeding may put it down.
+        val feeding = org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo
+        if (feeding == null || feeding == device.deviceId) PhoneAudioEngine.reset()
         if (org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo == device.deviceId) {
             org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo = null
             org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource = null
@@ -1677,12 +1689,13 @@ class WebRtcSessionCoordinator(
     private fun endAudioWithPeerLocked() {
         if (org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom == device.deviceId) org.desklink.mobile.plugins.audio.PhoneAudio.hearingFrom = null
         if (audioSessions.clear().any { it.direction == WebRtcRemoteSessionControlMessage.PHONE_TO_DESK }) {
-            PhoneAudioEngine.reset()
+            val feeding = org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo
+            if (feeding == null || feeding == device.deviceId) PhoneAudioEngine.reset()
             if (org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo == device.deviceId) {
                 org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo = null
                 org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource = null
             }
-            context.stopService(Intent(context, org.desklink.mobile.plugins.audio.PhoneAudioService::class.java))
+            if (feeding == null || feeding == device.deviceId) context.stopService(Intent(context, org.desklink.mobile.plugins.audio.PhoneAudioService::class.java))
         }
     }
 
