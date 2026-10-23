@@ -1,400 +1,140 @@
 {
- "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
- "phoneDeviceId": "phone-device",
- "deskDeviceId": "desk-device",
- "sessionId": 9,
- "connectionGeneration": 2,
- "transferToken": "00112233445566778899aabbccddeeff",
- "pattern": "byte(i) = ((i * 31) + (i >> 12)) & 0xff",
- "format": "steps replayed in order; \"from\" the engine under test = \"phone\"; peer steps are fed in, phone steps are asserted in order; a frame is {pass, offset, length, last} with the payload taken from the pattern and, on a last frame, the block hash as trailer (trailer:\"bad\" corrupts it); control messages are compared parsed and without \"message\"",
- "scenario": "S1",
- "title": "a sender resumed at block 10 without its hashes reads the prefix again, continues at block 10 under the same pass, and completes. (A sender that cannot verify the prefix restarts at block 0 under pass+1.)",
- "engine": "sender",
- "sender": "phone",
- "file": {
-  "name": "s1.bin",
-  "size": 12582912
- },
- "senderState": {
-  "hashes": "none",
-  "source": "intact"
- },
- "steps": [
-  {
-   "from": "phone",
-   "control": {
-    "action": "offer",
-    "filename": "s1.bin",
-    "totalSize": 12582912,
-    "mtime": 1700000000000,
-    "blockSize": 1048576,
-    "maxFrameBytes": 61440
-   }
+  "scenario": "S1",
+  "title": "sender resumed at block 2 without hashes: it re-reads the prefix, keeps its pass, completes",
+  "replay": [
+    "sender",
+    "receiver"
+  ],
+  "ids": {
+    "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+    "token": "00112233445566778899aabbccddeeff",
+    "sender": "sender-device",
+    "receiver": "receiver-device",
+    "sessionId": 9,
+    "generation": 2
   },
-  {
-   "from": "desk",
-   "control": {
-    "action": "accept",
-    "resumeBlock": 10,
-    "prefixSha256": "0f4dde189ca691f115bb90715707856e287ff22bf7118fda9ce775738cd84459",
-    "maxFrameBytes": 61440
-   }
+  "file": {
+    "name": "scenario.bin",
+    "length": 3146728,
+    "formula": "byte(i) = (((i * 2654435761) mod 2^32) >> 13) & 255",
+    "mtime": 1700000000000
   },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10485760,
-    "length": 61368,
-    "last": false
-   }
+  "ignore": [
+    "message"
+  ],
+  "receiverHolds": {
+    "blocks": 2
   },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10547128,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10608496,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10669864,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10731232,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10792600,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10853968,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10915336,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 10976704,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11038072,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11099440,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11160808,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11222176,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11283544,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11344912,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11406280,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11467648,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11529016,
-    "length": 5320,
-    "last": true
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11534336,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11595704,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11657072,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11718440,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11779808,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11841176,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11902544,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 11963912,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12025280,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12086648,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12148016,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12209384,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12270752,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12332120,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12393488,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12454856,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12516224,
-    "length": 61368,
-    "last": false
-   }
-  },
-  {
-   "from": "phone",
-   "frame": {
-    "pass": 0,
-    "offset": 12577592,
-    "length": 5320,
-    "last": true
-   }
-  },
-  {
-   "from": "desk",
-   "control": {
-    "action": "block-ack",
-    "blockIndex": 10,
-    "sha256": "b6b489647a3bb506b77904b97dce2e3c77ca5e85a5707b2821cb1605afa522c0"
-   }
-  },
-  {
-   "from": "desk",
-   "control": {
-    "action": "block-ack",
-    "blockIndex": 11,
-    "sha256": "b6b489647a3bb506b77904b97dce2e3c77ca5e85a5707b2821cb1605afa522c0"
-   }
-  },
-  {
-   "from": "phone",
-   "control": {
-    "action": "done",
-    "fileHash": "76b81c4d3261dd8a71a8abac6285bee18a19e962279ba7b16b26bb15e9d6365e",
-    "blocks": 12,
-    "totalSize": 12582912
-   }
-  },
-  {
-   "from": "desk",
-   "control": {
-    "action": "complete",
-    "fileHash": "76b81c4d3261dd8a71a8abac6285bee18a19e962279ba7b16b26bb15e9d6365e"
-   }
+  "steps": [
+    {
+      "from": "sender",
+      "control": {
+        "protocolVersion": 2,
+        "action": "offer",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "sender-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "filename": "scenario.bin",
+        "totalSize": 3146728,
+        "mtime": 1700000000000,
+        "blockSize": 1048576,
+        "maxFrameBytes": 61440
+      }
+    },
+    {
+      "from": "receiver",
+      "control": {
+        "protocolVersion": 2,
+        "action": "accept",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "receiver-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "resumeBlock": 2,
+        "prefixSha256": "280ace7205549cb3498232e0be3a1dc8d9ee540552b6a0f1fb72562072b3d69f",
+        "maxFrameBytes": 61440
+      }
+    },
+    {
+      "from": "sender",
+      "blockFrames": {
+        "pass": 0,
+        "block": 2,
+        "frames": 18,
+        "sha256": "afdf8532b36f778793bf13580327b023d9e1e573a386eb97c25a4fb417e91916"
+      }
+    },
+    {
+      "from": "sender",
+      "blockFrames": {
+        "pass": 0,
+        "block": 3,
+        "frames": 1,
+        "sha256": "3f7ba39a5ed3e352d42da14b423d7f601fb12dcc391a3a33c050feddb7ebc4aa"
+      }
+    },
+    {
+      "from": "receiver",
+      "control": {
+        "protocolVersion": 2,
+        "action": "block-ack",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "receiver-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "blockIndex": 2,
+        "sha256": "f5600770a8695a85fc7bb6d18a40a5b80a2b8a39c86f346a1b58f8ccc1e8fde6"
+      }
+    },
+    {
+      "from": "receiver",
+      "control": {
+        "protocolVersion": 2,
+        "action": "block-ack",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "receiver-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "blockIndex": 3,
+        "sha256": "5ce24b09ed17367a4becf59d11b53f298bdd6a068dfe10050028e046137f9653"
+      }
+    },
+    {
+      "from": "sender",
+      "control": {
+        "protocolVersion": 2,
+        "action": "done",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "sender-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "fileHash": "01288e1f378a945a764ac5a331d4777792a90a25bab0a075241032c4fc48149e",
+        "blocks": 4,
+        "totalSize": 3146728
+      }
+    },
+    {
+      "from": "receiver",
+      "control": {
+        "protocolVersion": 2,
+        "action": "complete",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "receiver-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "fileHash": "01288e1f378a945a764ac5a331d4777792a90a25bab0a075241032c4fc48149e"
+      }
+    }
+  ],
+  "final": {
+    "receiverPublished": true,
+    "slotsFree": true
   }
- ]
 }

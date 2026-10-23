@@ -1,59 +1,116 @@
 {
- "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
- "phoneDeviceId": "phone-device",
- "deskDeviceId": "desk-device",
- "sessionId": 9,
- "connectionGeneration": 2,
- "transferToken": "00112233445566778899aabbccddeeff",
- "pattern": "byte(i) = ((i * 31) + (i >> 12)) & 0xff",
- "format": "steps replayed in order; \"from\" the engine under test = \"phone\"; peer steps are fed in, phone steps are asserted in order; a frame is {pass, offset, length, last} with the payload taken from the pattern and, on a last frame, the block hash as trailer (trailer:\"bad\" corrupts it); control messages are compared parsed and without \"message\"",
- "scenario": "S6",
- "title": "the same offer again while the transfer is live is answered with an accept from the live state",
- "engine": "manager",
- "file": {
-  "name": "s6.bin",
-  "size": 2097152
- },
- "steps": [
-  {
-   "from": "desk",
-   "control": {
-    "action": "offer",
-    "filename": "s6.bin",
-    "totalSize": 2097152,
-    "mtime": 1700000000000,
-    "blockSize": 1048576,
-    "maxFrameBytes": 61440
-   }
+  "scenario": "S6",
+  "title": "a re-offer of a live transfer is answered with accept {resumeBlock, prefix}, never busy",
+  "replay": [
+    "receiver"
+  ],
+  "ids": {
+    "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+    "token": "00112233445566778899aabbccddeeff",
+    "sender": "sender-device",
+    "receiver": "receiver-device",
+    "sessionId": 9,
+    "generation": 2
   },
-  {
-   "from": "phone",
-   "control": {
-    "action": "accept",
-    "resumeBlock": 0,
-    "prefixSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "maxFrameBytes": 61440
-   }
+  "file": {
+    "name": "scenario.bin",
+    "length": 2097152,
+    "formula": "byte(i) = (((i * 2654435761) mod 2^32) >> 13) & 255",
+    "mtime": 1700000000000
   },
-  {
-   "from": "desk",
-   "control": {
-    "action": "offer",
-    "filename": "s6.bin",
-    "totalSize": 2097152,
-    "mtime": 1700000000000,
-    "blockSize": 1048576,
-    "maxFrameBytes": 61440
-   }
-  },
-  {
-   "from": "phone",
-   "control": {
-    "action": "accept",
-    "resumeBlock": 0,
-    "prefixSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "maxFrameBytes": 61440
-   }
+  "ignore": [
+    "message"
+  ],
+  "steps": [
+    {
+      "from": "sender",
+      "control": {
+        "protocolVersion": 2,
+        "action": "offer",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "sender-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "filename": "scenario.bin",
+        "totalSize": 2097152,
+        "mtime": 1700000000000,
+        "blockSize": 1048576,
+        "maxFrameBytes": 61440
+      }
+    },
+    {
+      "from": "receiver",
+      "control": {
+        "protocolVersion": 2,
+        "action": "accept",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "receiver-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "resumeBlock": 0,
+        "prefixSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "maxFrameBytes": 61440
+      }
+    },
+    {
+      "from": "sender",
+      "blockFrames": {
+        "pass": 0,
+        "block": 0,
+        "frames": 18,
+        "sha256": "1ab6887be18edcae4dce826bae6671af123b1c5352ae26bf2bc8dcf59e9d40d6"
+      }
+    },
+    {
+      "from": "receiver",
+      "control": {
+        "protocolVersion": 2,
+        "action": "block-ack",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "receiver-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "blockIndex": 0,
+        "sha256": "f5600770a8695a85fc7bb6d18a40a5b80a2b8a39c86f346a1b58f8ccc1e8fde6"
+      }
+    },
+    {
+      "from": "sender",
+      "control": {
+        "protocolVersion": 2,
+        "action": "offer",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "sender-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "filename": "scenario.bin",
+        "totalSize": 2097152,
+        "mtime": 1700000000000,
+        "blockSize": 1048576,
+        "maxFrameBytes": 61440
+      }
+    },
+    {
+      "from": "receiver",
+      "control": {
+        "protocolVersion": 2,
+        "action": "accept",
+        "transferId": "0f8fad5b-d9cb-469f-a165-70867728950e",
+        "deviceId": "receiver-device",
+        "sessionId": 9,
+        "connectionGeneration": 2,
+        "transferToken": "00112233445566778899aabbccddeeff",
+        "resumeBlock": 1,
+        "prefixSha256": "34901e55a6b3bf0e3c30be9568e1413ea7a25fb12ee97606bce79124851b00fb",
+        "maxFrameBytes": 61440
+      }
+    }
+  ],
+  "final": {
+    "slotsFree": false
   }
- ]
 }

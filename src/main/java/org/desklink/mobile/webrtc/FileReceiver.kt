@@ -56,8 +56,9 @@ class FileReceiver(
     private var expectedPass = 0
 
     /**
-     * Set after an accept (ours, or the answer to a re-offer) and after our own resume: the next frame at a block
-     * boundary we have verified up to starts the stream, whatever its pass; its pass becomes ours.
+     * Set after an accept (ours, or the answer to a re-offer): the next frame at a block boundary we have verified
+     * up to starts the stream, whatever its pass; its pass becomes ours. Not after our own resume: frames of the
+     * old pass still in flight must be dropped (transcript S3); the sender's reply to a resume is the next pass.
      */
     private var adoptAny = true
     private var awaitingStart = true
@@ -241,7 +242,6 @@ class FileReceiver(
             truncateTo(0)
             expectedPass = (expectedPass + 1) and 0xff
             awaitingStart = true
-            adoptAny = true
             send(control(WebRtcFileAction.RESUME).copy(resumeBlock = 0, prefixSha256 = FileHashes.prefixHash(hashes, 0), pass = expectedPass))
             return
         }
@@ -296,7 +296,6 @@ class FileReceiver(
         truncateTo(hashes.size)
         expectedPass = (expectedPass + 1) and 0xff
         awaitingStart = true
-        adoptAny = true
         lastActivityAt = clock()
         send(
             control(WebRtcFileAction.RESUME).copy(

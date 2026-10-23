@@ -495,6 +495,16 @@ class WebRtcFileTransferManager(
         }
     }
 
+    /** Tests: the receive queue overflows (`on`) or drains, as if frames had piled up. */
+    @androidx.annotation.VisibleForTesting
+    internal fun testBacklog(on: Boolean) {
+        runner.post {
+            pausedForBacklog = on
+            backlogged.set(on)
+            receives.values.toList().forEach { if (on) it.pauseBacklog() else it.resumeBacklog() }
+        }
+    }
+
     /** The data channel's buffered amount fell under its low mark: send more. */
     fun onBufferedAmountLow() {
         if (pumpPending.compareAndSet(false, true)) runner.post {
