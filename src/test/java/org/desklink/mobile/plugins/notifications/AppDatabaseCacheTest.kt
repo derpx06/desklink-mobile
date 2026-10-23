@@ -21,13 +21,19 @@ class AppDatabaseCacheTest {
     private fun loaded(db: AppDatabase) = AppDatabase::class.java.getDeclaredField("cacheLoaded").apply { isAccessible = true }.getBoolean(db)
 
     @Test
-    fun theMainThreadAnswersWithTheDefaultUntilTheTablesAreLoadedAndDoesNotQuery() {
+    fun untilTheTablesAreLoadedTheMainThreadAnswersNoAndBlockedAndDoesNotQuery() {
         val db = fresh()
         assertFalse(loaded(db))
-        assertTrue(db.isEnabled("com.example.app"))
+        assertFalse("unknown is never 'allowed'", db.isEnabled("com.example.app"))
+        assertTrue("contents are blocked until the real options are known", db.getPrivacy("com.example.app", AppDatabase.PrivacyOptions.BLOCK_CONTENTS))
+        assertTrue("pictures too", db.getPrivacy("com.example.app", AppDatabase.PrivacyOptions.BLOCK_IMAGES))
+        assertFalse("nothing was read from the database", loaded(db))
+        assertFalse(db.isReady())
+        db.preload()
+        assertTrue(db.isReady())
+        assertTrue("loaded: the default for an app nobody changed", db.isEnabled("com.example.app"))
         assertFalse("Google's notifications are off by default", db.isEnabled("com.google.android.googlequicksearchbox"))
         assertFalse(db.getPrivacy("com.example.app", AppDatabase.PrivacyOptions.BLOCK_CONTENTS))
-        assertFalse("nothing was read from the database", loaded(db))
     }
 
     @Test

@@ -73,6 +73,16 @@ class AppDatabase {
         cacheLoaded = true;
     }
 
+    /** True once both tables are in memory. */
+    boolean isReady() {
+        return cacheLoaded;
+    }
+
+    /** Every privacy option blocked: what an app is treated as having until its real options are known. */
+    static int allBlocked() {
+        return (1 << PrivacyOptions.values().length) - 1;
+    }
+
     private static boolean onMainThread() {
         return Looper.myLooper() == Looper.getMainLooper();
     }
@@ -149,9 +159,10 @@ class AppDatabase {
     }
 
     boolean isEnabled(String packageName) {
-        // Until the tables are in memory the main thread answers with the default rather than query the database.
+        // Until the tables are in memory the main thread answers "no" rather than query the database: an app the
+        // person switched off must never be mirrored because its setting had not been read yet.
         if (!cacheLoaded) {
-            if (onMainThread()) return getDefaultStatus(packageName);
+            if (onMainThread()) return false;
             loadCache();
         }
         Boolean cached = enabledCache.get(packageName);
@@ -174,7 +185,7 @@ class AppDatabase {
     private int getPrivacyOptionsValue(String packageName)
     {
         if (!cacheLoaded) {
-            if (onMainThread()) return 0;
+            if (onMainThread()) return allBlocked(); // unknown: contents and pictures blocked
             loadCache();
         }
         Integer cached = privacyCache.get(packageName);

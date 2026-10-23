@@ -85,10 +85,29 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         return NotificationReceiver.hasReadNotificationsPermission(context)
     }
 
+    /** Holds notifications until the per-app settings are in memory (and retries a failed load); see [NotificationGate]. */
+    private val gate: NotificationGate<Pair<StatusBarNotification, Boolean>> by lazy {
+        NotificationGate(
+            load = { appDatabase.preload() },
+            runWorker = { task -> org.desklink.mobile.helpers.ThreadHelper.execute(Runnable { task() }) },
+            postLater = { delay, task -> mainHandler.postDelayed({ task() }, delay) },
+            onReady = { held ->
+                mainHandler.post {
+                    // What was held back goes out now, by the user's settings; and the snapshot is sent again if one was asked for meanwhile.
+                    held.forEach { (sbn, preexisting) -> sendNotification(sbn, preexisting) }
+                    if (resyncWhenReady) {
+                        resyncWhenReady = false
+                        NotificationReceiver.WithService(context) { service -> if (service.isConnected) sendCurrentNotifications(service, resync = true) }
+                    }
+                }
+            },
+        )
+    }
+    @Volatile private var resyncWhenReady = false
+
     override fun onCreate(): Boolean {
         appDatabase = AppDatabase.getInstance(context)
         // The per-app tables into memory, off the main thread: the listener asks about every notification there.
-        org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { appDatabase.preload() } }
         sharedPreferences = context.getSharedPreferences(sharedPreferencesName, Context.MODE_PRIVATE)
         keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         mainHandler = Handler(Looper.getMainLooper())
@@ -96,10 +115,12 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             service.addListener(this@NotificationsPlugin)
             serviceReady = service.isConnected
         }
+        gate.start() // the per-app settings into memory, off the main thread
         return true
     }
 
     override fun onDestroy() {
+        gate.stop()
         synchronized(notificationDeliveryLock) {
             currentNotifications.clear()
             notificationsIcons.clear()
@@ -119,6 +140,11 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     override fun onListenerConnected(service: NotificationReceiver?) {
         serviceReady = true
+        if (!appDatabase.isReady()) {
+            resyncWhenReady = true
+            gate.start()
+            return
+        }
         if (service != null && isDeviceInitialized) {
             // Listener reconnection is a synchronization boundary. Re-send
             // the active set so desktop state does not depend on missed post
@@ -132,6 +158,11 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
      * dismissed while the link was down (no retried cancellations needed), then each body silent.
      */
     override fun onFeatureReady() {
+        if (!appDatabase.isReady()) {
+            resyncWhenReady = true // the snapshot lists only what is mirrored: sent when the settings are known
+            gate.start()
+            return
+        }
         if (!isDeviceInitialized || !NotificationReceiver.hasReadNotificationsPermission(context)) {
             sendSnapshot(emptyList(), resync = true)
             return
@@ -169,13 +200,14 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
         pendingActions.remove(id)
 
-        if (!appDatabase.isEnabled(statusBarNotification.packageName)) {
+        if (appDatabase.isReady() && !appDatabase.isEnabled(statusBarNotification.packageName)) {
             synchronized(notificationDeliveryLock) {
                 currentNotifications.remove(id)
             }
             return
         }
 
+        // (A cancellation carries no content: sent even while the settings are still loading.)
         sendNotificationCancellation(id)
         synchronized(notificationDeliveryLock) {
             currentNotifications.remove(id)
@@ -264,6 +296,11 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     ) {
         val notification = statusBarNotification.notification
         // One filter for what is mirrored and what the snapshot lists.
+        // Settings not in memory yet: nothing is mirrored on a guess. It is held and sent once they are.
+        if (!appDatabase.isReady()) {
+            gate.hold(statusBarNotification to isPreexisting)
+            return
+        }
         if (!isMirrored(statusBarNotification)) return
         val packageName = statusBarNotification.packageName
 
