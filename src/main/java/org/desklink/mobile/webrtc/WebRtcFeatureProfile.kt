@@ -64,6 +64,9 @@ object WebRtcFeatureProfile {
 
     fun allows(packetType: String): Boolean = packetType in enabled
 
+    /** Every type of the profile (tests). */
+    val all: Set<String> get() = enabled
+
     fun capabilities(advertised: Collection<String>?): List<String> = advertised
         .orEmpty()
         .filter(::allows)

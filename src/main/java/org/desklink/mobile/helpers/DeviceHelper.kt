@@ -156,6 +156,10 @@ object DeviceHelper {
         // misleading bootstrap-only "Connected" state.
         incoming += DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
         outgoing += DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1
+        // The delta-resync `have` is handled by Device itself, not by a plugin: without these two entries the handover
+        // never lists it, and the desk (which sends only what the phone confirmed) never sent its own.
+        incoming += DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE
+        outgoing += DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE
         return DeviceInfo(
             getDeviceId(context),
             SslHelper.certificate,

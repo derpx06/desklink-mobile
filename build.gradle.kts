@@ -131,6 +131,10 @@ android {
     }
 }
 
+// The plugin index is generated for the main sources. Generated again for the unit tests it would be empty, and (same
+// name) would hide the real one, so tests would see no plugins at all.
+tasks.matching { it.name.startsWith("kspDebugUnitTest") || it.name.startsWith("kspReleaseUnitTest") }.configureEach { enabled = false }
+
 ksp {
     arg("com.albertvaka.classindexksp.annotations", "org.desklink.mobile.plugins.PluginFactory.LoadablePlugin")
 }
