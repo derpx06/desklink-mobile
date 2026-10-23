@@ -100,6 +100,7 @@ import androidx.core.content.FileProvider
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.share.TransferRecord
+import org.desklink.mobile.plugins.share.hasPicture
 import org.desklink.mobile.plugins.share.previewKind
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.MonoFamily
@@ -286,7 +287,8 @@ class BucketUi(
             ) else if (embedded) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) { headerActions() }
             } else ScreenHeader(onBack, actions = headerActions)
-            if (on && !selecting) Breadcrumb(path) { path = it }
+            // Only inside a folder: at the top it would be an empty 48 dp band under the header.
+            if (on && !selecting && path.isNotEmpty()) Breadcrumb(path) { path = it }
             if (!embedded && (!on || path.isEmpty())) LargeTitle(stringResource(R.string.bucket_title), subtitle = if (on && view!!.summary == null) status(view, desk) else if (!on) stringResource(R.string.bucket_subtitle, desk) else null)
             view?.summary?.takeIf { on }?.let { SyncHeader(it, view.userPaused, desk) }
             Box(Modifier.weight(1f)) {
@@ -707,13 +709,13 @@ class BucketUi(
                 if (item.dir) {
                     TypeIcon(R.drawable.sym_folder)
                 } else if (uri == null) {
-                    Box(Modifier.fillMaxSize().shimmer())
+                    if (kind.hasPicture) Box(Modifier.fillMaxSize().shimmer()) else TypeIcon(iconFor(kind))
                 } else {
                     val record = TransferRecord(uri.toString() + item.mtime, deviceId, desk, item.name, item.size, false, item.mtime, uri.toString(), null)
                     val preview by rememberFilePreview(record, sizePx)
                     val bitmap = preview.bitmap
                     when {
-                        preview.loading -> Box(Modifier.fillMaxSize().shimmer())
+                        preview.loading && kind.hasPicture -> Box(Modifier.fillMaxSize().shimmer())
                         bitmap != null -> Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         else -> TypeIcon(iconFor(kind))
                     }

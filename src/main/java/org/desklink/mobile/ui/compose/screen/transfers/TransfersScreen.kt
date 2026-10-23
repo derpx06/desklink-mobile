@@ -89,6 +89,7 @@ import kotlinx.coroutines.withContext
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.share.PreviewKind
 import org.desklink.mobile.plugins.share.TransferRecord
+import org.desklink.mobile.plugins.share.hasPicture
 import org.desklink.mobile.plugins.share.previewKind
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.components.IconCircle
@@ -247,7 +248,7 @@ private fun FileCard(record: TransferRecord, deskName: String, revision: Int, ac
             val kind = previewKind(record.mime, record.name)
             val bitmap = preview.bitmap
             when {
-                preview.loading -> Box(Modifier.fillMaxSize().shimmer())
+                preview.loading && kind.hasPicture -> Box(Modifier.fillMaxSize().shimmer())
                 preview.missing -> TypedIcon(R.drawable.sym_broken_image, t.fill, t.textDim)
                 bitmap != null -> Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                 else -> TypedIcon(iconFor(kind), t.accentContainer, t.onAccentContainer)

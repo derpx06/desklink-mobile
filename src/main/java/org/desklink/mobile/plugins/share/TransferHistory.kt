@@ -37,6 +37,9 @@ data class TransferRecord(
 /** How a file is previewed in the transfers grid. */
 enum class PreviewKind { IMAGE, VIDEO, AUDIO, PDF, TEXT, ARCHIVE, OTHER }
 
+/** Whether a picture of the file's content can exist; other kinds show their type icon at once, never a grey placeholder. */
+val PreviewKind.hasPicture: Boolean get() = this == PreviewKind.IMAGE || this == PreviewKind.VIDEO || this == PreviewKind.PDF
+
 fun previewKind(mime: String?, name: String): PreviewKind {
     val type = mime?.lowercase()?.takeIf { it.isNotBlank() && it != "application/octet-stream" }
         ?: mimeForExtension(name.substringAfterLast('.', "").lowercase())
