@@ -118,7 +118,6 @@ import org.desklink.mobile.ui.compose.tokens
 import java.io.InputStreamReader
 
 const val KEY_CONNECT_ON_STARTUP = "connect_on_startup"
-const val KEY_BLUETOOTH_ENABLED = "bluetooth_enabled"
 const val KEY_APP_THEME = "theme_pref"
 
 /** The selected computer's settings, as the "<desk>" section shows them. */
@@ -394,10 +393,6 @@ internal fun permissionRows(context: Context, desk: String, request: (Array<Stri
             NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName),
             allow = open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
         ))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && prefs.getBoolean(KEY_BLUETOOTH_ENABLED, false)) {
-            val nearby = arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
-            add(PermissionRow(R.drawable.sym_bluetooth_searching, context.getString(R.string.settings_perm_nearby), context.getString(R.string.settings_perm_nearby_summary, desk), nearby.all(::granted)) { request(nearby) })
-        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             add(PermissionRow(R.drawable.sym_photo_library, context.getString(R.string.settings_perm_files), context.getString(R.string.settings_perm_files_summary, desk), granted(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 request(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE))

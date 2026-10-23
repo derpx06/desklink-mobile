@@ -14,7 +14,7 @@ enum class DeviceConnection {
     /** Through the DeskLink relay, away from the computer's network. */
     AWAY,
 
-    /** Features are flowing, over a path that is neither of the above (e.g. Bluetooth). */
+    /** Features are flowing, over a path that is neither of the above (the relay). */
     CONNECTED,
 
     /** A link exists but the feature transport has not finished its handover. */

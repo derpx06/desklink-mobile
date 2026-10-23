@@ -204,7 +204,7 @@ object QrPairing {
 
     /**
      * Waits for a pinned-TLS LAN link whose certificate matches the code. Not
-     * Bluetooth (its certificate is only claimed), and an impostor answering
+     * any link whose certificate is only claimed), and an impostor answering
      * first under the desktop's public id is not fatal: keep waiting for the
      * real one until the deadline.
      */

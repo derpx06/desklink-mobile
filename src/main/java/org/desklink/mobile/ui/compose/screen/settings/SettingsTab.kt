@@ -706,12 +706,6 @@ private fun AppearanceGroup(actions: SettingsActions, prefs: android.content.Sha
 @Composable
 private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: android.content.SharedPreferences, onOpen: (String) -> Unit, changed: () -> Unit) {
     val context = LocalContext.current
-    val btRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        if (result.values.all { it }) {
-            prefs.edit { putBoolean(KEY_BLUETOOTH_ENABLED, true) }
-            changed()
-        }
-    }
     val exportLogs = rememberLauncherForActivityResult(CreateFileResultContract()) { uri: Uri? ->
         val output = uri?.let { context.contentResolver.openOutputStream(it) } ?: return@rememberLauncherForActivityResult
         CoroutineScope(Dispatchers.IO).launch {
@@ -765,16 +759,6 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
             subtitle = stringResource(R.string.custom_devices_settings_summary, CustomDevicesActivity.getCustomDeviceList(context).size),
             onClick = { customDevices.launch(Intent(context, CustomDevicesActivity::class.java)) },
         )
-        val bluetooth = prefs.getBoolean(KEY_BLUETOOTH_ENABLED, false)
-        GroupRow(stringResource(R.string.setting_bluetooth), icon = R.drawable.sym_bluetooth_searching, checked = bluetooth, onClick = {
-            val permissions = arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
-            if (!bluetooth && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !permissions.all { granted(context, it) }) {
-                btRequest.launch(permissions)
-            } else {
-                prefs.edit { putBoolean(KEY_BLUETOOTH_ENABLED, !bluetooth) }
-                changed()
-            }
-        })
     }
     SectionLabel(stringResource(R.string.settings_permissions))
     RowGroup {

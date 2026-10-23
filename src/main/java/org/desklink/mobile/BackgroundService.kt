@@ -35,7 +35,6 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.MutableLiveData
 import org.desklink.mobile.backends.BaseLinkProvider
 import org.desklink.mobile.backends.BaseLinkProvider.ConnectionReceiver
-import org.desklink.mobile.backends.bluetooth.BluetoothLinkProvider
 import org.desklink.mobile.backends.lan.LanLinkProvider
 import org.desklink.mobile.backends.relay.RelayLinkProvider
 import org.desklink.mobile.backends.relay.RelaySettings
@@ -78,7 +77,7 @@ class BackgroundService : Service() {
     private val linkProviders = mutableListOf<BaseLinkProvider>()
 
     private val connectedToNonCellularNetwork = MutableLiveData<Boolean>()
-    /** Indicates whether device is connected over wifi / usb / bluetooth / (anything other than cellular) */
+    /** Indicates whether device is connected over wifi / usb / (anything other than cellular) */
     val isConnectedToNonCellularNetwork: LiveData<Boolean>
         get() = connectedToNonCellularNetwork
 
@@ -91,12 +90,11 @@ class BackgroundService : Service() {
     }
 
     private fun registerLinkProviders() {
-        // Debug "Force relay": no LAN or Bluetooth links at all, so every
+        // Debug "Force relay": no LAN links at all, so every
         // paired device is reached through the relay. Read at service start.
         if (!RelaySettings.forceRelay(this)) {
             linkProviders.add(LanLinkProvider(this))
             //linkProviders.add(LoopbackLinkProvider(this))
-            linkProviders.add(BluetoothLinkProvider(this))
         }
         linkProviders.add(RelayLinkProvider(this))
     }
@@ -593,7 +591,6 @@ class BackgroundService : Service() {
                 addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                 addTransportType(NetworkCapabilities.TRANSPORT_VPN)
                 addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
-                addTransportType(NetworkCapabilities.TRANSPORT_BLUETOOTH)
                 if (Build.VERSION.SDK_INT > Build.VERSION_CODES.O) {
                     addTransportType(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
                 }

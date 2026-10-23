@@ -114,7 +114,6 @@ import org.desklink.mobile.ui.compose.screen.pairing.PairStage
 import org.desklink.mobile.ui.compose.screen.pairing.ScanScreen
 import org.desklink.mobile.ui.compose.screen.pairing.WelcomeScreen
 import org.desklink.mobile.ui.compose.screen.settings.DeskSettings
-import org.desklink.mobile.ui.compose.screen.settings.KEY_BLUETOOTH_ENABLED
 import org.desklink.mobile.ui.compose.screen.settings.SettingsActions
 import org.desklink.mobile.ui.compose.screen.settings.SettingsPage
 import org.desklink.mobile.ui.compose.screen.settings.SettingsTab
@@ -1168,11 +1167,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             // Android 10+ needs a writable folder chosen by hand for received files.
             @Suppress("DEPRECATION")
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), STORAGE_LOCATION_CONFIGURED)
-        }
-        if (isPermissionGranted(permissions, grantResults, Manifest.permission.BLUETOOTH_CONNECT) &&
-            isPermissionGranted(permissions, grantResults, Manifest.permission.BLUETOOTH_SCAN)
-        ) {
-            PreferenceManager.getDefaultSharedPreferences(this).edit { putBoolean(KEY_BLUETOOTH_ENABLED, true) }
         }
         // A new permission: reload the plugins that waited for it.
         CoroutineScope(Dispatchers.IO).launch {

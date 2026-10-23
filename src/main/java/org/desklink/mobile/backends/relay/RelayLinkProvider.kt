@@ -60,7 +60,7 @@ object RelaySettings {
 
     fun useTurn(context: Context) = prefs(context).getBoolean(KEY_USE_TURN, true)
 
-    /** Debug builds only: no LAN or Bluetooth links at all. Read when the service starts. */
+    /** Debug builds only: no LAN links at all. Read when the service starts. */
     fun forceRelay(context: Context) = BuildConfig.DEBUG && prefs(context).getBoolean(KEY_FORCE_RELAY, false)
 
     /** Debug builds only: relay-only ICE transport policy. */
@@ -146,7 +146,7 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
 
     override fun getName(): String = "RelayLinkProvider"
 
-    /** Below LAN (20) and Bluetooth (10): the relay is the last resort. */
+    /** Below LAN (20): the relay is the last resort. */
     override fun getPriority(): Int = 5
 
     /**

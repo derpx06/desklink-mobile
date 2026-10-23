@@ -501,7 +501,7 @@ class Device : PacketReceiver {
     var connectionPath: org.desklink.mobile.webrtc.WebRtcConnectionPath? = null
         private set
 
-    /** The preferred link is pinned TLS over the LAN (not, e.g., Bluetooth). */
+    /** The preferred link is pinned TLS over the LAN (the relay is the other). */
     /** Whether [packetType] is in the feature set shared with this computer (both profiles agree). */
     fun featureActive(packetType: String): Boolean = WebRtcFeatureProfile.peerAccepts(deviceId, packetType)
 
@@ -753,9 +753,10 @@ class Device : PacketReceiver {
      * Whether a link may speak for this device.
      *
      * The LAN transport proves this during its TLS handshake, by installing the
-     * stored pairing certificate as the only trust anchor. No other transport
-     * does: [org.desklink.mobile.backends.bluetooth.BluetoothLink] takes the
-     * peer's certificate straight out of the identity packet it was handed.
+     * stored pairing certificate as the only trust anchor; the relay link proves
+     * it with a signature against the stored certificate. There is no other
+     * transport (Bluetooth, which took the peer's certificate straight out of the
+     * identity packet it was handed, was removed).
      *
      * [dispatchPacket] has no link parameter, so once a link is attached
      * nothing downstream can tell a pinned socket from an unpinned one — an
