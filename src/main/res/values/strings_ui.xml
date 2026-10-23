@@ -659,6 +659,15 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="capture_pages_full" tools:ignore="PluralsCandidate">A scan holds up to %1$d pages. Send this one, then scan the rest.</string>
     <string name="capture_no_camera">This phone has no camera DeskLink can use right now.</string>
     <string name="capture_camera_denied">Camera access is off for DeskLink. Turn it on in Android settings to use this.</string>
+    <string name="files_received_notification">Received %1$s from %2$s</string>
+    <string name="files_save_failed_notification">%1$s arrived but could not be saved. It is kept: open Files to try again.</string>
+    <string name="files_saved_in">Received files go to %1$s</string>
+    <string name="files_saved_in_downloads">the Downloads folder</string>
+    <string name="files_unsaved_title">%1$s could not be saved</string>
+    <string name="files_unsaved_body">It arrived whole and is kept on this phone. Check there is room, then try again.</string>
+    <string name="files_unsaved_retry">Try again</string>
+    <string name="files_unsaved_discard">Delete</string>
+    <string name="files_unsaved_done">Saved %1$s</string>
     <string name="home_more_actions">More actions</string>
     <!-- W5: Settings, grouped by feature in the desk's order -->
     <string name="sg_connection_summary">This phone\'s name, %1$s, unpairing</string>

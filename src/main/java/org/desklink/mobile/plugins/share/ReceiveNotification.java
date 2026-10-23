@@ -30,7 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 
-class ReceiveNotification {
+public class ReceiveNotification {
     private final NotificationManager notificationManager;
     private final int notificationId;
     private NotificationCompat.Builder builder;

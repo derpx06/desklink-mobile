@@ -206,6 +206,11 @@ object TransferHistory {
         revision++
     }
 
+    /** Something a screen shows changed without a history row (a file kept for a retry). */
+    fun changed() {
+        revision++
+    }
+
     fun remove(context: Context, id: String) {
         store(context).remove(id)
         revision++

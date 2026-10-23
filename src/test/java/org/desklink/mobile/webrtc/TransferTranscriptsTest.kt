@@ -232,14 +232,12 @@ class TransferTranscriptsTest {
         val captured = Captured()
         val runner = ManualRunner()
         val published = mutableListOf<ByteArray>()
-        val device = mockk<Device>(relaxed = true).also {
-            every { it.onWebRtcPacketReceived(any()) } answers {
-                val packet = firstArg<org.desklink.mobile.NetworkPacket>()
-                published += packet.payload!!.inputStream!!.readBytes()
-                packet.payload!!.close()
-            }
+        val device = mockk<Device>(relaxed = true)
+        val destination = org.desklink.mobile.plugins.share.ReceiveDestination { source, name, _, mime ->
+            published += source.readBytes()
+            org.desklink.mobile.plugins.share.Published(android.net.Uri.parse("content://fake/$name"), name, mime, source.length())
         }
-        val manager = WebRtcFileTransferManager(context, device, captured, runner, { 0L }, { Long.MAX_VALUE })
+        val manager = WebRtcFileTransferManager(context, device, captured, runner, { 0L }, { Long.MAX_VALUE }, destination)
         // A checkpoint of the first blocks, as a crashed receiver left it.
         doc.optJSONObject("receiverHolds")?.optInt("blocks", 0)?.takeIf { it > 0 }?.let { blocks ->
             val store = FileTransferStore(root())

@@ -34,8 +34,14 @@ class FileReceiver(
         /** Bytes of this file in place so far (verified blocks plus the current one). */
         fun progress(receiver: FileReceiver, bytesDone: Long)
 
-        /** Hands the verified file on (to the share, the clipboard or the Bucket). Throws if it cannot be delivered. */
+        /** Hands the verified file on (to the destination, the clipboard or the Bucket). Throws if it cannot be delivered. */
         fun deliver(receiver: FileReceiver, partial: File, fileHash: String)
+
+        /**
+         * [deliver] threw: keeps the verified [partial] for a retry (moving it out of the transfer directory) and says
+         * so; true if it was kept. Otherwise it is deleted with the rest.
+         */
+        fun keepUndelivered(receiver: FileReceiver, partial: File, error: Throwable): Boolean = false
 
         /** The transfer is over (delivered, failed or cancelled); the manager forgets it. */
         fun ended(receiver: FileReceiver, outcome: Outcome, message: String?)
@@ -252,7 +258,11 @@ class FileReceiver(
             file = null
             listener.deliver(this, store.partial(id), derived)
         } catch (error: Throwable) {
-            return fail(FileCodes.INTERNAL, "The phone could not keep the received file.")
+            // Verified but not in place: never `complete`. The sender is told it failed, the file is kept for a retry.
+            runCatching { raf.close() }
+            file = null
+            val kept = runCatching { listener.keepUndelivered(this, store.partial(id), error) }.getOrDefault(false)
+            return finishUndelivered(if (kept) "The phone could not save the file; it is kept to try again." else "The phone could not save the file.")
         }
         ended = true
         runCatching { send(control(WebRtcFileAction.COMPLETE).copy(fileHash = derived)) }
@@ -351,6 +361,11 @@ class FileReceiver(
         ended = true
         listener.ended(this, Outcome.SUSPENDED, null)
     }
+
+    /** After a failed delivery: the sender gets `error`, the checkpoint goes, the part has been moved (or is deleted). */
+    private fun finishUndelivered(message: String) = finish(
+        Outcome.FAILED, message, tellPeer = control(WebRtcFileAction.ERROR).copy(code = FileCodes.INTERNAL, message = message),
+    )
 
     private fun fail(code: String, message: String) = finish(
         Outcome.FAILED, message, tellPeer = control(WebRtcFileAction.ERROR).copy(code = code, message = message),

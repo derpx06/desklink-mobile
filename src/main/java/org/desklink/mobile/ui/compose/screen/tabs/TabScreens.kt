@@ -83,19 +83,57 @@ fun FilesTab(
     records: List<TransferRecord>,
     revision: Int,
     actions: TransferActions,
+    /** Where received files go, in words ("the Downloads folder", a folder's name). */
+    savedIn: String = "",
+    /** Verified files that arrived but could not be saved, kept for a retry. */
+    unsaved: List<org.desklink.mobile.plugins.share.UnpublishedFiles.Item> = emptyList(),
+    onRetryUnsaved: (String) -> Unit = {},
+    onDiscardUnsaved: (String) -> Unit = {},
 ) {
     val t = tokens
     var showAll by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-        LargeTitle(stringResource(R.string.files_title), Modifier.padding(top = 12.dp), subtitle = stringResource(R.string.files_subtitle)) {
+        LargeTitle(
+            stringResource(R.string.files_title),
+            Modifier.padding(top = 12.dp),
+            subtitle = if (savedIn.isNotEmpty()) stringResource(R.string.files_saved_in, savedIn) else stringResource(R.string.files_subtitle),
+        ) {
             IconButton(onClick = actions.onSendFiles, modifier = Modifier.size(48.dp)) {
                 Icon(painterResource(R.drawable.sym_upload_file), contentDescription = stringResource(R.string.home_send_files), tint = t.text)
             }
         }
+        unsaved.forEach { item -> UnsavedCard(item, onRetryUnsaved, onDiscardUnsaved) }
         Box(Modifier.weight(1f)) {
             bucket.Screen(deviceId, onBack = {}, embedded = true) {
                 recentTransfers(deskName, live, records, revision, actions, limit = if (showAll) Int.MAX_VALUE else RECENT_LIMIT, onShowAll = { showAll = true })
             }
+        }
+    }
+}
+
+/** A file that arrived whole but could not be saved: plain words, and the two things that can be done. */
+@Composable
+private fun UnsavedCard(
+    item: org.desklink.mobile.plugins.share.UnpublishedFiles.Item,
+    onRetry: (String) -> Unit,
+    onDiscard: (String) -> Unit,
+) {
+    val t = tokens
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(t.coralContainer)
+            .padding(16.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(stringResource(R.string.files_unsaved_title, item.name), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.coralText)
+        Text(stringResource(R.string.files_unsaved_body), fontSize = 13.sp, color = t.text)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PillButton(stringResource(R.string.files_unsaved_retry), { onRetry(item.id) }, height = 48.dp)
+            PillButton(stringResource(R.string.files_unsaved_discard), { onDiscard(item.id) }, style = PillStyle.Outlined, height = 48.dp)
         }
     }
 }

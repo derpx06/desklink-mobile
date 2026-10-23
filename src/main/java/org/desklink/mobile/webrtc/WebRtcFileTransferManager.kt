@@ -78,6 +78,8 @@ class WebRtcFileTransferManager(
     private val runner: FileRunner = ThreadFileRunner(),
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
     private val freeSpace: () -> Long = { File(context.applicationContext.filesDir.path).usableSpace },
+    /** Where a verified received file is put; replaced by tests. */
+    private val destination: org.desklink.mobile.plugins.share.ReceiveDestination = org.desklink.mobile.plugins.share.DeviceStorageDestination(context.applicationContext),
 ) {
     private val appContext = context.applicationContext
     private val store = FileTransferStore(File(appContext.filesDir, "webrtc-transfers"))
@@ -104,6 +106,7 @@ class WebRtcFileTransferManager(
 
     init {
         store.purgeLegacy()
+        runCatching { org.desklink.mobile.plugins.share.UnpublishedFiles.prune(appContext) }
     }
 
     /** The clock (stalls, checkpoints) runs only while a transfer is live: an idle phone has no timer here. */
@@ -452,36 +455,77 @@ class WebRtcFileTransferManager(
                 BucketEngine.arrived(receiver.wire.peerDeviceId, ref, partial, requireNotNull(offer.contentSha256), receiver.totalSize)
                 return
             }
-            val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
-                this["filename"] = receiver.filename
-                this["sha256"] = fileHash
-                offer.mtime?.takeIf { it > 0 }?.let { this["lastModified"] = it }
-                if (clipboardOffers.remove(receiver.id)) {
+            if (clipboardOffers.remove(receiver.id)) {
+                // C3: an image copy goes on the clipboard, never into Downloads. A picture that cannot be used is a failure too.
+                val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
+                    this["filename"] = receiver.filename
                     this["clipboard"] = true
                     this["mimeType"] = org.desklink.mobile.plugins.clipboard.ClipboardImages.MIME
+                    payload = NetworkPacket.Payload(java.io.FileInputStream(partial), receiver.totalSize) { partial.delete() }
                 }
-                payload = NetworkPacket.Payload(java.io.FileInputStream(partial), receiver.totalSize) { partial.delete() }
+                if (!org.desklink.mobile.plugins.clipboard.ClipboardImages.receive(appContext, packet)) {
+                    throw java.io.IOException("The picture could not be put on the clipboard")
+                }
+                return
             }
-            try {
-                device.onWebRtcPacketReceived(packet)
-            } catch (error: Throwable) {
-                packet.payload?.close() // deletes the partial file
-                throw error
+            // The file was verified block by block and as a whole; what is left is one copy into place. Only when it is
+            // really there does the receiver tell the sender `complete`.
+            val published = destination.publish(partial, receiver.filename, offer.mtime?.takeIf { it > 0 }, offer.mimeType)
+            partial.delete()
+            runCatching {
+                org.desklink.mobile.plugins.share.TransferHistory.recordReceived(appContext, receiver.wire.peerDeviceId, published.name, published.size, published.uri, published.mime)
             }
+            announceReceived(receiver, published)
+        }
+
+        override fun keepUndelivered(receiver: FileReceiver, partial: File, error: Throwable): Boolean {
+            Log.w(TAG, "could not publish ${receiver.filename}: ${error.javaClass.simpleName}: ${error.message}")
+            // A Bucket file or a clipboard picture has its own way to come again; only a plain file is worth keeping.
+            if (folderOffers.containsKey(receiver.id) || clipboardOffers.contains(receiver.id) || !partial.isFile) return false
+            val offer = receiver.offer
+            val item = org.desklink.mobile.plugins.share.UnpublishedFiles.keep(
+                appContext, partial, receiver.filename, offer.mimeType, offer.mtime?.takeIf { it > 0 }, receiver.wire.peerDeviceId,
+            ) ?: return false
+            org.desklink.mobile.plugins.share.TransferHistory.changed()
+            return item.size >= 0
         }
 
         override fun ended(receiver: FileReceiver, outcome: FileReceiver.Outcome, message: String?) {
             if (!folderOffers.containsKey(receiver.id)) {
                 val job = receiveJob(receiver.id)
                 when (outcome) {
-                    FileReceiver.Outcome.FAILED -> TransferProgress.finish(job, receiver.filename, true)
-                    // Delivered: the share plugin's own job reports "received"; cancelled or suspended: nothing to show.
+                    FileReceiver.Outcome.FAILED -> {
+                        TransferProgress.finish(job, receiver.filename, true)
+                        announceReceiveFailed(receiver, message)
+                    }
+                    FileReceiver.Outcome.DELIVERED -> TransferProgress.finish(job, receiver.filename, false)
+                    // Cancelled or suspended: nothing to show.
                     else -> TransferProgress.cancel(job)
                 }
             }
             if (receives[receiver.id] === receiver) receives.remove(receiver.id)
             folderOffers.remove(receiver.id)
             clipboardOffers.remove(receiver.id)
+        }
+    }
+
+    /** "Received report.pdf": the notification that opens it, as the old receive job showed. Never allowed to fail the transfer. */
+    private fun announceReceived(receiver: FileReceiver, published: org.desklink.mobile.plugins.share.Published) {
+        runCatching {
+            val note = org.desklink.mobile.plugins.share.ReceiveNotification(device, receiveJob(receiver.id))
+            note.setFinished(appContext.getString(org.desklink.mobile.R.string.files_received_notification, published.name, device.name))
+            note.setURI(published.uri, published.mime ?: "*/*", published.name)
+            note.show()
+        }.onFailure { Log.w(TAG, "could not show the received notification", it) }
+    }
+
+    private fun announceReceiveFailed(receiver: FileReceiver, message: String?) {
+        runCatching {
+            // A transfer the computer or the person ended says nothing more here; one that could not be saved does.
+            if (message == null || !message.startsWith("The phone could not save")) return
+            val note = org.desklink.mobile.plugins.share.ReceiveNotification(device, receiveJob(receiver.id))
+            note.setFailed(appContext.getString(org.desklink.mobile.R.string.files_save_failed_notification, receiver.filename))
+            note.show()
         }
     }
 
