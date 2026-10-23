@@ -76,4 +76,34 @@ class GlideAllowedTest {
         repeat(200) { p.onPacketReceived(enter()) }
         assertTrue("one hand-back per allowed enter, not 200: ${sent.count { it.has("releaseDeltax") }}", sent.count { it.has("releaseDeltax") } <= Glide.MAX_ENTERS_PER_SECOND)
     }
+
+    @Test
+    fun anAcceptedEnterIsAnsweredOnceWithEnteredBeforeAnyHandBackAndARefusedOneNever() {
+        Glide.setAllowed(app, "desk-1", true)
+        // The accessibility service is what makes an enter acceptable; a stand-in instance for the test.
+        val service = org.robolectric.Robolectric.setupService(org.desklink.mobile.plugins.mousereceiver.MouseReceiverService::class.java)
+        try {
+            val p = plugin()
+            p.onPacketReceived(enter())
+            val accepts = sent.filter { it.getBoolean("entered", false) }
+            assertEquals(1, accepts.size)
+            assertEquals(true, accepts.single().getBoolean("allowed", false))
+            assertFalse("not a release", accepts.single().has("releaseDeltax"))
+            assertEquals("the accept is the first thing sent", accepts.single(), sent.first())
+            assertEquals("Glide is on", "desk-1", Glide.activeDesk)
+            // A hand-back, when it comes, comes after.
+            p.stop(release = true)
+            assertTrue(sent.indexOf(accepts.single()) < sent.indexOfFirst { it.has("releaseDeltax") })
+        } finally {
+            service.onDestroy()
+        }
+    }
+
+    @Test
+    fun aRefusedEnterNeverSendsAnAccept() {
+        Glide.setAllowed(app, "desk-1", false)
+        val p = plugin()
+        p.onPacketReceived(enter())
+        assertTrue(sent.none { it.getBoolean("entered", false) })
+    }
 }

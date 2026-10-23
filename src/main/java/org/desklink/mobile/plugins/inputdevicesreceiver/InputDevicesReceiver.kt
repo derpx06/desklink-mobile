@@ -147,6 +147,17 @@ class InputDevicesReceiverPlugin : Plugin() {
         val (x, y) = Glide.entry(edge, deltax, deltay, length, metrics.widthPixels, metrics.heightPixels)
         MouseReceiverService.setPos(x, y)
         SessionLiveNotification.refresh(context, device.deviceId)
+        // The accept (W6): the desk streams nothing until it hears this, and takes silence for a refusal after 300 ms. Sent
+        // only for an enter acted on, and before any hand-back this glide can produce.
+        sendAccept()
+    }
+
+    /** `desklink.shareinputdevices {allowed: true, entered: true}`: a state report that also answers the enter. */
+    private fun sendAccept() {
+        device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES).apply {
+            this["allowed"] = true
+            this["entered"] = true
+        })
     }
 
     private fun screenIsOn() = context.getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
