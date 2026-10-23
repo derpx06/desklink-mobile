@@ -52,13 +52,24 @@ object ThemeUtil {
         }
     }
 
+    private fun <T> readAllowingDisk(read: () -> T): T {
+        val before = android.os.StrictMode.allowThreadDiskReads()
+        try {
+            return read()
+        } finally {
+            android.os.StrictMode.setThreadPolicy(before)
+        }
+    }
+
     /**
      * Called when an activity is created for the first time to reliably load the correct theme.
      */
     fun setUserPreferredTheme(application: Application) {
-        val appTheme = PreferenceManager
-            .getDefaultSharedPreferences(application)
-            .getString("theme_pref", DEFAULT_MODE)!!
+        // The one read the first screen cannot wait without: the theme must be set before any activity is made, or the
+        // screen is drawn and then recreated. A small file, read once, so the disk-read check is told it is meant.
+        val appTheme = readAllowingDisk {
+            PreferenceManager.getDefaultSharedPreferences(application).getString("theme_pref", DEFAULT_MODE)!!
+        }
         // Read at each activity's creation, so turning it off applies to the next screen opened.
         DynamicColors.applyToActivitiesIfAvailable(
             application,
