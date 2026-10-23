@@ -33,7 +33,8 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 public class MouseReceiverService extends AccessibilityService {
-    public static MouseReceiverService instance;
+    /** Read from the binder and main threads and from every packet: never cached across a call (see the local copies in the statics). */
+    public static volatile MouseReceiverService instance;
 
     private View cursorView;
     private LayoutParams cursorLayout;
@@ -93,72 +94,86 @@ public class MouseReceiverService extends AccessibilityService {
     }
 
     private void hideAfter5Seconds() {
-        instance.hide(5000);
+        hide(5000);
     }
 
     public void hide(int delayMillis) {
-        if (runHandler == null || hideRunnable == null) return; // not connected yet, or already torn down
-        runHandler.removeCallbacks(hideRunnable);
-        runHandler.postDelayed(hideRunnable, delayMillis);
+        final Handler handler = runHandler;
+        final Runnable hider = hideRunnable;
+        if (handler == null || hider == null) return; // not connected yet, or already torn down
+        handler.removeCallbacks(hider);
+        handler.postDelayed(hider, delayMillis);
     }
 
+    // The view and its layout are gone once the service is: 0 is the answer then, not a crash.
     public int getX() {
-        return cursorLayout.x + cursorView.getWidth() / 2;
+        final View view = cursorView;
+        final LayoutParams layout = cursorLayout;
+        return view == null || layout == null ? 0 : layout.x + view.getWidth() / 2;
     }
 
     public int getY() {
-        return cursorLayout.y + cursorView.getHeight() / 2;
+        final View view = cursorView;
+        final LayoutParams layout = cursorLayout;
+        return view == null || layout == null ? 0 : layout.y + view.getHeight() / 2;
     }
 
     public void moveView(int dx, int dy) {
+        // Everything the posted update needs is taken now: the service can be switched off between here and the main thread.
+        final WindowManager manager = windowManager;
+        final View view = cursorView;
+        final LayoutParams layout = cursorLayout;
+        if (manager == null || view == null || layout == null) return;
         DisplayMetrics displayMetrics = new DisplayMetrics();
-        instance.windowManager.getDefaultDisplay().getRealMetrics(displayMetrics);
+        manager.getDefaultDisplay().getRealMetrics(displayMetrics);
 
-        cursorLayout.x += dx;
-        cursorLayout.y += dy;
+        layout.x += dx;
+        layout.y += dy;
 
         if (getX() > displayMetrics.widthPixels)
-            cursorLayout.x = displayMetrics.widthPixels - cursorView.getWidth() / 2;
+            layout.x = displayMetrics.widthPixels - view.getWidth() / 2;
         if (getY() > displayMetrics.heightPixels)
-            cursorLayout.y = displayMetrics.heightPixels - cursorView.getHeight() / 2;
-        if (getX() < 0) cursorLayout.x = -cursorView.getWidth() / 2;
-        if (getY() < 0) cursorLayout.y = -cursorView.getHeight() / 2;
+            layout.y = displayMetrics.heightPixels - view.getHeight() / 2;
+        if (getX() < 0) layout.x = -view.getWidth() / 2;
+        if (getY() < 0) layout.y = -view.getHeight() / 2;
 
         Cursor.INSTANCE.setX(getX());
         Cursor.INSTANCE.setY(getY());
 
-        new Handler(instance.getMainLooper()).post(() -> {
-            // Log.i("MouseReceiverService", "performing move");
+        new Handler(getMainLooper()).post(() -> {
             try {
-                instance.windowManager.updateViewLayout(instance.cursorView, instance.cursorLayout);
-                instance.cursorView.setVisibility(View.VISIBLE);
-            } catch (IllegalArgumentException e) {
-                e.printStackTrace();
+                manager.updateViewLayout(view, layout);
+                view.setVisibility(View.VISIBLE);
+            } catch (RuntimeException e) {
+                // The window went with the service (IllegalArgumentException), or the token did (BadTokenException).
+                Log.w("MouseReceiverService", "pointer update dropped: " + e.getClass().getSimpleName());
             }
         });
     }
 
     public static boolean move(int dx, int dy) {
-        if (instance == null) return false;
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
 
-        int fromX = instance.getX();
-        int fromY = instance.getY();
+        int fromX = s.getX();
+        int fromY = s.getY();
 
-        instance.moveView(dx, dy);
+        s.moveView(dx, dy);
 
-        instance.hideAfter5Seconds();
+        s.hideAfter5Seconds();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && instance.isSwiping()) {
-            return instance.continueSwipe(fromX, fromY);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && s.isSwiping()) {
+            return s.continueSwipe(fromX, fromY);
         }
 
         return true;
     }
 
     public static boolean setPos(int x, int y) {
-        if (instance == null) return false;
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
 
-        return move(x - instance.getX(), y - instance.getY());
+        return move(x - s.getX(), y - s.getY());
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -174,26 +189,29 @@ public class MouseReceiverService extends AccessibilityService {
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     public static boolean click() {
-        if (instance == null) return false;
-        // Log.i("MouseReceiverService", "x: " + instance.getX() + " y:" + instance.getY());
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
+        // Log.i("MouseReceiverService", "x: " + s.getX() + " y:" + s.getY());
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && instance.isSwiping()) {
-            return instance.stopSwipe();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && s.isSwiping()) {
+            return s.stopSwipe();
         }
 
-        return click(instance.getX(), instance.getY());
+        return click(s.getX(), s.getY());
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     public static boolean click(int x, int y) {
-        if (instance == null) return false;
-        return instance.dispatchGesture(createClick(x, y, 1 /*ms*/), null, null);
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
+        return s.dispatchGesture(createClick(x, y, 1 /*ms*/), null, null);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     public static boolean longClick() {
-        if (instance == null) return false;
-        return instance.dispatchGesture(createClick(instance.getX(), instance.getY(),
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
+        return s.dispatchGesture(createClick(s.getX(), s.getY(),
                 ViewConfiguration.getLongPressTimeout()), null, null);
     }
 
@@ -204,19 +222,21 @@ public class MouseReceiverService extends AccessibilityService {
      */
     @RequiresApi(api = Build.VERSION_CODES.N)
     public static boolean longClick(int x, int y) {
-        if (instance == null) return false;
-        return instance.dispatchGesture(createClick(x, y,
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
+        return s.dispatchGesture(createClick(x, y,
                 ViewConfiguration.getLongPressTimeout()), null, null);
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public static boolean longClickSwipe() {
-        if (instance == null) return false;
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
 
-        if (instance.isSwiping()) {
-            return instance.stopSwipe();
+        if (s.isSwiping()) {
+            return s.stopSwipe();
         } else {
-            return instance.startSwipe();
+            return s.startSwipe();
         }
     }
 
@@ -225,9 +245,10 @@ public class MouseReceiverService extends AccessibilityService {
      * request to release the current drag. */
     @RequiresApi(api = Build.VERSION_CODES.O)
     public static boolean longClickSwipe(int x, int y) {
-        if (instance == null || instance.isSwiping()) return false;
+        final MouseReceiverService s = instance;
+        if (s == null || s.isSwiping()) return false;
         if (!setPos(x, y)) return false;
-        return instance.startSwipe();
+        return s.startSwipe();
     }
 
     private boolean isSwiping() {
@@ -268,7 +289,8 @@ public class MouseReceiverService extends AccessibilityService {
         GestureDescription.Builder builder = new GestureDescription.Builder();
         builder.addStroke(swipeStoke);
         swipeStoke = null;
-        ((ImageView) cursorView.findViewById(R.id.mouse_cursor)).setImageResource(R.drawable.mouse_pointer);
+        final View view = cursorView;
+        if (view != null) ((ImageView) view.findViewById(R.id.mouse_cursor)).setImageResource(R.drawable.mouse_pointer);
         return dispatchGesture(builder.build(), null, null);
     }
 
@@ -290,8 +312,8 @@ public class MouseReceiverService extends AccessibilityService {
      * on a phone being controlled from the desktop, scrolling barely worked.
      */
     public static boolean scroll(int dx, int dy) {
-        if (instance == null) return false;
         final MouseReceiverService service = instance;
+        if (service == null) return false;
         service.pendingScrollX += dx;
         service.pendingScrollY += dy;
         if (!service.scrollFlushScheduled) {
@@ -348,24 +370,28 @@ public class MouseReceiverService extends AccessibilityService {
     }
 
     public static boolean backButton() {
-        if (instance == null) return false;
-        return instance.performGlobalAction(GLOBAL_ACTION_BACK);
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
+        return s.performGlobalAction(GLOBAL_ACTION_BACK);
     }
 
     public static boolean homeButton() {
-        if (instance == null) return false;
-        return instance.performGlobalAction(GLOBAL_ACTION_HOME);
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
+        return s.performGlobalAction(GLOBAL_ACTION_HOME);
     }
 
     public static boolean recentButton() {
-        if (instance == null) return false;
-        return instance.performGlobalAction(GLOBAL_ACTION_RECENTS);
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
+        return s.performGlobalAction(GLOBAL_ACTION_RECENTS);
     }
 
     public static boolean powerButton() {
-        if (instance == null) return false;
+        final MouseReceiverService s = instance;
+        if (s == null) return false;
 
-        return instance.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
+        return s.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
     }
 
     @Override
