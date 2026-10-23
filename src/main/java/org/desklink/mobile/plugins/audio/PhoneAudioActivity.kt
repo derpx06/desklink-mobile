@@ -72,6 +72,8 @@ class PhoneAudioActivity : AppCompatActivity() {
 
     private fun proceed() {
         PhoneAudio.pending = null
+        // Another computer is being heard: this answer must not reach the running service, which carries that one.
+        if (PhoneAudio.busyWith(PhoneAudio.sendingTo, deviceId)) return deny("busy")
         if (request.source == "mic") {
             // Android 14+ refuses a microphone service the moment this window is no longer in front.
             if (!PhoneAudioService.startMic(this, deviceId)) return deny("unavailable")

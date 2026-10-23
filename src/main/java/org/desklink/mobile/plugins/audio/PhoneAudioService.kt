@@ -40,6 +40,8 @@ class PhoneAudioService : Service() {
             return START_NOT_STICKY
         }
         val id = intent?.getStringExtra(EXTRA_DEVICE) ?: return stop()
+        // Already carrying a session for another computer: that one is left exactly as it is (this start was a refusal).
+        if (shouldKeepCurrent(deviceId, sessionId, id)) return START_NOT_STICKY
         deviceId = id
         val sound = intent.hasExtra(EXTRA_RESULT_DATA)
         // Microphone service without RECORD_AUDIO (revoked meanwhile), or a start Android no longer allows.
@@ -48,10 +50,10 @@ class PhoneAudioService : Service() {
             return stop()
         }
         if (sound) {
-            val data = resultData(intent) ?: return stop()
-            val manager = ContextCompat.getSystemService(this, MediaProjectionManager::class.java) ?: return stop()
+            val data = resultData(intent) ?: return refuse(id)
+            val manager = ContextCompat.getSystemService(this, MediaProjectionManager::class.java) ?: return refuse(id)
             projection = runCatching { manager.getMediaProjection(intent.getIntExtra(EXTRA_RESULT_CODE, 0), data) }.getOrNull()
-                ?: return stop()
+                ?: return refuse(id)
             // Android 14+ wants a callback before the projection is used.
             projection?.registerCallback(object : MediaProjection.Callback() {
                 override fun onStop() {
@@ -63,11 +65,19 @@ class PhoneAudioService : Service() {
         val coordinator = app.webRtcCoordinator(id)
         if (coordinator?.startAudioSending(projection) != true) {
             Log.w(TAG, "audio did not start for $id")
+            // (A busy refusal was answered by the coordinator already; asking again is a no-op then.)
+            app.webRtcCoordinator(id)?.denyAudio("unavailable")
             stopSelf()
         } else {
             sessionId = coordinator.sendingSessionId()
         }
         return START_NOT_STICKY
+    }
+
+    /** Whatever stopped this start, the computer that asked is told, not left waiting. */
+    private fun refuse(id: String): Int {
+        DeskLinkApplication.getInstance().webRtcCoordinator(id)?.denyAudio("unavailable")
+        return stop()
     }
 
     private fun stop(): Int {
@@ -117,6 +127,10 @@ class PhoneAudioService : Service() {
 
     companion object {
         private const val TAG = "DeskLink/Audio"
+
+        /** A start for [requested] while this service already carries the live session [sessionId] of [current]. */
+        internal fun shouldKeepCurrent(current: String?, sessionId: String?, requested: String): Boolean =
+            current != null && sessionId != null && current != requested
         private const val NOTIFICATION_ID = 1736
         private const val ACTION_STOP = "org.desklink.mobile.plugins.audio.STOP"
         private const val EXTRA_DEVICE = "deviceId"

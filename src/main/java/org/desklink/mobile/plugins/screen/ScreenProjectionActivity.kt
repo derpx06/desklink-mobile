@@ -50,6 +50,8 @@ class ScreenProjectionActivity : Activity() {
             DeskLinkApplication.getInstance()
                 .getDevicePlugin(deviceId, ScreenControlPlugin::class.java)
                 ?.onPhoneCapturePermissionFinished(started)
+            // Android refused the service (a background start): the desk is told, as for a declined prompt.
+            if (!started) DeskLinkApplication.getInstance().reportWebRtcScreenCaptureFailure(deviceId, "Android did not allow sharing the screen")
         } else if (requestCode == REQUEST_CAPTURE) {
             DeskLinkApplication.getInstance()
                 .getDevicePlugin(deviceId, ScreenControlPlugin::class.java)
