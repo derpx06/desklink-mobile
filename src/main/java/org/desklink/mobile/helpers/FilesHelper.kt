@@ -151,7 +151,7 @@ object FilesHelper {
                     }
                 }
                 catch (e: Exception) {
-                    Log.e(LOG_TAG, "Problem getting file information", e)
+                    Log.e(LOG_TAG, "Problem getting file information (${e.javaClass.simpleName})")
                 }
                 return Triple(null, sizeDefault, null)
             }
@@ -185,7 +185,7 @@ object FilesHelper {
             return packet
         }
         catch (e: Exception) {
-            Log.e(LOG_TAG, "Exception creating network packet", e)
+            Log.e(LOG_TAG, "Exception creating network packet (${e.javaClass.simpleName})")
             return null
         }
     }

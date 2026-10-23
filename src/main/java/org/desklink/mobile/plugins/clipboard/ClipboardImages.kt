@@ -48,7 +48,7 @@ object ClipboardImages {
             file.outputStream().use { input.copyTo(it) }
             if (!isPng(file.inputStream().use { it.readNBytesCompat(PNG_SIGNATURE.size) })) error("not a PNG")
         } catch (e: Exception) {
-            Log.w(TAG, "clipboard image refused: ${e.message}")
+            Log.w(TAG, "clipboard image refused (${e.javaClass.simpleName})")
             file.delete()
             return false
         } finally {

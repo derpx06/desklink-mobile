@@ -280,7 +280,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                 fileDocument.delete();
             }
 
-            Log.e("Shareplugin", "Error receiving file", e);
+            Log.e("Shareplugin", "Error receiving file (" + e.getClass().getSimpleName() + ")");
 
             int failedFiles;
             synchronized (lock) {

@@ -560,7 +560,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         try {
             repliableNotification.pendingIntent.send(context, 0, localIntent)
         } catch (e: PendingIntent.CanceledException) {
-            Log.e(TAG, "replyToNotification error: " + e.message)
+            Log.e(TAG, "replyToNotification error (" + e.javaClass.getSimpleName() + ")")
         }
         pendingIntents.remove(id)
     }
@@ -641,7 +641,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             try {
                 sendNotification(notification, true)
             } catch (error: Exception) {
-                Log.w(TAG, "Skipping notification during resync", error)
+                Log.w(TAG, "Skipping notification during resync (${error.javaClass.simpleName})")
             }
         }
     }

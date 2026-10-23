@@ -28,7 +28,7 @@ public class ShareChooserTargetService extends ChooserTargetService {
         final List<ChooserTarget> targets = new ArrayList<>();
         for (Device d : DeskLinkApplication.getInstance().getDevices().values()) {
             if (d.isReachable() && d.isPaired()) {
-                Log.d("DirectShare", d.getName());
+                
                 final String targetName = d.getName();
                 final Icon targetIcon = Icon.createWithResource(this, R.drawable.desklink_mark);
                 final float targetRanking = 1;

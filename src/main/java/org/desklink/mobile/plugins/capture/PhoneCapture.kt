@@ -165,7 +165,7 @@ object PhoneCapture {
             }
             override fun onFailure(e: Throwable) {
                 file.delete()
-                Log.w(TAG, "capture ${request.kind} not sent: ${e.message}")
+                Log.w(TAG, "capture ${request.kind} not sent (${e.javaClass.simpleName})")
             }
         })
         current = null

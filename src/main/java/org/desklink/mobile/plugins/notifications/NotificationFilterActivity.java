@@ -221,7 +221,7 @@ public class NotificationFilterActivity extends BaseActivity<ActivityNotificatio
             }
             return false;
         } catch (PackageManager.NameNotFoundException e) {
-            Log.e("NotificationFilterActiv", "Package not found for " + appInfo.packageName, e);
+            Log.e("NotificationFilterActiv", "Package not found (" + e.getClass().getSimpleName() + ")");
             return true;
         }
     }

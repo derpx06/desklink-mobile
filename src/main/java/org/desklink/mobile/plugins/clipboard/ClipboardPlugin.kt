@@ -60,7 +60,7 @@ class ClipboardPlugin : Plugin() {
             val name = device.name
             device.sendPacket(ClipboardImages.packet(png), object : Device.SendPacketStatusCallback() {
                 override fun onSuccess() { Log.i(TAG, "clipboard: image sent to $name") }
-                override fun onFailure(e: Throwable) { Log.w(TAG, "clipboard: image not sent to $name: ${e.message}") }
+                override fun onFailure(e: Throwable) { Log.w(TAG, "clipboard: image not sent to $name (${e.javaClass.simpleName})") }
             })
         }
     }
@@ -76,7 +76,7 @@ class ClipboardPlugin : Plugin() {
         val name = device.name
         device.sendPacket(np, object : Device.SendPacketStatusCallback() {
             override fun onSuccess() { Log.i(TAG, "clipboard: sent to $name") }
-            override fun onFailure(e: Throwable) { Log.w(TAG, "clipboard: not sent to $name: ${e.message}") }
+            override fun onFailure(e: Throwable) { Log.w(TAG, "clipboard: not sent to $name (${e.javaClass.simpleName})") }
         })
     }
 

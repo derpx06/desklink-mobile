@@ -124,7 +124,7 @@ class ContactsPlugin : Plugin() {
     private fun sendSnapshot(force: Boolean, refresh: Boolean = false) {
         if (!force && !device.hasActiveWebRtcFeatureTransport) return // the next feature-ready sends it
         val stamps = runCatching { readStamps(context) }.getOrElse {
-            Log.w(TAG, "Could not read contacts", it)
+            Log.w(TAG, "Could not read contacts (${it.javaClass.simpleName})")
             return
         }
         if (!force && stamps == lastSent) return
@@ -141,7 +141,7 @@ class ContactsPlugin : Plugin() {
     private fun sendVcards(uids: List<String>) {
         if (uids.isEmpty()) return
         val cards = runCatching { readCards(context, uids) }.getOrElse {
-            Log.w(TAG, "Could not read contacts", it)
+            Log.w(TAG, "Could not read contacts (${it.javaClass.simpleName})")
             return
         }
         ContactsBook.vcardPackets(cards.associate { it.uid to ContactsBook.vcard(it) }).forEach { device.sendBulk(it) }
