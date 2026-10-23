@@ -25,8 +25,11 @@ object ShareUris {
     fun isInsideAppData(context: Context, file: File): Boolean {
         val target = runCatching { file.canonicalFile }.getOrNull() ?: return true
         val roots = listOfNotNull(
-            context.dataDir, context.filesDir, context.cacheDir, context.codeCacheDir, context.noBackupFilesDir,
-            context.applicationInfo?.deviceProtectedDataDir?.let(::File),
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) context.dataDir else null,
+            // The data directory itself (shared_prefs, databases) on every API level.
+            context.filesDir.parentFile,
+            context.filesDir, context.cacheDir, context.codeCacheDir, context.noBackupFilesDir,
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) context.applicationInfo?.deviceProtectedDataDir?.let(::File) else null,
         ).mapNotNull { runCatching { it.canonicalFile }.getOrNull() }
         return roots.any { target.path == it.path || target.path.startsWith(it.path + File.separator) }
     }

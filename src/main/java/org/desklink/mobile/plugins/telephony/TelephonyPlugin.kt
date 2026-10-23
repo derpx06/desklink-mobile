@@ -206,6 +206,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             manager.isMicrophoneMute == mute
         }.getOrDefault(false)
 
+        @SuppressLint("MissingPermission") // POST_NOTIFICATIONS is checked by areNotificationsEnabled() just below
         override fun askToPlaceCall(number: String): Boolean {
             val manager = NotificationManagerCompat.from(context)
             if (!manager.areNotificationsEnabled()) return false
