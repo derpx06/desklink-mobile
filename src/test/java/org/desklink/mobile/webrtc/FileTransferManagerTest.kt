@@ -66,10 +66,16 @@ class FileTransferManagerTest {
         /** What this side's destination was handed: a verified file, copied out before the part is deleted. */
         val delivered = CopyOnWriteArrayList<Received>()
         var publishFailure: java.io.IOException? = null
-        val destination = org.desklink.mobile.plugins.share.ReceiveDestination { source, name, _, mime ->
-            publishFailure?.let { throw it }
-            delivered += Received(name, source.readBytes(), sent.count { it.action == WebRtcFileAction.COMPLETE })
-            org.desklink.mobile.plugins.share.Published(android.net.Uri.parse("content://fake/$name"), name, mime, source.length())
+        var free = Long.MAX_VALUE
+        var publishes = 0
+        val destination = object : org.desklink.mobile.plugins.share.ReceiveDestination {
+            override fun freeBytes() = free
+            override fun publish(source: File, name: String, lastModified: Long?, mime: String?): org.desklink.mobile.plugins.share.Published {
+                publishes++
+                publishFailure?.let { throw it }
+                delivered += Received(name, source.readBytes(), sent.count { it.action == WebRtcFileAction.COMPLETE })
+                return org.desklink.mobile.plugins.share.Published(android.net.Uri.parse("content://fake/$name"), name, mime, source.length())
+            }
         }
         val device: Device = mockk<Device>(relaxed = true)
         val outControl = ArrayDeque<WebRtcFileControl>()
@@ -90,7 +96,7 @@ class FileTransferManagerTest {
             override fun bufferedAmount() = bufferedAmount
         }
         var now = 0L
-        val manager = WebRtcFileTransferManager(context, device, link, runner, { now }, { Long.MAX_VALUE }, destination)
+        val manager = WebRtcFileTransferManager(context, device, link, runner, { now }, { Long.MAX_VALUE }, destination, java.util.concurrent.Executor { it.run() })
         val root: File get() = File(context.filesDir, "webrtc-transfers")
         fun control(action: WebRtcFileAction, id: String, token: String = "t".repeat(32), block: WebRtcFileControl.() -> WebRtcFileControl = { this }) = WebRtcFileControl(
             action = action, transferId = id, deviceId = peerWire.senderDeviceId, sessionId = peerWire.sessionId,
@@ -105,6 +111,7 @@ class FileTransferManagerTest {
     fun setUp() {
         phoneContext = ApplicationProvider.getApplicationContext()
         File(phoneContext.filesDir, "webrtc-transfers").deleteRecursively()
+        File(phoneContext.filesDir, "webrtc-delivered.json").delete()
         phone = Side(phoneContext, phoneWire, deskWire)
         val deskDir = tmp.newFolder()
         val deskContext = mockk<Context>()
@@ -201,8 +208,10 @@ class FileTransferManagerTest {
         val recorder = Recorder()
         assertFalse(runUntilDone(startSend(share(bytes, "big.bin"), recorder)))
         assertEquals("never `complete` for a file that is not in place", 0, desk.sent.count { it.action == WebRtcFileAction.COMPLETE })
-        assertEquals(FileCodes.INTERNAL, desk.sent.last { it.action == WebRtcFileAction.ERROR }.code)
+        assertEquals("a full disk says so", FileCodes.STORAGE_FULL, desk.sent.last { it.action == WebRtcFileAction.ERROR }.code)
         assertEquals("the sender is told it failed", 1, recorder.failures.size)
+        assertEquals("in words the person can act on", true, desk.sent.last { it.action == WebRtcFileAction.ERROR }.message?.startsWith("Not enough space on the phone"))
+        assertTrue(org.desklink.mobile.plugins.share.UnpublishedFiles.list(desk.context).single().storageFull)
         assertTrue("nothing is left in the transfer directory", desk.root.listFiles().orEmpty().isEmpty())
         // The verified file is kept whole.
         val kept = org.desklink.mobile.plugins.share.UnpublishedFiles.list(desk.context)
@@ -211,7 +220,7 @@ class FileTransferManagerTest {
         // Room again: trying once more puts it in place and clears the kept copy.
         desk.publishFailure = null
         val published = org.desklink.mobile.plugins.share.UnpublishedFiles.retry(desk.context, kept.single().id, desk.destination)
-        assertEquals("big.bin", published?.name)
+        assertEquals("big.bin", (published as org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Done).published.name)
         assertArrayEquals(bytes, desk.delivered.single().bytes)
         assertEquals(emptyList<Any>(), org.desklink.mobile.plugins.share.UnpublishedFiles.list(desk.context))
     }
@@ -222,8 +231,81 @@ class FileTransferManagerTest {
         desk.publishFailure = java.io.IOException("the folder is gone")
         assertFalse(runUntilDone(startSend(share(bytes, "x.txt"), Recorder())))
         val id = org.desklink.mobile.plugins.share.UnpublishedFiles.list(desk.context).single().id
-        assertEquals(null, org.desklink.mobile.plugins.share.UnpublishedFiles.retry(desk.context, id, desk.destination))
+        assertTrue(org.desklink.mobile.plugins.share.UnpublishedFiles.retry(desk.context, id, desk.destination) is org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Failed)
         assertEquals(1, org.desklink.mobile.plugins.share.UnpublishedFiles.list(desk.context).size)
+    }
+
+    @Test
+    fun withoutRoomForASecondWholeCopyNothingIsPublishedAndTheFileIsKept() {
+        val bytes = data(FileV2.BLOCK_BYTES + 5)
+        desk.free = bytes.size + 1024L // the copy needs the size plus a reserve
+        val recorder = Recorder()
+        assertFalse(runUntilDone(startSend(share(bytes, "big.bin"), recorder)))
+        assertEquals("checked before a long copy that would fail halfway", 0, desk.publishes)
+        assertEquals(FileCodes.STORAGE_FULL, desk.sent.last { it.action == WebRtcFileAction.ERROR }.code)
+        val kept = org.desklink.mobile.plugins.share.UnpublishedFiles.list(desk.context).single()
+        assertTrue(kept.storageFull)
+        // Retrying with the room still short says how much to free.
+        val again = org.desklink.mobile.plugins.share.UnpublishedFiles.retry(desk.context, kept.id, desk.destination)
+        val failed = again as org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Failed
+        assertEquals(bytes.size + org.desklink.mobile.plugins.share.UnpublishedFiles.RESERVE_BYTES - desk.free, failed.freeUpBytes)
+        assertEquals(0, desk.publishes)
+        desk.free = Long.MAX_VALUE
+        assertTrue(org.desklink.mobile.plugins.share.UnpublishedFiles.retry(desk.context, kept.id, desk.destination) is org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Done)
+    }
+
+    @Test
+    fun aSecondTapOnTryAgainWhileTheFirstRunsPublishesNothingTwice() {
+        val bytes = data(100)
+        desk.publishFailure = java.io.IOException("the folder is gone")
+        assertFalse(runUntilDone(startSend(share(bytes, "x.txt"), Recorder())))
+        desk.publishFailure = null
+        val id = org.desklink.mobile.plugins.share.UnpublishedFiles.list(desk.context).single().id
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val slow = object : org.desklink.mobile.plugins.share.ReceiveDestination {
+            var calls = 0
+            override fun publish(source: File, name: String, lastModified: Long?, mime: String?): org.desklink.mobile.plugins.share.Published {
+                calls++
+                entered.countDown()
+                release.await(10, TimeUnit.SECONDS)
+                return org.desklink.mobile.plugins.share.Published(android.net.Uri.parse("content://fake/$name"), name, mime, source.length())
+            }
+        }
+        val first = executor.submit<org.desklink.mobile.plugins.share.UnpublishedFiles.Retry> { org.desklink.mobile.plugins.share.UnpublishedFiles.retry(desk.context, id, slow) }
+        assertTrue(entered.await(10, TimeUnit.SECONDS))
+        assertTrue(org.desklink.mobile.plugins.share.UnpublishedFiles.isRetrying(id))
+        assertEquals(org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Busy, org.desklink.mobile.plugins.share.UnpublishedFiles.retry(desk.context, id, slow))
+        release.countDown()
+        assertTrue(first.get(10, TimeUnit.SECONDS) is org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Done)
+        assertEquals("published once", 1, slow.calls)
+        assertFalse(org.desklink.mobile.plugins.share.UnpublishedFiles.isRetrying(id))
+    }
+
+    @Test
+    fun aFileAlreadyInPlaceIsNotReceivedAgainWhenTheSenderOffersItAgain() {
+        // The `complete` never reached the sender (lost, or the phone died right after publishing): the sender offers again.
+        val bytes = data(FileV2.BLOCK_BYTES + 5)
+        assertTrue(runUntilDone(startSend(share(bytes, "report.pdf"), Recorder())))
+        val offer = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        assertEquals(1, desk.delivered.size)
+        desk.sent.clear()
+        // A restarted phone: a new manager on the same storage.
+        val restarted = WebRtcFileTransferManager(desk.context, desk.device, desk.link, desk.runner, { 0L }, { Long.MAX_VALUE }, desk.destination, java.util.concurrent.Executor { it.run() })
+        restarted.handleControl(deskWire, offer)
+        desk.runner.runPending()
+        val accept = desk.sent.single { it.action == WebRtcFileAction.ACCEPT }
+        assertEquals("all of it is here", FileV2.blockCount(bytes.size.toLong()), accept.resumeBlock)
+        assertEquals(1, desk.delivered.size)
+        // The sender's `done`: answered `complete` with the same hash, nothing written again.
+        val done = desk.control(WebRtcFileAction.DONE, offer.transferId, offer.transferToken) {
+            copy(fileHash = accept.prefixSha256, totalSize = bytes.size.toLong(), blocks = FileV2.blockCount(bytes.size.toLong()))
+        }
+        restarted.handleControl(deskWire, done)
+        desk.runner.runPending()
+        assertEquals(accept.prefixSha256, desk.sent.single { it.action == WebRtcFileAction.COMPLETE }.fileHash)
+        assertEquals("never a second copy", 1, desk.delivered.size)
+        assertEquals(1, desk.publishes)
     }
 
     @Test

@@ -488,8 +488,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val records = androidx.compose.runtime.remember(revision, device.deviceId) { TransferHistory.store(this).forDevice(device.deviceId) }
         val running = TransferProgress.visibleFor(device.deviceId)?.takeIf { !it.finished }
         // Read off the main thread: a folder listing is disk I/O.
-        val unsaved by androidx.compose.runtime.produceState(emptyList<org.desklink.mobile.plugins.share.UnpublishedFiles.Item>(), revision) {
-            value = kotlinx.coroutines.withContext(Dispatchers.IO) { org.desklink.mobile.plugins.share.UnpublishedFiles.list(this@MainActivity) }
+        // Only this computer's files; the folder name is read here too (checking a chosen folder is disk I/O).
+        val unsaved by androidx.compose.runtime.produceState(emptyList<org.desklink.mobile.plugins.share.UnpublishedFiles.Item>(), revision, device.deviceId) {
+            value = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                org.desklink.mobile.plugins.share.UnpublishedFiles.list(this@MainActivity).filter { it.deviceId == device.deviceId }
+            }
+        }
+        val savedIn by androidx.compose.runtime.produceState(getString(R.string.files_saved_in_downloads), revision) {
+            value = kotlinx.coroutines.withContext(Dispatchers.IO) { receivedFolderName() }
         }
         FilesTab(
             bucket = bucketUi,
@@ -499,25 +505,43 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             records = records,
             revision = revision,
             actions = androidx.compose.runtime.remember(device) { transferActions(device) },
-            savedIn = androidx.compose.runtime.remember(revision) { receivedFolderName() },
+            savedIn = savedIn,
             unsaved = unsaved,
+            retrying = retryingUnsaved,
             onRetryUnsaved = ::retryUnsaved,
-            onDiscardUnsaved = { id -> org.desklink.mobile.plugins.share.UnpublishedFiles.discard(this, id) },
+            onDiscardUnsaved = { id -> lifecycleScope.launch(Dispatchers.IO) { org.desklink.mobile.plugins.share.UnpublishedFiles.discard(this@MainActivity, id) } },
         )
     }
 
-    /** "the Downloads folder", or the folder chosen in Settings, by its name. */
+    /** "the Downloads folder", or the folder chosen in Settings by its name; the Downloads folder when the chosen one is not there. */
     private fun receivedFolderName(): String {
-        if (!ShareDestination.isCustomDestinationEnabled(this)) return getString(R.string.files_saved_in_downloads)
+        if (!ShareDestination.isCustomDestinationEnabled(this) || !ShareDestination.customFolderUsable(this)) return getString(R.string.files_saved_in_downloads)
         val chosen = PreferenceManager.getDefaultSharedPreferences(this).getString("share_destination_folder_uri", null)
         return chosen?.let { android.net.Uri.parse(it).lastPathSegment?.substringAfterLast(':')?.substringAfterLast('/') }?.takeIf { it.isNotBlank() }
             ?: getString(R.string.files_saved_in_downloads)
     }
 
+    /** The files whose "Try again" is running: their card is disabled until it has an answer. */
+    private val retryingUnsaved = androidx.compose.runtime.mutableStateListOf<String>()
+
     private fun retryUnsaved(id: String) {
+        if (id in retryingUnsaved) return
+        retryingUnsaved.add(id)
         lifecycleScope.launch(Dispatchers.IO) {
-            val done = org.desklink.mobile.plugins.share.UnpublishedFiles.retry(this@MainActivity, id, org.desklink.mobile.plugins.share.DeviceStorageDestination(this@MainActivity))
-            runOnUiThread { showMessage(done?.let { getString(R.string.files_unsaved_done, it.name) } ?: getString(R.string.files_unsaved_body)) }
+            val result = try {
+                org.desklink.mobile.plugins.share.UnpublishedFiles.retry(this@MainActivity, id, org.desklink.mobile.plugins.share.DeviceStorageDestination(this@MainActivity))
+            } finally {
+                runOnUiThread { retryingUnsaved.remove(id) }
+            }
+            val text = when (result) {
+                is org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Done ->
+                    getString(R.string.files_unsaved_done, result.published.name) +
+                        if (result.published.fellBackToDownloads) " " + getString(R.string.files_fell_back) else ""
+                is org.desklink.mobile.plugins.share.UnpublishedFiles.Retry.Failed ->
+                    result.freeUpBytes?.let { result.message + " " + getString(R.string.files_storage_free_up, android.text.format.Formatter.formatShortFileSize(this@MainActivity, it)) } ?: result.message
+                else -> null
+            }
+            if (text != null) runOnUiThread { showMessage(text) }
         }
     }
 
@@ -813,6 +837,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private fun liveTransfer(running: TransferProgress.Transfer?): LiveTransfer? {
         running ?: return null
         val speed = running.bytesPerSecond.takeIf { it > 0 }?.let { getString(R.string.transfers_speed, android.text.format.Formatter.formatShortFileSize(this, it)) }
+        if (running.saving) return LiveTransfer(running.title, running.upload, null, getString(R.string.files_saving_label))
         return LiveTransfer(running.title, running.upload, running.percent?.let { it / 100f }, listOfNotNull(running.percent?.let { "$it%" }, speed).joinToString(" · "))
     }
 

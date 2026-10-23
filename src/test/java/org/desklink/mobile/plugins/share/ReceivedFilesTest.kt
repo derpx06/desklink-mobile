@@ -44,6 +44,46 @@ class ReceivedFilesTest {
         assertFalse(File(notAFolder, "inside").exists())
     }
 
+    private val app get() = ApplicationProvider.getApplicationContext<Application>()
+    private fun unpublished() = File(app.filesDir, "webrtc-unpublished").apply { mkdirs() }
+
+    @Test
+    fun aKeptFileWhoseRenameFailsLeavesNoRecordBehind() {
+        unpublished().listFiles().orEmpty().forEach { it.delete() }
+        val missing = File(tmp.root, "no-such-part")
+        assertEquals(null, UnpublishedFiles.keep(app, missing, "a.bin", null, null, "desk"))
+        assertEquals("no record without a file", emptyList<String>(), unpublished().list().orEmpty().toList())
+    }
+
+    @Test
+    fun pruneDeletesStrayPartsAndRecordsOlderThanADayButNotFreshOnes() {
+        val dir = unpublished().also { d -> d.listFiles().orEmpty().forEach { it.delete() } }
+        val now = System.currentTimeMillis()
+        val strayPart = File(dir, "aaaa.part").apply { writeBytes(ByteArray(10)); setLastModified(now - 2 * 24 * 3600 * 1000L) }
+        val strayJson = File(dir, "bbbb.json").apply { writeText("{}"); setLastModified(now - 2 * 24 * 3600 * 1000L) }
+        val freshPart = File(dir, "cccc.part").apply { writeBytes(ByteArray(10)) } // a keep in progress
+        val kept = UnpublishedFiles.keep(app, tmp.newFile("p").apply { writeBytes(ByteArray(5)) }, "k.bin", null, null, "desk")!!
+        UnpublishedFiles.prune(app, now)
+        assertFalse(strayPart.exists())
+        assertFalse(strayJson.exists())
+        assertEquals(true, freshPart.exists())
+        assertEquals("a complete record is kept for a week", listOf(kept.id), UnpublishedFiles.list(app).map { it.id })
+        UnpublishedFiles.prune(app, now + 8 * 24 * 3600 * 1000L)
+        assertEquals(emptyList<String>(), UnpublishedFiles.list(app).map { it.id })
+    }
+
+    @Test
+    fun aChosenFolderThatIsGoneIsNotUsableSoTheScreenAndPublishSayDownloads() {
+        val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(app)
+        prefs.edit().putBoolean("share_destination_custom", false).commit()
+        assertFalse("nothing chosen: nothing to fall back from", ShareDestination.customFolderUsable(app))
+        prefs.edit().putBoolean("share_destination_custom", true)
+            .putString("share_destination_folder_uri", "content://com.android.externalstorage.documents/tree/gone%3AFolder").commit()
+        assertFalse("chosen but not there: the destination is Downloads, and it says so", ShareDestination.customFolderUsable(app))
+        assertEquals("and the room is that of the phone's own storage", app.filesDir.usableSpace, destination.freeBytes())
+        prefs.edit().clear().commit()
+    }
+
     @Test
     fun namesAreUniqueWithTheLastExtensionKept() {
         val dir = tmp.newFolder("names")

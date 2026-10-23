@@ -87,6 +87,8 @@ fun FilesTab(
     savedIn: String = "",
     /** Verified files that arrived but could not be saved, kept for a retry. */
     unsaved: List<org.desklink.mobile.plugins.share.UnpublishedFiles.Item> = emptyList(),
+    /** Ids whose "Try again" is running. */
+    retrying: List<String> = emptyList(),
     onRetryUnsaved: (String) -> Unit = {},
     onDiscardUnsaved: (String) -> Unit = {},
 ) {
@@ -102,7 +104,7 @@ fun FilesTab(
                 Icon(painterResource(R.drawable.sym_upload_file), contentDescription = stringResource(R.string.home_send_files), tint = t.text)
             }
         }
-        unsaved.forEach { item -> UnsavedCard(item, onRetryUnsaved, onDiscardUnsaved) }
+        unsaved.forEach { item -> UnsavedCard(item, item.id in retrying, onRetryUnsaved, onDiscardUnsaved) }
         Box(Modifier.weight(1f)) {
             bucket.Screen(deviceId, onBack = {}, embedded = true) {
                 recentTransfers(deskName, live, records, revision, actions, limit = if (showAll) Int.MAX_VALUE else RECENT_LIMIT, onShowAll = { showAll = true })
@@ -115,6 +117,7 @@ fun FilesTab(
 @Composable
 private fun UnsavedCard(
     item: org.desklink.mobile.plugins.share.UnpublishedFiles.Item,
+    busy: Boolean,
     onRetry: (String) -> Unit,
     onDiscard: (String) -> Unit,
 ) {
@@ -130,10 +133,17 @@ private fun UnsavedCard(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(stringResource(R.string.files_unsaved_title, item.name), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.coralText)
-        Text(stringResource(R.string.files_unsaved_body), fontSize = 13.sp, color = t.text)
+        Text(
+            if (item.storageFull) stringResource(R.string.files_unsaved_body_full) else stringResource(R.string.files_unsaved_body),
+            fontSize = 13.sp, color = t.text,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PillButton(stringResource(R.string.files_unsaved_retry), { onRetry(item.id) }, height = 48.dp)
-            PillButton(stringResource(R.string.files_unsaved_discard), { onDiscard(item.id) }, style = PillStyle.Outlined, height = 48.dp)
+            // While it runs a second tap would start a second copy: the buttons do nothing until it has an answer.
+            PillButton(
+                stringResource(if (busy) R.string.files_saving_label else R.string.files_unsaved_retry),
+                { if (!busy) onRetry(item.id) }, height = 48.dp,
+            )
+            PillButton(stringResource(R.string.files_unsaved_discard), { if (!busy) onDiscard(item.id) }, style = PillStyle.Outlined, height = 48.dp)
         }
     }
 }

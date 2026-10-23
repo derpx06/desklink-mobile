@@ -166,6 +166,8 @@ class DeskLinkApplication : Application() {
         }
         // 1.3 removed several features: what they stored is deleted once, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.helpers.RemovedFeatures.runOnce(this) }
+        // Received files that could not be saved are kept a week; leftovers of a crash a day. Not only when a transfer starts.
+        org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { org.desklink.mobile.plugins.share.UnpublishedFiles.prune(this) } }
 
         if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             StrictMode.setVmPolicy(

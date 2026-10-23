@@ -726,4 +726,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="tab_quick_send_files">Send files…</string>
     <string name="tab_quick_new_note">New note</string>
     <string name="tab_quick_new_terminal">New terminal</string>
+    <string name="files_saving_title">Saving %1$s</string>
+    <string name="files_saving_text">From %1$s</string>
+    <string name="files_fell_back">The folder you chose isn\'t available; saved in Downloads.</string>
+    <string name="files_save_failed_full">%1$s could not be saved: not enough space on the phone. It is kept so you can try again.</string>
+    <string name="files_storage_free_up">Free up about %1$s, then try again.</string>
+    <string name="files_saving_label">Saving…</string>
+    <string name="files_unsaved_body_full">There wasn\'t enough space on the phone. Free some up, then try again.</string>
 </resources>

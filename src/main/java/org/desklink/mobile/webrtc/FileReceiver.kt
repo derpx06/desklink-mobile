@@ -29,6 +29,8 @@ class FileReceiver(
     private val freeSpace: () -> Long,
     private val listener: Listener,
     val offer: WebRtcFileControl,
+    /** Runs a task on the thread this receiver lives on (the file thread); inline when a test does not care. */
+    private val post: (() -> Unit) -> Unit = { it() },
 ) {
     interface Listener {
         /** Bytes of this file in place so far (verified blocks plus the current one). */
@@ -36,6 +38,14 @@ class FileReceiver(
 
         /** Hands the verified file on (to the destination, the clipboard or the Bucket). Throws if it cannot be delivered. */
         fun deliver(receiver: FileReceiver, partial: File, fileHash: String)
+
+        /**
+         * Starts [deliver] where it may take a long time (a copy of several GiB) without holding up the file thread, and
+         * calls [finished] with null, or the error, from any thread. The default delivers at once.
+         */
+        fun deliverAsync(receiver: FileReceiver, partial: File, fileHash: String, finished: (Throwable?) -> Unit) {
+            finished(runCatching { deliver(receiver, partial, fileHash) }.exceptionOrNull())
+        }
 
         /**
          * [deliver] threw: keeps the verified [partial] for a retry (moving it out of the transfer directory) and says
@@ -80,6 +90,13 @@ class FileReceiver(
     private var unsavedBlocks = 0
     private var ended = false
 
+    /** The verified file is being put in place (on another thread): frames, a restart or a peer's end change nothing now. */
+    private var publishing = false
+
+    /** Set when the file arrived whole but could not be saved: what went wrong, for the notification and the Files tab. */
+    @Volatile var saveFailure: Throwable? = null
+        private set
+
     /** Where a frame's bytes go; replaced by tests to simulate a full disk. */
     @androidx.annotation.VisibleForTesting
     internal var writeFrame: (FileFrame, RandomAccessFile) -> Unit = { frame, raf -> frame.writeTo(raf) }
@@ -105,6 +122,9 @@ class FileReceiver(
             "frames=$frames hashMs=${ms(hashNs)} writeMs=${ms(writeNs)} checkpointMs=${ms(checkpointNs)} ackMs=${ms(ackNs)} " +
             "waitingMs=${(seconds * 1000).toLong() - ms(busy)}"
     }
+
+    /** The verified block hashes (a copy), for the record kept of a delivered file. */
+    fun blockHashes(): List<ByteArray> = hashes.toList()
 
     val verifiedBlocks: Int get() = hashes.size
     val isPaused: String? get() = pausedFor ?: if (noProgress) FileCodes.NO_PROGRESS else null
@@ -162,7 +182,7 @@ class FileReceiver(
 
     /** The same transfer offered again while it is live (the sender lost our accept): answered from where we are. */
     fun onReoffer() {
-        if (ended || file == null) return
+        if (ended || publishing || file == null) return
         pausedFor = null
         truncateTo(hashes.size)
         awaitingStart = true
@@ -174,7 +194,7 @@ class FileReceiver(
     // ------------------------------------------------------------ frames
 
     fun onFrame(frame: FileFrame) {
-        if (ended || pausedFor != null || file == null) return
+        if (ended || publishing || pausedFor != null || file == null) return
         val end = frame.offset + frame.length
         if (end > totalSize) return
         if (frame.pass != expectedPass) {
@@ -284,23 +304,50 @@ class FileReceiver(
             send(control(WebRtcFileAction.RESUME).copy(resumeBlock = 0, prefixSha256 = FileHashes.prefixHash(hashes, 0), pass = expectedPass))
             return
         }
+        if (publishing) return // a repeated `done` while the file is being put in place
         val raf = requireNotNull(file)
         try {
             raf.fd.sync()
             raf.close()
-            file = null
-            listener.deliver(this, store.partial(id), derived)
         } catch (error: Throwable) {
-            // Verified but not in place: never `complete`. The sender is told it failed, the file is kept for a retry.
             runCatching { raf.close() }
             file = null
-            val kept = runCatching { listener.keepUndelivered(this, store.partial(id), error) }.getOrDefault(false)
-            return finishUndelivered(if (kept) "The phone could not save the file; it is kept to try again." else "The phone could not save the file.")
+            return undelivered(error, derived)
         }
+        file = null
+        publishing = true
+        listener.deliverAsync(this, store.partial(id), derived) { error -> post { afterDelivery(error, derived) } }
+    }
+
+    /** The file is in place, or is not: only now does the sender hear `complete`, or `error`. On the receiver's own thread. */
+    private fun afterDelivery(error: Throwable?, derived: String) {
+        publishing = false
+        if (error != null) return undelivered(error, derived)
+        val alreadyOver = ended // the link went while the file was being put in place: it is there, the sender asks again
         ended = true
-        runCatching { send(control(WebRtcFileAction.COMPLETE).copy(fileHash = derived)) }
+        if (!alreadyOver) runCatching { send(control(WebRtcFileAction.COMPLETE).copy(fileHash = derived)) }
         store.removeMetadata(id)
-        listener.ended(this, Outcome.DELIVERED, null)
+        if (!alreadyOver) listener.ended(this, Outcome.DELIVERED, null)
+    }
+
+    /** Verified but not in place: never `complete`. The sender is told it failed and the file is kept for a retry. */
+    private fun undelivered(error: Throwable, derived: String) {
+        saveFailure = error
+        val kept = runCatching { listener.keepUndelivered(this, store.partial(id), error) }.getOrDefault(false)
+        val full = isStorageFull(error)
+        val message = when {
+            full -> "Not enough space on the phone" + if (kept) "; the file is kept to try again." else "."
+            kept -> "The phone could not save the file; it is kept to try again."
+            else -> "The phone could not save the file."
+        }
+        if (ended) {
+            store.remove(id)
+            return
+        }
+        finish(
+            Outcome.FAILED, message,
+            tellPeer = control(WebRtcFileAction.ERROR).copy(code = if (full) FileCodes.STORAGE_FULL else FileCodes.INTERNAL, message = message),
+        )
     }
 
     fun onPeerPause(reason: String? = null) {
@@ -314,10 +361,16 @@ class FileReceiver(
     }
 
     /** The peer ended it (cancel or error): everything kept is deleted. */
-    fun onPeerEnded(cancelled: Boolean, message: String?) = finish(if (cancelled) Outcome.CANCELLED else Outcome.FAILED, message, tellPeer = null)
+    fun onPeerEnded(cancelled: Boolean, message: String?) {
+        if (publishing) return // it arrived whole: the sender's end changes nothing now
+        finish(if (cancelled) Outcome.CANCELLED else Outcome.FAILED, message, tellPeer = null)
+    }
 
     /** This side ends it (the person removed the file): the peer is told and both clean up. */
-    fun cancel(code: String, message: String) = finish(Outcome.CANCELLED, message, tellPeer = control(WebRtcFileAction.CANCEL).copy(code = code, message = message))
+    fun cancel(code: String, message: String) {
+        if (publishing) return
+        finish(Outcome.CANCELLED, message, tellPeer = control(WebRtcFileAction.CANCEL).copy(code = code, message = message))
+    }
 
     /** The manager is overloaded (a queue over its cap): stop the sender until it drains. */
     fun pauseBacklog() = pause(FileCodes.BACKLOG)
@@ -394,11 +447,6 @@ class FileReceiver(
         ended = true
         listener.ended(this, Outcome.SUSPENDED, null)
     }
-
-    /** After a failed delivery: the sender gets `error`, the checkpoint goes, the part has been moved (or is deleted). */
-    private fun finishUndelivered(message: String) = finish(
-        Outcome.FAILED, message, tellPeer = control(WebRtcFileAction.ERROR).copy(code = FileCodes.INTERNAL, message = message),
-    )
 
     private fun fail(code: String, message: String) = finish(
         Outcome.FAILED, message, tellPeer = control(WebRtcFileAction.ERROR).copy(code = code, message = message),

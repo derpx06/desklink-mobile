@@ -30,6 +30,19 @@ public final class ShareDestination {
         return Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
     }
 
+    /** A folder was chosen and Android still lets this app write to it (disk access: not for the main thread). */
+    public static boolean customFolderUsable(Context context) {
+        if (!isCustomDestinationEnabled(context)) return false;
+        String path = PreferenceManager.getDefaultSharedPreferences(context).getString(PREFERENCE_DESTINATION, null);
+        if (path == null) return false;
+        try {
+            DocumentFile tree = DocumentFile.fromTreeUri(context, Uri.parse(path));
+            return tree != null && tree.canWrite();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     public static boolean isCustomDestinationEnabled(Context context) {
         return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(PREFERENCE_CUSTOMIZE_DESTINATION, false);
     }

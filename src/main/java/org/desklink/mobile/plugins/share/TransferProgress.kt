@@ -32,6 +32,8 @@ object TransferProgress {
         val bytesPerSecond: Long = 0,
         /** The link went away mid-send: it continues by itself when the desk is back. */
         val resuming: Boolean = false,
+        /** A received file is whole and is being copied into place. */
+        val saving: Boolean = false,
     )
 
     /** A finished transfer stays on Home this long. */
@@ -55,6 +57,12 @@ object TransferProgress {
         // Percent moves in whole steps: keep the last measurement until it moves again.
         if (previous != null && percent == previous.percent && title == previous.title) return
         current = Transfer(deviceId, jobId, upload, title ?: previous?.title.orEmpty(), percent ?: previous?.percent, updatedAt = now, totalBytes = total, bytesPerSecond = speed)
+    }
+
+    /** The file arrived whole and is being put in place: no percentage, but not finished either. */
+    @JvmStatic
+    fun saving(deviceId: String, jobId: Long, title: String, totalBytes: Long) {
+        current = Transfer(deviceId, jobId, upload = false, title = title, percent = null, totalBytes = totalBytes, saving = true)
     }
 
     @JvmStatic

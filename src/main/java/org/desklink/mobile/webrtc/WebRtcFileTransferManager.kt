@@ -80,9 +80,20 @@ class WebRtcFileTransferManager(
     private val freeSpace: () -> Long = { File(context.applicationContext.filesDir.path).usableSpace },
     /** Where a verified received file is put; replaced by tests. */
     private val destination: org.desklink.mobile.plugins.share.ReceiveDestination = org.desklink.mobile.plugins.share.DeviceStorageDestination(context.applicationContext),
+    /**
+     * Where a received file is copied into place: one at a time, apart from the file thread, so a copy of several GiB holds
+     * up no other transfer (and the sender waits for `complete` while it runs).
+     */
+    private val publisher: java.util.concurrent.Executor = ThreadPublisher.shared,
 ) {
     private val appContext = context.applicationContext
     private val store = FileTransferStore(File(appContext.filesDir, "webrtc-transfers"))
+
+    /** Transfers already in place: a re-offer of one is answered, never received twice. */
+    private val delivered = DeliveredTransfers(File(appContext.filesDir, "webrtc-delivered.json"))
+
+    /** The "Saving…" notification of a file being put in place, reused for how it ended. */
+    private val savingNotes = HashMap<String, org.desklink.mobile.plugins.share.ReceiveNotification>()
 
     private class SendEntry(
         var sender: FileSender,
@@ -120,7 +131,7 @@ class WebRtcFileTransferManager(
         ticking = true
         runner.tickWhile(TICK_MS) {
             // A tick that throws must not end the clock for good (the 60 s pause and the checkpoints depend on it).
-            runCatching { tick() }.onFailure { Log.w(TAG, "a transfer tick failed", it) }
+            runCatching { tick() }.onFailure { Log.w(TAG, "a transfer tick failed (${it.javaClass.simpleName})") }
             (sends.isNotEmpty() || receives.isNotEmpty()).also { if (!it) ticking = false }
         }
     }
@@ -334,7 +345,7 @@ class WebRtcFileTransferManager(
                 currentWire = wire
                 route(wire, message)
             } catch (error: Throwable) {
-                Log.w(TAG, "Rejected a file control message: ${error.message}")
+                Log.w(TAG, "Rejected a file control message (${error.javaClass.simpleName})")
                 if (message.action == WebRtcFileAction.OFFER && !sends.containsKey(message.transferId) && !receives.containsKey(message.transferId)) {
                     runCatching {
                         link.sendControl(
@@ -355,7 +366,10 @@ class WebRtcFileTransferManager(
             WebRtcFileAction.ACCEPT, WebRtcFileAction.BLOCK_ACK, WebRtcFileAction.BLOCK_NACK, WebRtcFileAction.COMPLETE -> {
                 sendEntry(wire, message)?.sender?.onControl(message)
             }
-            WebRtcFileAction.DONE -> receiveEntry(wire, message)?.onDone(message)
+            WebRtcFileAction.DONE -> {
+                val receiver = receiveEntry(wire, message)
+                if (receiver != null) receiver.onDone(message) else answerDeliveredDone(wire, message)
+            }
             WebRtcFileAction.PAUSE, WebRtcFileAction.RESUME -> {
                 val receiver = receives[id]?.takeIf { it.wire == wire && it.offer.transferToken == message.transferToken }
                 if (receiver != null) {
@@ -417,11 +431,22 @@ class WebRtcFileTransferManager(
             existing.onReoffer() // the sender did not get our accept: answered again from where we are
             return
         }
+        // Already in place (a crash, or a `complete` that never arrived, before the sender heard it): "I have all of it", then
+        // `complete` when the sender's `done` comes. Never a second full copy.
+        delivered.find(id, message.transferToken, wire.peerDeviceId, message.filename, totalSize)?.let { record ->
+            link.sendControl(
+                reply(wire, id, message.transferToken, WebRtcFileAction.ACCEPT).copy(
+                    resumeBlock = FileV2.blockCount(totalSize), prefixSha256 = record.fileHash,
+                    maxFrameBytes = minOf(message.maxFrameBytes ?: FileV2.FRAME_BYTES_PROVEN, FileV2.FRAME_BYTES_PROVEN),
+                ),
+            )
+            return
+        }
         if (receives.size >= FileV2.ACTIVE_PER_DIRECTION) {
             link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.BUSY, message = "The phone is receiving other files."))
             return
         }
-        val receiver = FileReceiver(wire, store, link, clock, freeSpace, receiverListener, message)
+        val receiver = FileReceiver(wire, store, link, clock, freeSpace, receiverListener, message) { task -> runner.post(Runnable(task)) }
         if (ref != null) folderOffers[id] = ref
         if (message.clipboard == true && message.mimeType == org.desklink.mobile.plugins.clipboard.ClipboardImages.MIME &&
             totalSize <= org.desklink.mobile.plugins.clipboard.ClipboardImages.MAX_BYTES
@@ -440,6 +465,16 @@ class WebRtcFileTransferManager(
         }
     }
 
+    /** `done` for a file that is already in place: `complete` if it is the same file, else an error. */
+    private fun answerDeliveredDone(wire: WebRtcWireBinding, message: WebRtcFileControl) {
+        val record = delivered.find(message.transferId, message.transferToken, wire.peerDeviceId, null, null) ?: return
+        val same = record.fileHash.equals(message.fileHash, ignoreCase = true) && message.totalSize == record.totalSize
+        link.sendControl(
+            if (same) reply(wire, record.transferId, record.token, WebRtcFileAction.COMPLETE).copy(fileHash = record.fileHash)
+            else reply(wire, record.transferId, record.token, WebRtcFileAction.ERROR).copy(code = FileCodes.HASH_MISMATCH, message = "That is not the file received."),
+        )
+    }
+
     private val receiverListener: FileReceiver.Listener = object : FileReceiver.Listener {
         override fun progress(receiver: FileReceiver, bytesDone: Long) {
             val ref = folderOffers[receiver.id]
@@ -452,10 +487,20 @@ class WebRtcFileTransferManager(
             }
         }
 
+        override fun deliverAsync(receiver: FileReceiver, partial: File, fileHash: String, finished: (Throwable?) -> Unit) {
+            // A Bucket file and a clipboard picture are quick and have their own places to go: on the file thread, as before.
+            if (folderOffers.containsKey(receiver.id) || clipboardOffers.contains(receiver.id)) {
+                finished(runCatching { deliver(receiver, partial, fileHash) }.exceptionOrNull())
+                return
+            }
+            startSaving(receiver)
+            publisher.execute { finished(runCatching { publishPlain(receiver, partial) }.exceptionOrNull()) }
+        }
+
         override fun deliver(receiver: FileReceiver, partial: File, fileHash: String) {
             val offer = receiver.offer
             folderOffers.remove(receiver.id)?.let { ref ->
-                // F8: placed into the synced folder (the engine takes the file), never a share.
+                // F8: placed into the synced folder (the engine takes the file), never a share. Throws if it cannot be taken.
                 BucketEngine.arrived(receiver.wire.peerDeviceId, ref, partial, requireNotNull(offer.contentSha256), receiver.totalSize)
                 return
             }
@@ -472,23 +517,19 @@ class WebRtcFileTransferManager(
                 }
                 return
             }
-            // The file was verified block by block and as a whole; what is left is one copy into place. Only when it is
-            // really there does the receiver tell the sender `complete`.
-            val published = destination.publish(partial, receiver.filename, offer.mtime?.takeIf { it > 0 }, offer.mimeType)
-            partial.delete()
-            runCatching {
-                org.desklink.mobile.plugins.share.TransferHistory.recordReceived(appContext, receiver.wire.peerDeviceId, published.name, published.size, published.uri, published.mime)
-            }
-            announceReceived(receiver, published)
+            publishPlain(receiver, partial)
         }
 
         override fun keepUndelivered(receiver: FileReceiver, partial: File, error: Throwable): Boolean {
-            Log.w(TAG, "could not publish ${receiver.filename}: ${error.javaClass.simpleName}: ${error.message}")
-            // A Bucket file or a clipboard picture has its own way to come again; only a plain file is worth keeping.
-            if (folderOffers.containsKey(receiver.id) || clipboardOffers.contains(receiver.id) || !partial.isFile) return false
+            // The class and the transfer id: a message can carry a path, and a name is the person's own.
+            Log.w(TAG, "could not publish transfer ${receiver.id} (${error.javaClass.simpleName})")
             val offer = receiver.offer
+            // A Bucket file or a clipboard picture has its own way to come again; only a plain file is worth keeping.
+            if (offer.folder != null || offer.clipboard == true || !partial.isFile) return false
+            val full = isStorageFull(error)
             val item = org.desklink.mobile.plugins.share.UnpublishedFiles.keep(
                 appContext, partial, receiver.filename, offer.mimeType, offer.mtime?.takeIf { it > 0 }, receiver.wire.peerDeviceId,
+                reason = if (full) "Not enough space on the phone" else null, storageFull = full,
             ) ?: return false
             org.desklink.mobile.plugins.share.TransferHistory.changed()
             return item.size >= 0
@@ -510,28 +551,66 @@ class WebRtcFileTransferManager(
                     else -> TransferProgress.cancel(job)
                 }
             }
+            if (outcome == FileReceiver.Outcome.CANCELLED) synchronized(savingNotes) { savingNotes.remove(receiver.id) }?.let { runCatching { it.cancel() } }
             if (receives[receiver.id] === receiver) receives.remove(receiver.id)
             folderOffers.remove(receiver.id)
             clipboardOffers.remove(receiver.id)
         }
     }
 
+    /** One copy into place (on the publisher thread), then what only a file in place may do: remember it, record it, say so. */
+    private fun publishPlain(receiver: FileReceiver, partial: File) {
+        val needed = partial.length() + org.desklink.mobile.plugins.share.UnpublishedFiles.RESERVE_BYTES
+        if (destination.freeBytes() < needed) {
+            // The copy needs room for a second whole file while this one is still kept: said before a long copy fails halfway.
+            throw java.io.IOException("No space left on device: ${needed} bytes are needed")
+        }
+        val offer = receiver.offer
+        val published = destination.publish(partial, receiver.filename, offer.mtime?.takeIf { it > 0 }, offer.mimeType)
+        partial.delete()
+        // Written before `complete` can go out: a crash or a lost `complete` from here on is answered, not received again.
+        runCatching {
+            delivered.add(
+                DeliveredTransfers.Record(receiver.id, offer.transferToken, receiver.wire.peerDeviceId, receiver.filename, receiver.totalSize, FileHashes.fileHash(receiver.blockHashes()), System.currentTimeMillis()),
+            )
+        }
+        runCatching {
+            org.desklink.mobile.plugins.share.TransferHistory.recordReceived(appContext, receiver.wire.peerDeviceId, published.name, published.size, published.uri, published.mime)
+        }
+        announceReceived(receiver, published)
+    }
+
+    /** "Saving report.pdf…": on Home, in the Files tab and as a notification, while the copy runs. */
+    private fun startSaving(receiver: FileReceiver) {
+        TransferProgress.saving(receiver.wire.peerDeviceId, receiveJob(receiver.id), receiver.filename, receiver.totalSize)
+        runCatching {
+            val note = org.desklink.mobile.plugins.share.ReceiveNotification(device, receiveJob(receiver.id))
+            note.setTitle(appContext.getString(org.desklink.mobile.R.string.files_saving_title, receiver.filename))
+            note.setProgress(100, appContext.getString(org.desklink.mobile.R.string.files_saving_text, device.name))
+            note.show()
+            synchronized(savingNotes) { savingNotes[receiver.id] = note }
+        }
+    }
+
     /** "Received report.pdf": the notification that opens it, as the old receive job showed. Never allowed to fail the transfer. */
     private fun announceReceived(receiver: FileReceiver, published: org.desklink.mobile.plugins.share.Published) {
         runCatching {
-            val note = org.desklink.mobile.plugins.share.ReceiveNotification(device, receiveJob(receiver.id))
-            note.setFinished(appContext.getString(org.desklink.mobile.R.string.files_received_notification, published.name, device.name))
+            val note = synchronized(savingNotes) { savingNotes.remove(receiver.id) } ?: org.desklink.mobile.plugins.share.ReceiveNotification(device, receiveJob(receiver.id))
+            val where = if (published.fellBackToDownloads) " " + appContext.getString(org.desklink.mobile.R.string.files_fell_back) else ""
+            note.setFinished(appContext.getString(org.desklink.mobile.R.string.files_received_notification, published.name, device.name) + where)
             note.setURI(published.uri, published.mime ?: "*/*", published.name)
             note.show()
-        }.onFailure { Log.w(TAG, "could not show the received notification", it) }
+        }.onFailure { Log.w(TAG, "could not show the received notification (${it.javaClass.simpleName})") }
     }
 
     private fun announceReceiveFailed(receiver: FileReceiver, message: String?) {
         runCatching {
             // A transfer the computer or the person ended says nothing more here; one that could not be saved does.
-            if (message == null || !message.startsWith("The phone could not save")) return
-            val note = org.desklink.mobile.plugins.share.ReceiveNotification(device, receiveJob(receiver.id))
-            note.setFailed(appContext.getString(org.desklink.mobile.R.string.files_save_failed_notification, receiver.filename))
+            val error = receiver.saveFailure ?: return
+            val note = synchronized(savingNotes) { savingNotes.remove(receiver.id) } ?: org.desklink.mobile.plugins.share.ReceiveNotification(device, receiveJob(receiver.id))
+            val text = if (isStorageFull(error)) appContext.getString(org.desklink.mobile.R.string.files_save_failed_full, receiver.filename)
+            else appContext.getString(org.desklink.mobile.R.string.files_save_failed_notification, receiver.filename)
+            note.setFailed(text)
             note.show()
         }
     }
@@ -719,6 +798,16 @@ class WebRtcFileTransferManager(
 /** The link went away mid-send; the checkpoint is kept and the next connection resumes it. */
 class TransferResumingException(reason: String) : IllegalStateException(reason)
 
+/** The disk is full: somewhere in what caused [error] Android said so. */
+internal fun isStorageFull(error: Throwable): Boolean = org.desklink.mobile.plugins.share.UnpublishedFiles.isStorageFull(error)
+
+/** One thread that puts finished files in place, one at a time, apart from the file thread. */
+internal object ThreadPublisher {
+    val shared: java.util.concurrent.Executor by lazy {
+        java.util.concurrent.Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "DeskLink-publish").apply { isDaemon = true } }
+    }
+}
+
 /** The link under a transfer closed or is not open yet: pause it, never fail it. */
 internal fun linkClosed(error: Throwable): Boolean =
     error is org.desklink.mobile.transport.TransportError &&
@@ -731,8 +820,7 @@ internal fun linkClosed(error: Throwable): Boolean =
 internal fun peerReason(error: Throwable, fallback: String): String {
     val message = error.message.orEmpty()
     return when {
-        generateSequence(error) { it.cause }.any { "ENOSPC" in it.message.orEmpty() || "No space left" in it.message.orEmpty() } ->
-            "Not enough space on the phone"
+        isStorageFull(error) -> "Not enough space on the phone"
         // Our own checks (require/check) say what went wrong in plain words.
         (error is IllegalArgumentException || error is IllegalStateException) && message.isNotBlank() &&
             !Regex("""Exception|Error:|org\.|java\.|android\.|/""").containsMatchIn(message) -> message.take(256)

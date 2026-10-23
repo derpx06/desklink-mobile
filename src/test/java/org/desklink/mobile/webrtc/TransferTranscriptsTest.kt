@@ -228,6 +228,7 @@ class TransferTranscriptsTest {
         val file = doc.getJSONObject("file")
         val context = ApplicationProvider.getApplicationContext<android.app.Application>()
         root().deleteRecursively()
+        java.io.File(context.filesDir, "webrtc-delivered.json").delete()
         val wire = WebRtcWireBinding(ids.getString("receiver"), ids.getString("sender"), ids.getLong("sessionId"), ids.getLong("generation"))
         val captured = Captured()
         val runner = ManualRunner()
@@ -237,7 +238,7 @@ class TransferTranscriptsTest {
             published += source.readBytes()
             org.desklink.mobile.plugins.share.Published(android.net.Uri.parse("content://fake/$name"), name, mime, source.length())
         }
-        val manager = WebRtcFileTransferManager(context, device, captured, runner, { 0L }, { Long.MAX_VALUE }, destination)
+        val manager = WebRtcFileTransferManager(context, device, captured, runner, { 0L }, { Long.MAX_VALUE }, destination, java.util.concurrent.Executor { it.run() })
         // A checkpoint of the first blocks, as a crashed receiver left it.
         doc.optJSONObject("receiverHolds")?.optInt("blocks", 0)?.takeIf { it > 0 }?.let { blocks ->
             val store = FileTransferStore(root())
