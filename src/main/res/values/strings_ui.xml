@@ -750,4 +750,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="one">%1$d file</item>
         <item quantity="other">%1$d files</item>
     </plurals>
+    <string name="telephony_call_ask_title">%1$s wants to call %2$s</string>
+    <string name="telephony_call_ask_text">Nothing is dialled unless you allow it.</string>
+    <string name="telephony_call_allow">Allow</string>
+    <string name="telephony_call_deny">Deny</string>
 </resources>

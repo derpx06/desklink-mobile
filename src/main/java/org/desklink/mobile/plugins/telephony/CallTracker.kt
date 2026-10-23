@@ -170,8 +170,15 @@ class CallTracker(
             TrackedCall(json.getString("callId"), STATE_TALKING, json.getBoolean("incoming"), json.optLong("startedAt").takeIf { json.has("startedAt") })
         }.getOrNull()
 
-        /** A number the desk may dial: digits and the usual dialling characters, at most 32. */
+        /**
+         * A number the desk may dial: digits, a leading `+`, and the separators space - . ( ), at most 32 characters. Never
+         * `*` or `#` anywhere: those make an MMI/USSD code (`**21*number#` forwards every call, `**04*…#` changes the SIM
+         * PIN) that the telephony stack runs as if it were a call.
+         */
         fun dialable(number: String?): String? =
-            number?.let(::plain)?.trim()?.takeIf { it.length in 1..32 && it.all { c -> c.isDigit() || c in "+*#() -." } && it.any(Char::isDigit) }
+            number?.let(::plain)?.trim()?.takeIf { text ->
+                text.length in 1..32 && text.any(Char::isDigit) &&
+                    text.withIndex().all { (i, c) -> c.isDigit() || c in "() -." || (c == '+' && i == 0) }
+            }
     }
 }

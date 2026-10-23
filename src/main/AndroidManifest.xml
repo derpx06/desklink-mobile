@@ -348,6 +348,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
                 android:value="org.desklink.mobile.plugins.share.ShareChooserTargetService" />
         </activity>
 
+        <receiver
+            android:name="org.desklink.mobile.plugins.telephony.CallApprovalReceiver"
+            android:exported="false" />
+
         <receiver android:name="org.desklink.mobile.plugins.share.ShareBroadcastReceiver"
             android:exported="true">
             <intent-filter>

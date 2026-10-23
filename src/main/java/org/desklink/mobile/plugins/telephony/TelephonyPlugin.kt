@@ -62,6 +62,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
     /** The dialer's call notification: who, and its Decline / Hang up buttons. */
     @Volatile private var dialerNotification: StatusBarNotification? = null
     private var ringerMuted = false
+    private val approvals = CallApprovals()
 
     override val displayName: String
         get() = context.getString(R.string.pref_plugin_calls)
@@ -205,6 +206,30 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             manager.isMicrophoneMute == mute
         }.getOrDefault(false)
 
+        override fun askToPlaceCall(number: String): Boolean {
+            val manager = NotificationManagerCompat.from(context)
+            if (!manager.areNotificationsEnabled()) return false
+            val ask = approvals.ask(device.deviceId, number) ?: return false
+            fun action(name: String, code: Int) = PendingIntent.getBroadcast(
+                context, code + ask.nonce.hashCode(),
+                Intent(name).setClass(context, CallApprovalReceiver::class.java)
+                    .putExtra(CallApprovalReceiver.EXTRA_NONCE, ask.nonce).putExtra(CallApprovalReceiver.EXTRA_DEVICE, device.deviceId),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val notification = NotificationCompat.Builder(context, NotificationHelper.Channels.CALLS)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.telephony_call_ask_title, device.name, number))
+                .setContentText(context.getString(R.string.telephony_call_ask_text))
+                .addAction(0, context.getString(R.string.telephony_call_allow), action(CallApprovalReceiver.ACTION_ALLOW, 1))
+                .addAction(0, context.getString(R.string.telephony_call_deny), action(CallApprovalReceiver.ACTION_DENY, 2))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setTimeoutAfter(CallApprovals.LIFETIME_MS)
+                .setAutoCancel(true)
+                .build()
+            return runCatching { manager.notify("call-approval:${device.deviceId}", CallApprovalReceiver.NOTIFICATION_ID, notification) }.isSuccess
+        }
+
         @SuppressLint("MissingPermission")
         override fun placeCall(number: String): Boolean = runCatching {
             telecom?.placeCall(Uri.fromParts("tel", number, null), Bundle()) != null
@@ -235,6 +260,15 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             return runCatching { manager.notify("message:${device.deviceId}", 7331, notification) }.isSuccess
         }
     }
+
+    /** Allow on the heads-up: the one number that desk asked for, once, within a minute. */
+    fun placeApprovedCall(nonce: String?) {
+        val ask = approvals.take(nonce)?.takeIf { it.deviceId == device.deviceId } ?: return
+        if (!controls.canDial()) return
+        if (controls.placeCall(ask.number)) sendSnapshot()
+    }
+
+    fun denyCall(nonce: String?) = approvals.discard(nonce)
 
     private fun restoreRinger() {
         if (!ringerMuted) return

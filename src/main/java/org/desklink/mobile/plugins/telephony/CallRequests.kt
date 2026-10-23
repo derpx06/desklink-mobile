@@ -15,6 +15,8 @@ interface CallControls {
     fun muteRinger(): Boolean
     fun setMicrophoneMute(mute: Boolean): Boolean
     fun placeCall(number: String): Boolean
+    /** A heads-up on the phone, "<desk> wants to call <number>" with Allow and Deny; the call is placed only on Allow. */
+    fun askToPlaceCall(number: String): Boolean
     /** F5 K5: the messaging app's compose screen for [number] (or a heads-up to open it); false when none can. */
     fun openMessages(number: String): Boolean
 }
@@ -59,7 +61,8 @@ object CallRequests {
             when {
                 !controls.canDial() -> ERROR_PERMISSION
                 dialable == null -> ERROR_FAILED
-                controls.placeCall(dialable) -> null
+                // The computer asks, the person on the phone decides: nothing is dialled from here.
+                controls.askToPlaceCall(dialable) -> null
                 else -> ERROR_FAILED
             }
         }

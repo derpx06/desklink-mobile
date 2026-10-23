@@ -144,6 +144,7 @@ class CallsTest {
         override fun muteRinger() = true.also { done += "silence" }
         override fun setMicrophoneMute(mute: Boolean) = micWorks.also { if (it) done += "mic:$mute" }
         override fun placeCall(number: String) = true.also { done += "dial:$number" }
+        override fun askToPlaceCall(number: String) = true.also { done += "ask:$number" }
         override fun openMessages(number: String) = messagesWork.also { if (it) done += "message:$number" }
     }
 
@@ -217,7 +218,50 @@ class CallsTest {
         assertEquals(CallRequests.ERROR_PERMISSION, CallRequests.handle("dial", "5551234", t, FakeControls(dial = false), CallFlags()))
         assertEquals(CallRequests.ERROR_FAILED, CallRequests.handle("dial", "not a number", t, controls, CallFlags()))
         assertNull(CallRequests.handle("dial", "5551234", t, controls, CallFlags()))
-        assertEquals(listOf("dial:5551234"), controls.done)
+        assertEquals("the phone's person decides: a request only asks", listOf("ask:5551234"), controls.done)
         assertNotNull(CallTracker.errorPacket("no-call", "answer").getString("error"))
+    }
+
+    @Test
+    fun hostileNumbersNeverBecomeACallOrAnMmiCode() {
+        for (hostile in listOf("**21*+19005551234#", "*#06#", "#31#5551234", "**04*1234*5678*5678#", "*21#", "5551234#", "555*1234", "++1555", "1+555", "+1 555\u0000", "12345678901234567890123456789012345", "")) {
+            assertNull("refused: $hostile", CallTracker.dialable(hostile))
+            val controls = FakeControls()
+            assertEquals(CallRequests.ERROR_FAILED, CallRequests.handle("dial", hostile, tracker(), controls, CallFlags()))
+            assertEquals(emptyList<String>(), controls.done)
+        }
+        assertEquals("+1 (555) 123-4567", CallTracker.dialable("+1 (555) 123-4567"))
+        assertEquals("5551234", CallTracker.dialable("5551234"))
+    }
+
+    @Test
+    fun aCallAskIsOneTimeBoundToItsDeskAndNumberAndRateLimited() {
+        var now = 0L
+        val approvals = CallApprovals { now }
+        val first = approvals.ask("desk-1", "5551234")!!
+        assertEquals("5551234", approvals.take(first.nonce)!!.number)
+        assertNull("used once", approvals.take(first.nonce))
+        val second = approvals.ask("desk-1", "5559999")!!
+        now += CallApprovals.LIFETIME_MS + 1
+        assertNull("expired", approvals.take(second.nonce))
+        assertNull(approvals.take("not-a-nonce"))
+        assertNull(approvals.take(null))
+        // Five a minute, then no more until the minute is over.
+        now = 0
+        val rated = CallApprovals { now }
+        repeat(CallApprovals.MAX_ASKS_PER_WINDOW) { assertNotNull(rated.ask("desk-2", "5551234")) }
+        assertNull(rated.ask("desk-2", "5551234"))
+        assertNotNull("another desk is unaffected", rated.ask("desk-3", "5551234"))
+        now = CallApprovals.WINDOW_MS
+        assertNotNull(rated.ask("desk-2", "5551234"))
+    }
+
+    @Test
+    fun askingAgainReplacesWhatThatDeskAskedBefore() {
+        val approvals = CallApprovals { 0L }
+        val old = approvals.ask("desk-1", "5551234")!!
+        val new = approvals.ask("desk-1", "5559999")!!
+        assertNull(approvals.take(old.nonce))
+        assertEquals("5559999", approvals.take(new.nonce)!!.number)
     }
 }
