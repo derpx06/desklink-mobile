@@ -47,6 +47,7 @@ public class MouseReceiverService extends AccessibilityService {
     public void onCreate() {
         MouseReceiverService.instance = this;
         Log.i("MouseReceiverService", "created");
+        org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.reportAllowedToAll();
     }
 
     @Override
@@ -400,6 +401,7 @@ public class MouseReceiverService extends AccessibilityService {
         // Switched off or killed while the desk's pointer is here: it is handed back before this goes.
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(true);
         if (instance == this) instance = null;
+        org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.reportAllowedToAll();
         if (windowManager != null && cursorView != null) {
             try {
                 windowManager.removeView(cursorView);
@@ -414,6 +416,7 @@ public class MouseReceiverService extends AccessibilityService {
     public boolean onUnbind(android.content.Intent intent) {
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(true);
         if (instance == this) instance = null;
+        org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.reportAllowedToAll();
         return super.onUnbind(intent);
     }
 

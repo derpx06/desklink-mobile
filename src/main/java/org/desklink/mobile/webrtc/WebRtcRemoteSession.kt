@@ -626,20 +626,21 @@ class WebRtcRemoteSessionController(
             current.expiresAt > System.currentTimeMillis()
     }
 
-    /** Verifies an inbound input packet before it reaches AccessibilityService. */
+    /**
+     * Verifies an inbound input packet before it reaches AccessibilityService. A packet that is merely not allowed now (no
+     * lease, not controlling, another owner, an expired lease, an old or repeated sequence number) throws
+     * [InboundNotAllowed], which the caller drops: the input channel is unordered and a desk may stream before or after a
+     * grant, so none of these proves a bad peer. (A bad signature or a replayed envelope is refused before this point.)
+     */
     @Synchronized
     fun verifyInboundInput(packet: NetworkPacket, wire: WebRtcWireBinding) {
-        val current = requireNotNull(lease) { "DeskLink remote input has no active lease" }
-        require(state == WebRtcRemoteSessionState.CONTROLLING) { "DeskLink remote input is not active" }
-        require(current.ownerDeviceId == wire.peerDeviceId && current.generation == wire.generation) {
-            "DeskLink remote input lease is not owned by this peer"
-        }
-        require(current.expiresAt > System.currentTimeMillis()) { "DeskLink remote input lease expired" }
-        require(packet.getString(REMOTE_SESSION_ID_FIELD) == sessionId && packet.getString(LEASE_ID_FIELD) == current.id) {
-            "DeskLink remote input session or lease mismatch"
-        }
+        val current = lease ?: throw InboundNotAllowed("no active lease")
+        if (state != WebRtcRemoteSessionState.CONTROLLING) throw InboundNotAllowed("not controlling")
+        if (!(current.ownerDeviceId == wire.peerDeviceId && current.generation == wire.generation)) throw InboundNotAllowed("lease owned by another peer")
+        if (current.expiresAt <= System.currentTimeMillis()) throw InboundNotAllowed("lease expired")
+        if (!(packet.getString(REMOTE_SESSION_ID_FIELD) == sessionId && packet.getString(LEASE_ID_FIELD) == current.id)) throw InboundNotAllowed("session or lease mismatch")
         val sequence = packet.getLong(INPUT_SEQUENCE_FIELD, 0)
-        require(current.sequenceWindow.accept(sequence)) { "Replayed DeskLink remote input" }
+        if (!current.sequenceWindow.accept(sequence)) throw InboundNotAllowed("old or repeated sequence")
         current.expiresAt = System.currentTimeMillis() + LEASE_MILLIS
     }
 

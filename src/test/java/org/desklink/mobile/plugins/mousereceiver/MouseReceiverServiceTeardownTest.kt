@@ -94,7 +94,7 @@ class MouseReceiverServiceTeardownTest {
             this["deltay"] = 100
         })
         assertNull(Glide.activeDesk)
-        assertEquals("the desk gets its pointer back at once", 1, sent.count { it.type == DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES })
+        assertEquals("the desk gets its pointer back at once", 1, sent.count { it.type == DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES && it.has("releaseDeltax") })
         // The same request with the screen on is taken.
         shadowOf(context.getSystemService(android.os.PowerManager::class.java)).setIsInteractive(true)
         p.onPacketReceived(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST).apply {

@@ -1027,6 +1027,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 onGlide = { on ->
                     device?.let { d ->
                         org.desklink.mobile.plugins.inputdevicesreceiver.Glide.setAllowed(this, d.deviceId, on)
+                        d.getPlugin(org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin::class.java)?.reportAllowed()
                         // Turned off mid-glide: the desk gets its pointer back now.
                         if (!on) d.getPlugin(org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin::class.java)
                             ?.takeIf { org.desklink.mobile.plugins.inputdevicesreceiver.Glide.activeDesk == d.deviceId }?.stop(release = true)

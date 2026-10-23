@@ -1054,34 +1054,7 @@ class WebRtcSessionCoordinator(
                         requireNotNull(activeWireBinding) { "No active DeskLink WebRTC wire binding" },
                         envelope,
                     )
-                    val focusedField = packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST &&
-                        org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.targetsFocusedField(packet)
-                    val glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide
-                    if (
-                        packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST && !focusedField &&
-                        glide.isGliding(device.deviceId) && glide.allowed(context, device.deviceId)
-                    ) {
-                        // F4 glide (G5): the person's per-desk "Let <desk> control this phone" is the
-                        // consent while the desk's pointer is here; no screen lease.
-                        if (!glide.accepts(device.deviceId, packet.getStringOrNull("key"))) return@runCatching
-                    } else if (focusedField) {
-                        // "Type on <phone>" (C2): no screen session, so no lease; the person's
-                        // per-desk switch is the consent, and only keys may come this way.
-                        val typing = org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping
-                        require(typing.keyboardOnly(packet)) { "Focused-field input may carry keys only" }
-                        if (!typing.allowed(context, device.deviceId)) {
-                            typing.askToAllow(context, device)
-                            return@runCatching
-                        }
-                    } else if (packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST) {
-                        remoteSession.verifyInboundInput(
-                            packet,
-                            requireNotNull(activeWireBinding) {
-                                "No active DeskLink WebRTC wire binding"
-                            },
-                        )
-                    }
-                    device.onWebRtcPacketReceived(packet)
+                    deliverFeaturePacket(packet, wire)
                 }.onFailure { error ->
                     Log.w(TAG, "Rejected WebRTC feature packet", error)
                     publish("Failed", error.message)
@@ -2557,6 +2530,51 @@ class WebRtcSessionCoordinator(
      * `LinkedHashSet` eviction is oldest-first, so a recently seen ID is never
      * dropped ahead of an old one.
      */
+    private val inboundDrops = DropLog(TAG)
+
+    /**
+     * What an authenticated feature packet gets: the input rules (glide, focused-field typing, the screen lease), then its
+     * plugin. A packet that is merely not allowed now is dropped (one rate-limited log line, a count) and never ends the link;
+     * only a protocol violation does ([publish] "Failed"). Internal so a test drives the real path without a peer.
+     */
+    internal fun deliverFeaturePacket(packet: NetworkPacket, wire: WebRtcWireBinding) {
+        runCatching {
+            val focusedField = packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST &&
+                org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.targetsFocusedField(packet)
+            val glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide
+            if (
+                packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST && !focusedField &&
+                glide.isGliding(device.deviceId) && glide.allowed(context, device.deviceId)
+            ) {
+                // F4 glide (G5): the person's per-desk "Let <desk> control this phone" is the
+                // consent while the desk's pointer is here; no screen lease.
+                if (!glide.accepts(device.deviceId, packet.getStringOrNull("key"))) return@runCatching
+            } else if (focusedField) {
+                // "Type on <phone>" (C2): no screen session, so no lease; the person's
+                // per-desk switch is the consent, and only keys may come this way.
+                val typing = org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping
+                if (!typing.keyboardOnly(packet)) throw InboundNotAllowed("focused-field input with more than keys")
+                if (!typing.allowed(context, device.deviceId)) {
+                    typing.askToAllow(context, device)
+                    return@runCatching
+                }
+            } else if (packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST) {
+                remoteSession.verifyInboundInput(packet, wire)
+            }
+            // A plugin that cannot take a packet is its own problem: it never ends the link.
+            runCatching { device.onWebRtcPacketReceived(packet) }
+                .onFailure { Log.w(TAG, "A feature could not take ${packet.type} (${it.javaClass.simpleName})") }
+        }.onFailure { error ->
+            if (error is InboundNotAllowed) {
+                inboundDrops.dropped(error.message ?: "not allowed")
+            } else {
+                Log.w(TAG, "Rejected WebRTC feature packet", error)
+                publish("Failed", error.message)
+            }
+        }
+    }
+
+
     private fun acceptEnvelopeId(attemptId: String, messageId: String) =
         synchronized(seenEnvelopeIds) {
             require(messageId.isNotEmpty()) { "WebRTC envelope has no message ID" }

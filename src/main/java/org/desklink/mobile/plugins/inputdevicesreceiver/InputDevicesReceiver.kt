@@ -61,6 +61,19 @@ class InputDevicesReceiverPlugin : Plugin() {
         if (Glide.activeDesk == device.deviceId) stop(release = false)
     }
 
+    /** Whether a glide could start now: the person's switch for this desk and the accessibility service that moves the pointer. */
+    fun glideAllowed() = Glide.allowed(context, device.deviceId) && MouseReceiverService.instance != null
+
+    /**
+     * `desklink.shareinputdevices {allowed}`: a report of state, never a command, so the desk arms its edge only when a glide
+     * could be taken. Sent on every feature-ready and whenever the switch or the service changes.
+     */
+    fun reportAllowed() {
+        device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES).apply { this["allowed"] = glideAllowed() })
+    }
+
+    override fun onFeatureReady() = reportAllowed()
+
     /** The link is gone: the desk's own link-loss rule gives it its pointer back; here the overlay must not stay. */
     override fun onFeatureLost() {
         if (Glide.activeDesk == device.deviceId) stop(release = false)
@@ -121,6 +134,8 @@ class InputDevicesReceiverPlugin : Plugin() {
         if (!Glide.validEdge(edge) || !Glide.allowed(context, device.deviceId) || MouseReceiverService.instance == null || !screenIsOn()) {
             Log.i(TAG, "Glide refused (allowed=${Glide.allowed(context, device.deviceId)}, service=${MouseReceiverService.instance != null})")
             sendRelease(0, deltay.coerceIn(-Glide.MAX_DESK_PX, Glide.MAX_DESK_PX).toInt())
+            // And the reason as state, so the desk stops arming the edge for nothing.
+            reportAllowed()
             return
         }
         // Another desk was gliding: it gets its pointer back first.
@@ -160,6 +175,13 @@ class InputDevicesReceiverPlugin : Plugin() {
          * Ends whatever glide is on, whichever desk: the screen went off, or the accessibility service went away.
          * With [release] the desk is told to take its pointer back (best effort: the link may be asleep).
          */
+        /** The switch or the accessibility service changed: every desk that has this plugin hears the new state. */
+        @JvmStatic
+        fun reportAllowedToAll() {
+            val app = org.desklink.mobile.DeskLinkApplication.getInstance()
+            app.devices.values.forEach { d -> runCatching { d.getPlugin(InputDevicesReceiverPlugin::class.java)?.takeIf { d.isPaired }?.reportAllowed() } }
+        }
+
         @JvmStatic
         fun endActive(release: Boolean) {
             val id = Glide.activeDesk ?: return
