@@ -623,7 +623,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_rename_failed">That name cannot be used, or it is taken</string>
     <string name="bucket_remove">Remove from both</string>
     <string name="bucket_remove_title">Remove “%1$s”?</string>
-    <string name="bucket_remove_body">It is removed here and on %1$s (to its trash).</string>
+    <string name="bucket_remove_body">It is removed from this phone for good, and on %1$s it goes to the trash.</string>
     <string name="bucket_conflict_title">Changed on both</string>
     <string name="bucket_conflict_body">This phone\'s version of a file was kept as “%1$s” because %2$s changed it too.</string>
     <string name="bucket_keep_both">Keep both</string>
