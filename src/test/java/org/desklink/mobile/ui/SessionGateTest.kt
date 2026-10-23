@@ -60,4 +60,16 @@ class SessionGateTest {
         assertNull(SessionGate.decodeBlob(SessionGate.encodeBlob(iv, ByteArray(16))))
         assertNull(SessionGate.decodeBlob("!!!:???"))
     }
+
+    @Test
+    fun aGatePassedOnOneConnectionIsNotPassedOnTheNext() {
+        SessionGate.clearPassed()
+        SessionGate.markPassed("desk-1", 1001L)
+        assertEquals(true, SessionGate.isPassed("desk-1", 1001L))
+        // A rebuilt peer is a new session id: the gate is asked again, whatever the constant generation says.
+        assertEquals(false, SessionGate.isPassed("desk-1", 1002L))
+        assertEquals(false, SessionGate.isPassed("desk-2", 1001L))
+        assertEquals(false, SessionGate.isPassed("desk-1", null))
+        SessionGate.clearPassed()
+    }
 }

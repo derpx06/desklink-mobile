@@ -75,6 +75,13 @@ object SessionGate {
     /** deviceId → the connection on which the gate was passed. */
     private val passed = HashMap<String, Long>()
 
+    /** The gate was passed on [connection] (a session id): only that connection, never the next. */
+    internal fun markPassed(deviceId: String, connection: Long) = synchronized(passed) { passed[deviceId] = connection }
+
+    internal fun isPassed(deviceId: String, connection: Long?) = connection != null && synchronized(passed) { passed[deviceId] == connection }
+
+    internal fun clearPassed() = synchronized(passed) { passed.clear() }
+
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun hasStored(context: Context, deviceId: String) = decodeBlob(prefs(context).getString(deviceId, null)) != null
@@ -93,7 +100,7 @@ object SessionGate {
         val connection = app.connectionKey(deviceId)
         val stored = hasStored(activity, deviceId)
         val step = step(
-            alreadyPassed = connection != null && synchronized(passed) { passed[deviceId] == connection },
+            alreadyPassed = isPassed(deviceId, connection),
             passwordKnown = app.sessionPassword(deviceId) != null,
             stored = stored,
             strongEnrolled = Biometrics.strongEnrolled(activity),
@@ -101,7 +108,7 @@ object SessionGate {
             anyAuth = Biometrics.available(activity, Biometrics.STRONG_OR_CREDENTIAL),
         )
         fun pass() {
-            connection?.let { synchronized(passed) { passed[deviceId] = it } }
+            connection?.let { markPassed(deviceId, it) }
             onOpen()
         }
         val desk = DeskNames.of(deviceId)
