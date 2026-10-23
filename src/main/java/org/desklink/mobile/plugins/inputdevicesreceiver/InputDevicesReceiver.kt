@@ -60,6 +60,11 @@ class InputDevicesReceiverPlugin : Plugin() {
         if (Glide.activeDesk == device.deviceId) stop(release = false)
     }
 
+    /** The link is gone: the desk's own link-loss rule gives it its pointer back; here the overlay must not stay. */
+    override fun onFeatureLost() {
+        if (Glide.activeDesk == device.deviceId) stop(release = false)
+    }
+
     /** A new connection: whatever glide the old one had is over on the desk too. */
     override fun onFeatureReady() {
         if (Glide.activeDesk == device.deviceId) stop(release = false)
@@ -129,6 +134,9 @@ class InputDevicesReceiverPlugin : Plugin() {
     /** G2 motion: hand back once the pointer reaches the edge it came in by. */
     private fun onMotion(np: NetworkPacket) {
         if (!Glide.isGliding(device.deviceId)) return
+        // The accessibility service was switched off or killed mid-glide: nothing can show or move the pointer, so
+        // the desk gets it back now rather than typing into the void.
+        if (MouseReceiverService.instance == null) return stop(release = true)
         Glide.lastPacketAt = SystemClock.elapsedRealtime()
         if (!np.has("dx") || np.getBoolean("scroll", false)) return
         Glide.release(Glide.enterEdge, Cursor.x, Cursor.y, Glide.edgeLength, metrics.widthPixels, metrics.heightPixels)?.let { (dx, dy) ->
@@ -144,5 +152,16 @@ class InputDevicesReceiverPlugin : Plugin() {
 
     companion object {
         private const val TAG = "DeskLink/Glide"
+
+        /**
+         * Ends whatever glide is on, whichever desk: the screen went off, or the accessibility service went away.
+         * With [release] the desk is told to take its pointer back (best effort: the link may be asleep).
+         */
+        @JvmStatic
+        fun endActive(release: Boolean) {
+            val id = Glide.activeDesk ?: return
+            val plugin = org.desklink.mobile.DeskLinkApplication.getInstance().getDevice(id)?.getPlugin(InputDevicesReceiverPlugin::class.java)
+            if (plugin != null) runCatching { plugin.stop(release) } else Glide.end()
+        }
     }
 }

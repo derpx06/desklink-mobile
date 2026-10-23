@@ -589,6 +589,11 @@ class Device : PacketReceiver {
         // What the desk said it holds belongs to one connection. Replacing or dropping the transport
         // ends it; a first transport after none keeps a `have` that arrived a moment early.
         if (transport == null || (webRtcTransport != null && webRtcTransport !== transport)) sync.endLink()
+        if (transport == null && webRtcTransport != null) {
+            loadedPlugins.values.toList().forEach { plugin ->
+                runCatching { plugin.onFeatureLost() }.onFailure { Log.w("DeskLink/Device", "${plugin.pluginKey} failed to let go", it) }
+            }
+        }
         if (webRtcTransport === transport) return
         webRtcTransport = transport
         connectionPath = null

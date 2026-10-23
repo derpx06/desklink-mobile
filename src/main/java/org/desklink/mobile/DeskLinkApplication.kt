@@ -283,7 +283,11 @@ class DeskLinkApplication : Application() {
 
     /** SCREEN_ON: every live peer is probed at once and rebuilt if silent (contract B2). */
     fun onScreenOn() = webRtcCoordinators.values.forEach { runCatching { it.onScreenOn() } }
-    fun onScreenOff() = webRtcCoordinators.values.forEach { runCatching { it.onScreenOff() } }
+    fun onScreenOff() {
+        // A pointer on a dark screen helps no one, and the desk would wait for it: it goes back.
+        runCatching { org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(release = true) }
+        webRtcCoordinators.values.forEach { runCatching { it.onScreenOff() } }
+    }
 
     /** The live WebRTC connection's identity for [deviceId], or null (see [org.desklink.mobile.ui.SessionGate]). */
     fun connectionKey(deviceId: String?): Long? = getDevice(deviceId)?.let { webRtcCoordinatorFor(it).connectionKey() }

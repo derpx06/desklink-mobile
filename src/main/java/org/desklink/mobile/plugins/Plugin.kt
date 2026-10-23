@@ -113,6 +113,12 @@ abstract class Plugin {
     open fun onFeatureReady() {}
 
     /**
+     * The feature link went away (the WebRTC transport closed). A plugin that holds something on the other side's
+     * behalf (a pointer, a microphone) lets go here: nothing will tell it later.
+     */
+    open fun onFeatureLost() {}
+
+    /**
      * The person turned this plugin off for the device. A plugin that owns state the desk shows
      * sends the empty form here, before it is unloaded, so the desk clears it (contract S2).
      */

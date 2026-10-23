@@ -83,6 +83,7 @@ public class MouseReceiverService extends AccessibilityService {
         windowManager.addView(cursorView, cursorLayout);
 
         hideRunnable = () -> {
+            if (cursorView == null) return;
             cursorView.setVisibility(View.GONE);
             Log.i("MouseReceiverService", "Hiding pointer due to inactivity");
         };
@@ -96,6 +97,7 @@ public class MouseReceiverService extends AccessibilityService {
     }
 
     public void hide(int delayMillis) {
+        if (runHandler == null || hideRunnable == null) return; // not connected yet, or already torn down
         runHandler.removeCallbacks(hideRunnable);
         runHandler.postDelayed(hideRunnable, delayMillis);
     }
@@ -369,10 +371,24 @@ public class MouseReceiverService extends AccessibilityService {
     @Override
     public void onDestroy() {
         super.onDestroy();
-
+        // Switched off or killed while the desk's pointer is here: it is handed back before this goes.
+        org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(true);
+        if (instance == this) instance = null;
         if (windowManager != null && cursorView != null) {
-            windowManager.removeView(cursorView);
+            try {
+                windowManager.removeView(cursorView);
+            } catch (IllegalArgumentException ignored) {
+                // already gone with its window
+            }
         }
+        cursorView = null;
+    }
+
+    @Override
+    public boolean onUnbind(android.content.Intent intent) {
+        org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(true);
+        if (instance == this) instance = null;
+        return super.onUnbind(intent);
     }
 
     @Override
