@@ -64,6 +64,43 @@ class FileSender(
     private var lastReportAt = 0L
     private var ended = false
 
+    // Where the time of this send went, in nanoseconds (see [summary]).
+    private val startedAt = System.nanoTime()
+    private var readNs = 0L
+    private var hashNs = 0L
+    private var sendNs = 0L
+    private var windowWaitNs = 0L
+    private var ackWaitNs = 0L
+    private var blockedSince = 0L
+    private var blockedOnAcks = false
+    private var framesSent = 0L
+
+    private fun blocked(onAcks: Boolean) {
+        if (blockedSince == 0L) {
+            blockedSince = System.nanoTime()
+            blockedOnAcks = onAcks
+        }
+    }
+
+    private fun unblocked() {
+        if (blockedSince == 0L) return
+        val waited = System.nanoTime() - blockedSince
+        if (blockedOnAcks) ackWaitNs += waited else windowWaitNs += waited
+        blockedSince = 0L
+    }
+
+    /**
+     * One line for the debug log when a send is over: bytes, seconds, MB/s, and the milliseconds spent reading the source,
+     * hashing, handing frames to the data channel, held back by the channel's buffered amount ("window") and held back
+     * waiting for the receiver's acknowledgements ("acks"). The rest is waiting for something else to call this.
+     */
+    fun summary(): String {
+        val seconds = (System.nanoTime() - startedAt) / 1e9
+        fun ms(ns: Long) = ns / 1_000_000
+        return "send-stats $filename bytes=$totalSize seconds=${"%.1f".format(seconds)} MBps=${"%.1f".format(totalSize / 1e6 / seconds.coerceAtLeast(0.001))} " +
+            "frames=$framesSent readMs=${ms(readNs)} hashMs=${ms(hashNs)} sendMs=${ms(sendNs)} windowWaitMs=${ms(windowWaitNs)} ackWaitMs=${ms(ackWaitNs)}"
+    }
+
     fun sourceForRestart(): FileSource = source
     fun metaForRestart(): Map<String, String> = meta
     fun isSpooled(): Boolean = spooled
@@ -235,8 +272,9 @@ class FileSender(
         if (ended || state != State.STREAMING || peerPaused != null) return
         try {
             while (true) {
-                if (link.bufferedAmount() >= FileV2.IN_FLIGHT_TARGET) return
-                if (sentBytes() - ackedBytes() >= FileV2.UNACKED_MAX) return
+                if (link.bufferedAmount() >= FileV2.IN_FLIGHT_TARGET) return blocked(onAcks = false)
+                if (sentBytes() - ackedBytes() >= FileV2.UNACKED_MAX) return blocked(onAcks = true)
+                unblocked()
                 if (cursor >= blocksTotal) {
                     // Everything is read; once it is all acknowledged, one last look at the source before `done`.
                     if (ackedBlocks == blocksTotal) {
@@ -268,6 +306,7 @@ class FileSender(
         val length = minOf(FileV2.BLOCK_BYTES.toLong(), totalSize - offset).toInt()
         val input = stream ?: source.open(offset).also { stream = it }
         val buffer = block?.takeIf { it.size >= length } ?: ByteArray(FileV2.BLOCK_BYTES)
+        val readStart = System.nanoTime()
         var read = 0
         while (read < length) {
             val n = input.read(buffer, read, length - read)
@@ -278,7 +317,10 @@ class FileSender(
             sourceChanged()
             return false
         }
+        val hashStart = System.nanoTime()
+        readNs += hashStart - readStart
         val digest = MessageDigest.getInstance("SHA-256").apply { update(buffer, 0, length) }.digest()
+        hashNs += System.nanoTime() - hashStart
         block = buffer
         blockLength = length
         blockHash = digest
@@ -291,9 +333,12 @@ class FileSender(
         val data = requireNotNull(block)
         val count = minOf(FileV2.payloadCapacity(frameBytes), blockLength - emitted)
         val last = emitted + count == blockLength
+        val sendStart = System.nanoTime()
         link.sendFrame(
             FileFrame.encode(uuid, pass, cursor, cursor.toLong() * FileV2.BLOCK_BYTES + emitted, data, emitted, count, if (last) blockHash else null),
         )
+        sendNs += System.nanoTime() - sendStart
+        framesSent++
         emitted += count
         if (last) {
             cursor++

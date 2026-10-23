@@ -521,6 +521,24 @@ class FileTransferEngineTest {
     }
 
     @Test
+    fun theSendSummaryNamesWhereTheTimeWent() {
+        val bytes = data(3 * FileV2.BLOCK_BYTES)
+        val h = harness(bytes)
+        h.senderBuffered = FileV2.IN_FLIGHT_TARGET // the channel is full: the sender is held back
+        val s = h.run()
+        Thread.sleep(30)
+        h.senderBuffered = 0
+        s.pump()
+        h.pump()
+        val line = s.summary()
+        assertTrue(line, line.startsWith("send-stats report.bin bytes=${bytes.size} "))
+        val windowWait = Regex("windowWaitMs=(\\d+)").find(line)!!.groupValues[1].toLong()
+        assertTrue("held back by the window for at least the pause: $line", windowWait >= 20)
+        assertTrue(line, Regex("frames=(\\d+)").find(line)!!.groupValues[1].toLong() > 0)
+        assertEquals(h.sha(bytes), h.deliveredSha)
+    }
+
+    @Test
     fun aCheckpointForADifferentTransferOrFileIsNeverTrusted() {
         val bytes = data(3 * FileV2.BLOCK_BYTES)
         val h = harness(bytes)

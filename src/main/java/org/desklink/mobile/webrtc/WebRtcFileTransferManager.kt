@@ -256,6 +256,7 @@ class WebRtcFileTransferManager(
             }
             when (outcome) {
                 FileSender.Outcome.COMPLETED -> {
+                    if (org.desklink.mobile.BuildConfig.DEBUG) Log.i(TAG, sender.summary())
                     cleanupSend(id, sender)
                     entry.callback.onPayloadProgressChanged(100)
                     entry.callback.onSuccess()
