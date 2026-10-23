@@ -273,15 +273,16 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             ?.let(CallTracker::plain)?.trim()
             ?.takeIf(String::isNotEmpty) ?: return
         val number = CallTracker.dialable(title)
+        // The call this lookup is for, fixed now: if another call rings before the answer comes back, the answer is dropped.
+        val callId = (tracker.ringing() ?: tracker.calls.singleOrNull())?.callId ?: return
         // The contacts database is asked on a worker (a query on the main thread stutters and StrictMode flags it); the
         // answer comes back to the main thread, where the call state lives, and is sent as an updated snapshot.
         runCatching { lookups.execute {
             val uid = if (share) ContactsPlugin.uidFor(context, number, title.takeIf { number == null }) else null
             val name = if (show) (if (number != null) contactName(number) else title) else null
             mainHandler.post {
-                if (!tracker.hasCall()) return@post
-                if (show) tracker.annotate(name, number, uid) else tracker.annotate(null, null, uid)
-                sendSnapshot()
+                val annotated = if (show) tracker.annotate(name, number, uid, callId) else tracker.annotate(null, null, uid, callId)
+                if (annotated) sendSnapshot()
             }
         } }
     }

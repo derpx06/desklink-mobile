@@ -88,15 +88,21 @@ class CallTracker(
     fun hasCall(): Boolean = calls.isNotEmpty()
 
     /** Names the current calls from the dialer notification (or contacts), when the person allows it. */
-    fun annotate(contactName: String?, number: String?, contactUid: String? = null) {
-        if (contactName == null && number == null && contactUid == null) return
+    fun annotate(contactName: String?, number: String?, contactUid: String? = null, forCallId: String? = null): Boolean {
+        if (contactName == null && number == null && contactUid == null) return false
+        // A lookup that began for one call is never written onto another: if that call is gone, the answer is dropped.
+        if (forCallId != null && calls.none { it.callId == forCallId }) return false
         calls = calls.map {
-            if (it.state == STATE_RINGING || calls.size == 1) {
+            if (forCallId != null) {
+                if (it.callId != forCallId) return@map it
+                it.copy(contactName = contactName ?: it.contactName, number = number ?: it.number, contactUid = contactUid ?: it.contactUid)
+            } else if (it.state == STATE_RINGING || calls.size == 1) {
                 it.copy(contactName = contactName ?: it.contactName, number = number ?: it.number, contactUid = contactUid ?: it.contactUid)
             } else {
                 it
             }
         }
+        return true
     }
 
     companion object {

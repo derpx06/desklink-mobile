@@ -29,6 +29,21 @@ class CallsTest {
     }
 
     @Test
+    fun aLookupForOneCallIsNeverWrittenOntoAnother() {
+        val t = tracker()
+        t.onLine(LineState.RINGING) // c1 rings; its contact lookup starts
+        val forFirst = t.ringing()!!.callId
+        t.onLine(LineState.IDLE) // it ends, another call rings before the answer comes back
+        t.onLine(LineState.RINGING)
+        assertEquals("c2", t.ringing()!!.callId)
+        assertFalse("the answer is dropped", t.annotate("Ada", "+15551234", null, forCallId = forFirst))
+        assertNull(t.calls.single().contactName)
+        assertNull(t.calls.single().number)
+        assertTrue(t.annotate("Grace", "+15559999", null, forCallId = "c2"))
+        assertEquals("Grace", t.calls.single().contactName)
+    }
+
+    @Test
     fun anUnansweredCallIsMissedButADeclinedOneIsNot() {
         val t = tracker()
         t.onLine(LineState.RINGING)
