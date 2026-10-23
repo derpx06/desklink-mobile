@@ -179,7 +179,8 @@ object FilesHelper {
 
             packet.payload = NetworkPacket.Payload(inputStream, size).also {
                 // Sent in place, block by block, never copied first (and re-read after a lost link).
-                it.source = org.desklink.mobile.webrtc.UriFileSource(context, uri)
+                // Opened now, while this screen's permission to read the file is alive: a send that takes a while must not ask again.
+                it.source = org.desklink.mobile.webrtc.UriFileSource(context, uri).also { source -> source.hold() }
             }
 
             return packet

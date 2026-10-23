@@ -162,6 +162,7 @@ class WebRtcFileTransferManager(
             spooled = given == null
             source = given ?: spool(id, payload)
         } catch (error: Throwable) {
+            Log.w(TAG, "send $id could not start (${error.javaClass.simpleName})")
             store.remove(id)
             payload.close()
             callback.onFailure(error)
@@ -169,7 +170,9 @@ class WebRtcFileTransferManager(
         }
         val stat = source.stat()
         if (stat == null || stat.size > FileV2.MAX_TRANSFER_BYTES) {
+            Log.w(TAG, "send $id refused: ${if (stat == null) "the file cannot be read" else "over the size limit"}")
             if (spooled) store.remove(id)
+            runCatching { source.close() }
             payload.close()
             callback.onFailure(IllegalArgumentException(if (stat == null) "The file no longer exists." else "File exceeds the DeskLink transfer limit"))
             return false
@@ -292,6 +295,7 @@ class WebRtcFileTransferManager(
                 FileSender.Outcome.SOURCE_CHANGED -> {
                     cleanupSend(id, sender, keepSource = true)
                     if (entry.restarts >= FileV2.MAX_RESTARTS) {
+                        Log.w(TAG, "send $id ended: the source kept changing")
                         cleanupSource(sender)
                         entry.callback.onFailure(IllegalStateException("The file keeps changing, so it was not sent."))
                         entry.completion.complete(false)
@@ -300,6 +304,7 @@ class WebRtcFileTransferManager(
                     val source = sender.sourceForRestart()
                     val stat = source.stat()
                     if (stat == null) {
+                        Log.w(TAG, "send $id ended: the file cannot be read any more")
                         cleanupSource(sender)
                         entry.callback.onFailure(IllegalStateException("The file no longer exists."))
                         entry.completion.complete(false)
@@ -313,6 +318,7 @@ class WebRtcFileTransferManager(
                     startSender(entry)
                 }
                 FileSender.Outcome.FAILED, FileSender.Outcome.CANCELLED -> {
+                    Log.w(TAG, "send $id ended: $outcome${message?.let { " (${it.length} chars)" }.orEmpty()}")
                     cleanupSend(id, sender)
                     entry.callback.onFailure(IllegalStateException(message ?: "The file could not be sent."))
                     entry.completion.complete(false)
@@ -327,12 +333,14 @@ class WebRtcFileTransferManager(
     )
 
     private fun cleanupSend(id: String, sender: FileSender, keepSource: Boolean = false) {
+        if (!keepSource) runCatching { sender.sourceForRestart().close() }
         store.remove(id).also { if (keepSource && sender.isSpooled()) Unit }
         TransferHistory.forgetResumable(appContext, id)
         if (store.list().none { it.direction == "send" && it.deviceId == device.deviceId }) TransferProgress.dropResuming(device.deviceId)
     }
 
     private fun cleanupSource(sender: FileSender) {
+        runCatching { sender.sourceForRestart().close() }
         if (sender.isSpooled()) store.spool(sender.transferId).delete()
     }
 

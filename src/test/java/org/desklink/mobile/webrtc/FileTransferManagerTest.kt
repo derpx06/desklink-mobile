@@ -308,6 +308,94 @@ class FileTransferManagerTest {
         assertEquals(1, desk.publishes)
     }
 
+    /** A provider like the Downloads app's: a size and a name, a descriptor for the bytes. */
+    class FilesProvider : android.content.ContentProvider() {
+        override fun onCreate() = true
+        override fun query(uri: android.net.Uri, projection: Array<String>?, selection: String?, args: Array<String>?, order: String?): android.database.Cursor {
+            if (revoked) throw SecurityException("the grant is gone")
+            val file = files.getValue(uri.lastPathSegment!!)
+            val columns = projection ?: arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE)
+            return android.database.MatrixCursor(columns).apply {
+                addRow(columns.map<String, Any?> { c ->
+                    when (c) {
+                        android.provider.OpenableColumns.DISPLAY_NAME -> file.name
+                        android.provider.OpenableColumns.SIZE -> file.length()
+                        "last_modified", "date_modified" -> file.lastModified() / 1000
+                        else -> null
+                    }
+                }.toTypedArray())
+            }
+        }
+        override fun openFile(uri: android.net.Uri, mode: String): android.os.ParcelFileDescriptor {
+            if (revoked) throw SecurityException("the grant is gone")
+            return android.os.ParcelFileDescriptor.open(files.getValue(uri.lastPathSegment!!), android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+        }
+        override fun getType(uri: android.net.Uri) = "application/octet-stream"
+        override fun insert(uri: android.net.Uri, values: android.content.ContentValues?): android.net.Uri? = null
+        override fun delete(uri: android.net.Uri, selection: String?, args: Array<String>?) = 0
+        override fun update(uri: android.net.Uri, values: android.content.ContentValues?, selection: String?, args: Array<String>?) = 0
+        companion object { val files = HashMap<String, File>(); @Volatile var revoked = false }
+    }
+
+    /**
+     * The real fault: a file shared from another app is readable only while the sharing screen's grant lasts, which ends
+     * moments after the screen closes. A file of one block was sent before that; a bigger one asked the provider again
+     * for block 2 (and its size), got "no", and was cancelled as "no longer exists".
+     */
+    @Test
+    fun aSharedFileOfSeveralBlocksStillGoesAcrossAfterTheShareScreenGrantEnds() {
+        org.robolectric.Robolectric.setupContentProvider(FilesProvider::class.java, "org.desklink.test.files")
+        val bytes = data(3 * FileV2.BLOCK_BYTES + 5)
+        FilesProvider.files["late"] = tmp.newFile("late.bin").apply { writeBytes(bytes) }
+        FilesProvider.revoked = false
+        val packet = org.desklink.mobile.helpers.FilesHelper.uriToNetworkPacket(phoneContext, android.net.Uri.parse("content://org.desklink.test.files/late"), DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST)!!
+        try {
+            FilesProvider.revoked = true // the share screen closed
+            val recorder = Recorder()
+            assertTrue(runUntilDone(startSend(packet, recorder)))
+            assertEquals(emptyList<Throwable>(), recorder.failures.toList())
+            assertArrayEquals(bytes, desk.delivered.single().bytes)
+        } finally {
+            FilesProvider.revoked = false
+        }
+    }
+
+    @Test
+    fun aSourceNotOpenedWhileTheGrantLastedIsReportedInWordsNotSilently() {
+        org.robolectric.Robolectric.setupContentProvider(FilesProvider::class.java, "org.desklink.test.files")
+        FilesProvider.files["gone"] = tmp.newFile("gone.bin").apply { writeBytes(data(100)) }
+        val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
+            this["filename"] = "gone.bin"
+            payload = NetworkPacket.Payload(100L).also { it.source = org.desklink.mobile.webrtc.UriFileSource(phoneContext, android.net.Uri.parse("content://org.desklink.test.files/gone")) }
+        }
+        FilesProvider.revoked = true
+        try {
+            val recorder = Recorder()
+            assertFalse(runUntilDone(startSend(packet, recorder)))
+            assertEquals("The file no longer exists.", recorder.failures.single().message)
+        } finally {
+            FilesProvider.revoked = false
+        }
+    }
+
+    @Test
+    fun aContentUriFileOfSeveralBlocksGoesAcrossLikeAShareFromTheDownloadsApp() {
+        org.robolectric.Robolectric.setupContentProvider(FilesProvider::class.java, "org.desklink.test.files")
+        for (size in listOf(64, FileV2.BLOCK_BYTES, 2 * FileV2.BLOCK_BYTES, 3 * FileV2.BLOCK_BYTES + 5)) {
+            val bytes = data(size)
+            val file = tmp.newFile("share-$size.bin").apply { writeBytes(bytes) }
+            FilesProvider.files["f$size"] = file
+            val uri = android.net.Uri.parse("content://org.desklink.test.files/f$size")
+            val packet = org.desklink.mobile.helpers.FilesHelper.uriToNetworkPacket(phoneContext, uri, DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST)!!
+            val recorder = Recorder()
+            val before = desk.delivered.size
+            assertTrue("$size bytes", runUntilDone(startSend(packet, recorder)))
+            assertEquals("$size bytes: ${recorder.failures.map { it.message }}", emptyList<Throwable>(), recorder.failures.toList())
+            assertEquals(before + 1, desk.delivered.size)
+            assertArrayEquals(bytes, desk.delivered.last().bytes)
+        }
+    }
+
     @Test
     fun aFileThatIsReadInPlaceIsNeverCopiedFirst() {
         val bytes = data(FileV2.BLOCK_BYTES + 5)

@@ -6,6 +6,7 @@
 
 package org.desklink.mobile.plugins.share;
 
+import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -136,7 +137,8 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                 failedFiles = (totalNumFiles - currentFileNum + 1);
                 uploadNotification.setFailed(getDevice().getContext().getResources()
                         .getQuantityString(R.plurals.send_files_fail_title, failedFiles, getDevice().getName(),
-                                failedFiles, totalNumFiles));
+                                failedFiles, totalNumFiles), failureReason());
+                android.util.Log.w("DeskLink/Files", "upload failed (" + (lastFailure == null ? "no reason" : lastFailure.getClass().getSimpleName()) + ")");
             }
 
             uploadNotification.show();
@@ -156,6 +158,18 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
             networkPacket.set(SharePlugin.KEY_NUMBER_OF_FILES, totalNumFiles);
             networkPacket.set(SharePlugin.KEY_TOTAL_PAYLOAD_SIZE, totalPayloadSize);
         }
+    }
+
+    /** Why the last send failed, in words the person can read; our own sentences, none carries a file name. */
+    private String failureReason() {
+        Throwable failure = lastFailure;
+        Context context = getDevice().getContext();
+        if (failure == null) return context.getString(R.string.send_failed_unknown);
+        String text = failure.getMessage();
+        if (failure instanceof IllegalStateException || failure instanceof IllegalArgumentException) {
+            if (text != null && !text.isEmpty()) return text;
+        }
+        return context.getString(R.string.send_failed_unknown);
     }
 
     /** Why the last send failed, as its callback said. */

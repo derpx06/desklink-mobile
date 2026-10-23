@@ -25,6 +25,9 @@ interface FileSource {
 
     /** A string that can rebuild this source after a restart (a `file:` or `content:` URI), or null. */
     val persistentUri: String? get() = null
+
+    /** Lets go of anything held open for the send (the transfer is over for good). */
+    fun close() = Unit
 }
 
 class PlainFileSource(private val file: File) : FileSource {
@@ -38,7 +41,47 @@ class PlainFileSource(private val file: File) : FileSource {
 class UriFileSource(private val context: android.content.Context, private val uri: Uri) : FileSource {
     private val resolver: ContentResolver get() = context.contentResolver
 
-    override fun stat(): FileSource.Stat? = runCatching {
+    /**
+     * The file opened while the permission to read it was alive. A file shared from another app (Downloads, Photos,
+     * Files) is readable only while the sharing screen's grant lasts, which ends moments after it closes; a descriptor
+     * opened before that keeps working, so the send reads this one, in place, never asking the provider again.
+     */
+    private var held: android.os.ParcelFileDescriptor? = null
+    private var heldStat: FileSource.Stat? = null
+
+    /** Opens the file now, on the caller's thread, while it may still be read. False: left to be opened when it is read. */
+    fun hold(): Boolean {
+        if (uri.scheme == "file" || held != null) return held != null
+        val pfd = runCatching { resolver.openFileDescriptor(uri, "r") }.getOrNull() ?: return false
+        val size = pfd.statSize
+        if (size < 0) {
+            runCatching { pfd.close() } // not a plain file (a pipe): nothing to seek in
+            return false
+        }
+        held = pfd
+        heldStat = FileSource.Stat(size, heldModified(pfd).takeIf { it > 0 } ?: providerStat()?.mtime ?: 0L)
+        return true
+    }
+
+    private fun heldModified(pfd: android.os.ParcelFileDescriptor): Long =
+        runCatching { File("/proc/self/fd/${pfd.fd}").lastModified() }.getOrDefault(0L)
+
+    override fun close() {
+        runCatching { held?.close() }
+        held = null
+    }
+
+    override fun stat(): FileSource.Stat? {
+        val pfd = held
+        if (pfd != null) {
+            // The size of what is open, and its time: the provider is not asked, it may no longer allow it.
+            val size = pfd.statSize
+            return if (size < 0) null else FileSource.Stat(size, heldModified(pfd).takeIf { it > 0 } ?: heldStat?.mtime ?: 0L)
+        }
+        return providerStat()
+    }
+
+    private fun providerStat(): FileSource.Stat? = runCatching {
         if (uri.scheme == "file") return PlainFileSource(File(requireNotNull(uri.path))).stat()
         if (android.provider.DocumentsContract.isDocumentUri(context, uri)) {
             // A document in a picked folder (the Bucket): its provider's own size and modified time.
@@ -61,7 +104,7 @@ class UriFileSource(private val context: android.content.Context, private val ur
     }.getOrNull()
 
     override fun open(offset: Long): InputStream {
-        val descriptor = requireNotNull(resolver.openFileDescriptor(uri, "r")) { "The file cannot be opened" }
+        val descriptor = held?.dup() ?: requireNotNull(resolver.openFileDescriptor(uri, "r")) { "The file cannot be opened" }
         val stream = FileInputStream(descriptor.fileDescriptor)
         // The stream owns the descriptor from here: closing it closes both.
         val owned = object : InputStream() {

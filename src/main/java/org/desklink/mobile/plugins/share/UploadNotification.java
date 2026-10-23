@@ -73,6 +73,14 @@ class UploadNotification {
                 .setOngoing(false);
     }
 
+    /** The failure and, under it, why (a short sentence of ours, never a file name). */
+    public void setFailed(String message, String reason) {
+        setFailed(message);
+        if (reason != null && !reason.isEmpty()) {
+            builder.setContentText(reason).setStyle(new NotificationCompat.BigTextStyle().bigText(reason));
+        }
+    }
+
     public void setFailed(String message) {
         setFinished(message);
         TransferProgress.finish(jobId, message, true);
