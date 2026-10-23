@@ -470,7 +470,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         }
         var sharingInfo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
         // One actions object per computer: a new one every second would make Home recompose even when nothing changed.
-        val actions = androidx.compose.runtime.remember(device.deviceId, computersRequest) { homeActions(device) { sharingInfo = true } }
+        val actions = androidx.compose.runtime.remember(device, computersRequest) { homeActions(device) { sharingInfo = true } }
         HomeScreen(state, actions)
         if (sharingInfo) {
             AlertDialog(
@@ -494,7 +494,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             live = liveTransfer(running),
             records = records,
             revision = revision,
-            actions = androidx.compose.runtime.remember(device.deviceId) { transferActions(device) },
+            actions = androidx.compose.runtime.remember(device) { transferActions(device) },
         )
     }
 
