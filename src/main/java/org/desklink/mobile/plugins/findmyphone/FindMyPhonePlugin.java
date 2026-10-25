@@ -105,6 +105,7 @@ public class FindMyPhonePlugin extends Plugin {
             startPlaying();
             startFlashing();
             showBroadcastNotification();
+            if (silent) scheduleRingLimit();
         }
         return true;
     }
@@ -147,8 +148,22 @@ public class FindMyPhonePlugin extends Plugin {
         }
         // Make sure we are heard even when the phone is silent, restore original volume later
         previousVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+        RingVolume.remember(context, previousVolume);
         audioManager.setStreamVolume(AudioManager.STREAM_ALARM, audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0);
         mediaPlayer.start();
+        scheduleRingLimit();
+    }
+
+    private final android.os.Handler ringLimit = new android.os.Handler(android.os.Looper.getMainLooper());
+
+    /** A ring that nobody stops ends by itself after a minute (sound, light and notification). */
+    private void scheduleRingLimit() {
+        ringLimit.removeCallbacksAndMessages(null);
+        ringLimit.postDelayed(() -> {
+            stopPlaying();
+            stopFlashing();
+            hideNotification();
+        }, RingVolume.RING_LIMIT_MS);
     }
 
     private MediaPlayer preparePlayer() {
@@ -208,6 +223,7 @@ public class FindMyPhonePlugin extends Plugin {
             // The Plugin was destroyed (probably the device disconnected)
             return;
         }
+        ringLimit.removeCallbacksAndMessages(null);
         if (silent) {
             silent = false;
             if (vibrator != null) {
@@ -220,6 +236,7 @@ public class FindMyPhonePlugin extends Plugin {
         if (previousVolume != -1) {
             audioManager.setStreamVolume(AudioManager.STREAM_ALARM, previousVolume, 0);
             previousVolume = -1;
+            RingVolume.forget(context);
         }
         mediaPlayer.stop();
         mediaPlayer.release();
