@@ -72,4 +72,11 @@ class SessionGateTest {
         assertEquals(false, SessionGate.isPassed("desk-1", null))
         SessionGate.clearPassed()
     }
+
+    @Test
+    fun cancellingTheFingerprintStillMeetsThePhoneOnlyCheckWhenItIsOn() {
+        assertEquals(Step.PHONE_CHECK, SessionGate.afterStoredFails(phoneGate = true, anyAuth = true))
+        assertEquals("nothing to check with: the screen opens", Step.OPEN, SessionGate.afterStoredFails(phoneGate = true, anyAuth = false))
+        assertEquals("the person never asked for the check", Step.OPEN, SessionGate.afterStoredFails(phoneGate = false, anyAuth = true))
+    }
 }

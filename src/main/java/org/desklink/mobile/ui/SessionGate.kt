@@ -62,6 +62,9 @@ object SessionGate {
         else -> Step.OPEN
     }
 
+    /** After the remembered password could not be used: the phone-only check when the person turned it on, else the screen. */
+    fun afterStoredFails(phoneGate: Boolean, anyAuth: Boolean): Step = if (phoneGate && anyAuth) Step.PHONE_CHECK else Step.OPEN
+
     /** `iv:ciphertext`, both Base64 (no wrap); null when malformed. Pure, for tests. */
     fun encodeBlob(iv: ByteArray, ciphertext: ByteArray): String =
         Base64.encodeToString(iv, Base64.NO_WRAP) + ":" + Base64.encodeToString(ciphertext, Base64.NO_WRAP)
@@ -112,11 +115,18 @@ object SessionGate {
             onOpen()
         }
         val desk = DeskNames.of(deviceId)
+        fun phoneCheck() = Biometrics.prompt(activity, activity.getString(R.string.gate_title, desk), null, Biometrics.STRONG_OR_CREDENTIAL, null) { result ->
+            if (result is BiometricResult.Succeeded) pass() else onDenied()
+        }
+        // The remembered password could not be used (cancelled, failed, key gone): the phone-only check the person asked
+        // for still stands, so it is asked instead of opening, never skipped.
+        fun withoutStored() = when (afterStoredFails(phoneGate = phoneGateOn(activity), anyAuth = Biometrics.available(activity, Biometrics.STRONG_OR_CREDENTIAL))) {
+            Step.PHONE_CHECK -> phoneCheck()
+            else -> onOpen()
+        }
         when (step) {
             Step.OPEN -> onOpen()
-            Step.PHONE_CHECK -> Biometrics.prompt(activity, activity.getString(R.string.gate_title, desk), null, Biometrics.STRONG_OR_CREDENTIAL, null) { result ->
-                if (result is BiometricResult.Succeeded) pass() else onDenied()
-            }
+            Step.PHONE_CHECK -> phoneCheck()
             Step.UNLOCK_STORED -> {
                 val (iv, ciphertext) = decodeBlob(prefs(activity).getString(deviceId, null))!!
                 val cipher = try {
@@ -126,11 +136,11 @@ object SessionGate {
                     Log.i(TAG, "Session password key invalidated", invalidated)
                     dropKey()
                     prefs(activity).edit { clear() }
-                    onOpen()
+                    withoutStored()
                     return
                 } catch (error: Exception) {
                     Log.w(TAG, "Could not open the remembered session password", error)
-                    onOpen()
+                    withoutStored()
                     return
                 }
                 Biometrics.prompt(
@@ -148,8 +158,9 @@ object SessionGate {
                         app.setSessionPassword(deviceId, password)
                         pass()
                     } else {
-                        // Cancelled: the screen asks for the password if the desk wants it.
-                        onOpen()
+                        // Cancelled: the screen asks for the password if the desk wants it, but a phone-only check that is
+                        // switched on is not skipped by cancelling the fingerprint.
+                        withoutStored()
                     }
                 }
             }
