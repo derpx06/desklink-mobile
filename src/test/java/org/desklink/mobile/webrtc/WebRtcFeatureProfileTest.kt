@@ -163,7 +163,6 @@ class WebRtcFeatureProfileTest {
             DeskLinkProtocol.PACKET_TYPE_BATTERY,
             DeskLinkProtocol.PACKET_TYPE_CLIPBOARD,
             DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT,
-            DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_ALL_UIDS_TIMESTAMPS,
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST_VCARDS_BY_UIDS,
             DeskLinkProtocol.PACKET_TYPE_CONTACTS_RESPONSE_UIDS_TIMESTAMPS,

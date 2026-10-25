@@ -22,8 +22,6 @@ class DeskLinkProtocolTest {
             DeskLinkProtocol.PACKET_TYPE_MPRIS,
             DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST,
-            DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME,
-            DeskLinkProtocol.PACKET_TYPE_CONTACTS_REQUEST,
             DeskLinkProtocol.PACKET_TYPE_TELEPHONY_REQUEST,
         )
 

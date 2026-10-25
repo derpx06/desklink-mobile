@@ -49,10 +49,8 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_NOTIFICATION_ACTION = "desklink.notification.action"
     const val PACKET_TYPE_SCREEN_REQUEST = "desklink.screen.request"
     const val PACKET_TYPE_SCREEN_READY = "desklink.screen.ready"
-    const val PACKET_TYPE_SCREEN_FRAME = "desklink.screen.frame"
     const val PACKET_TYPE_SCREEN_STOP = "desklink.screen.stop"
     const val PACKET_TYPE_SCREEN_ERROR = "desklink.screen.error"
-    const val PACKET_TYPE_CONTACTS_REQUEST = "desklink.contacts.request"
     const val PACKET_TYPE_TELEPHONY_REQUEST = "desklink.telephony.request"
     /** W2: what this side already holds of the peer's snapshots (revs), sent first on every feature-ready. */
     const val PACKET_TYPE_SYNC_HAVE = "desklink.sync.have"

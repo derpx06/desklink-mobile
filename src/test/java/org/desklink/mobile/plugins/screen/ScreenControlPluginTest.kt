@@ -21,8 +21,8 @@ class ScreenControlPluginTest {
             assertTrue("missing supported packet $packetType", packetType in supported)
             assertTrue("missing outgoing packet $packetType", packetType in outgoing)
         }
-        assertTrue(DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME !in supported)
-        assertTrue(DeskLinkProtocol.PACKET_TYPE_SCREEN_FRAME !in outgoing)
+        assertTrue("desklink.screen.frame" !in supported)
+        assertTrue("desklink.screen.frame" !in outgoing)
     }
 
     @Test
