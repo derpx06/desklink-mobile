@@ -32,6 +32,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -429,6 +433,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             terminalsAttention = id in attention,
             settingsAttention = settingsWaiting,
         )
+        FirstShareDialog(device)
         // Seen: opening the tab clears its dot.
         LaunchedEffect(nav.selected, id) { if (nav.selected == AppTab.TERMINALS) TerminalAttentionBadge.clear(id) }
         TabsShell(nav, badges, onQuickAction = { quickAction(it, device) }) { tab ->
@@ -446,6 +451,48 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 AppTab.SETTINGS -> SettingsContent(device)
             }
         }
+    }
+
+    /**
+     * After pairing, once per computer: what DeskLink may share with it. Both start off; nothing is shared that the person did
+     * not tick. (A computer paired before this question keeps what it had and is never asked.)
+     */
+    @Composable
+    private fun FirstShareDialog(device: Device) {
+        val id = device.deviceId
+        val needed by androidx.compose.runtime.produceState(false, id) {
+            value = kotlinx.coroutines.withContext(Dispatchers.IO) { device.isPaired && org.desklink.mobile.helpers.FirstShare.needed(this@MainActivity, id) }
+        }
+        var gone by androidx.compose.runtime.remember(id) { mutableStateOf(false) }
+        if (!needed || gone) return
+        var clipboard by androidx.compose.runtime.remember { mutableStateOf(false) }
+        var notifications by androidx.compose.runtime.remember { mutableStateOf(false) }
+        fun finish(apply: Boolean) {
+            gone = true
+            CoroutineScope(Dispatchers.IO).launch { org.desklink.mobile.helpers.FirstShare.markDone(this@MainActivity, id) }
+            if (apply && clipboard) setPluginEnabled(device, HomeModel.clipboardKey, true)
+            if (apply && notifications) setPluginEnabled(device, Plugin.getPluginKey(NotificationsPlugin::class.java), true)
+        }
+        AlertDialog(
+            onDismissRequest = { finish(apply = false) },
+            title = { Text(stringResource(R.string.first_share_title, device.name)) },
+            text = {
+                androidx.compose.foundation.layout.Column {
+                    Text(stringResource(R.string.first_share_body, device.name))
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().clickable { clipboard = !clipboard }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(checked = clipboard, onCheckedChange = null)
+                        Text(stringResource(R.string.first_share_clipboard), Modifier.padding(start = 8.dp))
+                    }
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().clickable { notifications = !notifications }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Checkbox(checked = notifications, onCheckedChange = null)
+                        Text(stringResource(R.string.first_share_notifications, device.name), Modifier.padding(start = 8.dp))
+                    }
+                    Text(stringResource(R.string.first_share_later), Modifier.padding(top = 8.dp), style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = { TextButton(onClick = { finish(apply = true) }) { Text(stringResource(R.string.first_share_done)) } },
+        )
     }
 
     /** A long-press on a tab. */

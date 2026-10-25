@@ -761,4 +761,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="accessibility_disclosure_deny">No thanks</string>
     <string name="notes_saved_shared_cut">Saved, but only the first part fits: a note is limited to 20 KB</string>
     <string name="snippets_full">500 snippets are pinned: unpin one first</string>
+    <string name="first_share_title">What should DeskLink share with %1$s?</string>
+    <string name="first_share_body">Nothing is shared until you say so. You can change both in Settings at any time.</string>
+    <string name="first_share_clipboard">Clipboard: what you copy on either device can be pasted on the other</string>
+    <string name="first_share_notifications">Notifications: this phone\'s notifications (not secret ones) appear on %1$s, and you can reply from there</string>
+    <string name="first_share_later">Files and links are always sent only when you choose to send them.</string>
+    <string name="first_share_done">Done</string>
 </resources>

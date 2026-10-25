@@ -97,20 +97,23 @@ object RemovedFeatures {
         val marker = app.getSharedPreferences(MARKER_PREFS, Context.MODE_PRIVATE)
         runCatching { runSimplification(app, marker) }
         if (marker.getBoolean(MARKER_KEY, false)) return
-        runCatching { deleteFiles(app.filesDir) }
-        runCatching { cancelStaleAlarm(app) }
-        runCatching {
-            PREFERENCE_FILES.forEach { name ->
-                app.getSharedPreferences(name, Context.MODE_PRIVATE).edit(commit = true) { clear() }
-                app.deleteSharedPreferences(name)
-            }
-        }
-        runCatching {
-            val prefs = PreferenceManager.getDefaultSharedPreferences(app)
-            val stale = staleKeys(prefs.all.keys)
-            if (stale.isNotEmpty()) prefs.edit { stale.forEach(::remove) }
-        }
-        marker.edit { putBoolean(MARKER_KEY, true) }
+        // The marker is set only when every step worked, so a step that failed is tried again at the next start.
+        val steps = listOf(
+            runCatching { deleteFiles(app.filesDir) },
+            runCatching { cancelStaleAlarm(app) },
+            runCatching {
+                PREFERENCE_FILES.forEach { name ->
+                    app.getSharedPreferences(name, Context.MODE_PRIVATE).edit(commit = true) { clear() }
+                    app.deleteSharedPreferences(name)
+                }
+            },
+            runCatching {
+                val prefs = PreferenceManager.getDefaultSharedPreferences(app)
+                val stale = staleKeys(prefs.all.keys)
+                if (stale.isNotEmpty()) prefs.edit { stale.forEach(::remove) }
+            },
+        )
+        if (steps.all { it.isSuccess }) marker.edit { putBoolean(MARKER_KEY, true) }
     }
 
     private fun runSimplification(app: Context, marker: SharedPreferences) {

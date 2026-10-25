@@ -104,6 +104,9 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     }
     @Volatile private var resyncWhenReady = false
 
+    /** Off until the person says yes on the first-run question (an existing pairing keeps what it had). */
+    override val isEnabledByDefault: Boolean = false
+
     override fun onCreate(): Boolean {
         appDatabase = AppDatabase.getInstance(context)
         // The per-app tables into memory, off the main thread: the listener asks about every notification there.

@@ -165,7 +165,10 @@ class DeskLinkApplication : Application() {
             org.desklink.mobile.plugins.folders.BucketEngine.start(this)
         }
         // 1.3 removed several features: what they stored is deleted once, off the main thread.
-        org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.helpers.RemovedFeatures.runOnce(this) }
+        org.desklink.mobile.helpers.ThreadHelper.execute {
+            org.desklink.mobile.helpers.RemovedFeatures.runOnce(this)
+            runCatching { org.desklink.mobile.helpers.PrivacyDefaults.grandfather(this) }
+        }
         // Received files that could not be saved are kept a week; leftovers of a crash a day. Not only when a transfer starts.
         org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { org.desklink.mobile.plugins.share.UnpublishedFiles.prune(this) } }
 

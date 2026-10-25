@@ -20,6 +20,9 @@ import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 @LoadablePlugin
 class ClipboardPlugin : Plugin() {
     private val maxClipboardBytes = 1024 * 1024
+
+    /** Off until the person says yes on the first-run question (an existing pairing keeps what it had). */
+    override val isEnabledByDefault: Boolean = false
     override val displayName: String
         get() = context.resources.getString(R.string.pref_plugin_clipboard)
 
