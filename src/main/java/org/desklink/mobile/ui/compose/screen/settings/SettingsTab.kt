@@ -194,7 +194,7 @@ private fun SettingsGroupPage(page: SettingsPage, desk: DeskSettings?, actions: 
 
 /** A desk-owned switch: asks the desk, shows "Saving…" until its report, "Waiting for <desk>…" without the link. */
 @Composable
-private fun DeskSwitch(desk: DeskSettings, actions: SettingsActions, key: String, title: String, icon: Int, summary: String, reported: Boolean) {
+private fun DeskSwitch(desk: DeskSettings, actions: SettingsActions, key: String, title: String, icon: Int, summary: String, reported: Boolean, notAllowedHere: Boolean = false) {
     val remote = desk.remote
     val live = desk.ready && remote != null
     val pending = key in desk.pending
@@ -204,11 +204,12 @@ private fun DeskSwitch(desk: DeskSettings, actions: SettingsActions, key: String
         icon = icon,
         subtitle = when {
             !live -> stringResource(R.string.settings_waiting_for, desk.name)
+            notAllowedHere -> stringResource(R.string.settings_turn_on_at, desk.name)
             pending -> stringResource(R.string.settings_saving)
             else -> summary
         },
         checked = on,
-        enabled = live && !pending,
+        enabled = live && !pending && !notAllowedHere,
         onClick = { actions.onDeskSetting(key, !on) },
     )
 }
@@ -544,7 +545,7 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
     }
     SectionLabel(desk.name)
     RowGroup {
-        DeskSwitch(desk, actions, DeskSettingsPlugin.KEEP_AWAKE, stringResource(R.string.settings_keep_awake, desk.name), R.drawable.sym_coffee, stringResource(R.string.settings_keep_awake_summary), desk.remote?.keepAwake == true)
+        DeskSwitch(desk, actions, DeskSettingsPlugin.KEEP_AWAKE, stringResource(R.string.settings_keep_awake, desk.name), R.drawable.sym_coffee, stringResource(R.string.settings_keep_awake_summary), desk.remote?.keepAwake == true, notAllowedHere = !DeskSettingsPlugin.keepAwakeUsable(desk.remote))
     }
     if (choosingSpeed) {
         ChoiceDialog(

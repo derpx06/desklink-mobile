@@ -812,4 +812,5 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="one">%1$d file could not be read any more. Share it again.</item>
         <item quantity="other">%1$d files could not be read any more. Share them again.</item>
     </plurals>
+    <string name="settings_turn_on_at">Turn on at %1$s</string>
 </resources>

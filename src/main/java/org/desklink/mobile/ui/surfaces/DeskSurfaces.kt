@@ -42,6 +42,8 @@ data class DeskSnapshot(
     /** The desk's own keepAwake (shown as asked while pending); null before its first report. */
     val keepAwake: Boolean?,
     val keepAwakePending: Boolean,
+    /** The computer lets this phone keep it awake (W10); false until it says so. */
+    val keepAwakeAllowed: Boolean = false,
     val terminals: Int,
     /** A terminal is open here right now (the coral dot). */
     val terminalAttached: Boolean,
@@ -65,13 +67,14 @@ object DeskSurfaceRules {
      * would otherwise queue silently behind a tile that looks like it worked). Keep awake shows the
      * desk's own value (its single writer) and is unavailable until the desk has reported it.
      */
-    fun tile(kind: TileKind, desk: DeskSnapshot?, notConnected: String, saving: String): TileUi {
+    fun tile(kind: TileKind, desk: DeskSnapshot?, notConnected: String, saving: String, turnOnAtDesk: String = ""): TileUi {
         if (desk == null) return TileUi(Tile.STATE_UNAVAILABLE, notConnected)
         if (!desk.ready) return TileUi(Tile.STATE_UNAVAILABLE, notConnected)
         return when (kind) {
             TileKind.KEEP_AWAKE -> when (val on = desk.keepAwake) {
                 null -> TileUi(Tile.STATE_UNAVAILABLE, desk.name)
-                else -> TileUi(if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE, if (desk.keepAwakePending) saving else desk.name)
+                // The computer has not allowed it: shown as it really is, disabled, with where to turn it on.
+                else -> if (!desk.keepAwakeAllowed) TileUi(Tile.STATE_UNAVAILABLE, turnOnAtDesk.ifEmpty { desk.name }) else TileUi(if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE, if (desk.keepAwakePending) saving else desk.name)
             }
             else -> TileUi(Tile.STATE_INACTIVE, desk.name)
         }
@@ -137,6 +140,7 @@ object DeskSurfaces {
             ready = ready,
             keepAwake = settings?.let { DeskSettingsPlugin.shown(DeskSettingsPlugin.KEEP_AWAKE, it.keepAwake, pending) },
             keepAwakePending = DeskSettingsPlugin.KEEP_AWAKE in pending,
+            keepAwakeAllowed = DeskSettingsPlugin.keepAwakeUsable(settings),
             terminals = sessions.size,
             terminalAttached = sessions.any { it.attached },
             unseenFinished = prefs.getInt("finished_${device.deviceId}", 0),
@@ -220,6 +224,7 @@ object DeskSurfaces {
             Action.KEEP_AWAKE -> {
                 val plugin = device.getPlugin(DeskSettingsPlugin::class.java)
                 val settings = plugin?.settings ?: return tell(context.getString(R.string.settings_waiting_for, device.name))
+                if (!DeskSettingsPlugin.keepAwakeUsable(settings)) return tell(context.getString(R.string.settings_turn_on_at, device.name))
                 val on = DeskSettingsPlugin.shown(DeskSettingsPlugin.KEEP_AWAKE, settings.keepAwake, plugin.pending)
                 plugin.set(DeskSettingsPlugin.KEEP_AWAKE, !on)
             }

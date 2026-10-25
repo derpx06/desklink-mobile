@@ -29,6 +29,8 @@ data class DeskSettingsState(
     val unlockNearby: Boolean,
     /** Whether a session password is set at the desk (S4); null from a desk that does not say. */
     val sessionPasswordSet: Boolean? = null,
+    /** W10: whether the computer lets this phone keep it awake (its own per-phone switch, off by default); null from a desk that does not say. */
+    val keepAwakeAllowed: Boolean? = null,
 )
 
 /**
@@ -110,8 +112,12 @@ class DeskSettingsPlugin : Plugin() {
                 commandAlerts = np.getBoolean(COMMAND_ALERTS),
                 unlockNearby = np.getBoolean("unlockNearby"),
                 sessionPasswordSet = if (np.has("sessionPasswordSet")) np.getBoolean("sessionPasswordSet") else null,
+                keepAwakeAllowed = if (np.has("keepAwakeAllowed")) np.getBoolean("keepAwakeAllowed") else null,
             )
         }
+
+        /** The phone may ask the desk to stay awake only when the desk says it is allowed (false and absent both mean no). */
+        fun keepAwakeUsable(state: DeskSettingsState?): Boolean = state?.keepAwakeAllowed == true
 
         /** What a switch shows: the asked value while pending, else the desk's. */
         fun shown(key: String, reported: Boolean, pending: Map<String, Boolean>): Boolean = pending[key] ?: reported

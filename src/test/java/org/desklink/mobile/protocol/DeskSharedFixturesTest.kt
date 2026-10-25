@@ -20,6 +20,15 @@ class DeskSharedFixturesTest {
     private fun cases(f: JSONObject): List<JSONObject> = f.getJSONArray("cases").let { a -> (0 until a.length()).map { a.getJSONObject(it) } }
 
     @Test
+    fun caseClashWinnersAgreeWithTheDesksOwnVectors() {
+        val f = fixture("case_clash_desk")
+        val names = f.getJSONArray("names").let { a -> (0 until a.length()).map { a.getString(it) } }
+        val winners = f.getJSONArray("winners").let { a -> (0 until a.length()).map { a.getString(it) } }
+        val losers = org.desklink.mobile.plugins.folders.FolderSync.caseClashes(names)
+        assertEquals(winners, names.filter { !org.desklink.mobile.plugins.folders.FolderSync.isLeftOut(it, losers) })
+    }
+
+    @Test
     fun glideBodiesTheDeskReadsAreWhatThePhoneSends() {
         val ours = mapOf(
             "allowed on" to InputDevicesReceiverPlugin.statePacket(true, false),

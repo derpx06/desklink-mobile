@@ -9,9 +9,9 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DeskSurfaceRulesTest {
-    private fun desk(ready: Boolean = true, keepAwake: Boolean? = false, pending: Boolean = false) = DeskSnapshot(
+    private fun desk(ready: Boolean = true, keepAwake: Boolean? = false, pending: Boolean = false, allowed: Boolean = true) = DeskSnapshot(
         id = "d", name = "arch-desk", link = DeskSurfaceRules.link(ready, reachable = true), ready = ready,
-        keepAwake = keepAwake, keepAwakePending = pending, terminals = 0, terminalAttached = false,
+        keepAwake = keepAwake, keepAwakePending = pending, keepAwakeAllowed = allowed, terminals = 0, terminalAttached = false,
         unseenFinished = 0, mediaTitle = null, mediaPlaying = false, lastSeen = null,
     )
 
@@ -35,6 +35,15 @@ class DeskSurfaceRulesTest {
         // No report yet, or stale.
         assertEquals(Tile.STATE_UNAVAILABLE, tile(TileKind.KEEP_AWAKE, desk(keepAwake = null)).state)
         assertEquals(Tile.STATE_UNAVAILABLE, tile(TileKind.KEEP_AWAKE, desk(ready = false, keepAwake = true)).state)
+    }
+
+    @Test
+    fun keepAwakeIsDisabledWithWhereToTurnItOnWhileTheComputerHasNotAllowedIt() {
+        val ui = DeskSurfaceRules.tile(TileKind.KEEP_AWAKE, desk(keepAwake = false, allowed = false), "Not connected", "Saving…", "Turn on at arch-desk")
+        assertEquals(TileUi(Tile.STATE_UNAVAILABLE, "Turn on at arch-desk"), ui)
+        // Its real state is not hidden by this: allowed again shows the desk's own value.
+        assertEquals(Tile.STATE_ACTIVE, tile(TileKind.KEEP_AWAKE, desk(keepAwake = true, allowed = true)).state)
+        assertEquals(false, org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin.keepAwakeUsable(null))
     }
 
     @Test

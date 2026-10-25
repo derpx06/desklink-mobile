@@ -26,7 +26,7 @@ abstract class DeskTileService(private val kind: TileKind) : TileService() {
         fun render(service: TileService, kind: TileKind) {
             val tile = service.qsTile ?: return
             val desk = DeskSurfaces.currentDesk(service)?.let { DeskSurfaces.snapshot(service, it) }
-            val ui = DeskSurfaceRules.tile(kind, desk, service.getString(R.string.surfaces_not_connected), service.getString(R.string.settings_saving))
+            val ui = DeskSurfaceRules.tile(kind, desk, service.getString(R.string.surfaces_not_connected), service.getString(R.string.settings_saving), desk?.let { service.getString(R.string.settings_turn_on_at, it.name) }.orEmpty())
             tile.state = ui.state
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = ui.subtitle
             tile.contentDescription = "${tile.label}, ${ui.subtitle}"
