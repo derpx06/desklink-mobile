@@ -10,7 +10,7 @@ import org.json.JSONArray
  * its file is sent, handed to the transfer manager, or cannot be read any more.
  */
 object ShareQueue {
-    private const val PREFS = "share_queue"
+    private const val PREFS = org.desklink.mobile.helpers.PerPeerState.SHARE_QUEUE
     const val MAX_PER_DEVICE = 100
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

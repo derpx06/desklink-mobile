@@ -125,7 +125,7 @@ object DeskSurfaces {
     fun snapshot(context: Context, device: Device): DeskSnapshot {
         val ready = device.hasActiveWebRtcFeatureTransport
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (ready) prefs.edit { putLong("seen_${device.deviceId}", System.currentTimeMillis()) }
+        if (ready) prefs.edit { putLong(org.desklink.mobile.helpers.PerPeerState.seenKey(device.deviceId), System.currentTimeMillis()) }
         val settingsPlugin = device.getPlugin(DeskSettingsPlugin::class.java)
         val settings = settingsPlugin?.settings?.takeIf { ready }
         val pending = settingsPlugin?.pending.orEmpty()
@@ -143,24 +143,24 @@ object DeskSurfaces {
             keepAwakeAllowed = DeskSettingsPlugin.keepAwakeUsable(settings),
             terminals = sessions.size,
             terminalAttached = sessions.any { it.attached },
-            unseenFinished = prefs.getInt("finished_${device.deviceId}", 0),
+            unseenFinished = prefs.getInt(org.desklink.mobile.helpers.PerPeerState.finishedKey(device.deviceId), 0),
             mediaTitle = player?.title?.takeIf(String::isNotBlank),
             mediaPlaying = player != null && MediaControl.shownPlaying(player.isPlaying, mpris.pendingPlaying, mpris.pendingSince, now),
-            lastSeen = prefs.getLong("seen_${device.deviceId}", 0).takeIf { it > 0 },
+            lastSeen = prefs.getLong(org.desklink.mobile.helpers.PerPeerState.seenKey(device.deviceId), 0).takeIf { it > 0 },
         )
     }
 
     /** A "finished" alert was posted: the widget badges it until Terminals is opened. */
     fun noteFinished(context: Context, deviceId: String) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.edit { putInt("finished_$deviceId", prefs.getInt("finished_$deviceId", 0) + 1) }
+        prefs.edit { putInt(org.desklink.mobile.helpers.PerPeerState.finishedKey(deviceId), prefs.getInt(org.desklink.mobile.helpers.PerPeerState.finishedKey(deviceId), 0) + 1) }
         refresh(context)
     }
 
     fun clearFinished(context: Context, deviceId: String) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (prefs.getInt("finished_$deviceId", 0) == 0) return
-        prefs.edit { remove("finished_$deviceId") }
+        if (prefs.getInt(org.desklink.mobile.helpers.PerPeerState.finishedKey(deviceId), 0) == 0) return
+        prefs.edit { remove(org.desklink.mobile.helpers.PerPeerState.finishedKey(deviceId)) }
         refresh(context)
     }
 

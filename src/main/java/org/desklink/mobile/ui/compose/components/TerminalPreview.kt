@@ -70,7 +70,7 @@ data class SessionPreview(
 
 object SessionPreviews {
     /** Where the terminal screen keeps the names people give sessions (see TerminalActivity). */
-    private const val LABEL_PREFS = "desklink_terminal_labels"
+    private const val LABEL_PREFS = org.desklink.mobile.helpers.PerPeerState.LABELS
 
     /**
      * The sessions on [deviceId], read without side effects: only screens this phone already has
@@ -89,7 +89,7 @@ object SessionPreviews {
             }.orEmpty()
             SessionPreview(
                 id = session.id,
-                name = labels.getString("$deviceId/${session.id}", null)
+                name = labels.getString(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, session.id), null)
                     ?: agentName(context, session.title)
                     ?: session.title.ifBlank { session.id.take(8) },
                 badge = badgeOf(session.title),

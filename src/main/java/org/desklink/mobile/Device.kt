@@ -396,6 +396,8 @@ class Device : PacketReceiver {
                     }
                     notifyPluginsOfDeviceUnpaired(context, deviceInfo.id)
                     reloadPluginsFromSettings()
+                    // And again once everything is closed: a writer that was still running when the first sweep ran leaves nothing.
+                    org.desklink.mobile.helpers.PeerState.forget(context, deviceInfo.id)
                 }
 
                 pairingCallbacks.forEach { it.unpaired(this@Device) }

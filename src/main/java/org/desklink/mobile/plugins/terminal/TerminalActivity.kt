@@ -315,7 +315,7 @@ class TerminalActivity : AppCompatActivity() {
         val trimmed = label.trim().take(60)
         if (trimmed.isEmpty()) labels.remove(id) else labels[id] = trimmed
         getSharedPreferences(LABEL_PREFS, MODE_PRIVATE).edit {
-            if (trimmed.isEmpty()) remove("$deviceId/$id") else putString("$deviceId/$id", trimmed)
+            if (trimmed.isEmpty()) remove(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, id)) else putString(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, id), trimmed)
         }
     }
 
@@ -1367,7 +1367,7 @@ class TerminalActivity : AppCompatActivity() {
         const val EXTRA_NEW = "newTerminal"
 
         private const val STATE_OPEN_ID = "openTerminalId"
-        private const val LABEL_PREFS = "desklink_terminal_labels"
+        private const val LABEL_PREFS = org.desklink.mobile.helpers.PerPeerState.LABELS
         private const val KEY_FULLSCREEN = "/fullscreen"
         private const val DEFAULT_ROWS = 24
         private const val DEFAULT_COLS = 80
