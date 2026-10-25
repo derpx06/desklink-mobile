@@ -8,8 +8,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
 
 /** Serializes device lifecycle work that must never run from an Android UI callback. */
 internal class DeviceUnpairCoordinator(
@@ -18,7 +19,28 @@ internal class DeviceUnpairCoordinator(
         android.util.Log.e("DeskLink/DeviceLifecycle", operation, error)
     },
 ) {
-    private val serial = Mutex()
+    /** One FIFO channel and one consumer: work runs in exactly the order it was queued (launching a coroutine per item did not). */
+    private class Item(val operation: String, val work: suspend () -> Unit, val done: CompletableJob)
+
+    private val queue = Channel<Item>(Channel.UNLIMITED)
+
+    init {
+        scope.launch {
+            for (item in queue) {
+                if (item.done.isCancelled) continue
+                try {
+                    item.work()
+                } catch (error: CancellationException) {
+                    item.done.cancel()
+                    if (!scope.isActive) throw error
+                    continue
+                } catch (error: Throwable) {
+                    onFailure(item.operation, error)
+                }
+                item.done.complete()
+            }
+        }
+    }
     private val stateLock = Any()
     private var lastUnpairGeneration: Long? = null
 
@@ -33,19 +55,14 @@ internal class DeviceUnpairCoordinator(
     }
 
     /** Queues lifecycle work behind any active unpair cleanup. */
-    fun enqueue(operation: String, work: suspend () -> Unit): Job = scope.launch {
-        serial.withLock {
-            try {
-                work()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                onFailure(operation, error)
-            }
-        }
+    fun enqueue(operation: String, work: suspend () -> Unit): Job {
+        val done = Job()
+        if (queue.trySend(Item(operation, work, done)).isFailure) done.cancel()
+        return done
     }
 
     fun close() {
+        queue.close()
         scope.cancel()
     }
 }

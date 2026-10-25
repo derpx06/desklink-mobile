@@ -97,6 +97,17 @@ class DeviceUnpairCoordinatorTest {
         coordinator.close()
     }
 
+    @Test
+    fun workRunsInExactlyTheOrderItWasQueued() {
+        val coordinator = DeviceUnpairCoordinator(CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        val seen = java.util.concurrent.CopyOnWriteArrayList<Int>()
+        val done = CountDownLatch(500)
+        repeat(500) { i -> coordinator.enqueue("step $i") { seen += i; done.countDown() } }
+        assertTrue(done.await(AWAIT_SECONDS, TimeUnit.SECONDS))
+        assertEquals((0 until 500).toList(), seen.toList())
+        coordinator.close()
+    }
+
     private companion object {
         /** Generous: the pool may need a moment to start on a loaded machine. */
         const val AWAIT_SECONDS = 20L
