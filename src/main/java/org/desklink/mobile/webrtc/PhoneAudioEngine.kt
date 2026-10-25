@@ -66,6 +66,7 @@ object PhoneAudioEngine {
     fun usePhoneSound(mediaProjection: MediaProjection) {
         releaseCapture()
         readErrorLogged = false
+        captureFailed = false
         projection = mediaProjection
         source = Source.SYSTEM
         module?.setAudioRecordEnabled(false)
@@ -110,6 +111,9 @@ object PhoneAudioEngine {
     }
 
     @Volatile private var readErrorLogged = false
+
+    /** The capture could not be opened (a stopped projection): said once, not tried again for every 10 ms buffer. */
+    @Volatile private var captureFailed = false
     private var nextSlotNs = 0L
 
     /** Sleeps until this buffer's slot has passed, so filled buffers go out in real time. */
@@ -130,6 +134,7 @@ object PhoneAudioEngine {
     @Synchronized
     private fun openCapture(channels: Int, sampleRate: Int): AudioRecord? {
         capture?.let { return it }
+        if (captureFailed) return null
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         val mediaProjection = projection ?: return null
         return runCatching {
@@ -152,7 +157,10 @@ object PhoneAudioEngine {
                 .setBufferSizeInBytes(maxOf(AudioRecord.getMinBufferSize(sampleRate, mask, AudioFormat.ENCODING_PCM_16BIT), sampleRate / 10 * 2 * channels))
                 .build()
                 .also { it.startRecording() }
-        }.onFailure { Log.w(TAG, "Phone sound capture did not start", it) }.getOrNull()?.also { capture = it }
+        }.onFailure {
+            captureFailed = true
+            Log.w(TAG, "Phone sound capture did not start (${it.javaClass.simpleName}); sending silence")
+        }.getOrNull()?.also { capture = it }
     }
 
     @Synchronized

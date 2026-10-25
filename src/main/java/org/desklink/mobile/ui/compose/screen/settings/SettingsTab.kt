@@ -479,6 +479,16 @@ private fun SoundGroup(desk: DeskSettings?, actions: SettingsActions) {
             onClick = { actions.onDeskMayPlay(!desk.deskMayPlay) },
         )
         if (desk.deskSoundOn || desk.deskMayPlay) DeskSoundVolume(desk.deskSoundVolume, actions.onDeskSoundVolume)
+        // Allowed once with "remember": turned off here, the computer has to ask again.
+        if (desk.micConsent) {
+            GroupRow(
+                stringResource(R.string.settings_mic_consent, desk.name),
+                icon = R.drawable.sym_mic,
+                subtitle = stringResource(R.string.settings_mic_consent_summary, desk.name),
+                checked = true,
+                onClick = { actions.onMicConsent(false) },
+            )
+        }
         GroupRow(
             stringResource(R.string.settings_phone_media, desk.name),
             icon = R.drawable.sym_music_note,

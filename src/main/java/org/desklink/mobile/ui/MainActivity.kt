@@ -1007,6 +1007,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 deskSoundOn = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this, it.deviceId),
                 deskSoundVolume = org.desklink.mobile.plugins.audio.PhoneAudio.volume(this, it.deviceId),
                 deskMayPlay = org.desklink.mobile.plugins.audio.PhoneAudio.deskMayPlay(this, it.deviceId),
+                micConsent = org.desklink.mobile.plugins.audio.PhoneAudio.consented(this, it.deviceId),
                 contactsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.contacts.ContactsPlugin::class.java)),
                 contactsReadable = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED,
                 accessibilityOn = org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance != null,
@@ -1058,6 +1059,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) requestMissing(listOf(Manifest.permission.POST_NOTIFICATIONS))
                 },
                 onDeskSound = { on -> device?.let { setDeskSound(it.deviceId, on) } },
+                onMicConsent = { on ->
+                    device?.let { d ->
+                        if (!on) org.desklink.mobile.plugins.audio.PhoneAudio.forgetConsent(this, d.deviceId)
+                        tick++
+                    }
+                },
                 onDeskSoundVolume = { percent ->
                     device?.let {
                         org.desklink.mobile.plugins.audio.PhoneAudio.setVolume(this, it.deviceId, percent)

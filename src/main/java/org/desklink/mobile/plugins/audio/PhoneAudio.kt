@@ -83,6 +83,9 @@ object PhoneAudio {
      */
     fun busyWith(sendingTo: String?, requester: String): Boolean = sendingTo != null && sendingTo != requester
 
+    /** The one audio module may be put down by the computer it is feeding (or by anyone when it feeds nobody), never by another's session ending. */
+    fun mayReset(feeding: String?, deviceId: String): Boolean = feeding == null || feeding == deviceId
+
     private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context)
 
     /** "Play <desk>'s sound here": asked again on every link while on. Off by default. */
@@ -104,6 +107,9 @@ object PhoneAudio {
     fun consented(context: Context, deviceId: String) = prefs(context).getBoolean(consentKey(deviceId), false)
 
     fun rememberConsent(context: Context, deviceId: String) = prefs(context).edit { putBoolean(consentKey(deviceId), true) }
+
+    /** The person takes the remembered consent back: the next request from this computer asks again. */
+    fun forgetConsent(context: Context, deviceId: String) = prefs(context).edit { remove(consentKey(deviceId)) }
 
     fun hasMicPermission(context: Context) =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED

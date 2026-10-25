@@ -155,6 +155,8 @@ data class DeskSettings(
     val deskSoundVolume: Int = 100,
     /** F1: the desk may start its sound here unasked (on by default). */
     val deskMayPlay: Boolean = true,
+    /** The microphone (or sound) consent given to this computer is remembered: it may start them without asking. */
+    val micConsent: Boolean = false,
     /** F5: "Share contacts with <desk>" (phone-owned, off by default), and whether Android lets DeskLink read them. */
     val contactsOn: Boolean = false,
     val contactsReadable: Boolean = true,
@@ -176,6 +178,7 @@ class SettingsActions(
     val onDeskSound: (Boolean) -> Unit = {},
     val onDeskSoundVolume: (Int) -> Unit = {},
     val onDeskMayPlay: (Boolean) -> Unit = {},
+    val onMicConsent: (Boolean) -> Unit = {},
     val onContacts: (Boolean) -> Unit = {},
     val onPairAnother: () -> Unit = {},
     val onSendClipboard: () -> Unit = {},

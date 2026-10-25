@@ -375,6 +375,7 @@ class WebRtcSessionCoordinator(
     fun stopPhoneScreenCapture() {
         synchronized(lock) {
             unwatchDisplay()
+            audioEndsWithShareLocked()
             transport?.stopScreenCapture()
         }
     }
@@ -1151,7 +1152,7 @@ class WebRtcSessionCoordinator(
 
             override fun onScreenCaptureStopped(reason: String) {
                 device.getPlugin(ScreenControlPlugin::class.java)?.onPhoneCaptureStopped(reason)
-                synchronized(lock) { unwatchDisplay() }
+                synchronized(lock) { unwatchDisplay(); audioEndsWithShareLocked() }
                 // The projection token is no longer usable. End only this
                 // foreground capture service; the authenticated WebRTC peer
                 // and pairing remain available for an explicit resume.
@@ -1648,6 +1649,8 @@ class WebRtcSessionCoordinator(
             if (session.source == "system") PhoneAudioEngine.usePhoneSound(projection!!) else PhoneAudioEngine.useMicrophone()
         }
         audioSessions.ready(session.remoteSessionId)
+        // Sound taken through the screen share's own projection ends with the share (it cannot outlive it).
+        audioOnScreenProjection = session.source == "system" && projection != null && projection === active.screenProjection()
         org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo = device.deviceId
         org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource = session.source
         sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_READY, session)
@@ -1684,12 +1687,23 @@ class WebRtcSessionCoordinator(
         sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = reason)
     }
 
+    /** The phone's sound is going through the running screen share's projection. */
+    private var audioOnScreenProjection = false
+
+    /** The screen share ended (stopped, revoked, failed): sound that rode on its projection ends with it, and the computer is told. */
+    private fun audioEndsWithShareLocked() {
+        if (!audioOnScreenProjection) return
+        audioOnScreenProjection = false
+        audioSessions.sending?.let { stopSendingLocked(it, "screen-share-ended", notifyPeer = true) }
+    }
+
     private fun stopSendingLocked(session: org.desklink.mobile.plugins.audio.AudioSessions.Session, reason: String, notifyPeer: Boolean) {
+        audioOnScreenProjection = false
         audioSessions.end(session.remoteSessionId)
         transport?.setAudioRecording(false)
         // The audio module is the process's one: only the computer it is feeding may put it down.
         val feeding = org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo
-        if (feeding == null || feeding == device.deviceId) PhoneAudioEngine.reset()
+        if (org.desklink.mobile.plugins.audio.PhoneAudio.mayReset(feeding, device.deviceId)) PhoneAudioEngine.reset()
         if (org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo == device.deviceId) {
             org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo = null
             org.desklink.mobile.plugins.audio.PhoneAudio.sendingSource = null

@@ -1001,7 +1001,8 @@ class WebRtcTransport(
         stopScreenCapture()
         pathExecutor.shutdownNow()
         inboundStatsTimer?.cancel()
-        PhoneAudioEngine.reset()
+        // The audio module is the process's one: this peer closing must not silence another computer's live session.
+        if (org.desklink.mobile.plugins.audio.PhoneAudio.mayReset(org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo, wireBinding.peerDeviceId)) PhoneAudioEngine.reset()
         videoTrack.dispose()
         videoSource.dispose()
         audioTrack.dispose()
