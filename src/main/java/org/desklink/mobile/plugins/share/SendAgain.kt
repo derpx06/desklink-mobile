@@ -48,6 +48,17 @@ object SendAgain {
         TransferHistory.changed()
     }
 
+    /** One notification for any number of files that could not be read (the card for each is already in the list). */
+    @JvmStatic
+    fun announce(context: Context, device: Device, text: String) {
+        runCatching {
+            val note = UploadNotification(device, text.hashCode().toLong() and 0xffffffffL)
+            note.setFailed(text)
+            note.show()
+        }
+        TransferHistory.changed()
+    }
+
     /** The computer was unpaired: what was waiting to be sent to it is gone. */
     @JvmStatic
     @Synchronized

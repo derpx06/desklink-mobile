@@ -35,9 +35,25 @@ object ShareQueue {
     @Synchronized
     fun remove(context: Context, deviceId: String, uri: String) = save(context, deviceId, pending(context, deviceId) - uri)
 
+    /**
+     * A "link not ready" attempt for [deviceId]: how many in a row now. At [ShareFailure.MAX_NOT_READY_ATTEMPTS] the entries are
+     * dropped and the caller offers "Send again" once (returns that count).
+     */
     @JvmStatic
     @Synchronized
-    fun forgetDevice(context: Context, deviceId: String) = prefs(context).edit().remove(deviceId).apply()
+    fun notReady(context: Context, deviceId: String): Int {
+        val n = prefs(context).getInt("attempts_$deviceId", 0) + 1
+        prefs(context).edit().putInt("attempts_$deviceId", n).apply()
+        return n
+    }
+
+    @JvmStatic
+    @Synchronized
+    fun sent(context: Context, deviceId: String) = prefs(context).edit().remove("attempts_$deviceId").apply()
+
+    @JvmStatic
+    @Synchronized
+    fun forgetDevice(context: Context, deviceId: String) = prefs(context).edit().remove(deviceId).remove("attempts_$deviceId").apply()
 
     private fun save(context: Context, deviceId: String, uris: List<String>) {
         val edit = prefs(context).edit()

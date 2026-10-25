@@ -107,13 +107,16 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                 // has been received by the other end,  so payloads are sent one by one.
                 android.net.Uri source = TransferHistory.INSTANCE.peekSource(currentNetworkPacket);
                 if (!getDevice().sendPacketBlocking(currentNetworkPacket, sendPacketStatusCallback, true)) {
-                    // A file the transfer manager took (it resumes by itself) is no longer ours to queue; the rest stay queued.
-                    if (source != null && lastFailure instanceof org.desklink.mobile.webrtc.TransferResumingException) {
+                    // A file the transfer manager took (it resumes by itself), one that was cancelled and one the computer refused are
+                    // no longer ours to queue (shown once, never sent again by themselves). Only a link that was not ready keeps it.
+                    failureKind = ShareFailure.classify(lastFailure, isCancelled());
+                    if (source != null && !(failureKind == ShareFailure.Kind.NOT_READY)) {
                         ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
                     }
                     throw new RuntimeException("Sending packet failed");
                 }
                 if (source != null) ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
+                ShareQueue.sent(getDevice().getContext(), getDevice().getDeviceId());
                 TransferHistory.recordSent(getDevice().getContext(), getDevice().getDeviceId(), currentNetworkPacket);
 
                 synchronized (lock) {
@@ -138,10 +141,21 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                 reportError(e);
                 return;
             }
-            // A real failure ends the share: what was still queued would only fail the same way.
-            for (NetworkPacket left : networkPacketList) {
-                android.net.Uri source = TransferHistory.INSTANCE.peekSource(left);
-                if (source != null) ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
+            if (failureKind == ShareFailure.Kind.NOT_READY) {
+                // The link was not ready: every entry stays for the next feature-ready, three tries at most, then one card.
+                int attempts = ShareQueue.notReady(getDevice().getContext(), getDevice().getDeviceId());
+                if (attempts >= ShareFailure.MAX_NOT_READY_ATTEMPTS) {
+                    int waiting = ShareQueue.pending(getDevice().getContext(), getDevice().getDeviceId()).size();
+                    ShareQueue.forgetDevice(getDevice().getContext(), getDevice().getDeviceId());
+                    SendAgain.add(getDevice().getContext(), getDevice(), java.util.UUID.randomUUID().toString(), getDevice().getDeviceId(),
+                            getDevice().getContext().getResources().getQuantityString(R.plurals.share_queue_gave_up, Math.max(waiting, 1), Math.max(waiting, 1)), false);
+                }
+            } else {
+                // A real failure ends the share: what was still queued would only fail the same way.
+                for (NetworkPacket left : networkPacketList) {
+                    android.net.Uri source = TransferHistory.INSTANCE.peekSource(left);
+                    if (source != null) ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
+                }
             }
             int failedFiles;
             synchronized (lock) {
@@ -162,7 +176,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                     android.net.Uri source = TransferHistory.INSTANCE.peekSource(networkPacket);
                     if (source != null) ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
                 }
-                networkPacket.getPayload().close();
+                if (networkPacket.getPayload() != null) networkPacket.getPayload().close();
             }
             networkPacketList.clear();
         }
@@ -189,6 +203,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
 
     /** Why the last send failed, as its callback said. */
     private volatile Throwable lastFailure;
+    private volatile ShareFailure.Kind failureKind = ShareFailure.Kind.FAILED;
 
     private void setProgress(int progress) {
         synchronized (lock) {

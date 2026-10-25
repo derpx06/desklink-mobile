@@ -103,14 +103,21 @@ public class SharePlugin extends Plugin {
     @Override
     public void onFeatureReady() {
         if (uploadFileJob != null) return;
-        List<String> pending = ShareQueue.pending(context, device.getDeviceId());
-        if (pending.isEmpty()) return;
+        if (ShareQueue.pending(context, device.getDeviceId()).isEmpty()) return;
         new Thread(() -> {
-            ArrayList<Uri> uris = new ArrayList<>();
-            for (String text : pending) uris.add(Uri.parse(text));
-            sendUriList(uris);
+            // Decided under the same lock sendUriList builds under: a share being built or running is never started twice.
+            synchronized (buildLock) {
+                if (uploadFileJob != null) return;
+                List<String> pending = ShareQueue.pending(context, device.getDeviceId());
+                if (pending.isEmpty()) return;
+                ArrayList<Uri> uris = new ArrayList<>();
+                for (String text : pending) uris.add(Uri.parse(text));
+                sendUriList(uris);
+            }
         }, "desklink-share-queue").start();
     }
+
+    private final Object buildLock = new Object();
 
     @Override
     public void onDestroy() {
@@ -288,7 +295,14 @@ public class SharePlugin extends Plugin {
 
 
     void sendUriList(final ArrayList<Uri> uriList) {
+        synchronized (buildLock) {
+            sendUriListLocked(uriList);
+        }
+    }
+
+    private void sendUriListLocked(final ArrayList<Uri> uriList) {
         CompositeUploadFileJob job;
+        int unreadable = 0;
 
         if (uploadFileJob == null) {
             job = new CompositeUploadFileJob(getDevice(), this.receiveFileJobCallback);
@@ -312,8 +326,13 @@ public class SharePlugin extends Plugin {
                 job.addNetworkPacket(np);
             } else {
                 ShareQueue.remove(context, device.getDeviceId(), uri.toString());
-                SendAgain.add(context, device, java.util.UUID.randomUUID().toString(), device.getDeviceId(), uri.getLastPathSegment() == null ? "file" : uri.getLastPathSegment(), true);
+                // Remembered per file, announced once below (a queue left from before a reboot would otherwise post one each).
+                SendAgain.add(context, null, java.util.UUID.randomUUID().toString(), device.getDeviceId(), uri.getLastPathSegment() == null ? "file" : uri.getLastPathSegment(), true);
+                unreadable++;
             }
+        }
+        if (unreadable > 0) {
+            SendAgain.announce(context, device, context.getResources().getQuantityString(R.plurals.share_queue_unreadable, unreadable, unreadable));
         }
 
         if (job != uploadFileJob) {
