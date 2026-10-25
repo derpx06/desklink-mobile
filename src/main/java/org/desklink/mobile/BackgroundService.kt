@@ -217,7 +217,6 @@ class BackgroundService : Service() {
         Log.d("DeskLink/BgService", "onCreate")
         this.applicationInstance = DeskLinkApplication.getInstance()
         instance = this
-        acquireWifiLock()
 
         DeskLinkApplication.getInstance().addDeviceListChangedCallback(
             "BackgroundService",
@@ -249,7 +248,6 @@ class BackgroundService : Service() {
                 Log.i("BackgroundService", "Valid network available")
                 availableNetworks.add(network)
                 connectedToNonCellularNetwork.postValue(availableNetworks.isNotEmpty())
-                if (wifiLock == null) acquireWifiLock()
                 // A new network next to the current one (make-before-break
                 // Wi-Fi, ethernet) moves nothing that exists: announce on it,
                 // drop nothing. Previously only the *first* network did
@@ -339,6 +337,8 @@ class BackgroundService : Service() {
         if (!::applicationInstance.isInitialized) return
         val working = applicationInstance.devices.values.any { device -> device.isPaired && hasActiveWork(device) }
         if (working) acquireWorkWakeLock() else releaseConnectionWakeLock()
+        // The Wi-Fi radio is kept in its low-latency mode only while work needs it (and never held for a service that merely sits).
+        if (working) acquireWifiLock() else releaseWifiLock()
         leaseRecheck.removeCallbacks(leaseRecheckTask)
         leaseRecheck.postDelayed(leaseRecheckTask, WORK_LEASE_CHECK_MS)
     }
@@ -351,6 +351,7 @@ class BackgroundService : Service() {
             deskScreen = screen?.remoteLive == true,
             phoneScreenShared = org.desklink.mobile.plugins.screen.PhoneScreenCaptureService.sharingDeviceId == id,
             transferring = org.desklink.mobile.plugins.share.TransferProgress.visibleFor(id)?.finished == false,
+            gliding = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.activeDesk == id,
         )
     }
 
@@ -390,7 +391,13 @@ class BackgroundService : Service() {
         }
     }
 
+    private fun releaseWifiLock() {
+        wifiLock?.let { lock -> if (lock.isHeld) runCatching { lock.release() } }
+        wifiLock = null
+    }
+
     private fun acquireWifiLock() {
+        if (wifiLock?.isHeld == true) return
         val wifiManager = getSystemService<WifiManager>() ?: return
         if (!wifiManager.isWifiEnabled) return
         val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -577,8 +584,8 @@ class BackgroundService : Service() {
         const val WORK_LEASE_CHECK_MS = 20_000L
 
         /** Work that needs the CPU with the screen off; being connected is not work. */
-        fun isActiveWork(terminalAttached: Boolean, deskScreen: Boolean, phoneScreenShared: Boolean, transferring: Boolean): Boolean =
-            terminalAttached || deskScreen || phoneScreenShared || transferring
+        fun isActiveWork(terminalAttached: Boolean, deskScreen: Boolean, phoneScreenShared: Boolean, transferring: Boolean, gliding: Boolean = false): Boolean =
+            terminalAttached || deskScreen || phoneScreenShared || transferring || gliding
 
         @JvmStatic
         var instance: BackgroundService? = null

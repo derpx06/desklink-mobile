@@ -1479,8 +1479,9 @@ class Device : PacketReceiver {
     // Helper function for reloadPluginsFromSettings(), do not call from elsewhere
     private fun removePlugin(pluginKey: String): Boolean {
         val plugin = loadedPlugins.remove(pluginKey) ?: return false
-        // What this device applied from the desk lived in that plugin: the next connection asks for it again.
-        sync.forgetAll()
+        // A plugin the person turned off while the link is up held what the desk sent: the next connection asks for it again.
+        // (Not when the link itself went away: that is the ordinary delta resync.)
+        if (isPaired && isReachable) sync.forgetAll()
 
         try {
             plugin.onDestroy()

@@ -27,9 +27,12 @@
     native <methods>;
 }
 
-# Release builds drop debug and verbose logging.
+# Release builds log errors only: debug, verbose, info and warning lines carry device names, addresses and ids that
+# end up in bug reports. (Debug builds keep everything.)
 -assumenosideeffects class android.util.Log {
     public static int d(...);
     public static int v(...);
+    public static int i(...);
+    public static int w(...);
 }
 
