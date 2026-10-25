@@ -52,7 +52,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private lateinit var appDatabase: AppDatabase
     private val currentNotifications = mutableSetOf<String>()
     // Here we will map every notification to it's icon(hash)
-    private val notificationsIcons = mutableMapOf<String, String>()
     /**
      * Delivery callbacks run on DeskLink's outbound worker, while Android
      * notification callbacks run on the main thread. Keep synchronization
@@ -60,7 +59,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
      */
     private val notificationDeliveryLock = Any()
     private val postedNotifications = mutableSetOf<String>()
-    private val pendingIntents = mutableMapOf<String, RepliableNotification>()
+    private val pendingIntents = PendingReplies<RepliableNotification>(MAX_PENDING_REPLIES)
     private val pendingActions = ArrayListValuedHashMap<String, Notification.Action>()
     private var serviceReady = false
     private lateinit var sharedPreferences: SharedPreferences
@@ -123,7 +122,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         gate.stop()
         synchronized(notificationDeliveryLock) {
             currentNotifications.clear()
-            notificationsIcons.clear()
         }
         pendingIntents.clear()
         pendingActions.clear()
@@ -199,6 +197,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
 
         pendingActions.remove(id)
+        pendingIntents.removeKey(id)
 
         if (appDatabase.isReady() && !appDatabase.isEnabled(statusBarNotification.packageName)) {
             synchronized(notificationDeliveryLock) {
@@ -211,7 +210,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         sendNotificationCancellation(id)
         synchronized(notificationDeliveryLock) {
             currentNotifications.remove(id)
-            notificationsIcons.remove(id)
         }
     }
 
@@ -312,26 +310,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
         val key = getNotificationKeyCompat(statusBarNotification)
         val np = NetworkPacket(PACKET_TYPE_NOTIFICATION)
-        var iconHashToCommit: String? = null
-
-        val appIcon = runCatching { extractIcon(statusBarNotification, notification) }
-            .onFailure { error ->
-                Log.w(TAG, "Unable to extract notification icon for $packageName; continuing without it", error)
-            }
-            .getOrNull()
-
-        if (appIcon != null && !appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_IMAGES)) {
-            val iconBytes = getIconBytes(appIcon)
-            val iconHash = getIconHash(iconBytes)
-
-            // If it's the same icon, the other end should have it already, so there's no need to send it again.
-            if (iconHash != synchronized(notificationDeliveryLock) { notificationsIcons[key] }) {
-                np.payload = NetworkPacket.Payload(iconBytes)
-                iconHashToCommit = iconHash
-            }
-            // We should always send the icon's hash so the other end can know which icon to use.
-            np["payloadHash"] = iconHash
-        }
+        // No icon is rendered, encoded or sent: the computer never shows it (the transport strips a notification's payload).
+        // Doing it cost a bitmap render and a PNG encode on the main thread for every notification of a resync.
 
         val messagingStyle = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
 
@@ -357,7 +337,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             val rn = extractRepliableNotification(statusBarNotification)
             if (rn != null) {
                 np["requestReplyId"] = rn.id
-                pendingIntents[rn.id] = rn
+                pendingIntents.put(key, rn.id, rn)
             }
 
             np["ticker"] = getTickerText(notification)
@@ -401,18 +381,12 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             override fun onSuccess() {
                 synchronized(notificationDeliveryLock) {
                     currentNotifications.add(key)
-                    if (iconHashToCommit != null) {
-                        notificationsIcons[key] = iconHashToCommit
-                    }
                 }
             }
 
             override fun onFailure(e: Throwable) {
                 synchronized(notificationDeliveryLock) {
                     currentNotifications.remove(key)
-                    if (iconHashToCommit != null) {
-                        notificationsIcons.remove(key)
-                    }
                 }
                 Log.w(TAG, "Unable to synchronize notification $key; it will be retried on resync", e)
             }
@@ -436,16 +410,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         return extractStringFromExtra(extras, NotificationCompat.EXTRA_TEXT)
     }
 
-    private fun getIconBytes(appIcon: Bitmap): ByteArray {
-        val outStream = ByteArrayOutputStream()
-        appIcon.compress(Bitmap.CompressFormat.PNG, 90, outStream)
-        return outStream.toByteArray()
-    }
-
-    private fun getIconHash(iconBytes: ByteArray): String {
-        return getChecksum(iconBytes)
-    }
-
     private fun getMessageAt(
         messagingStyle: NotificationCompat.MessagingStyle,
         index: Int
@@ -456,29 +420,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         return Pair(sender, content)
     }
 
-    private fun extractIcon(
-        statusBarNotification: StatusBarNotification,
-        notification: Notification
-    ): Bitmap? {
-        try {
-            val foreignContext = context.createPackageContext(statusBarNotification.packageName, 0)
-            if (notification.getLargeIcon() != null) {
-                return iconToBitmap(foreignContext, notification.getLargeIcon())
-            }
-            if (notification.smallIcon != null) {
-                return iconToBitmap(foreignContext, notification.smallIcon)
-            }
-            val foreignResources = context.packageManager.getResourcesForApplication(statusBarNotification.packageName)
-            val foreignIcon = foreignResources.getDrawable(notification.icon) // Might throw Resources.NotFoundException
-            return drawableToBitmap(foreignIcon)
-        } catch (e: PackageManager.NameNotFoundException) {
-            Log.e(TAG, "Package name not found", e)
-        } catch (e: Resources.NotFoundException) {
-            Log.e(TAG, "Package not found", e)
-        }
-        return null
-    }
-
     private fun extractActions(notification: Notification, key: String): JSONArray? {
         val notiActions = notification.actions
         if (notiActions.isNullOrEmpty()) {
@@ -486,6 +427,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
 
         val jsonArray = JSONArray()
+        // An update replaces the actions of the key, it does not add to them.
+        synchronized(pendingActions) { pendingActions.remove(key) }
         for (action in notiActions) {
             val title = action.title
                 ?: continue
@@ -521,39 +464,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         return conversation
     }
 
-    private fun drawableToBitmap(drawable: Drawable?): Bitmap? {
-        drawable ?: return null
-        val res = if (drawable.intrinsicWidth > 128 || drawable.intrinsicHeight > 128) {
-            createBitmap(96, 96)
-        } else if (drawable.intrinsicWidth <= 64 || drawable.intrinsicHeight <= 64) {
-            createBitmap(96, 96)
-        } else {
-            createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight)
-        }
-        val canvas = Canvas(res)
-        drawable.setBounds(0, 0, res.getWidth(), res.getHeight())
-        drawable.draw(canvas)
-        return res
-    }
-
-    private fun iconToBitmap(foreignContext: Context?, icon: Icon?): Bitmap? {
-        icon ?: return null
-        return try {
-            drawableToBitmap(icon.loadDrawable(foreignContext))
-        } catch (error: RuntimeException) {
-            // Notification icons may reference resources from packages that
-            // have been removed, updated, or no longer grant access to them.
-            // An invalid icon must not abort notification synchronization.
-            Log.w(TAG, "Unable to load notification icon", error)
-            null
-        } catch (error: SecurityException) {
-            Log.w(TAG, "Permission denied while loading notification icon", error)
-            null
-        }
-    }
-
     private fun replyToNotification(id: String, message: String) {
-        val repliableNotification = pendingIntents[id]
+        val repliableNotification = pendingIntents.get(id)
         if (repliableNotification == null) {
             Log.e(TAG, "No such notification")
             return
@@ -574,7 +486,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         } catch (e: PendingIntent.CanceledException) {
             Log.e(TAG, "replyToNotification error (" + e.javaClass.getSimpleName() + ")")
         }
-        pendingIntents.remove(id)
+        pendingIntents.take(id)
     }
 
     private fun extractRepliableNotification(statusBarNotification: StatusBarNotification): RepliableNotification? {
@@ -717,7 +629,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private fun dismissNotification(dismissedId: String) {
         synchronized(notificationDeliveryLock) {
             currentNotifications.remove(dismissedId)
-            notificationsIcons.remove(dismissedId)
         }
         NotificationReceiver.WithService(context) { service ->
             service.cancelNotification(dismissedId)
@@ -783,6 +694,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         private const val PACKET_TYPE_NOTIFICATION_REPLY = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_REPLY
         private const val PACKET_TYPE_NOTIFICATION_ACTION = DeskLinkProtocol.PACKET_TYPE_NOTIFICATION_ACTION
         const val PREFERENCE_KEY = "prefKey"
+        const val MAX_PENDING_REPLIES = 200
         const val PREF_NOTIFICATION_SCREEN_OFF = "pref_notification_screen_off"
         private const val NOTIFICATION_SYNC_DELAY_MS = 50L
 
@@ -811,21 +723,5 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
         }
 
-        private fun getChecksum(data: ByteArray): String {
-            val md = MessageDigest.getInstance("MD5")
-            md.update(data)
-            return bytesToHex(md.digest())
-        }
-
-        private fun bytesToHex(bytes: ByteArray): String {
-            val hexArray = "0123456789ABCDEF".toCharArray()
-            val hexChars = CharArray(bytes.size * 2)
-            for (j in bytes.indices) {
-                val v = bytes[j].toInt() and 0xFF
-                hexChars[j * 2] = hexArray[v ushr 4]
-                hexChars[j * 2 + 1] = hexArray[v and 0x0F]
-            }
-            return String(hexChars).lowercase(Locale.getDefault())
-        }
     }
 }
