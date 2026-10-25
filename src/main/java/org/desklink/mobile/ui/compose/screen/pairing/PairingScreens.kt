@@ -78,6 +78,9 @@ import org.desklink.mobile.ui.compose.components.PillButton
 import org.desklink.mobile.ui.compose.components.PillStyle
 import org.desklink.mobile.ui.compose.tokens
 
+/** Where to get DeskLink for the computer. */
+const val DESKTOP_APP_URL = "https://github.com/derpx06/DeskLink/releases"
+
 // ---- welcome ----------------------------------------------------------------------------------------
 
 @Composable
@@ -123,6 +126,33 @@ fun WelcomeScreen(onPair: () -> Unit, onSettings: () -> Unit) {
             WelcomeRow(R.drawable.sym_terminal, stringResource(R.string.welcome_terminals))
             WelcomeRow(R.drawable.sym_devices, stringResource(R.string.welcome_screens))
             WelcomeRow(R.drawable.sym_encrypted, stringResource(R.string.welcome_encrypted))
+        }
+        Spacer(Modifier.height(20.dp))
+        // Someone who installed only this app stalls here: where the computer's app comes from, with a way to send it to the computer.
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val installMessage = stringResource(R.string.welcome_install_message, DESKTOP_APP_URL)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(t.surface, RoundedCornerShape(20.dp))
+                .border(1.dp, t.hairline, RoundedCornerShape(20.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(stringResource(R.string.welcome_install_title), fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(stringResource(R.string.welcome_install_text, DESKTOP_APP_URL), fontSize = 14.sp, color = t.textDim)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PillButton(stringResource(R.string.welcome_install_copy), {
+                    context.getSystemService(android.content.ClipboardManager::class.java)
+                        ?.setPrimaryClip(android.content.ClipData.newPlainText("DeskLink", DESKTOP_APP_URL))
+                    android.widget.Toast.makeText(context, R.string.welcome_install_copied, android.widget.Toast.LENGTH_SHORT).show()
+                }, style = PillStyle.Outlined, height = 44.dp)
+                PillButton(stringResource(R.string.welcome_install_share), {
+                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(android.content.Intent.EXTRA_TEXT, installMessage)
+                    runCatching { context.startActivity(android.content.Intent.createChooser(send, null)) }
+                }, style = PillStyle.Outlined, height = 44.dp)
+            }
         }
         Spacer(Modifier.weight(1f).heightIn(min = 26.dp))
         PillButton(stringResource(R.string.welcome_pair), onPair, Modifier.fillMaxWidth(), icon = R.drawable.sym_qr_code_scanner)

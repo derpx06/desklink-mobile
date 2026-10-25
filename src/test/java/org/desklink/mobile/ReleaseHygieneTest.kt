@@ -51,4 +51,9 @@ class ReleaseHygieneTest {
         assertTrue("lint-baseline.xml" in gradle)
         assertTrue(project("lint-baseline.xml").length() > 0)
     }
+
+    @Test
+    fun theWelcomeScreenSaysWhereToGetTheComputersApp() {
+        assertTrue("https://github.com/derpx06/DeskLink/releases" == org.desklink.mobile.ui.compose.screen.pairing.DESKTOP_APP_URL)
+    }
 }
