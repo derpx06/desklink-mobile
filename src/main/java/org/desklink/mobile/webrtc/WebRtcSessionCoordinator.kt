@@ -332,7 +332,8 @@ class WebRtcSessionCoordinator(
             require(active.isReadyForPackets()) {
                 "DeskLink WebRTC screen transport is not ready"
             }
-            val display = context.resources.displayMetrics
+            val geometry = screenGeometry()
+            val display = android.util.DisplayMetrics().also { it.widthPixels = geometry.first; it.heightPixels = geometry.second }
             // Capture at the phone's real shape, not the 1280x720 landscape
             // default. A portrait phone captured into a 16:9 landscape surface
             // arrives squashed and letterboxed, and the desktop was
@@ -351,18 +352,9 @@ class WebRtcSessionCoordinator(
                 fps = 30,
             )
             val remoteSessionId = remoteSession.markScreenReady(WebRtcScreenDirection.PHONE_TO_DESKTOP)
-            @Suppress("DEPRECATION")
-            val rotation = (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)
-                ?.defaultDisplay
-                ?.rotation
-                ?.let { value ->
-                when (value) {
-                    android.view.Surface.ROTATION_90 -> 90
-                    android.view.Surface.ROTATION_180 -> 180
-                    android.view.Surface.ROTATION_270 -> 270
-                    else -> 0
-                }
-            }
+            val rotation = geometry.third
+            sharedGeometry = geometry
+            watchDisplayWhileShared()
             sendRemoteSessionControlLocked(
                 binding,
                 attemptId,
@@ -382,7 +374,86 @@ class WebRtcSessionCoordinator(
 
     fun stopPhoneScreenCapture() {
         synchronized(lock) {
+            unwatchDisplay()
             transport?.stopScreenCapture()
+        }
+    }
+
+    /** The real size and rotation of the display (what the capture covers), in the order width, height, degrees. */
+    private fun screenGeometry(): Triple<Int, Int, Int> {
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        val display = context.getSystemService(android.hardware.display.DisplayManager::class.java)?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+        @Suppress("DEPRECATION")
+        display?.getRealMetrics(metrics)
+        if (metrics.widthPixels <= 0) {
+            metrics.setTo(context.resources.displayMetrics)
+        }
+        val degrees = when (display?.rotation) {
+            android.view.Surface.ROTATION_90 -> 90
+            android.view.Surface.ROTATION_180 -> 180
+            android.view.Surface.ROTATION_270 -> 270
+            else -> 0
+        }
+        return Triple(metrics.widthPixels, metrics.heightPixels, degrees)
+    }
+
+    private var sharedGeometry: Triple<Int, Int, Int>? = null
+    private var displayListener: android.hardware.display.DisplayManager.DisplayListener? = null
+
+    /** While the phone's screen is shared, a rotation or a fold changes what is captured and what the computer maps taps against. */
+    private fun watchDisplayWhileShared() {
+        if (displayListener != null) return
+        val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+            override fun onDisplayRemoved(displayId: Int) = Unit
+            override fun onDisplayChanged(displayId: Int) {
+                if (displayId == android.view.Display.DEFAULT_DISPLAY) onPhoneScreenGeometryChanged()
+            }
+        }
+        displayListener = listener
+        context.getSystemService(android.hardware.display.DisplayManager::class.java)
+            ?.registerDisplayListener(listener, android.os.Handler(android.os.Looper.getMainLooper()))
+    }
+
+    private fun unwatchDisplay() {
+        displayListener?.let { listener ->
+            runCatching { context.getSystemService(android.hardware.display.DisplayManager::class.java)?.unregisterDisplayListener(listener) }
+        }
+        displayListener = null
+        sharedGeometry = null
+    }
+
+    /** The shared screen changed shape: the capture resizes and the computer is told the new size and rotation (`screen-ready` again). */
+    internal fun onPhoneScreenGeometryChanged() {
+        synchronized(lock) {
+            val last = sharedGeometry ?: return
+            val geometry = screenGeometry()
+            if (geometry == last) return
+            val active = transport ?: return
+            val binding = activeBinding ?: return
+            val attemptId = activeAttemptId ?: return
+            val wire = activeWireBinding ?: return
+            val snapshot = remoteSession.snapshot()
+            val remoteSessionId = snapshot.remoteSessionId ?: return
+            if (snapshot.direction != WebRtcScreenDirection.PHONE_TO_DESKTOP || !active.isReadyForPackets()) return
+            sharedGeometry = geometry
+            active.resizeScreenCapture(geometry.first, geometry.second)
+            runCatching {
+                sendRemoteSessionControlLocked(
+                    binding,
+                    attemptId,
+                    remoteSession.makeMessage(
+                        WebRtcRemoteSessionControlKind.SCREEN_READY,
+                        attemptId,
+                        wire,
+                        remoteSessionId = remoteSessionId,
+                        screenWidth = geometry.first,
+                        screenHeight = geometry.second,
+                        screenRotation = geometry.third,
+                    ),
+                )
+            }.onFailure { Log.w(TAG, "Could not tell the computer the screen changed shape (${it.javaClass.simpleName})") }
         }
     }
 
@@ -397,7 +468,7 @@ class WebRtcSessionCoordinator(
             val active = transport ?: return
             val remoteSessionId = remoteSession.snapshot().remoteSessionId ?: return
             if (!active.isReadyForPackets()) return
-            remoteSession.stop()
+            releaseHeldInput(); remoteSession.stop()
             cancelRemoteHeartbeatLocked()
             sendRemoteSessionControlLocked(
                 binding,
@@ -684,17 +755,17 @@ class WebRtcSessionCoordinator(
         remoteActionExecutor.execute {
             synchronized(lock) {
                 val binding = activeBinding ?: run {
-                    remoteSession.stop()
+                    releaseHeldInput(); remoteSession.stop()
                     cancelRemoteHeartbeatLocked()
                     return@synchronized
                 }
                 val attemptId = activeAttemptId ?: run {
-                    remoteSession.stop()
+                    releaseHeldInput(); remoteSession.stop()
                     cancelRemoteHeartbeatLocked()
                     return@synchronized
                 }
                 val wire = activeWireBinding ?: run {
-                    remoteSession.stop()
+                    releaseHeldInput(); remoteSession.stop()
                     cancelRemoteHeartbeatLocked()
                     return@synchronized
                 }
@@ -706,7 +777,7 @@ class WebRtcSessionCoordinator(
                         remoteSession.makeMessage(WebRtcRemoteSessionControlKind.RELEASE, attemptId, wire),
                     )
                 }
-                remoteSession.stop()
+                releaseHeldInput(); remoteSession.stop()
                 cancelRemoteHeartbeatLocked()
                 // The video track stays: libwebrtc delivers it once per peer, so
                 // dropping it here left every later view black.
@@ -1080,6 +1151,7 @@ class WebRtcSessionCoordinator(
 
             override fun onScreenCaptureStopped(reason: String) {
                 device.getPlugin(ScreenControlPlugin::class.java)?.onPhoneCaptureStopped(reason)
+                synchronized(lock) { unwatchDisplay() }
                 // The projection token is no longer usable. End only this
                 // foreground capture service; the authenticated WebRTC peer
                 // and pairing remain available for an explicit resume.
@@ -1090,6 +1162,7 @@ class WebRtcSessionCoordinator(
                     if (remoteSession.snapshot().remoteSessionId == null) {
                         return@synchronized false
                     }
+                    releaseHeldInput()
                     val remoteSessionId = remoteSession.pauseLocked()
                     cancelRemoteHeartbeatLocked()
                     if (
@@ -1846,6 +1919,10 @@ class WebRtcSessionCoordinator(
             )
         }
         updateRemoteHeartbeatLocked(binding, attemptId)
+        // Whatever ended or paused the control, a drag the desk was holding goes with it (not while a glide uses the pointer).
+        if (remoteSession.snapshot().state != WebRtcRemoteSessionState.CONTROLLING &&
+            !org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(device.deviceId)
+        ) releaseHeldInput()
         publish(
             "RemoteSession",
             "${message.kind.wireName} → ${remoteSession.snapshot().state.name}" +
@@ -2405,7 +2482,11 @@ class WebRtcSessionCoordinator(
         requireNotNull(transport) { "No active WebRTC peer connection" }
     }
 
+    /** A drag the desk was holding is let go (the session ended, paused or dropped). */
+    private fun releaseHeldInput() = runCatching { MouseReceiverService.releaseHeld() }
+
     private fun closeLocked(reloadPlugins: Boolean = true) {
+        unwatchDisplay()
         cancelLivenessLocked()
         cancelAnswerWatchdogLocked()
         cancelDisconnectedGraceLocked()
@@ -2422,7 +2503,7 @@ class WebRtcSessionCoordinator(
         if (remote.direction == WebRtcScreenDirection.DESKTOP_TO_PHONE && remote.state in RESUMABLE_REMOTE_STATES) {
             resumeScreen.set(true)
         }
-        remoteSession.stop()
+        releaseHeldInput(); remoteSession.stop()
         endAudioWithPeerLocked()
         device.getPlugin(ScreenControlPlugin::class.java)?.let { screen ->
             screen.clearRemoteVideoTrack()

@@ -653,6 +653,26 @@ class WebRtcTransport(
     }
 
     /**
+     * The phone was rotated (or its display changed size) while it is shared: the capture follows, at the new shape, so the
+     * picture is not a letterboxed copy of the old one. Off the caller's thread: changeCaptureFormat waits on the capture
+     * thread.
+     */
+    fun resizeScreenCapture(width: Int, height: Int) {
+        val capturer = synchronized(this) {
+            if (screenCapturer == null || (width == captureWidth && height == captureHeight)) return
+            captureWidth = width
+            captureHeight = height
+            screenCapturer
+        } ?: return
+        val longSide = captureLongSide.get().takeIf { it > 0 } ?: return
+        thread(name = "DeskLink-capture-resize") {
+            val (w, h) = captureSize(longSide)
+            runCatching { capturer.changeCaptureFormat(w, h, captureFps) }
+                .onFailure { Log.w(TAG, "Could not resize the screen capture (${it.javaClass.simpleName})") }
+        }
+    }
+
+    /**
      * Scale proportionally so the long side is at most [longSide]. Clamping
      * each side separately squashed a tall phone (2400 → 1920 high, width
      * untouched), and encoding the full panel cost twice the bandwidth and

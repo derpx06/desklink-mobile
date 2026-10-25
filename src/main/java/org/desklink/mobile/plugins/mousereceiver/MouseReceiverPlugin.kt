@@ -23,6 +23,11 @@ import kotlin.math.floor
 @LoadablePlugin
 @RequiresApi(api = Build.VERSION_CODES.N)
 class MouseReceiverPlugin : Plugin() {
+    /** The link went away, or the plugin is unloaded: a drag the desk was holding is let go. */
+    override fun onFeatureLost() = MouseReceiverService.releaseHeld()
+
+    override fun onDestroy() = MouseReceiverService.releaseHeld()
+
     override fun checkRequiredPermissions(): Boolean {
         return MouseReceiverService.instance != null
     }

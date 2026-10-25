@@ -252,6 +252,18 @@ public class MouseReceiverService extends AccessibilityService {
         return s.startSwipe();
     }
 
+    /**
+     * Lets go of anything a remote user was holding: a drag in progress is released at its last point. Called whenever a
+     * session ends, pauses or drops, so a finger is never left down on the screen for the next pointer move to drag.
+     */
+    public static void releaseHeld() {
+        final MouseReceiverService s = instance;
+        if (s == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && s.isSwiping()) {
+            s.stopSwipe();
+        }
+    }
+
     private boolean isSwiping() {
         return swipeStoke != null;
     }

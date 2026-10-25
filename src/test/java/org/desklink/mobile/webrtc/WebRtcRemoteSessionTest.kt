@@ -398,6 +398,23 @@ class WebRtcRemoteSessionTest {
             leaseExpiresAt = null,
         )
 
+    @Test
+    fun `a second screen-ready for the shared screen replaces the geometry (a rotation)`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        val remoteSessionId = controller.beginView(WebRtcScreenDirection.PHONE_TO_DESKTOP)
+        fun ready(width: Int, height: Int, rotation: Int) = controller.makeMessage(
+            WebRtcRemoteSessionControlKind.SCREEN_READY, attemptId, wire, remoteSessionId = remoteSessionId,
+            screenWidth = width, screenHeight = height, screenRotation = rotation,
+        )
+        controller.markScreenReady(WebRtcScreenDirection.PHONE_TO_DESKTOP)
+        assertTrue(controller.accept(ready(1080, 2400, 0).copy(deviceId = "desktop"), wire, attemptId))
+        assertEquals(1080, controller.snapshot().screenWidth)
+        // The owner rotates the phone: the same session announces the new shape.
+        assertTrue(controller.accept(ready(2400, 1080, 90).copy(deviceId = "desktop"), wire, attemptId))
+        assertEquals(2400, controller.snapshot().screenWidth)
+        assertEquals(1080, controller.snapshot().screenHeight)
+    }
+
     private fun grant(
         remoteSessionId: String,
         owner: String,
