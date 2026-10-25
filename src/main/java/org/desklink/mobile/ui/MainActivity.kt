@@ -276,6 +276,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         }
     }
 
+    override fun onStop() {
+        org.desklink.mobile.plugins.notes.NotesStore.flush(this)
+        super.onStop()
+    }
+
     override fun onStart() {
         super.onStart()
         BackgroundService.Start(applicationContext)

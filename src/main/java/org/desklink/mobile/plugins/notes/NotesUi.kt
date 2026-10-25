@@ -226,7 +226,7 @@ class NotesUi(
                 if (title.isBlank() && body.isBlank()) return
                 id = NotesStore.newNote(context, title, body) ?: return Toast.makeText(context, R.string.notes_full, Toast.LENGTH_SHORT).show()
             } else {
-                NotesStore.editNote(context, current) { it.copy(title = title, body = body, pinned = pinned) }
+                NotesStore.editNote(context, current, loaded = shown) { it.copy(title = title, body = body, pinned = pinned) }
             }
             shown = id?.let { NotesStore.note(context, it)?.modified } ?: shown
         }

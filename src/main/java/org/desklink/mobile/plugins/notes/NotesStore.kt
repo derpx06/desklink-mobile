@@ -182,6 +182,15 @@ object NotesStore {
         }, NOTE_PUSH_DELAY_MS, TimeUnit.MILLISECONDS)
     }
 
+    /** The app is leaving the screen: an edit still waiting for its delay is sent now, not lost with the process. */
+    fun flush(context: Context) {
+        val ids = synchronized(pendingNotes) {
+            notePush?.cancel(false)
+            pendingNotes.toList().also { pendingNotes.clear() }
+        }
+        if (ids.isNotEmpty()) worker.execute { push(context.applicationContext, ShelfKind.NOTES, ids) }
+    }
+
     // ---- local edits -----------------------------------------------------------------------------------------
 
     /** Live snippets, newest first, at most [Shelf.MAX_SNIPPETS]. */
@@ -193,6 +202,8 @@ object NotesStore {
         data object Pinned : PinResult
         data object Empty : PinResult
         data object TooLong : PinResult
+        /** [Shelf.MAX_SNIPPETS] are pinned: unpin one first. */
+        data object Full : PinResult
     }
 
     /** Pins [text] as a snippet; an identical one moves to the top. */
@@ -200,11 +211,18 @@ object NotesStore {
         val clean = text.trimEnd('\n')
         if (clean.isBlank()) return PinResult.Empty
         if (clean.toByteArray().size > Shelf.MAX_SNIPPET_BYTES) return PinResult.TooLong
+        var full = false
         val id = with(context) { s ->
-            val id = s.snippets.values.firstOrNull { !it.deleted && it.text == clean }?.id ?: UUID.randomUUID().toString()
+            val existing = s.snippets.values.firstOrNull { !it.deleted && it.text == clean }?.id
+            if (existing == null && s.snippets.values.count { !it.deleted } >= Shelf.MAX_SNIPPETS) {
+                full = true
+                return@with "" to false
+            }
+            val id = existing ?: UUID.randomUUID().toString()
             s.snippets[id] = Snippet(id, clean, modified = later(s.snippets[id]?.modified))
             id to true
         }
+        if (full) return PinResult.Full
         worker.execute { push(context.applicationContext, ShelfKind.SNIPPETS, listOf(id)) }
         return PinResult.Pinned
     }
@@ -238,29 +256,53 @@ object NotesStore {
         return id
     }
 
-    /** Saves an edit (title, body, pinned or deleted): `parent` = the last agreed version, `modified` = now. */
-    fun editNote(context: Context, id: String, change: (Note) -> Note) {
-        val changed = with(context) { s ->
-            val before = s.notes[id] ?: return@with false to false
+    /**
+     * Saves an edit (title, body, pinned or deleted): `parent` = the last agreed version, `modified` = now. [loaded] is the
+     * version the editor was showing: when another version landed meanwhile (the desk's edit, taken while the person was
+     * typing), the edit is merged as a sibling of it, so the desk's version is kept as a "conflicted copy" instead of being
+     * overwritten without a word.
+     */
+    fun editNote(context: Context, id: String, loaded: Long? = null, change: (Note) -> Note) {
+        val ids = with(context) { s ->
+            val before = s.notes[id] ?: return@with emptyList<String>() to false
             var after = change(before).let { it.copy(id = before.id, title = it.title.takeCodePoints(Shelf.MAX_NOTE_TITLE_CHARS)) }
-            if (!Shelf.syncable(after.body) || after.sameContent(before)) return@with false to false
+            if (!Shelf.syncable(after.body) || after.sameContent(before)) return@with emptyList<String>() to false
             if (after.deleted) after = after.copy(title = "", body = "")
-            s.notes[id] = after.copy(parent = s.synced[id] ?: 0, modified = later(before.modified))
-            true to true
+            if (loaded != null && loaded != before.modified && loaded > 0) {
+                val mine = after.copy(parent = loaded, modified = later(before.modified), ancestors = listOf(loaded))
+                val before2 = s.notes.keys.toSet()
+                s.mergeNote(mine)
+                (listOf(id) + (s.notes.keys - before2)) to true
+            } else {
+                s.notes[id] = Shelf.edited(before, after, s.synced[id], System.currentTimeMillis())
+                listOf(id) to true
+            }
         }
-        if (changed) pushNoteSoon(context, id)
+        ids.forEach { pushNoteSoon(context, it) }
     }
 
     /** Now, but strictly after [previous] even within one millisecond. */
     private fun later(previous: Long?) = maxOf(System.currentTimeMillis(), (previous ?: 0) + 1)
 
-    /** Cut at [Shelf.MAX_SYNCABLE_NOTE_BYTES] (a share can be longer), on a character boundary. */
-    fun clampBody(body: String): String {
-        if (body.toByteArray().size <= Shelf.MAX_SYNCABLE_NOTE_BYTES) return body
-        var end = minOf(body.length, Shelf.MAX_SYNCABLE_NOTE_BYTES)
-        while (end > 0 && body.substring(0, end).toByteArray().size > Shelf.MAX_SYNCABLE_NOTE_BYTES) end -= 1024.coerceAtMost(end)
+    /** [body] cut to what a note can be and still sync (see [fit]); never longer than the desk accepts. */
+    fun clampBody(body: String): String = fit(body).first
+
+    /**
+     * The longest start of [body] that is [Shelf.syncable] (the one cap everywhere: at most [Shelf.MAX_NOTE_BYTES] and, as
+     * JSON with its escapes, within a packet), cut on a character boundary, and whether anything was cut.
+     */
+    fun fit(body: String): Pair<String, Boolean> {
+        if (Shelf.syncable(body)) return body to false
+        var low = 0
+        var high = body.length
+        while (low < high) {
+            val mid = (low + high + 1) / 2
+            val cut = if (mid > 0 && Character.isHighSurrogate(body[mid - 1])) mid - 1 else mid
+            if (Shelf.syncable(body.substring(0, cut))) low = mid else high = mid - 1
+        }
+        var end = low
         if (end > 0 && Character.isHighSurrogate(body[end - 1])) end--
-        return body.substring(0, end)
+        return body.substring(0, end) to true
     }
 
     // ---- sealing ----------------------------------------------------------------------------------------------

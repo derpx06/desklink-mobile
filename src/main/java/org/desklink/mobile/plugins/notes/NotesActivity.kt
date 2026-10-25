@@ -107,6 +107,11 @@ class NotesActivity : AppCompatActivity() {
         setContent { DeskLinkTheme(this) { org.desklink.mobile.ui.compose.SecureWindow(); Root() } }
     }
 
+    override fun onStop() {
+        NotesStore.flush(this)
+        super.onStop()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handle(intent)
@@ -124,8 +129,10 @@ class NotesActivity : AppCompatActivity() {
                 val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
                 val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT).orEmpty()
                 if (text.isBlank() && subject.isBlank()) return
-                val id = NotesStore.newNote(this, subject.lineSequence().first(), NotesStore.clampBody(text))
-                Toast.makeText(this, if (id != null) R.string.notes_saved_shared else R.string.notes_full, Toast.LENGTH_SHORT).show()
+                val (body, cut) = NotesStore.fit(text)
+                val id = NotesStore.newNote(this, subject.lineSequence().first(), body)
+                // A text that is too long is never cut without saying so.
+                Toast.makeText(this, if (id == null) R.string.notes_full else if (cut) R.string.notes_saved_shared_cut else R.string.notes_saved_shared, if (cut) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
                 tab.value = TAB_NOTES
                 editing.value = id
             }
@@ -238,6 +245,7 @@ class NotesActivity : AppCompatActivity() {
                 NotesStore.PinResult.Pinned -> R.string.snippets_pinned
                 NotesStore.PinResult.Empty -> R.string.snippets_clipboard_empty
                 NotesStore.PinResult.TooLong -> R.string.snippets_too_long
+                NotesStore.PinResult.Full -> R.string.snippets_full
             }
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }

@@ -28,6 +28,12 @@ data class Note(
     val modified: Long,
     val parent: Long = 0,
     val deleted: Boolean = false,
+    /**
+     * W7 "notes ancestors": the `modified` of this side's earlier versions of the note (newest first, at most
+     * [Shelf.MAX_ANCESTORS]). A receiver that holds any of them holds an ancestor of this version, so this one just
+     * continues it: without them a second edit in a row looked like a rival of the first and left a "conflicted copy".
+     */
+    val ancestors: List<Long> = emptyList(),
 ) {
     /** Its title, or its first line without heading/list marks, or "New Note"; the desk derives conflicted-copy titles alike. */
     val label: String
@@ -85,11 +91,11 @@ class Shelf {
             synced[local.id] = local.modified
             return Merged.SAME
         }
-        if (incoming.parent == local.modified) {
+        if (incoming.parent == local.modified || local.modified in incoming.ancestors) {
             take(incoming)
             return Merged.TAKEN
         }
-        if (local.parent == incoming.modified) return Merged.KEPT_OURS
+        if (local.parent == incoming.modified || incoming.modified in local.ancestors) return Merged.KEPT_OURS
         // Siblings, both edited since the last agreement.
         val incomingWins = when {
             local.deleted != incoming.deleted -> local.deleted // a deletion never beats a concurrent edit
@@ -246,7 +252,7 @@ class Shelf {
         const val MAX_STORED_NOTES = 4000
 
         /** Stored snippets, tombstones included (16 KiB each at most: 32 MB worst case). */
-        const val MAX_STORED_SNIPPETS = 2000
+        const val MAX_STORED_SNIPPETS = 1000
 
         /** The stored file's schema; a newer one is kept aside rather than overwritten. */
         const val STORED_VERSION = 1
@@ -303,7 +309,23 @@ class Shelf {
             .apply { if (s.deleted) put("deleted", true) }
 
         fun toJson(n: Note): JSONObject = JSONObject().put("id", n.id).put("title", n.title).put("body", n.body).put("pinned", n.pinned)
-            .put("created", n.created).put("modified", n.modified).put("parent", n.parent).apply { if (n.deleted) put("deleted", true) }
+            .put("created", n.created).put("modified", n.modified).put("parent", n.parent)
+            .apply {
+                if (n.deleted) put("deleted", true)
+                if (n.ancestors.isNotEmpty()) put("ancestors", org.json.JSONArray(n.ancestors.take(MAX_ANCESTORS)))
+            }
+
+        /**
+         * The note [after] an edit of [before], as it is stored and pushed: `parent` is the version both sides last had,
+         * `modified` is [now] (strictly after [before]), and [Note.ancestors] grows by the version it replaces.
+         */
+        fun edited(before: Note, after: Note, syncedModified: Long?, now: Long): Note = after.copy(
+            parent = syncedModified ?: 0,
+            modified = maxOf(now, before.modified + 1),
+            ancestors = (listOf(before.modified) + before.ancestors).take(MAX_ANCESTORS),
+        )
+
+        const val MAX_ANCESTORS = 8
 
         /** A wire item, or null when a required field is missing or of the wrong type. */
         fun snippetFrom(o: JSONObject): Snippet? {
@@ -326,6 +348,7 @@ class Shelf {
                 modified = modified,
                 parent = (o.opt("parent") as? Number)?.toLong() ?: 0,
                 deleted = o.opt("deleted") == true,
+                ancestors = o.optJSONArray("ancestors")?.let { a -> (0 until minOf(a.length(), MAX_ANCESTORS)).mapNotNull { i -> (a.opt(i) as? Number)?.toLong() } }.orEmpty(),
             )
         }
 
