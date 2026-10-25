@@ -790,4 +790,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="export_logs_failed">The log could not be saved.</string>
     <string name="scan_camera_error">The camera could not start. Close other apps that use it, or pair with a nearby computer below.</string>
     <string name="remote_control_ask_again">Ask for control again</string>
+    <string name="settings_unpair_row">Unpair %1$s…</string>
+    <string name="bucket_restored_note">Restored: %1$s changed it after you deleted it</string>
 </resources>

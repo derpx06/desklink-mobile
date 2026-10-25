@@ -674,7 +674,7 @@ private fun UnpairRow(desk: DeskSettings?, actions: SettingsActions) {
     var confirmUnpair by rememberSaveable { mutableStateOf(false) }
     if (desk == null) return
     GroupRow(
-        stringResource(R.string.device_menu_unpair),
+        stringResource(R.string.settings_unpair_row, desk.name),
         icon = R.drawable.sym_link_off,
         titleColor = t.red,
         iconTint = t.red,

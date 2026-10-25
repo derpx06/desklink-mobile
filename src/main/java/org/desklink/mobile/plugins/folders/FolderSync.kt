@@ -34,7 +34,7 @@ sealed interface Step {
     data class Take(val path: String, val entry: Entry) : Step
     /** Remove the local file; record [entry] (a tombstone). */
     data class Delete(val path: String, val entry: Entry) : Step
-    data class Download(val path: String, val entry: Entry) : Step
+    data class Download(val path: String, val entry: Entry, val restored: Boolean = false) : Step
     /** A local file the plan deletes has the content to fetch. */
     data class Move(val from: String, val to: String, val entry: Entry, val tombstone: Entry) : Step
     /** Another local file has the content to fetch. */
@@ -130,7 +130,7 @@ object FolderSync {
                         (ours.deleted && theirs.deleted) || (!ours.deleted && !theirs.deleted && ours.sha256 == theirs.sha256) ->
                             steps += Step.Take(path, theirs.copy(vv = merged))
                         // An edit beats a concurrent deletion.
-                        ours.deleted -> steps += Step.Download(path, theirs.copy(vv = merged))
+                        ours.deleted -> steps += Step.Download(path, theirs.copy(vv = merged), restored = true)
                         theirs.deleted -> steps += Step.Bump(path, merged.bumped(localSide))
                         else -> {
                             val phoneMtime = if (localSide == Side.DESK) theirs.mtime else ours.mtime

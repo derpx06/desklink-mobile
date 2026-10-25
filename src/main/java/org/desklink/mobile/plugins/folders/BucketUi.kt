@@ -739,6 +739,8 @@ class BucketUi(
                     )
                     if (progressLine != null) {
                         Text(progressLine, fontSize = 11.sp, color = t.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    } else if (item.restored) {
+                        Text(stringResource(R.string.bucket_restored_note, desk), fontSize = 11.sp, color = t.textFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     } else if (tile.state == BucketItem.State.WAITING || tile.state == BucketItem.State.CONFLICT) {
                         Text(state, fontSize = 11.sp, color = if (tile.state == BucketItem.State.CONFLICT) t.coralText else t.textFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }

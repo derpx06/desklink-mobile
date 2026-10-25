@@ -51,6 +51,8 @@ data class BucketItem(
     /** Where it is in the Bucket ("A/B/file"); a folder's items are its children. */
     val path: String = name,
     val dir: Boolean = false,
+    /** Brought back after a delete here, because the computer edited it meanwhile. */
+    val restored: Boolean = false,
 ) {
     enum class State { SYNCED, SENDING, RECEIVING, WAITING, CONFLICT }
 }
@@ -119,6 +121,8 @@ object BucketEngine {
         /** The desk's last manifest: what it holds (path → sha256). */
         var remote = HashMap<String, String>()
         val conflicts = LinkedHashSet<String>()
+        /** Files brought back because the computer changed them after they were deleted here (shown until the next change). */
+        val restored = LinkedHashSet<String>()
         var lastSync: Long? = null
         var phase = Phase.WAITING
         var dirtyAt: Long? = null
@@ -659,7 +663,11 @@ object BucketEngine {
             }
             is Step.Download -> if (step.entry.dir) {
                 if (tree.mkdirs(step.path) != null) live.manifest[step.path] = step.entry else rescan = true
-            } else if (tree.caseVariantOf(step.path) != null) clashing += step.path else downloads += step.path to step.entry
+            } else if (tree.caseVariantOf(step.path) != null) clashing += step.path else {
+                downloads += step.path to step.entry
+                // Deleted here, edited on the computer meanwhile: the edit wins and comes back, and the tile says so.
+                if (step.restored) live.restored += step.path
+            }
             // A move within the Bucket (a rename on the desk): renamed here, no transfer.
             is Step.Move -> {
                 val item = tree.find(step.from)
@@ -1015,6 +1023,7 @@ object BucketEngine {
         live.manifest.filterValues { !it.deleted }.keys.filter { it !in before && it !in live.from }.forEach { live.from[it] = Side.PHONE }
         live.from.keys.retainAll(live.manifest.keys)
         live.conflicts.retainAll(found.keys)
+        live.restored.retainAll(found.keys)
         live.phase = when {
             live.manifest.values.count { !it.deleted } >= FolderSync.MAX_BUCKET_ITEMS -> Phase.TOO_MANY
             live.toRequest.isEmpty() && live.outstanding.isEmpty() -> Phase.UP_TO_DATE.also { live.lastSync = live.lastSync ?: System.currentTimeMillis() }
@@ -1171,7 +1180,7 @@ object BucketEngine {
                         path.substringAfterLast('/'), e.size, e.mtime, live.from[path], state,
                         live.documents[path]?.let { DocumentsContract.buildDocumentUriUsingTree(tree, it) },
                         if (e.dir) null else live.tracks[path]?.progress(lastPublishAt) ?: waiting(live, path, state, e.size),
-                        path, e.dir,
+                        path, e.dir, restored = path in live.restored,
                     )
                 } + (live.toRequest + live.outstanding + live.tracks.filterValues { !it.sending }.keys).distinct().filter { it !in local }.map { name ->
                     val size = synchronized(wanted) { wanted[deviceId to name]?.size } ?: 0

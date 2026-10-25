@@ -31,7 +31,8 @@ class FolderSyncTest {
         assertTrue(Step.Download("new", entry("n", 0, 1)) in steps)
         assertTrue(Step.Take("gone", tomb(0, 2)) in steps)
         assertTrue(Step.Conflict("both", "both (conflict from Pixel 2023-11-14)") in steps)
-        assertTrue(Step.Download("deleted-here", entry("e", 2, 1)) in steps)
+        assertTrue("an edit beats a delete, and says it was restored", Step.Download("deleted-here", entry("e", 2, 1), restored = true) in steps)
+        assertFalse(Step.Download("older", entry("z", 1, 1), restored = true) in steps)
         assertFalse(steps.any { it is Step.Bump && it.path == "both" })
     }
 
