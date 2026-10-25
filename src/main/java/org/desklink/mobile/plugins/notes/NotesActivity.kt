@@ -104,7 +104,7 @@ class NotesActivity : AppCompatActivity() {
             editing.value = it.getString(STATE_EDITING)
             tab.value = it.getInt(STATE_TAB)
         } ?: handle(intent)
-        setContent { DeskLinkTheme(this) { Root() } }
+        setContent { DeskLinkTheme(this) { org.desklink.mobile.ui.compose.SecureWindow(); Root() } }
     }
 
     override fun onNewIntent(intent: Intent) {

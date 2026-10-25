@@ -230,6 +230,7 @@ class TerminalActivity : AppCompatActivity() {
         SessionGate.check(this, deviceId, onOpen = {
             setContent {
                 DeskLinkTheme(this) {
+                    org.desklink.mobile.ui.compose.SecureWindow()
                     TerminalRoot(terminalClient)
                 }
             }

@@ -195,6 +195,7 @@ fun NotesTab(
     onSendClipboard: () -> Unit,
     onMessage: (String) -> Unit,
 ) {
+    org.desklink.mobile.ui.compose.SecureWindow()
     val t = tokens
     val editing = notes.editing.value
     if (editing != null) {
@@ -306,6 +307,7 @@ fun TerminalsTab(
     onOpenTerminals: () -> Unit,
     onNew: () -> Unit,
 ) {
+    org.desklink.mobile.ui.compose.SecureWindow()
     val t = tokens
     val context = LocalContext.current
     val client = remember(deviceId) { DeskLinkApplication.getInstance().terminalClient(deviceId) }

@@ -40,6 +40,8 @@ fun SessionPasswordDialog(wrong: Boolean, onSubmit: (String) -> Unit, onDismiss:
     val valid = text.isNotEmpty() && SessionPassword.fits(text)
     AlertDialog(
         onDismissRequest = onDismiss,
+        // A typed password is not for a screenshot or a recording.
+        properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
         title = { Text(stringResource(R.string.session_password_title)) },
         text = {
             Column {

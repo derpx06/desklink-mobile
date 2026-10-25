@@ -330,6 +330,7 @@ data class PairCodeState(val name: String, val code: String?, val stage: PairSta
 
 @Composable
 fun PairCodeScreen(state: PairCodeState, onCancel: () -> Unit, onMatch: () -> Unit, onRequest: () -> Unit) {
+    org.desklink.mobile.ui.compose.SecureWindow()
     val t = tokens
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().navigationBarsPadding()) {
         Column(
