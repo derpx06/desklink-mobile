@@ -46,4 +46,33 @@ class UnpairedLimitsTest {
         limits.release("x")
         assertTrue(limits.admit("z", a))
     }
+
+    @Test
+    fun overARealSocketAStrangersOversizedLineIsRefusedAndALaterNormalOneIsNot() {
+        java.net.ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+            val writer = Thread {
+                java.net.Socket(InetAddress.getLoopbackAddress(), server.localPort).use { out ->
+                    out.getOutputStream().apply {
+                        write(ByteArray(300 * 1024) { 'x'.code.toByte() }); write('\n'.code); flush()
+                    }
+                }
+            }.apply { start() }
+            server.accept().use { accepted ->
+                val input = accepted.getInputStream().buffered()
+                assertThrows(LineTooLongException::class.java) { readLineBounded(input, UnpairedLimits.MAX_UNPAIRED_LINE) }
+            }
+            writer.join()
+        }
+        java.net.ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+            val writer = Thread {
+                java.net.Socket(InetAddress.getLoopbackAddress(), server.localPort).use { out ->
+                    out.getOutputStream().apply { write("{\"type\":\"desklink.ping\"}\n".toByteArray()); flush() }
+                }
+            }.apply { start() }
+            server.accept().use { accepted ->
+                assertTrue(readLineBounded(accepted.getInputStream().buffered(), UnpairedLimits.MAX_UNPAIRED_LINE).contains("desklink.ping"))
+            }
+            writer.join()
+        }
+    }
 }

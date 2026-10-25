@@ -33,3 +33,14 @@ class RelayHostTest {
         assertNull(relayHost("not a url"))
     }
 }
+
+class RelayAuthSignInputTest {
+    @org.junit.Test
+    fun theBytesTheRelayVerifiesArePinned() {
+        // The relay builds format!("{AUTH_CONTEXT}\n{nonce}\n{public_host}") (relay/src/protocol.rs); the desktop signs the same.
+        org.junit.Assert.assertEquals(
+            "6465736b6c696e6b2d72656c61792d617574682d76310a6e6f6e63652d41420a72656c61792e6578616d706c652e6f7267",
+            authSignInput("nonce-AB", "relay.example.org").joinToString("") { "%02x".format(it) },
+        )
+    }
+}

@@ -318,7 +318,7 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
                     return
                 }
                 val key = RsaHelper.getPrivateKey(context)
-                val input = "$AUTH_CONTEXT\n${message.optString("nonce")}\n$host".toByteArray(Charsets.UTF_8)
+                val input = authSignInput(message.optString("nonce"), host)
                 val signature = identitySignature(key.algorithm).run {
                     initSign(key)
                     update(input)
@@ -513,7 +513,6 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
     companion object {
         private const val TAG = "DeskLink/Relay"
         private const val PROTOCOL_VERSION = 1
-        private const val AUTH_CONTEXT = "desklink-relay-auth-v1"
         private const val CLOSE_REPLACED = 4409
         private const val CLOSE_UPGRADE_REQUIRED = 4426
         private const val MAX_ALLOW = 32
@@ -561,6 +560,9 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
             }
     }
 }
+
+/** What the relay auth signs, byte for byte as the relay's `auth_sign_input`: context, nonce, host, newline-separated UTF-8. */
+internal fun authSignInput(nonce: String, host: String): ByteArray = "desklink-relay-auth-v1\n$nonce\n$host".toByteArray(Charsets.UTF_8)
 
 /**
  * The bare host the relay auth signs, as the desktop's `host_of`: no IPv6
