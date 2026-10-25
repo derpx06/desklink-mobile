@@ -188,17 +188,33 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     /** The view stopped because the screen went dark: nobody is watching, so no video keeps coming. */
     private var stoppedForScreenOff = false
 
-    override fun onStop() {
-        super.onStop()
-        val interactive = getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
-        if (!interactive && !isFinishing && !isChangingConfigurations && screenControlPlugin()?.remoteLive == true) {
+    private val backgroundHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val endInBackground = Runnable {
+        if (screenControlPlugin()?.remoteLive == true) {
             stoppedForScreenOff = true
             sendStopScreen()
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        val interactive = getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
+        val live = screenControlPlugin()?.remoteLive == true
+        when (backgroundAction(interactive, isFinishing, isChangingConfigurations, live)) {
+            BackgroundAction.END_NOW -> {
+                stoppedForScreenOff = true
+                sendStopScreen()
+            }
+            // Left for another app: the desk keeps encoding and the phone decoding at full rate to nobody, so after a grace
+            // period (coming back within it changes nothing) the view ends; the live notification can end it sooner.
+            BackgroundAction.END_AFTER_GRACE -> backgroundHandler.postDelayed(endInBackground, BACKGROUND_GRACE_MS)
+            BackgroundAction.NONE -> Unit
+        }
+    }
+
     override fun onStart() {
         super.onStart()
+        backgroundHandler.removeCallbacks(endInBackground)
         if (stoppedForScreenOff) {
             stoppedForScreenOff = false
             requestDesktopScreen()
@@ -206,6 +222,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     }
 
     override fun onDestroy() {
+        backgroundHandler.removeCallbacks(endInBackground)
         prefs.unregisterOnSharedPreferenceChangeListener(this)
         if (isFinishing && !isChangingConfigurations) {
             sendStopScreen()
@@ -903,7 +920,19 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         prefsApplied = true
     }
 
+    /** What leaving the screen does to a live view of the desk. */
+    enum class BackgroundAction { NONE, END_NOW, END_AFTER_GRACE }
+
     companion object {
+        /** A view of the desk left running behind another app ends after this long. */
+        const val BACKGROUND_GRACE_MS = 60_000L
+
+        fun backgroundAction(interactive: Boolean, finishing: Boolean, changingConfiguration: Boolean, live: Boolean): BackgroundAction = when {
+            !live || finishing || changingConfiguration -> BackgroundAction.NONE
+            !interactive -> BackgroundAction.END_NOW
+            else -> BackgroundAction.END_AFTER_GRACE
+        }
+
         private const val STANDARD_DPI = 240.0f
         /** Well inside the desktop's per-packet limit even at four bytes a character. */
         private const val TEXT_CHUNK_CHARS = 200
