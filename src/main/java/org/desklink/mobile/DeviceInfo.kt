@@ -35,6 +35,8 @@ data class DeviceInfo(
      * its previous process is dead. Mirrors the desktop's `instance_id`.
      */
     @JvmField var instanceId: String? = null,
+    /** The peer's product version ("1.3.0"), from its identity: shown as a hint, never a trust or capability decision. */
+    @JvmField var appVersion: String? = null,
 ) {
 
     /**
@@ -50,6 +52,7 @@ data class DeviceInfo(
                 putString("deviceName", name)
                 putString("deviceType", type.toString())
                 putInt("protocolVersion", protocolVersion)
+                appVersion?.let { putString("appVersion", it) }
             }
         } catch (e: CertificateEncodingException) {
             throw RuntimeException(e)
@@ -70,9 +73,30 @@ data class DeviceInfo(
             np["incomingCapabilities"] = incomingCapabilities!!
             np["outgoingCapabilities"] = outgoingCapabilities!!
             np["instanceId"] = PROCESS_INSTANCE_ID
+            np["appVersion"] = org.desklink.mobile.BuildConfig.VERSION_NAME.take(MAX_APP_VERSION)
         }
 
     companion object {
+        const val MAX_APP_VERSION = 32
+
+        /** A version from the wire: at most [MAX_APP_VERSION] chars of digits, letters and `.+-_`, else null. */
+        @JvmStatic
+        fun cleanAppVersion(raw: String?): String? =
+            raw?.takeIf { it.isNotEmpty() && it.length <= MAX_APP_VERSION && it.all { c -> c.isLetterOrDigit() || c in ".+-_" } }
+
+        /** "Update DeskLink on <peer>": the major.minor of two versions differ (a patch difference is not skew); unparsable never. */
+        @JvmStatic
+        fun versionsSkew(own: String?, peer: String?): Boolean {
+            fun majorMinor(v: String?) = v?.split('.')?.takeIf { it.size >= 2 }?.let { p ->
+                val major = p[0].toIntOrNull()
+                val minor = p[1].takeWhile(Char::isDigit).toIntOrNull()
+                if (major != null && minor != null) major to minor else null
+            }
+            val a = majorMinor(own) ?: return false
+            val b = majorMinor(peer) ?: return false
+            return a != b
+        }
+
         /** This process's restart epoch; see [instanceId]. */
         @JvmField
         val PROCESS_INSTANCE_ID: String = java.util.UUID.randomUUID().toString().replace("-", "")
@@ -95,6 +119,7 @@ data class DeviceInfo(
                     type = DeviceType.fromString(getString("deviceType", "desktop")!!),
                     certificate = TrustedDevices.getDeviceCertificate(context, deviceId),
                     protocolVersion = getInt("protocolVersion", 0),
+                    appVersion = cleanAppVersion(getString("appVersion", "")),
                 )
             }
 
@@ -123,6 +148,7 @@ data class DeviceInfo(
                     incomingCapabilities = getStringSet("incomingCapabilities"),
                     outgoingCapabilities = getStringSet("outgoingCapabilities"),
                     instanceId = getString("instanceId", "").takeIf { it.isNotEmpty() && it.length <= 64 },
+                    appVersion = cleanAppVersion(getString("appVersion", "")),
                 )
             }
 

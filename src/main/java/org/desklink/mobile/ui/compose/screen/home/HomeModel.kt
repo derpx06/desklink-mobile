@@ -38,6 +38,7 @@ object HomeModel {
             deviceId = id,
             name = device.name,
             connection = connection,
+            updateNeeded = !device.hasActiveWebRtcFeatureTransport && org.desklink.mobile.DeviceInfo.versionsSkew(org.desklink.mobile.BuildConfig.VERSION_NAME, device.deviceInfo.appVersion),
             computers = paired.map { ComputerRow(it.deviceId, it.name, it.toUiModel().connection) },
             live = LiveSessions(
                 screen = device.getPlugin(ScreenControlPlugin::class.java)?.remoteLive == true,

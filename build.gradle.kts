@@ -162,13 +162,11 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.recyclerview)
-    implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.documentfile)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.extensions)
+    implementation(libs.androidx.lifecycle.process) // ProcessLifecycleOwner (it came with the unused lifecycle-extensions)
     implementation(libs.androidx.lifecycle.common.java8)
-    implementation(libs.androidx.gridlayout)
     implementation(libs.google.android.material)
     implementation(libs.disklrucache) //For caching album art bitmaps. FIXME: Not updated in 10+ years. Replace with Kache.
     implementation(libs.slf4j.api)
@@ -210,10 +208,6 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(libs.androidx.junit)
-
-    // For device controls
-    implementation(libs.reactive.streams)
-    implementation(libs.rxjava)
 }
 
 licenseReport {

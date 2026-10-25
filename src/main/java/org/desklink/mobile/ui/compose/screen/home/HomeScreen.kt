@@ -125,6 +125,8 @@ data class HomeState(
     val name: String,
     val connection: DeviceConnection,
     val computers: List<ComputerRow>,
+    /** The computer runs a different DeskLink major.minor: the not-connected line says to update. */
+    val updateNeeded: Boolean = false,
     val path: WebRtcConnectionPath? = null,
     val rttMs: Int? = null,
     val live: LiveSessions = LiveSessions(),
@@ -226,10 +228,13 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
 
 @Composable
 private fun notReadyMessage(state: HomeState) = stringResource(
-    when (state.connection) {
+    when {
+        state.updateNeeded -> R.string.home_update_deskLink
+        else -> when (state.connection) {
         DeviceConnection.CONNECTING -> R.string.home_unavailable_connecting
         DeviceConnection.UNAVAILABLE -> R.string.home_unavailable_unreachable
         else -> R.string.home_unavailable_offline
+        }
     },
     state.name,
 )
