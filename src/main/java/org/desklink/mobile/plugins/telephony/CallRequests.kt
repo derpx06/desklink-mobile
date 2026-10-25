@@ -73,6 +73,21 @@ object CallRequests {
         else -> ERROR_FAILED
     }
 
+    /** What the dialer's Decline and Hang up buttons are called (AOSP and the common OEM dialers), whole titles only. */
+    private val DECLINE_TITLES = setOf("decline", "reject", "decline call", "reject call")
+    private val HANG_UP_TITLES = setOf("hang up", "end call", "end", "hangup", "hang-up")
+
+    /**
+     * Which of a dialer notification's [titles] is the button that ends the call, or null. A title must be the whole
+     * word(s), never a part of another ("Send message", "Friend" and "Attend" are not "end"), and an ambiguous
+     * notification is not tapped at all.
+     */
+    fun endAction(titles: List<String?>, hangUp: Boolean): Int? {
+        val wanted = if (hangUp) HANG_UP_TITLES + DECLINE_TITLES else DECLINE_TITLES + HANG_UP_TITLES
+        val hits = titles.withIndex().filter { (_, title) -> title?.trim()?.lowercase() in wanted }
+        return hits.singleOrNull()?.index
+    }
+
     private fun hangUp(controls: CallControls): String? = when {
         controls.endCall() -> null
         controls.notificationAction(hangUp = true) -> null

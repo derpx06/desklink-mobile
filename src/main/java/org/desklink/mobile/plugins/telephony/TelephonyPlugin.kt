@@ -189,7 +189,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
 
         override fun notificationAction(hangUp: Boolean): Boolean {
             val actions = dialerNotification?.notification?.actions ?: return false
-            val action = actions.firstOrNull { DECLINE_WORDS.any { w -> it.title?.toString()?.contains(w, ignoreCase = true) == true } } ?: return false
+            val action = CallRequests.endAction(actions.map { it.title?.toString() }, hangUp)?.let { actions[it] } ?: return false
             return runCatching { action.actionIntent.send(); true }.getOrDefault(false)
         }
 
@@ -356,9 +356,6 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
         private const val TAG = "DeskLink/Telephony"
         private const val KEY_SHOW_CALLER = "telephony_show_caller"
         private const val KEY_LIVE_CALL = "telephony_live_call"
-
-        /** Words of the dialer's Decline / Hang up buttons (AOSP and the common OEM dialers). */
-        private val DECLINE_WORDS = listOf("decline", "hang up", "end", "reject", "dismiss")
 
         /** "Show caller on <desk>": off unless the person turned it on (T3). */
         fun showCaller(context: Context, deviceId: String): Boolean =

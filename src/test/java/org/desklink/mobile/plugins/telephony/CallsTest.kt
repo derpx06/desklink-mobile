@@ -264,4 +264,15 @@ class CallsTest {
         assertNull(approvals.take(old.nonce))
         assertEquals("5559999", approvals.take(new.nonce)!!.number)
     }
+
+    @Test
+    fun theDialersEndButtonIsFoundByWholeTitleAndNeverBySubstring() {
+        assertEquals(1, CallRequests.endAction(listOf("Answer", "Decline"), hangUp = false))
+        assertEquals(1, CallRequests.endAction(listOf("Mute", "Hang up"), hangUp = true))
+        assertEquals(0, CallRequests.endAction(listOf(" END CALL ", "Speaker"), hangUp = true))
+        assertNull("'Send message' is not 'end'", CallRequests.endAction(listOf("Answer", "Send message"), hangUp = false))
+        assertNull(CallRequests.endAction(listOf("Friend", "Attend", "Dismiss"), hangUp = true))
+        assertNull("two candidates: not tapped", CallRequests.endAction(listOf("Decline", "Reject"), hangUp = false))
+        assertNull(CallRequests.endAction(listOf(null, ""), hangUp = true))
+    }
 }
