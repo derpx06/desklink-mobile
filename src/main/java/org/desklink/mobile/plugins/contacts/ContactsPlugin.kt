@@ -76,8 +76,9 @@ class ContactsPlugin : Plugin() {
 
     override fun onCreate(): Boolean {
         context.contentResolver.registerContentObserver(ContactsContract.Contacts.CONTENT_URI, true, observer)
-        // Turned on while connected: the desk gets the book now, not at the next connection.
-        if (device.hasActiveWebRtcFeatureTransport) background { sendSnapshot(force = true) }
+        // Turned on while connected: the desk gets the book now, not at the next connection. Always sent (a refresh): the desk
+        // deleted its copy when sharing went off, even though it still remembers the revision it once held.
+        if (device.hasActiveWebRtcFeatureTransport) background { sendSnapshot(force = true, refresh = true) }
         return true
     }
 
@@ -91,6 +92,7 @@ class ContactsPlugin : Plugin() {
     }
 
     override fun onTurnedOff() {
+        lastSent = null
         device.sendPacket(ContactsBook.notSharingPacket())
     }
 
