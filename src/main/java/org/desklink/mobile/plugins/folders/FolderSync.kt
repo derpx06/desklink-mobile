@@ -313,6 +313,21 @@ object FolderSync {
      * that is left out. Different directories never clash. Returns the paths left out (not what lies below them; see [isLeftOut]).
      * Tombstones are not passed in: they never clash.
      */
+    /**
+     * The one case-folding rule (contract "W3 - case clashes (folding)"), identical on the desk: per CODE POINT, the lowercase
+     * mapping without locale or context (a lone `Σ` is `σ`, there is no final-sigma rule), taken only when it is exactly one code
+     * point; a character whose lowercase is longer (`İ`) stays as it is. No normalisation: `é` and `e` + combining acute differ.
+     */
+    fun foldName(name: String): String = buildString {
+        var i = 0
+        while (i < name.length) {
+            val cp = name.codePointAt(i)
+            i += Character.charCount(cp)
+            val lower = String(Character.toChars(cp)).lowercase(java.util.Locale.ROOT)
+            if (lower.codePointCount(0, lower.length) == 1) append(lower) else appendCodePoint(cp)
+        }
+    }
+
     fun caseClashes(livePaths: Collection<String>): Set<String> {
         val first = HashSet<Pair<String, String>>()
         val losers = LinkedHashSet<String>()
@@ -320,7 +335,7 @@ object FolderSync {
             if (underLoser(path, losers)) continue
             val parent = path.substringBeforeLast('/', "")
             val name = path.substringAfterLast('/')
-            if (!first.add(parent to name.lowercase(java.util.Locale.ROOT))) losers += path
+            if (!first.add(parent to foldName(name))) losers += path
         }
         return losers
     }

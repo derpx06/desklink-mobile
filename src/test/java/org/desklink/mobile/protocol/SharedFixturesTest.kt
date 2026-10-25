@@ -63,6 +63,13 @@ class SharedFixturesTest {
         val names = strings(f.getJSONArray("names"))
         val losers = FolderSync.caseClashes(names)
         assertEquals(strings(f.getJSONArray("winners")), names.filter { !FolderSync.isLeftOut(it, losers) })
+        val cases = f.getJSONArray("cases")
+        for (i in 0 until cases.length()) {
+            val case = cases.getJSONObject(i)
+            val all = strings(case.getJSONArray("names"))
+            val out = FolderSync.caseClashes(all)
+            assertEquals(case.getString("name"), strings(case.getJSONArray("winners")), all.filter { !FolderSync.isLeftOut(it, out) })
+        }
     }
 
     @Test

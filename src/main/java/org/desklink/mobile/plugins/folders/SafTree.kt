@@ -169,7 +169,7 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
     fun caseVariantOf(path: String): String? {
         val parent = find(path.substringBeforeLast('/', "")) ?: return null
         val name = path.substringAfterLast('/')
-        return children(parent.documentId).keys.firstOrNull { it != name && it.equals(name, ignoreCase = true) }
+        return children(parent.documentId).keys.firstOrNull { it != name && FolderSync.foldName(it) == FolderSync.foldName(name) }
     }
 
     /** Writes [source] at [path]: a temporary document beside it, then renamed into place. The new stat, or null. */

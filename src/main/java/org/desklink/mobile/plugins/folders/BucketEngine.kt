@@ -409,17 +409,17 @@ object BucketEngine {
     private fun uniquePath(tree: SafTree, path: String): String {
         val dir = path.substringBeforeLast('/', "")
         val name = path.substringAfterLast('/')
-        val taken = tree.find(dir)?.let { tree.names(it) }.orEmpty().map { it.lowercase() }.toSet()
+        val taken = tree.find(dir)?.let { tree.names(it) }.orEmpty().map { FolderSync.foldName(it) }.toSet()
         return join(dir, uniqueName(name, taken))
     }
 
     /** Pure: [name], or "stem (2).ext" until it is not in [taken] (lower-case names). */
     fun uniqueName(name: String, taken: Set<String>): String {
-        if (name.lowercase() !in taken) return name
+        if (FolderSync.foldName(name) !in taken) return name
         val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
         for (n in 2..999) {
             val candidate = name.substring(0, dot) + " ($n)" + name.substring(dot)
-            if (candidate.lowercase() !in taken && candidate.toByteArray().size <= FolderSync.MAX_SEGMENT_BYTES) return candidate
+            if (FolderSync.foldName(candidate) !in taken && candidate.toByteArray().size <= FolderSync.MAX_SEGMENT_BYTES) return candidate
         }
         return name.substring(0, dot) + " " + UUID.randomUUID().toString().take(8) + name.substring(dot)
     }
