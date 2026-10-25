@@ -312,6 +312,32 @@ internal fun Chevron() = Icon(painterResource(R.drawable.sym_chevron_right), con
 
 // ---- permissions ------------------------------------------------------------------------------------------------
 
+/** What the person's choices need: opt-in permissions (accessibility, notification access, calls, contacts) count only when a feature that uses them is on. */
+internal data class PermissionNeeds(val accessibility: Boolean = true, val notificationAccess: Boolean = true, val calls: Boolean = true, val contacts: Boolean = true) {
+    companion object {
+        fun of(context: Context): PermissionNeeds {
+            val devices = runCatching { org.desklink.mobile.DeskLinkApplication.getInstance().devices.values.filter { it.isPaired } }.getOrDefault(emptyList())
+            fun any(check: (org.desklink.mobile.Device) -> Boolean) = devices.any { runCatching { check(it) }.getOrDefault(false) }
+            fun plugin(cls: Class<out org.desklink.mobile.plugins.Plugin>) = org.desklink.mobile.plugins.Plugin.getPluginKey(cls)
+            return PermissionNeeds(
+                accessibility = any {
+                    org.desklink.mobile.plugins.inputdevicesreceiver.Glide.allowed(context, it.deviceId) ||
+                        org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.allowed(context, it.deviceId)
+                },
+                notificationAccess = any {
+                    it.isPluginEnabled(plugin(org.desklink.mobile.plugins.notifications.NotificationsPlugin::class.java)) ||
+                        it.isPluginEnabled(plugin(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin::class.java))
+                },
+                calls = any { it.isPluginEnabled(plugin(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)) },
+                contacts = any {
+                    it.isPluginEnabled(plugin(org.desklink.mobile.plugins.contacts.ContactsPlugin::class.java)) ||
+                        org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(context, it.deviceId)
+                },
+            )
+        }
+    }
+}
+
 internal class PermissionRow(
     @DrawableRes val icon: Int,
     val title: String,
@@ -348,7 +374,8 @@ internal fun PermissionsSection(desk: DeskSettings?) {
     }
     val deskName = desk?.name ?: stringResource(R.string.settings_your_computer)
     val tapToGrant = stringResource(R.string.device_tap_permission)
-    val rows = remember(tick, asked, desk) { permissionRows(context, deskName, request::launch) } +
+    val ask: (Array<String>) -> Unit = { permissions -> org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(context, permissions, request::launch) }
+    val rows = remember(tick, asked, desk) { permissionRows(context, deskName, ask) } +
         desk?.pluginPermissions.orEmpty().map { (name, open) -> PermissionRow(R.drawable.sym_info, name, tapToGrant, false, allow = open) }
     val waiting = rows.count { !it.granted && !it.unknown }
     SectionLabel(stringResource(R.string.settings_permissions)) {
@@ -372,13 +399,13 @@ internal fun PermissionsSection(desk: DeskSettings?) {
 
 /** How many permissions a feature needs that are still missing (the amber dot on the Settings tab). */
 fun waitingPermissions(context: Context, deskName: String, extra: Int = 0): Int =
-    permissionRows(context, deskName) { }.count { !it.granted && !it.unknown } + extra
+    permissionRows(context, deskName, request = { }).count { !it.granted && !it.unknown } + extra
 
 @Composable
 private fun pluralsString(id: Int, count: Int) = androidx.compose.ui.res.pluralStringResource(id, count, count)
 
 /** The permissions DeskLink uses here, each with the system screen that grants it. */
-internal fun permissionRows(context: Context, desk: String, request: (Array<String>) -> Unit): List<PermissionRow> {
+internal fun permissionRows(context: Context, desk: String, request: (Array<String>) -> Unit, needs: PermissionNeeds = PermissionNeeds.of(context)): List<PermissionRow> {
     fun granted(permission: String) = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
     fun open(intent: Intent) = {
         runCatching { context.startActivity(intent) }.onFailure {
@@ -396,8 +423,23 @@ internal fun permissionRows(context: Context, desk: String, request: (Array<Stri
         add(PermissionRow(
             R.drawable.sym_notifications, context.getString(R.string.settings_perm_notification_access), context.getString(R.string.settings_perm_notification_access_summary, desk),
             NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName),
+            // Not counted as waiting while nothing the person turned on needs it.
+            unknown = !needs.notificationAccess && !NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName),
             allow = open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
         ))
+        if (needs.calls) {
+            val calls = buildList {
+                add(Manifest.permission.READ_PHONE_STATE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) add(Manifest.permission.ANSWER_PHONE_CALLS)
+                add(Manifest.permission.CALL_PHONE)
+            }.toTypedArray()
+            add(PermissionRow(R.drawable.sym_call, context.getString(R.string.settings_perm_calls), context.getString(R.string.settings_perm_calls_summary, desk), calls.all(::granted)) { request(calls) })
+        }
+        if (needs.contacts) {
+            add(PermissionRow(R.drawable.sym_person, context.getString(R.string.settings_perm_contacts), context.getString(R.string.settings_perm_contacts_summary, desk), granted(Manifest.permission.READ_CONTACTS)) {
+                request(arrayOf(Manifest.permission.READ_CONTACTS))
+            })
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             add(PermissionRow(R.drawable.sym_photo_library, context.getString(R.string.settings_perm_files), context.getString(R.string.settings_perm_files_summary, desk), granted(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                 request(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE))
@@ -427,6 +469,7 @@ internal fun permissionRows(context: Context, desk: String, request: (Array<Stri
         add(PermissionRow(
             R.drawable.sym_accessibility_new, context.getString(R.string.settings_perm_accessibility), context.getString(R.string.settings_perm_accessibility_summary, desk),
             AccessibilitySetupActivity.running(),
+            unknown = !needs.accessibility && !AccessibilitySetupActivity.running(),
             allow = { AccessibilitySetupActivity.open(context) },
         ))
     }

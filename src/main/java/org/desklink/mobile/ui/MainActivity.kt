@@ -704,7 +704,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     private fun requestMissing(permissions: List<String>) {
         val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-        if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), RESULT_CALL_PERMISSIONS)
+        if (missing.isNotEmpty()) {
+            org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(this, missing.toTypedArray()) { asking ->
+                ActivityCompat.requestPermissions(this, asking, RESULT_CALL_PERMISSIONS)
+            }
+        }
     }
 
     /** Written at once, applied off the main thread: reloading plugins is blocking. */
@@ -738,7 +742,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             nearby = nearby,
             camera = camera || granted,
             attempt = scanAttempt,
-            onAllowCamera = { request.launch(Manifest.permission.CAMERA) },
+            onAllowCamera = {
+                        org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(this, arrayOf(Manifest.permission.CAMERA)) { request.launch(Manifest.permission.CAMERA) }
+                    },
             onCode = ::onQrCode,
             onPairNearby = { id ->
                 DeskLinkApplication.getInstance().getDevice(id)?.requestPairing()

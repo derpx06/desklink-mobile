@@ -771,4 +771,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_mic_consent_summary">You said yes once and chose to remember it. Switch off and %1$s has to ask again</string>
     <string name="screen_share_live_controlling">%1$s can also control this phone</string>
     <string name="screen_share_live_hearing">%1$s hears its sound</string>
+    <string name="permission_blocked_hint">Android will not ask again. Open Permissions here and allow it.</string>
+    <string name="settings_perm_calls">Calls</string>
+    <string name="settings_perm_calls_summary">Show, answer and dial calls on %1$s</string>
+    <string name="settings_perm_contacts">Contacts</string>
+    <string name="settings_perm_contacts_summary">Share contacts and caller names with %1$s</string>
 </resources>
