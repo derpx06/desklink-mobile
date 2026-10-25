@@ -854,6 +854,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 }
             },
             confirmButton = {},
+            // A way out whatever stage it hangs at (it used to be a dialog nothing could dismiss).
+            dismissButton = {
+                TextButton(onClick = { qrProgress = null; scanAttempt++ }) { Text(stringResource(R.string.cancel)) }
+            },
         )
     }
 

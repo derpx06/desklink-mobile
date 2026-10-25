@@ -132,6 +132,11 @@ object QrPairing {
         application.getDevice(code.desktopId)
             ?.takeIf { it.isPaired && !fingerprint(it.certificate).contentEquals(code.fingerprint) }
 
+    /** The sentence for a failed pairing: ours when the failure carries one (a message we wrote), else [generic]; never empty. */
+    @JvmStatic
+    fun failureText(failure: Throwable, generic: String): String =
+        failure.takeIf { it is IllegalStateException }?.message?.takeIf { it.isNotBlank() } ?: generic
+
     @JvmStatic
     fun pair(
         application: DeskLinkApplication,
@@ -141,7 +146,9 @@ object QrPairing {
         onResult: (String?) -> Unit,
     ) {
         org.desklink.mobile.helpers.ThreadHelper.execute {
-            onResult(runCatching { pairBlocking(application, code, replaceExisting, onProgress) }.exceptionOrNull()?.message)
+            // Any throwable is a failure, and what the person reads is one of our own sentences, never a raw exception.
+            val failure = runCatching { pairBlocking(application, code, replaceExisting, onProgress) }.exceptionOrNull()
+            onResult(failure?.let { failureText(it, application.getString(R.string.qr_error_generic)) })
         }
     }
 

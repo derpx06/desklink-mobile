@@ -62,4 +62,14 @@ class QrPairingTest {
         org.junit.Assert.assertTrue(QrPairing.isSamePairing(fp.copyOf(), fp))
         org.junit.Assert.assertFalse(QrPairing.isSamePairing(ByteArray(32), fp))
     }
+
+    @Test
+    fun aFailureWithNoMessageIsNeverReadAsSuccessAndNeverShownRaw() {
+        val generic = "Pairing did not work."
+        assertEquals(generic, QrPairing.failureText(NullPointerException(), generic))
+        assertEquals(generic, QrPairing.failureText(InterruptedException(), generic))
+        assertEquals(generic, QrPairing.failureText(IllegalStateException(""), generic))
+        assertEquals(generic, QrPairing.failureText(java.io.IOException("socket closed at 10.0.0.5:1716"), generic))
+        assertEquals("Couldn't reach the computer.", QrPairing.failureText(IllegalStateException("Couldn't reach the computer."), generic))
+    }
 }

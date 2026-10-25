@@ -776,4 +776,5 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_perm_calls_summary">Show, answer and dial calls on %1$s</string>
     <string name="settings_perm_contacts">Contacts</string>
     <string name="settings_perm_contacts_summary">Share contacts and caller names with %1$s</string>
+    <string name="qr_error_generic">Pairing did not work. Check that this phone and the computer are on the same Wi-Fi, then scan the code again.</string>
 </resources>
