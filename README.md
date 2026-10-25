@@ -36,7 +36,11 @@ protocol v8; it is not advertised or transmitted by the active path.
 - Remote control of the computer (view and control its screen) and the phone's
   screen on the computer.
 - Ping, find-my-phone, battery, clipboard, files and links, notification
-  mirroring with reply and action, and file browsing.
+  mirroring with reply and action (both ways), media control, and lock and unlock.
+- The Bucket (a folder kept in step with the computer), notes and snippets, contacts and
+  calls on the computer, the phone's microphone or sound on the computer, the computer's
+  pointer and keyboard carrying on onto the phone, and inserting a photo, scan or QR text
+  into whatever you are doing on the computer.
 
 The exact set exchanged with the desktop client is `WebRtcFeatureProfile`. It
 must stay byte-identical to `DESKTOP_INCOMING` ∪ `DESKTOP_OUTGOING` in the
@@ -47,9 +51,8 @@ filtered capability list for exact equality. Tests on both sides pin the list.
 
 Wi-Fi Direct and a shared virtual library.
 
-Media control, system volume, and run-command are implemented here in the
-phone-controls-desktop direction only. They stay outside the shared profile
-until the desktop client grows the backends to answer them.
+Browsing the phone's files, the presentation remote, system volume, run-command and
+Bluetooth were removed in 1.3.
 
 ## Compatibility
 

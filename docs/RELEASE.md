@@ -46,9 +46,8 @@ workspace), the same way:
 DESKLINK_RELAY_URL=wss://relay.example.org/v1
 ```
 
-Without it `BuildConfig.DEFAULT_RELAY_URL` is the placeholder
-`wss://relay.desklink.example/v1`, which reaches nothing: LAN works, the relay
-never connects until the user types an address in settings. `release.yml` reads
+Without it `BuildConfig.DEFAULT_RELAY_URL` is empty: LAN works, and there is no relay
+until the user types an address in settings (nothing is ever looked up on its own). `release.yml` reads
 it from the repository variable `DESKLINK_RELAY_URL` (Settings > Secrets and
 variables > Actions > Variables).
 
@@ -142,3 +141,34 @@ https://github.com/derpx06/desklink-mobile/blob/master/PRIVACY.md
    relay (`docs/testing/RELIABILITY.md` in the workspace).
 4. Tag and push; check the GitHub release and its `SHA256SUMS`.
 5. Upload the AAB and `mapping.txt` to Play (internal track first).
+
+
+## 4. Version scheme
+
+`versionName` is the product version (1.3.0 on both apps). `versionCode` is
+`20000 + minor * 100 + patch` (1.3.0 = 20300): the first build was numbered 2.0.0 / 20000, so the code
+only ever goes up. Each release needs `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`
+(`ReleaseHygieneTest` checks that it exists) and a `CHANGELOG.md` entry.
+
+## 5. Third-party facts (the owner's decisions; nothing here was changed)
+
+What the release APK (`assembleRelease`, arm64-v8a + armeabi-v7a, 43.7 MB) bundles that is not free software
+or needs a decision. Written down so the choice is made knowingly:
+
+| Component | Where | Size (arm64 / arm32) | Licence | Notes |
+|---|---|---|---|---|
+| WebRTC (`libjingle_peerconnection_so.so`, `org.webrtc`) | `webrtc-sdk` AAR | 12.1 MB / 6.8 MB | BSD-3-Clause (WebRTC), with the AAR's own third-party notices | Needed for every feature |
+| ML Kit text recognition (`libmlkit_google_ocr_pipeline.so`, `assets/mlkit-google-ocr-models/`) | `com.google.mlkit:text-recognition:16.0.1` | 11.1 MB / 6.8 MB plus the models | Google ML Kit terms (proprietary, not GPL-compatible) | Used only to read text out of photos taken for "insert on the computer". Bundles Google's telemetry transport (`com.google.android.datatransport`) and `MlKitInitProvider`; ML Kit documents sending usage and performance metrics and an installation id. `PRIVACY.md` and `docs/PLAY_DATA_SAFETY.md` say so. |
+| AndroidX graphics path | AndroidX | 10 KB | Apache-2.0 | |
+
+Decisions that are the owner's, with the facts:
+
+- **GPL and ML Kit.** The app is GPL-3.0-or-later with KDE Connect code that cannot be re-licensed. Shipping a
+  closed library in the same APK is a recognised GPL conflict, and F-Droid will not accept it (non-free
+  dependency). Options: keep it (Play and GitHub only); move text recognition to a separate optional download;
+  drop it (the option removes about 18 MB per ABI and the telemetry).
+- **ABIs.** Dropping `armeabi-v7a` removes about 13.6 MB (the 32-bit copies of WebRTC and ML Kit). With every
+  ABI the release APK is 95.6 MB.
+- **Removing the ML Kit telemetry** (the datatransport services and `MlKitInitProvider` via
+  `tools:node="remove"`) was not done: it cannot be checked off-device that recognition still works without
+  them. Real-phone check V14 in the workspace list covers it if you want to try.

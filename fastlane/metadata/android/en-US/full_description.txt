@@ -13,8 +13,10 @@ DeskLink connects your Android phone to your Linux computer. Pair once by scanni
 <b>Everyday integration</b>
 - Notifications from your phone appear on the computer, and you can reply from there.
 - Shared clipboard: copy on one device, paste on the other.
-- Send files and links both ways, and browse the phone's storage from the computer.
-- Battery level, find my phone, and lock the computer from your phone.
+- Send files and links both ways, and keep a folder (the Bucket) in step between the phone and the computer.
+- Notes, snippets, contacts and calls on the computer, and your phone's microphone or sound on the computer when you allow it.
+- The computer's pointer and keyboard can carry on onto the phone's screen, and the phone can take a photo, a scan or a QR text into whatever you are doing on the computer.
+- Battery level, find my phone, lock and unlock the computer from your phone.
 
 <b>Works anywhere, privately</b>
 - On the same Wi-Fi, the devices talk directly over an encrypted connection.
@@ -24,9 +26,10 @@ DeskLink connects your Android phone to your Linux computer. Pair once by scanni
 DeskLink needs the DeskLink desktop app on your Linux computer.
 
 <b>Permissions</b>
-- Accessibility service (optional): lets the computer control your phone while you share the phone's screen, and type into apps. DeskLink does not collect or share data through it.
+- Accessibility service (optional, explained and agreed to first): lets the computer control your phone, type into apps and carry its pointer onto the screen. DeskLink does not collect or share data through it.
 - Notification access (optional): to show your phone's notifications on the computer.
-- All files access (optional): to browse the phone's storage from the computer.
+- Contacts, phone and call permissions (optional, off by default): to share contacts and use calls from the computer; a call the computer asks for is placed only when you tap Allow.
+- Microphone (optional): to stream your phone's microphone or sound to the computer when you allow it.
 - Screen capture: asked each time you share the phone's screen.
 - Camera: to scan the pairing QR code.
 

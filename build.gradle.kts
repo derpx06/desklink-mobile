@@ -36,8 +36,9 @@ android {
         applicationId = "org.desklink.mobile"
         minSdk = 23
         targetSdk = 36
-        versionCode = 20000
-        versionName = "2.0.0"
+        // 1.3.0: versionCode is 20000 + minor * 100 + patch (the first build was numbered 2.0.0 / 20000, so the number only goes up).
+        versionCode = 20300
+        versionName = "1.3.0"
         resConfigs("en")
         // The DeskLink relay (docs/RELAY.md): the deployed relay's wss://<host>/v1
         // from the DESKLINK_RELAY_URL Gradle property or environment variable,
@@ -169,7 +170,7 @@ dependencies {
     implementation(libs.slf4j.api)
     implementation(libs.slf4j.handroid)
 
-    implementation(libs.bcpkix.jdk15on) //For SSL certificate generation
+    implementation(libs.bcpkix.jdk18on) //For SSL certificate generation
 
     ksp(libs.classindexksp)
 

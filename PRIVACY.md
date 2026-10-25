@@ -1,34 +1,45 @@
 # DeskLink privacy policy
 
-Last updated: 2026-10-20. Applies to the DeskLink Android app (`org.desklink.mobile`)
-from version 2.0.0.
+Last updated: 2026-10-25. Applies to the DeskLink Android app (`org.desklink.mobile`)
+from version 1.3.0.
 
 DeskLink connects your phone to your own computer running DeskLink. It has no
-account, no ads, no analytics and no tracking SDKs. We do not collect, sell or share
+account, no ads and no advertising or tracking SDKs. We do not collect, sell or share
 your data: what the app reads goes to the computer you paired, and nowhere else.
+(The one component that talks to Google on its own, ML Kit text recognition, is
+described under "Other network requests".)
 
 ## What the app accesses, and why
 
 Everything below is sent only to a computer you have paired, over an encrypted
-connection, and only while the matching feature is turned on.
+connection, and only while the matching feature is turned on. Features that read
+sensitive data (contacts, calls, the microphone, notifications, the accessibility
+service) are off until you turn them on and Android asks you.
 
 | Data | Used for | Permission |
 |---|---|---|
-| Notifications (app name, title, text, icon) | Showing your phone's notifications on the computer and replying to them | Notification access |
-| Clipboard | Copying and pasting between the devices | — |
-| Files you share, and phone storage when you browse it from the computer | Sending files, and browsing the phone from the computer | All files access (Android 11+) / storage |
+| Notifications (app name, title, text; not the icon) | Showing your phone's notifications on the computer and replying to them. Notifications Android marks secret are never sent; private ones go without their text unless you allow it | Notification access |
+| Clipboard (text and images) | Copying and pasting between the devices, while clipboard sync is on | none |
+| Files and links you share; the Bucket folder you pick | Sending files and links, and keeping one folder in step with the computer | none (you pick the folder with Android's file picker) |
+| Contacts (names, numbers, photos) | Showing your contacts on the computer and naming callers, only if you turn on "Share contacts" | Contacts |
+| Call state, number and name | Showing, answering and ending calls on the computer, and dialling from it: a call the computer asks for is placed only after you tap Allow on the phone | Phone state, Answer calls, Make calls |
 | Screen contents | Showing the phone screen on the computer, only while you are sharing it | Screen capture (asked each time) |
-| Touch and key input from the computer | Controlling the phone from the computer, if you enable the accessibility service | Accessibility service |
-| Battery level and charging state | Shown on the computer | — |
-| Mobile network type and signal strength | Shown on the computer | Phone state |
-| Camera | Scanning the pairing QR code, and the flashlight for "find my phone" | Camera |
-| Microphone | Dictating into the terminal; speech goes to your phone's speech recognizer, which may be an online service from your phone's vendor | Microphone |
+| Touch, pointer and key input from the computer | Controlling the phone from the computer, typing into the focused field, and the pointer crossing from the computer's screen to the phone, if you enable the accessibility service | Accessibility service (explained and agreed to first) |
+| Microphone and the phone's sound | Streaming them to the computer when it asks and you allow it (you can have the choice remembered per computer) | Microphone |
+| Camera | Scanning the pairing QR code, the flashlight for "find my phone", and photos or scans you take to insert on the computer | Camera |
+| Notes and snippets | Syncing the notes and pinned snippets you write, kept encrypted on both devices | none |
+| Battery level, charging state; the title, artist and cover of the media playing | Shown and controlled on the computer | none (media needs Notification access) |
+| Terminal text you type | Typed into terminals that run on your computer | none |
 | Wi-Fi network name | Recognising your "trusted networks" | Location |
-| Device name, model, certificate | Identifying the phone to the computer during pairing | — |
+| Device name, model, certificate | Identifying the phone to the computer during pairing | none |
 
-Pairing keys, the list of paired computers and your settings are stored only on
-the phone. Uninstalling the app deletes them. App data is excluded from Android
-backups.
+The phone also keeps, for 30 days, a list of the files you sent and received (names and
+where they are stored) so you can open them again. Pairing keys, the list of paired
+computers, your settings and notes are stored only on the phone and are removed with
+the pairing or by uninstalling the app. App data is excluded from Android backups.
+
+What the phone does **not** do: it does not let the computer browse its storage, read
+your call log or messages, or see your location.
 
 ## The DeskLink relay
 
@@ -52,6 +63,10 @@ DeskLink relay (you can turn this off, or point the app at your own relay).
 - The app downloads Google Play's public list of device models
   (`storage.googleapis.com`) to show a friendly name for your phone. No personal
   data is sent with this request.
+- **ML Kit text recognition** (Google) reads text out of photos you take to insert on
+  the computer. The recognition runs on the phone, but Google's ML Kit library may send
+  usage and performance metrics and an installation identifier to Google. Nothing you
+  photograph is sent.
 
 ## Crash reports
 
