@@ -213,7 +213,7 @@ public class CompositeReceiveFileJob extends BackgroundJob<Device, Void> {
                             Files.setLastModifiedTime(Paths.get(fileDocument.getUri().getPath()), FileTime.fromMillis(lastModified));
                         } catch (Exception e) {
                             Log.e("SharePlugin", "Can't set date on file");
-                            e.printStackTrace();
+                            Log.w("SharePlugin", "Failed: " + e.getClass().getSimpleName());
                         }
                     }
                 }

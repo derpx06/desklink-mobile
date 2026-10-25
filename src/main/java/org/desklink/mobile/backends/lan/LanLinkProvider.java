@@ -765,7 +765,7 @@ public class LanLinkProvider extends BaseLinkProvider {
                 try {
                     ipList.add(InetAddress.getByName(host.toString()));
                 } catch (UnknownHostException e) {
-                    e.printStackTrace();
+                    Log.w("LanLinkProvider", "Failed: " + e.getClass().getSimpleName());
                 }
             }
 
@@ -807,7 +807,7 @@ public class LanLinkProvider extends BaseLinkProvider {
                     network.bindSocket(socket);
                 } catch (IOException e) {
                     Log.w("LanLinkProvider", "Couldn't bind socket to the network");
-                    e.printStackTrace();
+                    Log.w("LanLinkProvider", "Failed: " + e.getClass().getSimpleName());
                 }
             }
             socket.setReuseAddress(true);

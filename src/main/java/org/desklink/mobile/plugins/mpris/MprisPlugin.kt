@@ -481,7 +481,7 @@ class MprisPlugin : Plugin() {
                         )
                     }
                 } catch (e: MalformedURLException) {
-                    e.printStackTrace()
+                    android.util.Log.w("MprisPlugin", "Bad album art URL (${e.javaClass.simpleName})")
                 }
             }
         }

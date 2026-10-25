@@ -391,7 +391,7 @@ internal object AlbumArtCache {
                 mpris.fetchedAlbumArt(stringUrl)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("AlbumArtCache", "Album art failed (${e.javaClass.simpleName})")
             try {
                 cacheItem.abort()
             } catch (e: IOException) {

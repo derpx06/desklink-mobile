@@ -249,7 +249,7 @@ public class SharePlugin extends Plugin {
 
         } catch (Exception e) {
             Log.e("SharePlugin", "Exception");
-            e.printStackTrace();
+            Log.w("SharePlugin", "Packet failed: " + e.getClass().getSimpleName());
         }
 
         return true;

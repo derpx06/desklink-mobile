@@ -116,9 +116,9 @@ object DeviceHelper {
                     }
                 }
             } catch (e: IOException) {
-                e.printStackTrace()
+                Log.w("DeviceHelper", "Could not read the device list (${e.javaClass.simpleName})")
             } catch (e: TextParsingException) {
-                e.printStackTrace()
+                Log.w("DeviceHelper", "Could not read the device list (${e.javaClass.simpleName})")
             }
             fetchingName = false
         }

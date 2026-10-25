@@ -12,13 +12,6 @@ class ReleaseHygieneTest {
     private fun project(path: String) = listOf(File(path), File("desklink-mobile/$path")).first { it.exists() }
 
     @Test
-    fun releaseBuildsStripEveryLogLineButErrors() {
-        val rules = project("proguard-rules.pro").readText()
-        for (level in listOf("d", "v", "i", "w")) assertTrue("Log.$level is stripped", "public static int $level(...);" in rules)
-        assertFalse("errors stay", "public static int e(...);" in rules)
-    }
-
-    @Test
     fun theWifiLockIsPartOfActiveWork() {
         assertTrue(BackgroundService.isActiveWork(false, false, false, false, gliding = true))
         assertFalse("merely being connected is not work", BackgroundService.isActiveWork(false, false, false, false))
@@ -70,5 +63,14 @@ class ReleaseHygieneTest {
         assertTrue(org.desklink.mobile.helpers.LockedActions.refuse(locked = true, grants = true))
         assertFalse(org.desklink.mobile.helpers.LockedActions.refuse(locked = false, grants = true))
         assertFalse("declining stays possible", org.desklink.mobile.helpers.LockedActions.refuse(locked = true, grants = false))
+    }
+
+    @Test
+    fun releaseBuildsLogNothingAndNothingPrintsAStackTraceAround() {
+        val rules = java.io.File("proguard-rules.pro").readText()
+        listOf("d", "v", "i", "w", "e").forEach { assertTrue("Log.$it is stripped in release", rules.contains("public static int $it(...);")) }
+        val offenders = java.io.File("src/main/java").walkTopDown().filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
+            .filter { it.readText().contains("printStackTrace(") }.map { it.name }.toList()
+        assertEquals("printStackTrace bypasses the stripping", emptyList<String>(), offenders)
     }
 }

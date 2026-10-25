@@ -27,12 +27,13 @@
     native <methods>;
 }
 
-# Release builds log errors only: debug, verbose, info and warning lines carry device names, addresses and ids that
-# end up in bug reports. (Debug builds keep everything.)
+# Release builds log nothing: every level carries device names, addresses and ids that end up in bug reports (what is worth
+# keeping goes to the redacted crash reports instead). (Debug builds keep everything.)
 -assumenosideeffects class android.util.Log {
     public static int d(...);
     public static int v(...);
     public static int i(...);
     public static int w(...);
+    public static int e(...);
 }
 
