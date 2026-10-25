@@ -64,4 +64,11 @@ class ReleaseHygieneTest {
         assertFalse("finished", BackgroundService.bytesMoving(true, false, 1_000, 2_000))
         assertFalse("no progress for the whole lease", BackgroundService.bytesMoving(false, false, 0, BackgroundService.PROGRESS_LEASE_MS + 1))
     }
+
+    @Test
+    fun granting_notification_buttons_are_held_back_on_the_lock_screen() {
+        assertTrue(org.desklink.mobile.helpers.LockedActions.refuse(locked = true, grants = true))
+        assertFalse(org.desklink.mobile.helpers.LockedActions.refuse(locked = false, grants = true))
+        assertFalse("declining stays possible", org.desklink.mobile.helpers.LockedActions.refuse(locked = true, grants = false))
+    }
 }

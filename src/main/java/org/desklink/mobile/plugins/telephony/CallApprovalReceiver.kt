@@ -10,6 +10,7 @@ import org.desklink.mobile.DeskLinkApplication
 /** Allow or Deny on the "<desk> wants to call <number>" heads-up. Not exported: only this app's own notification reaches it. */
 class CallApprovalReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ACTION_ALLOW && org.desklink.mobile.helpers.LockedActions.refuseWhileLocked(context)) return
         val nonce = intent.getStringExtra(EXTRA_NONCE)
         val deviceId = intent.getStringExtra(EXTRA_DEVICE)
         runCatching { NotificationManagerCompat.from(context).cancel("call-approval:$deviceId", NOTIFICATION_ID) }

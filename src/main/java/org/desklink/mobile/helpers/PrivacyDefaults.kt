@@ -20,6 +20,7 @@ object PrivacyDefaults {
     fun notificationsKey(): String = Plugin.getPluginKey(NotificationsPlugin::class.java)
 
     /** For every paired computer without an explicit choice: the old default (on), recorded, and the question marked as asked. */
+    @Synchronized
     fun grandfather(context: Context, devices: List<String> = TrustedDevices.getAllTrustedDevices(context)) {
         val app = context.applicationContext
         val marker = app.getSharedPreferences(MARKER_PREFS, Context.MODE_PRIVATE)

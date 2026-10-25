@@ -13,6 +13,7 @@ import org.desklink.mobile.DeskLinkApplication
 class TypeOnPhoneAllowReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
+        if (org.desklink.mobile.helpers.LockedActions.refuseWhileLocked(context)) return
         if (DeskLinkApplication.getInstance().getDevice(id)?.isPaired != true) return
         FocusedFieldTyping.setAllowed(context, id, true)
         FocusedFieldTyping.dismissAsk(context)

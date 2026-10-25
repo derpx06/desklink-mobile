@@ -18,7 +18,10 @@ class PairingActionReceiver : BroadcastReceiver() {
         val timestamp = intent.getLongExtra(EXTRA_TIMESTAMP, -1L)
         val device = DeskLinkApplication.getInstance().getDevice(deviceId) ?: return
         when (intent.action) {
-            ACTION_ACCEPT -> device.acceptPairing(timestamp)
+            ACTION_ACCEPT -> {
+                if (org.desklink.mobile.helpers.LockedActions.refuseWhileLocked(context)) return
+                device.acceptPairing(timestamp)
+            }
             ACTION_REJECT -> device.rejectPairingRequest(timestamp)
             else -> return
         }

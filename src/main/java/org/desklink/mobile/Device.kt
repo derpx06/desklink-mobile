@@ -461,6 +461,14 @@ class Device : PacketReceiver {
             .setTicker(res.getString(R.string.pair_requested))
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
+            // On the lock screen the code stays hidden; Accept itself also refuses while locked (PairingActionReceiver).
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                NotificationCompat.Builder(context, NotificationHelper.Channels.PAIRING)
+                    .setSmallIcon(R.drawable.ic_notification)
+                    .setContentTitle(res.getString(R.string.pair_requested))
+                    .build(),
+            )
             .addAction(R.drawable.ic_accept_pairing_24dp, res.getString(R.string.pairing_accept), acceptedPendingIntent)
             .addAction(R.drawable.ic_reject_pairing_24dp, res.getString(R.string.pairing_reject), rejectedPendingIntent)
             .setAutoCancel(true)

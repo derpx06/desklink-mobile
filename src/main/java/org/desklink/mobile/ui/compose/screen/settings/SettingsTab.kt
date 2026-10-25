@@ -49,6 +49,7 @@ import androidx.preference.PreferenceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.apache.commons.io.IOUtils
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.BuildConfig
@@ -734,16 +735,20 @@ private fun AppearanceGroup(actions: SettingsActions, prefs: android.content.Sha
 @Composable
 private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: android.content.SharedPreferences, onOpen: (String) -> Unit, changed: () -> Unit) {
     val context = LocalContext.current
+    val failed = stringResource(R.string.export_logs_failed)
     val exportLogs = rememberLauncherForActivityResult(CreateFileResultContract()) { uri: Uri? ->
         val output = uri?.let { context.contentResolver.openOutputStream(it) } ?: return@rememberLauncherForActivityResult
         CoroutineScope(Dispatchers.IO).launch {
-            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d"))
-            val reader = InputStreamReader(process.inputStream)
-            output.use {
-                it.write("DeskLink ${BuildConfig.VERSION_NAME}\n".toByteArray(Charsets.UTF_8))
-                it.write("Android ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})\n".toByteArray(Charsets.UTF_8))
-                IOUtils.copy(reader, it, Charsets.UTF_8)
-            }
+            val ok = runCatching {
+                val process = Runtime.getRuntime().exec(org.desklink.mobile.helpers.LogExport.command())
+                output.use {
+                    org.desklink.mobile.helpers.LogExport.write(
+                        "DeskLink ${BuildConfig.VERSION_NAME}\nAndroid ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})",
+                        InputStreamReader(process.inputStream, Charsets.UTF_8).buffered().lineSequence(), it,
+                    )
+                }
+            }.isSuccess
+            if (!ok) withContext(Dispatchers.Main) { android.widget.Toast.makeText(context, failed, android.widget.Toast.LENGTH_LONG).show() }
         }
     }
     // Back from the trusted networks: discovery re-reads them at once.

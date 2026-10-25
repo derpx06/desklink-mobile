@@ -164,6 +164,7 @@ class TerminalAttentionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val deviceId = intent.getStringExtra(TerminalActivity.EXTRA_DEVICE_ID) ?: return
         val terminalId = intent.getStringExtra(TerminalActivity.EXTRA_TERMINAL_ID) ?: return
+        if (org.desklink.mobile.helpers.LockedActions.refuseWhileLocked(context)) return
         val reply = when (intent.action) {
             ACTION_YES -> "y\r"
             ACTION_NO -> "n\r"

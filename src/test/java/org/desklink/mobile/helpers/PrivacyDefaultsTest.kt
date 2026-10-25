@@ -25,6 +25,11 @@ class PrivacyDefaultsTest {
 
     @Test
     fun aComputerPairedBeforeKeepsItsSharingAndIsNeverAskedAndANewOneIsAsked() {
+        // The application's own start-up thread also runs grandfather(): the lock keeps it from interleaving with this test.
+        synchronized(PrivacyDefaults) { body() }
+    }
+
+    private fun body() {
         app.getSharedPreferences(PrivacyDefaults.MARKER_PREFS, 0).edit().clear().commit()
         val old = "aaaaaaaa-0000-0000-0000-000000000001"
         val explicitOff = "aaaaaaaa-0000-0000-0000-000000000002"
