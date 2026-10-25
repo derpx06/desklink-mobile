@@ -86,6 +86,9 @@ class FileTransferStore(val root: File) {
     private fun blocksFile(id: String) = File(root, ".desklink-${safe(id)}.blocks")
     private fun checkpointFile(id: String) = File(root, ".desklink-${safe(id)}.json")
 
+    /** Removes every transfer kept for [deviceId]: parts, hashes, checkpoints and spools. */
+    fun removeDevice(deviceId: String) = list().filter { it.deviceId == deviceId }.forEach { remove(it.transferId) }
+
     fun exists(id: String) = checkpointFile(id).exists()
 
     /** Atomic and durable (the file system journals the rename); false if it could not be written. */
@@ -174,6 +177,10 @@ class FileTransferStore(val root: File) {
     }
 
     companion object {
+        fun forgetDevice(context: android.content.Context, deviceId: String) {
+            FileTransferStore(File(context.applicationContext.filesDir, "webrtc-transfers")).removeDevice(deviceId)
+        }
+
         const val MAX_CHECKPOINT_BYTES = 16L * 1024
         private val V2_NAME = Regex("""\.desklink-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(json|part|blocks|spool)(\.tmp)?""")
     }

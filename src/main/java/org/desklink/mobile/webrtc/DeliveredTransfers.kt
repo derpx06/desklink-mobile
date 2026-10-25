@@ -28,6 +28,9 @@ class DeliveredTransfers(private val file: File, private val now: () -> Long = S
         }
 
     @Synchronized
+    fun forgetPeer(deviceId: String) = save(load().filterNot { it.deviceId == deviceId })
+
+    @Synchronized
     fun forget(transferId: String) = save(load().filterNot { it.transferId == transferId })
 
     private fun load(): List<Record> = runCatching {
@@ -56,6 +59,12 @@ class DeliveredTransfers(private val file: File, private val now: () -> Long = S
     }
 
     companion object {
+        /** Everything remembered as delivered by [deviceId], gone with its pairing. */
+        fun forgetDevice(context: android.content.Context, deviceId: String) {
+            val store = DeliveredTransfers(File(context.applicationContext.filesDir, "webrtc-delivered.json"))
+            store.forgetPeer(deviceId)
+        }
+
         const val MAX_RECORDS = 50
         const val MAX_AGE_MS = 7L * 24 * 3600 * 1000
     }

@@ -257,6 +257,25 @@ object BucketEngine {
         publish()
     }
 
+    /**
+     * The computer was unpaired: its Bucket entry, the persisted permission to its folder and its watch are dropped. The
+     * files in the folder are the person's and stay.
+     */
+    fun forgetPeer(context: Context, deviceId: String) {
+        if (!::app.isInitialized) app = context.applicationContext
+        worker.execute {
+            val live = buckets.remove(deviceId)
+            val tree = live?.treeUri ?: asked.remove(deviceId)?.first
+            offers.remove(deviceId)
+            ready -= deviceId
+            synchronized(wanted) { wanted.keys.removeAll { it.first == deviceId } }
+            live?.let(::unwatch)
+            tree?.let(::release)
+            save()
+            publish()
+        }
+    }
+
     fun decline(deviceId: String) = worker.execute {
         offers.remove(deviceId) ?: return@execute
         send(deviceId, packet("decline").apply { this["id"] = FolderSync.BUCKET_ID })

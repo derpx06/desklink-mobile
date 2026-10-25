@@ -67,6 +67,13 @@ class ReceiveNotificationsPlugin : Plugin() {
         return sampleSize
     }
 
+    /** Switched off: what the desk showed here goes from the shade and the lock screen. */
+    override fun onTurnedOff() {
+        val manager = ContextCompat.getSystemService(context, NotificationManager::class.java)
+        val posted = manager?.activeNotifications.orEmpty().mapNotNull { it.tag }
+        DeskNotification.stale(posted, device.deviceId, emptySet()).forEach { manager?.cancel(it, NOTIFICATION_ID) }
+    }
+
     /** A desk's notifications posted here, a minute at most (updates and cancels are not counted). */
     private val posts = org.desklink.mobile.helpers.RateLimiter(org.desklink.mobile.helpers.InboundLimits.MAX_DESK_NOTIFICATIONS_PER_MINUTE, 60_000, "DeskLink/Notifications")
 

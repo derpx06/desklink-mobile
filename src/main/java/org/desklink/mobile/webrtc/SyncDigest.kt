@@ -38,6 +38,12 @@ class SyncDigest(private val myInstance: () -> String) {
         linkGeneration++
     }
 
+    /** Everything applied from the peer is forgotten (it was unpaired, or the plugin that held it was removed). */
+    @Synchronized
+    fun forgetAll() {
+        received.clear()
+    }
+
     /**
      * Runs [action] once: at once if the peer's `have` is already here, else when it arrives, else
      * after [timeoutMs] (scheduled through [schedule]) with everything to be sent. Never blocks.

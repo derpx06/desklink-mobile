@@ -378,6 +378,9 @@ class Device : PacketReceiver {
                 assert(device == this@Device)
                 Log.i("Device", "unpaired, removing from trusted devices list")
                 TrustedDevices.removeTrustedDevice(context, deviceInfo.id)
+                // Everything else this phone held for it: digest, consents, Bucket, kept transfers, mirrored notifications.
+                sync.forgetAll()
+                org.desklink.mobile.helpers.PeerState.forget(context, deviceInfo.id)
                 updateSessionPairingState(PairingState.NOT_PAIRED)
 
                 val generation = pairingGeneration.get()
@@ -1476,6 +1479,8 @@ class Device : PacketReceiver {
     // Helper function for reloadPluginsFromSettings(), do not call from elsewhere
     private fun removePlugin(pluginKey: String): Boolean {
         val plugin = loadedPlugins.remove(pluginKey) ?: return false
+        // What this device applied from the desk lived in that plugin: the next connection asks for it again.
+        sync.forgetAll()
 
         try {
             plugin.onDestroy()

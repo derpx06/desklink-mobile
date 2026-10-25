@@ -48,6 +48,14 @@ object SendAgain {
         TransferHistory.changed()
     }
 
+    /** The computer was unpaired: what was waiting to be sent to it is gone. */
+    @JvmStatic
+    @Synchronized
+    fun forgetDevice(context: Context, deviceId: String) {
+        save(context, list(context).filterNot { it.deviceId == deviceId })
+        TransferHistory.changed()
+    }
+
     @JvmStatic
     @Synchronized
     fun dismiss(context: Context, id: String) {
