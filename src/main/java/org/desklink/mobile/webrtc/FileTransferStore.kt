@@ -76,6 +76,20 @@ class FileTransferStore(val root: File) {
         return removed
     }
 
+    /**
+     * docs/WEBRTC.md: a transfer nobody touched for [maxAgeMs] (7 days, as on the computer) is abandoned: its parts, hashes,
+     * checkpoint and spool all go. A transfer's files are grouped by id and judged by the newest of them.
+     */
+    fun sweepStale(now: Long, maxAgeMs: Long = STALE_AFTER_MS, keep: Set<String> = emptySet()): Int {
+        val groups = root.listFiles().orEmpty().filter { it.isFile && V2_NAME.matches(it.name) }.groupBy { it.name.substring(10, 46) }
+        var removed = 0
+        groups.forEach { (id, files) ->
+            if (id in keep || now - files.maxOf { it.lastModified() } < maxAgeMs) return@forEach
+            files.forEach { if (runCatching { it.delete() }.getOrDefault(false)) removed++ }
+        }
+        return removed
+    }
+
     private fun safe(id: String): String {
         validateTransferId(id)
         return id
@@ -182,6 +196,7 @@ class FileTransferStore(val root: File) {
         }
 
         const val MAX_CHECKPOINT_BYTES = 16L * 1024
+        const val STALE_AFTER_MS = 7L * 24 * 3600 * 1000
         private val V2_NAME = Regex("""\.desklink-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(json|part|blocks|spool)(\.tmp)?""")
     }
 }

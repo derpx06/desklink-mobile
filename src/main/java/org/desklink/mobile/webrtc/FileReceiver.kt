@@ -441,7 +441,9 @@ class FileReceiver(
 
     /** The link went away: keep everything verified so far (to the block) for the next connection. */
     fun suspend() {
-        if (ended) return
+        // The file is being copied into place: a link drop must not end this receiver, or the sender's re-offer would start a new
+        // one that truncates the part mid-copy. It finishes (and a lost `complete` is answered from the delivered record).
+        if (ended || publishing) return
         maybeCheckpoint(force = true)
         close()
         ended = true

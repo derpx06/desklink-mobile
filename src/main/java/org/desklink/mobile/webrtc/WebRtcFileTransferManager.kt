@@ -116,10 +116,12 @@ class WebRtcFileTransferManager(
     private val queuedBytes = AtomicLong()
     private val backlogged = AtomicBoolean(false)
     private val pumpPending = AtomicBoolean(false)
+    private var lastSweepAt = System.currentTimeMillis()
     @Volatile private var currentWire: WebRtcWireBinding? = null
 
     init {
         store.purgeLegacy()
+        store.sweepStale(System.currentTimeMillis())
         runCatching { org.desklink.mobile.plugins.share.UnpublishedFiles.prune(appContext) }
     }
 
@@ -739,6 +741,11 @@ class WebRtcFileTransferManager(
     private fun tick() {
         tickHook?.invoke()
         val now = clock()
+        val wall = System.currentTimeMillis()
+        if (wall - lastSweepAt > 24L * 3600 * 1000) {
+            lastSweepAt = wall
+            store.sweepStale(wall, keep = (sends.keys + receives.keys).toSet())
+        }
         sends.values.toList().forEach { it.sender.tick(now) }
         receives.values.toList().forEach { it.tick(now) }
     }

@@ -131,8 +131,14 @@ class FileTransferEngineTest {
             override fun progress(sender: FileSender, bytesDone: Long) { progress += bytesDone }
             override fun ended(sender: FileSender, outcome: FileSender.Outcome, message: String?) { senderOutcomes += outcome to message }
         }
+        /** When set, the copy into place does not finish until the test calls it. */
+        var holdPublish = false
+        var publishFinished: ((Throwable?) -> Unit)? = null
         val receiverListener = object : FileReceiver.Listener {
             override fun progress(receiver: FileReceiver, bytesDone: Long) = Unit
+            override fun deliverAsync(receiver: FileReceiver, partial: File, fileHash: String, finished: (Throwable?) -> Unit) {
+                if (holdPublish) publishFinished = finished else super.deliverAsync(receiver, partial, fileHash, finished)
+            }
             override fun deliver(receiver: FileReceiver, partial: File, fileHash: String) {
                 deliveredSize = partial.length()
                 deliveredFileHash = fileHash
@@ -351,6 +357,24 @@ class FileTransferEngineTest {
     }
 
     // ============================================== link drop and crash resume
+
+    @Test
+    fun aLinkDropWhileTheFileIsBeingPutInPlaceLeavesThePartAlone() {
+        val bytes = data(2 * FileV2.BLOCK_BYTES)
+        val h = harness(bytes)
+        h.holdPublish = true
+        h.run()
+        val finished = requireNotNull(h.publishFinished) { "the copy into place should be pending" }
+        val partial = h.receiverStore.partial(h.id)
+        val length = partial.length()
+        h.receiver!!.suspend() // the link went mid-copy
+        assertTrue("not suspended: it is still publishing", h.receiverOutcomes.none { it.first == FileReceiver.Outcome.SUSPENDED })
+        assertEquals("the part is untouched", length, partial.length())
+        h.receiver!!.onReoffer() // the desk offers again: no truncation, no second receiver work
+        assertEquals(length, partial.length())
+        finished(null)
+        assertEquals(FileReceiver.Outcome.DELIVERED, h.receiverOutcomes.last().first)
+    }
 
     @Test
     fun aDroppedLinkResumesAtTheLastVerifiedBlockAndTheFinalHashIsRight() {
@@ -961,5 +985,17 @@ class FileTransferEngineTest {
         (keep + legacy).forEach { File(store.root, it).writeText("x") }
         assertEquals(legacy.size, store.purgeLegacy())
         assertEquals(keep.sorted(), store.root.listFiles().orEmpty().map { it.name }.sorted())
+    }
+
+    @Test
+    fun aTransferNobodyTouchedForSevenDaysIsSweptWholeAndARecentOneIsKept() {
+        val store = FileTransferStore(tmp.newFolder())
+        val old = UUID.randomUUID().toString()
+        val fresh = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        listOf("json", "part", "blocks").forEach { File(store.root, ".desklink-$old.$it").apply { writeText("x"); setLastModified(now - 8L * 24 * 3600 * 1000) } }
+        listOf("json", "part").forEach { File(store.root, ".desklink-$fresh.$it").apply { writeText("x"); setLastModified(now - 3600_000) } }
+        assertEquals(3, store.sweepStale(now))
+        assertEquals(listOf(".desklink-$fresh.json", ".desklink-$fresh.part"), store.root.listFiles().orEmpty().map { it.name }.sorted())
     }
 }

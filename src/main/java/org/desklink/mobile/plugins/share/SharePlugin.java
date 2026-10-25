@@ -211,7 +211,10 @@ public class SharePlugin extends Plugin {
                 // C3: the desk's image copy goes on the clipboard, never into Downloads.
                 org.desklink.mobile.plugins.clipboard.ClipboardImages.INSTANCE.receive(context, np);
             } else if (np.has("filename")) {
-                receiveFile(np);
+                // The v1 payload-on-the-packet path is gone: files arrive only as v2 transfers. A bare packet like this used to
+                // make an empty file in Downloads.
+                Log.w("SharePlugin", "Ignoring a v1 file packet");
+                closeUnusedPayload(np);
             } else if (np.has("text")) {
                 Log.i("SharePlugin", "hasText");
                 receiveText(np);
@@ -270,33 +273,6 @@ public class SharePlugin extends Plugin {
         handler.post(() -> Toast.makeText(context, R.string.shareplugin_text_saved, Toast.LENGTH_LONG).show());
     }
 
-    @WorkerThread
-    private void receiveFile(NetworkPacket np) {
-        CompositeReceiveFileJob job;
-
-        boolean hasNumberOfFiles = np.has(KEY_NUMBER_OF_FILES);
-        boolean isOpen = np.getBoolean("open", false);
-
-        if (hasNumberOfFiles && !isOpen && receiveFileJob != null) {
-            job = receiveFileJob;
-        } else {
-            job = new CompositeReceiveFileJob(getDevice(), receiveFileJobCallback);
-        }
-
-        if (!hasNumberOfFiles) {
-            np.set(KEY_NUMBER_OF_FILES, 1);
-            np.set(KEY_TOTAL_PAYLOAD_SIZE, np.getPayloadSize());
-        }
-
-        job.addNetworkPacket(np);
-
-        if (job != receiveFileJob) {
-            if (hasNumberOfFiles && !isOpen) {
-                receiveFileJob = job;
-            }
-            backgroundJobHandler.runJob(job);
-        }
-    }
 
     void sendUriList(final ArrayList<Uri> uriList) {
         CompositeUploadFileJob job;
