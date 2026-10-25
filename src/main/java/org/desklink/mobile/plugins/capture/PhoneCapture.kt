@@ -134,7 +134,7 @@ object PhoneCapture {
     /** text/qr: the words themselves, in `capture-result`. */
     fun sendText(request: CaptureRequest, text: String): Boolean {
         val coordinator = DeskLinkApplication.getInstance().webRtcCoordinator(request.deviceId) ?: return false
-        val sent = coordinator.sendCaptureResult(request.captureId, request.kind, text = text.take(32 * 1024))
+        val sent = coordinator.sendCaptureResult(request.captureId, request.kind, text = CaptureText.fit(text))
         if (sent) current = null
         return sent
     }

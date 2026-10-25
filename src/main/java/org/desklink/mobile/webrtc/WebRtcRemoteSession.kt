@@ -167,7 +167,7 @@ data class WebRtcRemoteSessionControlMessage(
         require(source == null || source in AUDIO_SOURCES) { "Unknown DeskLink audio source" }
         require(display == null || display in DISPLAY_MODES) { "Unknown DeskLink display mode" }
         require(scale == null || scale in 0.5..8.0) { "DeskLink display scale is invalid" }
-        require((text?.length ?: 0) <= MAX_CAPTURE_TEXT && (pages ?: 1) in 1..200) { "DeskLink capture result is too large" }
+        require((text?.toByteArray(Charsets.UTF_8)?.size ?: 0) <= MAX_CAPTURE_TEXT && (pages ?: 1) in 1..200) { "DeskLink capture result is too large" }
         require((sampleRate ?: 8000) in 8000..192000 && (channels ?: 1) in 1..2 && (value ?: 0) in 0..100) {
             "DeskLink audio format is invalid"
         }
