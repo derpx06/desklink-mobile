@@ -261,15 +261,16 @@ class ContactsPlugin : Plugin() {
         private fun photo(context: Context, id: Long): ByteArray? = runCatching {
             val uri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, id)
             val bytes = ContactsContract.Contacts.openContactPhotoInputStream(context.contentResolver, uri, false)?.use { input ->
-                val buffer = ByteArray(MAX_PHOTO_SOURCE_BYTES + 1)
-                var read = 0
-                while (read < buffer.size) {
-                    val n = input.read(buffer, read, buffer.size - read)
+                // Grown as it is read (a thumbnail is a few KiB): not a megabyte allocated for every contact.
+                val out = ByteArrayOutputStream()
+                val chunk = ByteArray(8 * 1024)
+                while (true) {
+                    val n = input.read(chunk)
                     if (n < 0) break
-                    read += n
+                    out.write(chunk, 0, n)
+                    if (out.size() > MAX_PHOTO_SOURCE_BYTES) return null
                 }
-                if (read > MAX_PHOTO_SOURCE_BYTES) return null
-                buffer.copyOf(read)
+                out.toByteArray()
             } ?: return null
             // Decoded at a power-of-two reduction already near the target: bounded bitmap memory.
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
