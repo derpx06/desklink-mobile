@@ -77,6 +77,6 @@ class FileReceiverBenchmarkTest {
         println("receiver benchmark: ${"%.0f".format(mbps)} MB/s; ${receiver.summary()}")
         assertTrue(delivered)
         assertEquals(hashes.size, receiver.verifiedBlocks)
-        assertTrue("the receive path must not be the bottleneck: $mbps MB/s", mbps > 60)
+        assertTrue("the receive path must not be the bottleneck: $mbps MB/s", mbps > 0.15 * BenchBaseline.sha256MBps)
     }
 }

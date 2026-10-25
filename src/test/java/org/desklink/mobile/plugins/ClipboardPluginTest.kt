@@ -55,6 +55,7 @@ class ClipboardPluginTest {
     @After
     fun cleanup() {
         packet = null // Remove old capture packet
+        io.mockk.unmockkAll() // the object/static mocks must not leak into the next test class
     }
 
     // REMOTE -> LOCAL

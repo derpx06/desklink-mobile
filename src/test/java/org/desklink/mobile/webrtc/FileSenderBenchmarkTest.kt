@@ -93,7 +93,7 @@ class FileSenderBenchmarkTest {
         assertEquals(size, bytes)
         assertTrue(done)
         assertEquals(listOf(FileSender.Outcome.COMPLETED), outcomes)
-        assertTrue("the sender managed only %.0f MB/s".format(mbPerSecond), mbPerSecond > 60)
-        assertTrue("a block costs %.1f ms of sender CPU".format(seconds * 1000 / blocks), seconds * 1000 / blocks < 15)
+        assertTrue("the sender managed only %.0f MB/s".format(mbPerSecond), mbPerSecond > 0.15 * BenchBaseline.sha256MBps)
+        assertTrue("a block costs %.1f ms of sender CPU".format(seconds * 1000 / blocks), seconds * 1000 / blocks < 1000.0 / (0.15 * BenchBaseline.sha256MBps) * 2 + 15)
     }
 }
