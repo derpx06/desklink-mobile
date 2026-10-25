@@ -30,4 +30,31 @@ class IdleTimersTest {
             .toSortedSet()
         assertEquals("a periodic timer was added or removed: update the list with its reason", allowed.keys.toSortedSet(), found)
     }
+
+    // Loops that wait with a coroutine delay, and Handlers that post themselves again: the timers the first test cannot see.
+    private val delayLoop = Regex("""while \((true|[^)]*)\)\s*\{.{0,500}?\bdelay\(""", RegexOption.DOT_MATCHES_ALL)
+    private val selfPosting = Regex("""postDelayed\(\s*(this|[A-Za-z_]*(Task|Tick|Poll|Runnable|Refresh|Check)[A-Za-z_]*)\s*,""")
+
+    private val allowedLoops = mapOf(
+        "plugins/mousepad/MousePadActivity.kt" to "the control retry (stops after a refusal) and the controls auto-hide; only while the screen view is started",
+        "plugins/terminal/TerminalActivity.kt" to "list refresh and preview scrape; StartedEffect, only while the terminal screen is started",
+        "ui/MainActivity.kt" to "the 1 Hz UI tick inside repeatOnLifecycle(STARTED), and the 20 s QR proof wait",
+        "ui/compose/components/Primitives.kt" to "connection stats poll; StartedEffect, only while on screen",
+        "ui/compose/screen/home/HomeMediaUi.kt" to "the seek bar; StartedEffect and only while the media is playing",
+        "ui/compose/screen/tabs/TabScreens.kt" to "terminal list refresh and previews; StartedEffect, only while the tab is on screen",
+        "BackgroundService.kt" to "the work-lease recheck: re-arms only while work holds the lease, and the lease lapses on its own",
+        "Device.kt" to "the doze/peer expiry handler: armed only for a live link",
+        "plugins/findmyphone/FlashlightManager.kt" to "the flash blink, only while the phone is ringing (60 s limit)",
+        "plugins/mprisreceiver/MprisReceiverPlugin.java" to "position ticks, only while media plays",
+    )
+
+    @Test
+    fun onlyTheFilesWithAReasonLoopOnADelayOrRepostAHandler() {
+        val root = File("src/main/java")
+        val found = root.walkTopDown().filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
+            .filter { val t = it.readText(); delayLoop.containsMatchIn(t) || selfPosting.containsMatchIn(t) }
+            .map { it.relativeTo(File(root, "org/desklink/mobile")).path }
+            .toSortedSet()
+        assertEquals("a delay loop or self-posting Handler was added or removed: update the list with its reason", allowedLoops.keys.toSortedSet(), found)
+    }
 }

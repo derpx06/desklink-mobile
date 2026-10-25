@@ -18,6 +18,9 @@ class PairingBackupTest {
 
     @Test
     fun aFailedReplaceCanPutTheOldPairingBack() {
+        // The application's start-up thread runs PrivacyDefaults.grandfather() over every trusted device; settle it first so it
+        // cannot write into this test's pairing (the lock waits for a run in progress, and a done marker stops a later one).
+        org.desklink.mobile.helpers.PrivacyDefaults.grandfather(context, emptyList())
         TrustedDevices.addTrustedDevice(context, id)
         TrustedDevices.getDeviceSettings(context, id).edit().putString("certificate", "CERT").putString("deviceName", "Work Laptop").putInt("protocolVersion", 9).commit()
         val backup = PairingBackup.capture(context, id)

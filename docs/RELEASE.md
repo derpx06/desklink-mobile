@@ -172,3 +172,8 @@ Decisions that are the owner's, with the facts:
 - **Removing the ML Kit telemetry** (the datatransport services and `MlKitInitProvider` via
   `tools:node="remove"`) was not done: it cannot be checked off-device that recognition still works without
   them. Real-phone check V14 in the workspace list covers it if you want to try.
+- **Unused dependencies** (done in 1.3): rxjava, reactive-streams, swiperefreshlayout, gridlayout and lifecycle-extensions had no users
+  and were removed; `lifecycle-process` (for `ProcessLifecycleOwner`) is declared directly.
+- **minSdk 23 and API 24 calls.** Lint finds calls newer than API 23 (about 20 `NewApi` entries in `lint-baseline.xml`, the
+  baseline the build now fails against for anything new). Options: raise `minSdk` to 24 (drops Android 6.0, under 1% of devices,
+  and lets the baseline shrink) or guard each call with `Build.VERSION.SDK_INT`. Not changed: it is the owner's call.
