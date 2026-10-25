@@ -44,7 +44,7 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
     }
 
     private val pairingJob = SupervisorJob()
-    private val pairingScope = CoroutineScope(Dispatchers.IO + pairingJob)
+    private val pairingScope = CoroutineScope(Dispatchers.IO + pairingJob + org.desklink.mobile.helpers.Guarded.handler("pairing"))
     private var pairingTimestamp = 0L
 
     /** The negotiation a pairing notification was shown for; see [acceptPairing]. */

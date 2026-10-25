@@ -103,9 +103,7 @@ class WebRtcSessionCoordinator(
      * one. */
     private var remoteHeartbeatEpoch = 0L
     private val recovery = WebRtcRecoveryPolicy()
-    private val recoveryExecutor = Executors.newSingleThreadScheduledExecutor { runnable ->
-        Thread(runnable, "DeskLink-WebRTC-Recovery-${device.deviceId}").apply { isDaemon = true }
-    }
+    private val recoveryExecutor = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-WebRTC-Recovery-${device.deviceId}")
     private val pendingInitiation = ExpeditableTask(recoveryExecutor)
     private val transportCleanup = DeferredTaskExecutor(
         "DeskLink-WebRTC-Cleanup-${device.deviceId}",

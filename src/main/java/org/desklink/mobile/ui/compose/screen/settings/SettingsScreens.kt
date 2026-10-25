@@ -366,7 +366,7 @@ internal fun PermissionsSection(desk: DeskSettings?) {
         asked++
         if (result.values.any { it }) {
             // Plugins that waited for the permission (Share, Find my phone…) load now.
-            CoroutineScope(Dispatchers.IO).launch {
+            CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
                 org.desklink.mobile.DeskLinkApplication.getInstance().devices.values.forEach(org.desklink.mobile.Device::reloadPluginsFromSettings)
             }
         }

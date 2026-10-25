@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -738,7 +739,7 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
     val failed = stringResource(R.string.export_logs_failed)
     val exportLogs = rememberLauncherForActivityResult(CreateFileResultContract()) { uri: Uri? ->
         val output = uri?.let { context.contentResolver.openOutputStream(it) } ?: return@rememberLauncherForActivityResult
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
             val ok = runCatching {
                 val process = Runtime.getRuntime().exec(org.desklink.mobile.helpers.LogExport.command())
                 output.use {
@@ -759,6 +760,18 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
     val waiting = waitingPermissions(context, desk?.name ?: stringResource(R.string.settings_your_computer), desk?.pluginPermissions?.size ?: 0)
     val configured = RelaySettings.configured(context)
     val relayOn = configured && prefs.getBoolean(RelaySettings.KEY_ENABLED, true)
+    val stopped by org.desklink.mobile.helpers.Guarded.stopped.collectAsState()
+    if (stopped.isNotEmpty()) {
+        // A feature threw and was caught (its report is kept): one tap reloads what is turned on.
+        RowGroup {
+            GroupRow(
+                stringResource(R.string.feature_stopped_title),
+                icon = R.drawable.sym_refresh,
+                subtitle = stringResource(R.string.feature_stopped_summary, stopped.sorted().joinToString(", ")),
+                onClick = { org.desklink.mobile.helpers.Guarded.restartStopped() },
+            ) { Chevron() }
+        }
+    }
     SectionLabel(stringResource(R.string.settings_category_away))
     RowGroup {
         // Without a relay address the switch has nothing to turn on: say so, and wait for one.

@@ -10,11 +10,10 @@ import android.os.Looper
 import android.util.Log
 import org.desklink.mobile.BuildConfig
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 object ThreadHelper {
 
-    private val executor: ExecutorService = Executors.newCachedThreadPool()
+    private val executor: ExecutorService = Guarded.cached("DeskLink-worker")
 
     @JvmStatic
     fun execute(command: Runnable) = executor.execute(command)

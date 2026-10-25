@@ -469,7 +469,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         var notifications by androidx.compose.runtime.remember { mutableStateOf(false) }
         fun finish(apply: Boolean) {
             gone = true
-            CoroutineScope(Dispatchers.IO).launch { org.desklink.mobile.helpers.FirstShare.markDone(this@MainActivity, id) }
+            CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch { org.desklink.mobile.helpers.FirstShare.markDone(this@MainActivity, id) }
             if (apply && clipboard) setPluginEnabled(device, HomeModel.clipboardKey, true)
             if (apply && notifications) setPluginEnabled(device, Plugin.getPluginKey(NotificationsPlugin::class.java), true)
         }
@@ -713,7 +713,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     /** Written at once, applied off the main thread: reloading plugins is blocking. */
     private fun setPluginEnabled(device: Device, key: String, on: Boolean) {
-        CoroutineScope(Dispatchers.IO).launch { device.setPluginEnabled(key, on) }
+        CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch { device.setPluginEnabled(key, on) }
         tick++
     }
 
@@ -1216,7 +1216,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         when {
-            requestCode == RESULT_NEEDS_RELOAD -> CoroutineScope(Dispatchers.IO).launch {
+            requestCode == RESULT_NEEDS_RELOAD -> CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
                 DeskLinkApplication.getInstance().devices.values.forEach(Device::reloadPluginsFromSettings)
             }
             requestCode == STORAGE_LOCATION_CONFIGURED && resultCode == RESULT_OK && data != null ->
@@ -1239,7 +1239,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), STORAGE_LOCATION_CONFIGURED)
         }
         // A new permission: reload the plugins that waited for it.
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
             DeskLinkApplication.getInstance().devices.values.forEach(Device::reloadPluginsFromSettings)
         }
     }

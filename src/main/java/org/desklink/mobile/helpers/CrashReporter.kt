@@ -24,13 +24,25 @@ object CrashReporter {
 
     const val MAX_REPORTS = 5
 
+    @Volatile private var dir: File? = null
+
+    /**
+     * Installs the global handler. It only reaches threads the app does not own (the main thread, libraries): those are recorded and
+     * then crash as usual. Threads the app owns have their own handler (see [Guarded]) and the app carries on after them.
+     */
     fun install(context: Context) {
+        dir = context.filesDir
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            // Recorded, then the system's own handling: a bug on a worker thread is not hidden (it used to end that thread and carry on).
             runCatching { keep(context.filesDir, report(thread, error)) }
             previous?.uncaughtException(thread, error)
         }
+    }
+
+    /** A failure caught at a task boundary: kept like a crash (redacted), the process stays up. */
+    fun recordGuarded(name: String, error: Throwable) {
+        val where = dir ?: return
+        keep(where, LogExport.redact(report(Thread.currentThread(), error) + "\n(caught in $name; the app carried on)"))
     }
 
     /** One file per crash (the next one no longer overwrites the last), the newest [MAX_REPORTS] kept. */

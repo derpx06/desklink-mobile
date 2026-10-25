@@ -123,9 +123,7 @@ class TerminalAttentionNotifier(
         private const val TAIL_ROWS = 16
         private const val NOTIFICATION_ID = 1
 
-        private val SHARED_SCHEDULER: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { runnable ->
-            Thread(runnable, "DeskLink-Terminal-Attention").apply { isDaemon = true }
-        }
+        private val SHARED_SCHEDULER: ScheduledExecutorService = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-Terminal-Attention")
 
         fun tag(deviceId: String, terminalId: String) = "terminal:$deviceId:$terminalId"
 

@@ -793,4 +793,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_unpair_row">Unpair %1$s…</string>
     <string name="bucket_restored_note">Restored: %1$s changed it after you deleted it</string>
     <string name="home_update_deskLink">Update DeskLink on %1$s</string>
+    <string name="feature_stopped_title">Something stopped. Tap to restart</string>
+    <string name="feature_stopped_summary">%1$s hit an error and was stopped; the rest of DeskLink goes on. A report was kept.</string>
 </resources>

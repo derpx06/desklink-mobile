@@ -175,8 +175,8 @@ public class LanLinkProvider extends BaseLinkProvider {
     private final UnpairedLimits unpairedLimits = new UnpairedLimits();
 
     /** Looking at discovery beacons: four at a time, sixteen waiting, the rest dropped. */
-    private final ThreadPoolExecutor discoveryExecutor = new ThreadPoolExecutor(
-            1, 4, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(16), new ThreadPoolExecutor.AbortPolicy());
+    private final ThreadPoolExecutor discoveryExecutor = new org.desklink.mobile.helpers.Guarded.Pool(
+            1, 4, 30_000, new LinkedBlockingQueue<>(16), "DeskLink-discovery", new ThreadPoolExecutor.AbortPolicy());
 
     //They received my UDP broadcast and are connecting to me. The first thing they send should be their identity packet.
     @WorkerThread

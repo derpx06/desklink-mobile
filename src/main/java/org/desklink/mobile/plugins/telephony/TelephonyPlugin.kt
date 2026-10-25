@@ -323,7 +323,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
     }
 
     /** Contact lookups, one at a time and in order, off the main thread. */
-    private val lookups = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "DeskLink-call-lookup").apply { isDaemon = true } }
+    private val lookups = org.desklink.mobile.helpers.Guarded.single("DeskLink-call-lookup")
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     private fun sharesContacts() = ContactsPlugin.sharesWith(context, device)

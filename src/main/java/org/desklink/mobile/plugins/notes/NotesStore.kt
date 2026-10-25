@@ -52,7 +52,7 @@ object NotesStore {
 
     private var shelf: Shelf? = null
     private lateinit var file: AtomicFile
-    private val worker = Executors.newSingleThreadScheduledExecutor()
+    private val worker = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-notes")
     private val pendingNotes = LinkedHashSet<String>()
     private var notePush: ScheduledFuture<*>? = null
 

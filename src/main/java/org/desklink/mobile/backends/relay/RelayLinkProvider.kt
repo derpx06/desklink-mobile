@@ -113,8 +113,8 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
             started = true
             instance = this
             client = OkHttpClient.Builder().pingInterval(PING_SECONDS, TimeUnit.SECONDS).build()
-            timers = Executors.newSingleThreadScheduledExecutor { Thread(it, "DeskLink-Relay").apply { isDaemon = true } }
-            events = Executors.newSingleThreadExecutor { Thread(it, "DeskLink-Relay-Events").apply { isDaemon = true } }
+            timers = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-Relay")
+            events = org.desklink.mobile.helpers.Guarded.Pool(1, 1, 0, java.util.concurrent.LinkedBlockingQueue(), "DeskLink-Relay-Events")
         }
         reset(reconnect = true)
     }

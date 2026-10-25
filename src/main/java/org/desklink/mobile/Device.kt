@@ -217,9 +217,9 @@ class Device : PacketReceiver {
     })
 
     /** Files in flight (their own threads, [FILE_SENDS_IN_FLIGHT] at a time) and waiting; the rest are refused and reported. */
-    private val fileSendPool = java.util.concurrent.ThreadPoolExecutor(
-        FILE_SENDS_IN_FLIGHT, FILE_SENDS_IN_FLIGHT, 30, java.util.concurrent.TimeUnit.SECONDS,
-        java.util.concurrent.LinkedBlockingQueue(FILE_SENDS_WAITING),
+    private val fileSendPool = org.desklink.mobile.helpers.Guarded.Pool(
+        FILE_SENDS_IN_FLIGHT, FILE_SENDS_IN_FLIGHT, 30_000,
+        java.util.concurrent.LinkedBlockingQueue(FILE_SENDS_WAITING), "DeskLink-file-send",
     ).apply { allowCoreThreadTimeOut(true) }
     private var sendCoroutine : Job? = null
 
@@ -834,7 +834,7 @@ class Device : PacketReceiver {
         synchronized(outbound) {
             if (sendCoroutine == null) {
                 outbound.reopen()
-                sendCoroutine = CoroutineScope(Dispatchers.IO).launch {
+                sendCoroutine = CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
                     while (true) {
                         val (np, callback) = runInterruptible { outbound.take() } ?: break
                         // A file blocks until the peer has it, however long that takes: it runs on
@@ -1530,7 +1530,7 @@ class Device : PacketReceiver {
     }
 
     fun launchBackgroundReloadPluginsFromSettings() {
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
             reloadPluginsFromSettings()
         }
     }

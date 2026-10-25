@@ -33,9 +33,7 @@ interface FileRunner {
 }
 
 class ThreadFileRunner : FileRunner {
-    private val executor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { runnable ->
-        Thread(runnable, "DeskLink-file").apply { isDaemon = true }
-    }
+    private val executor: ScheduledExecutorService = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-file")
 
     override fun post(task: Runnable) {
         runCatching { executor.execute(task) }
@@ -881,7 +879,7 @@ internal fun isStorageFull(error: Throwable): Boolean = org.desklink.mobile.plug
 /** One thread that puts finished files in place, one at a time, apart from the file thread. */
 internal object ThreadPublisher {
     val shared: java.util.concurrent.Executor by lazy {
-        java.util.concurrent.Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "DeskLink-publish").apply { isDaemon = true } }
+        org.desklink.mobile.helpers.Guarded.single("DeskLink-publish")
     }
 }
 

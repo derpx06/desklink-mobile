@@ -38,6 +38,7 @@ import org.desklink.mobile.backends.BaseLinkProvider.ConnectionReceiver
 import org.desklink.mobile.backends.lan.LanLinkProvider
 import org.desklink.mobile.backends.relay.RelayLinkProvider
 import org.desklink.mobile.backends.relay.RelaySettings
+import org.desklink.mobile.helpers.Guarded
 import org.desklink.mobile.helpers.NotificationHelper
 import org.desklink.mobile.plugins.clipboard.ClipboardFloatingActivity
 import org.desklink.mobile.plugins.clipboard.ClipboardPlugin
@@ -70,9 +71,7 @@ class BackgroundService : Service() {
      * the service main thread (NetworkCallback is normally asynchronous, but
      * refresh intents and settings actions are not).
      */
-    private val networkChangeExecutor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "DeskLink-network-change").apply { isDaemon = true }
-    }
+    private val networkChangeExecutor: ExecutorService = Guarded.Pool(1, 1, 0, java.util.concurrent.LinkedBlockingQueue(), "DeskLink-network-change")
 
     private val linkProviders = mutableListOf<BaseLinkProvider>()
 

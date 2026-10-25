@@ -923,9 +923,7 @@ class WebRtcTransport(
     @Volatile private var onLan = false
 
     /** Where path changes are applied: off libwebrtc's threads, one at a time, in order. */
-    private val pathExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "DeskLink-screen-path").apply { isDaemon = true }
-    }
+    private val pathExecutor = org.desklink.mobile.helpers.Guarded.single("DeskLink-screen-path")
 
     /** The path moved on or off the LAN: a live capture takes the matching ceiling and preference. */
     @Synchronized

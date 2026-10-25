@@ -117,6 +117,12 @@ class DeskLinkApplication : Application() {
         super.onCreate()
         _instance = this
         CrashReporter.install(this)
+        // "Stopped, tap to restart": a feature that threw is reloaded from its settings.
+        org.desklink.mobile.helpers.Guarded.restart = {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("restart")).launch {
+                devices.values.forEach(Device::reloadPluginsFromSettings)
+            }
+        }
         setupSL4JLogging()
         Log.d("DeskLink/Application", "onCreate")
         ThemeUtil.setUserPreferredTheme(this)
@@ -342,7 +348,7 @@ class DeskLinkApplication : Application() {
         ).also { client ->
             // The live-session notification follows the attached sessions, whoever changed them.
             // The job lives exactly as long as the client (shutDownTerminalClient).
-            terminalWatchers[id] = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob()).launch {
+            terminalWatchers[id] = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob() + org.desklink.mobile.helpers.Guarded.handler("terminal-watch")).launch {
                 client.state.map { state -> state.sessions.count { !it.gone } to state.sessions.count { it.attached && !it.gone } }.distinctUntilChanged().collect {
                     org.desklink.mobile.plugins.screen.SessionLiveNotification.refresh(this@DeskLinkApplication, id)
                     org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(this@DeskLinkApplication)

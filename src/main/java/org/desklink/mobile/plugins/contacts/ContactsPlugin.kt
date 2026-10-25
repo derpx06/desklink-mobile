@@ -65,7 +65,7 @@ class ContactsPlugin : Plugin() {
     )
 
     /** Contacts are read and sent here, one job at a time, off the caller's thread. */
-    private val worker = Executors.newSingleThreadScheduledExecutor()
+    private val worker = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-contacts")
     private var pendingChange: ScheduledFuture<*>? = null
     /** The last snapshot sent: a change that leaves it the same sends nothing. */
     @Volatile private var lastSent: Map<String, Long>? = null

@@ -14,7 +14,7 @@ import kotlinx.coroutines.isActive
 
 /** Serializes device lifecycle work that must never run from an Android UI callback. */
 internal class DeviceUnpairCoordinator(
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("lifecycle")),
     private val onFailure: (String, Throwable) -> Unit = { operation, error ->
         android.util.Log.e("DeskLink/DeviceLifecycle", operation, error)
     },

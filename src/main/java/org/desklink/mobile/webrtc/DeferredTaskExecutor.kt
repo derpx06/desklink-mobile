@@ -11,12 +11,10 @@ import java.util.concurrent.RejectedExecutionException
 
 /** Runs potentially blocking work away from caller-held state locks and UI threads. */
 internal class DeferredTaskExecutor(
-    threadName: String,
+    private val threadName: String,
     private val onFailure: (Throwable) -> Unit = {},
 ) : AutoCloseable {
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, threadName).apply { isDaemon = true }
-    }
+    private val executor: ExecutorService = org.desklink.mobile.helpers.Guarded.Pool(1, 1, 0, java.util.concurrent.LinkedBlockingQueue(), threadName)
 
     fun execute(action: () -> Unit) {
         executor.execute {
@@ -24,6 +22,9 @@ internal class DeferredTaskExecutor(
                 action()
             } catch (error: Exception) {
                 onFailure(error)
+            } catch (error: Throwable) {
+                if (org.desklink.mobile.helpers.Guarded.fatal(error)) throw error
+                org.desklink.mobile.helpers.Guarded.record(threadName, error)
             }
         }
     }

@@ -88,7 +88,7 @@ internal object AlbumArtCache {
     /** Cover art is shown at most notification/card size: decoded no larger than this side. */
     private const val MAX_DECODED_SIDE = 1024
 
-    private val cacheScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val cacheScope = CoroutineScope(Dispatchers.IO + SupervisorJob() + org.desklink.mobile.helpers.Guarded.handler("album-art"))
 
     /**
      * Initializes the disk cache. Needs to be called at least once before trying to use the cache

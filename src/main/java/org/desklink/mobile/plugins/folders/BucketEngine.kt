@@ -108,7 +108,7 @@ object BucketEngine {
     /** A listing that failed, or a scan that lost a fifth of the files: looked at again after this long. */
     const val LISTING_RETRY_MS = 15_000L
 
-    private val worker = Executors.newSingleThreadScheduledExecutor()
+    private val worker = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-bucket")
     private val limiter = RateLimiter(MAX_PACKETS_PER_MINUTE, 60_000, TAG)
     private lateinit var app: Context
 
