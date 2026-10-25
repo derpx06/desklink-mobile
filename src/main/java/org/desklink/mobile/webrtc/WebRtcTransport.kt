@@ -812,6 +812,9 @@ class WebRtcTransport(
     @Synchronized
     fun screenProjection(): android.media.projection.MediaProjection? = screenCapturer?.mediaProjection
 
+    /** This phone's screen is being captured for the desk right now. */
+    fun isCapturingScreen(): Boolean = synchronized(this) { screenCapturer != null && activeScreenCaptureEpoch != null }
+
     private var screenStatsTimer: java.util.Timer? = null
     private var inboundStatsTimer: java.util.Timer? = null
     private val debugFramesAtTrack = java.util.concurrent.atomic.AtomicLong()

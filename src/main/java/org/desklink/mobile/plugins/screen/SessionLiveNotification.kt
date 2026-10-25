@@ -57,6 +57,8 @@ object SessionLiveNotification {
         val terminals = app.terminalClient(deviceId)?.state?.value?.sessions?.count { it.attached && !it.gone } ?: 0
         val glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(deviceId)
         update(context, deviceId, screen, terminals, glide)
+        // The phone's own share says what the computer can do with it (control, sound) as that changes.
+        runCatching { PhoneScreenCaptureService.refreshNotice(context) }
     }
 
     private fun update(context: Context, deviceId: String?, screen: Boolean, terminals: Int, glide: Boolean = false) {

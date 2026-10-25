@@ -81,4 +81,13 @@ class InboundNotAllowedTest {
         assertEquals(2, lines.size)
         assertTrue(lines.last(), "dropped 200" in lines.last())
     }
+
+    @Test
+    fun controlOfThePhoneIsGrantedOnlyWhileItsOwnScreenIsShared() {
+        val coordinator = WebRtcSessionCoordinator(app, mockk<Device>(relaxed = true), DeviceManager(), terminal = mockk<TerminalClient>(relaxed = true), onStateChanged = { _, _ -> })
+        assertTrue(coordinator.mayGrantControl(WebRtcScreenDirection.PHONE_TO_DESKTOP, capturing = true))
+        assertFalse("the phone is only viewing the desk", coordinator.mayGrantControl(WebRtcScreenDirection.DESKTOP_TO_PHONE, capturing = true))
+        assertFalse("the share has not started (the projection prompt is unanswered)", coordinator.mayGrantControl(WebRtcScreenDirection.PHONE_TO_DESKTOP, capturing = false))
+        assertFalse(coordinator.mayGrantControl(null, capturing = true))
+    }
 }

@@ -1842,7 +1842,21 @@ class WebRtcSessionCoordinator(
             }
             WebRtcRemoteSessionControlKind.REQUEST_CONTROL,
             WebRtcRemoteSessionControlKind.TAKEOVER_REQUEST -> {
-                if (MouseReceiverService.instance == null) {
+                // Control of THIS phone only goes with this phone's screen being shared to that computer.
+                if (!mayGrantControl(remoteSession.snapshot().direction, transport?.isCapturingScreen() == true)) {
+                    remoteSession.controlRequestTimedOut(message.remoteSessionId) // back to what it was, not "requesting"
+                    sendRemoteSessionControlLocked(
+                        binding,
+                        attemptId,
+                        remoteSession.makeMessage(
+                            WebRtcRemoteSessionControlKind.CONTROL_DENIED,
+                            attemptId,
+                            wire,
+                            remoteSessionId = message.remoteSessionId,
+                            reason = "The phone's screen is not being shared",
+                        ),
+                    )
+                } else if (MouseReceiverService.instance == null) {
                     org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.ask(context, device.name)
                     sendRemoteSessionControlLocked(
                         binding,
@@ -2495,6 +2509,10 @@ class WebRtcSessionCoordinator(
         }
         requireNotNull(transport) { "No active WebRTC peer connection" }
     }
+
+    /** A lease over this phone's input is granted only while its screen is shared (not when it is viewing the desk, nor before the share started). */
+    internal fun mayGrantControl(direction: WebRtcScreenDirection?, capturing: Boolean): Boolean =
+        direction == WebRtcScreenDirection.PHONE_TO_DESKTOP && capturing
 
     /** A drag the desk was holding is let go (the session ended, paused or dropped). */
     private fun releaseHeldInput() = runCatching { MouseReceiverService.releaseHeld() }

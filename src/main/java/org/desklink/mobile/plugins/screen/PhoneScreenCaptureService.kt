@@ -2,6 +2,7 @@ package org.desklink.mobile.plugins.screen
 
 import android.app.Service
 import org.desklink.mobile.helpers.DeskNames
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -49,7 +50,7 @@ class PhoneScreenCaptureService : Service() {
         val notification = NotificationCompat.Builder(this, SessionLiveNotification.CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.screen_share_live_title, desk))
-            .setContentText(getString(R.string.screen_share_live_text))
+            .setContentText(noticeText(this, desk, controlling = false, hearing = false))
             .setColor(SessionLiveNotification.CORAL)
             .setOngoing(true)
             .addAction(R.drawable.sym_stop_circle, getString(R.string.screen_share_stop), stop)
@@ -92,6 +93,42 @@ class PhoneScreenCaptureService : Service() {
         else intent.getParcelableExtra(EXTRA_RESULT_DATA)
 
     companion object {
+        /**
+         * What the sharing notification says: that the computer sees the screen, and, when it is so, that it can also control the
+         * phone and hears its sound. (It used to say only "stop at any time", whatever was going on.)
+         */
+        fun noticeText(context: Context, desk: String, controlling: Boolean, hearing: Boolean): String = buildList {
+            if (controlling) add(context.getString(R.string.screen_share_live_controlling, desk))
+            if (hearing) add(context.getString(R.string.screen_share_live_hearing, desk))
+            add(context.getString(R.string.screen_share_live_text))
+        }.joinToString(" · ")
+
+        /** The share's notification follows what the computer can do now (control, sound). Safe to call at any time. */
+        fun refreshNotice(context: Context) {
+            val id = sharingDeviceId ?: return
+            val app = DeskLinkApplication.getInstance()
+            val coordinator = app.webRtcCoordinator(id) ?: return
+            val snapshot = coordinator.remoteSessionSnapshot()
+            val controlling = snapshot.hasControlLease && snapshot.direction == org.desklink.mobile.webrtc.WebRtcScreenDirection.PHONE_TO_DESKTOP
+            val hearing = org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo == id
+            val manager = androidx.core.app.NotificationManagerCompat.from(context)
+            if (!manager.areNotificationsEnabled()) return
+            val stop = android.app.PendingIntent.getService(
+                context, 0, Intent(context, PhoneScreenCaptureService::class.java).setAction(ACTION_STOP),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+            )
+            val desk = DeskNames.of(id)
+            val notification = NotificationCompat.Builder(context, SessionLiveNotification.CHANNEL)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.screen_share_live_title, desk))
+                .setContentText(noticeText(context, desk, controlling, hearing))
+                .setColor(SessionLiveNotification.CORAL)
+                .setOngoing(true)
+                .addAction(R.drawable.sym_stop_circle, context.getString(R.string.screen_share_stop), stop)
+                .build()
+            runCatching { @Suppress("MissingPermission") manager.notify(NOTIFICATION_ID, notification) }
+        }
+
         private const val TAG = "DeskLink/PhoneScreen"
         private const val ACTION_STOP = "org.desklink.mobile.plugins.screen.STOP_PHONE_SCREEN"
         private const val NOTIFICATION_ID = 1701
