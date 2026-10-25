@@ -1632,7 +1632,12 @@ internal fun emptyStatesFor(device: Device): List<NetworkPacket> {
     }
     return buildList {
         if (silent(org.desklink.mobile.plugins.battery.BatteryPlugin::class.java)) add(org.desklink.mobile.plugins.battery.BatteryPlugin.turnedOffPacket())
-        if (silent(org.desklink.mobile.plugins.notifications.NotificationsPlugin::class.java)) add(org.desklink.mobile.plugins.notifications.NotificationsPlugin.snapshotPacket(emptyList()))
+        // W7 notification access state: said here too, because without the access the plugin is not loaded to say it.
+        if (silent(org.desklink.mobile.plugins.notifications.NotificationsPlugin::class.java)) {
+            add(org.desklink.mobile.plugins.notifications.NotificationsPlugin.snapshotPacket(
+                emptyList(), org.desklink.mobile.plugins.notifications.NotificationReceiver.hasReadNotificationsPermission(device.context),
+            ))
+        }
         if (silent(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin::class.java)) add(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin.emptyStatePacket())
         if (silent(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)) add(org.desklink.mobile.plugins.telephony.CallTracker.emptySnapshot())
         // F5: not shared (off, or no permission): the desk deletes its copy of the contacts.
