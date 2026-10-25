@@ -264,6 +264,12 @@ class ClipboardListener private constructor(ctx: Context) {
             // Synchronized: two listeners meant two logcat readers and every copy sent twice.
             _instance ?: ClipboardListener(context).also { _instance = it }
 
+        /** Whether this build declares the permission the workaround needs (only hand-installed debug builds do). */
+        fun workaroundDeclared(context: Context): Boolean = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions
+                .orEmpty().contains(Manifest.permission.READ_LOGS)
+        }.getOrDefault(false)
+
         fun readLogsGranted(context: Context): Boolean =
             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
 

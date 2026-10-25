@@ -6,7 +6,13 @@ SPDX-FileCopyrightText: 2026 Albert Vaca Cintora <albertvaka@gmail.com>
 SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
 -->
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- The "Automatic clipboard sync (advanced)" workaround reads the system log for the clipboard refusal and draws a 1 px
+         window to gain focus. It circumvents Android 10's clipboard rule and Google Play rejects both permissions, so only
+         builds installed by hand (debug) declare them; release builds have no such switch. -->
+    <uses-permission android:name="android.permission.READ_LOGS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application>
         <activity

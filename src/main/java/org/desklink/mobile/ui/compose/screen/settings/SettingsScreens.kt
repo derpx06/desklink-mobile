@@ -244,6 +244,8 @@ internal fun ClipboardAutoSyncRows(deskName: String, prefs: android.content.Shar
     val context = LocalContext.current
     val listener = org.desklink.mobile.plugins.clipboard.ClipboardListener
     val resumed = rememberResumeTick()
+    // Release builds do not declare the permission, so they have no such switch (Play rejects READ_LOGS).
+    if (!listener.workaroundDeclared(context)) return
     if (!listener.readLogsGranted(context)) {
         val command = listener.grantCommand(context)
         val copied = stringResource(R.string.settings_clipboard_auto_copied)
