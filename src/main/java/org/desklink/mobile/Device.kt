@@ -1306,7 +1306,7 @@ class Device : PacketReceiver {
                 "DeskLink WebRTC file transport is not ready",
             )
             callback.onFailure(error)
-            np.payload?.close()
+            np.payload?.release()
             countSent(deviceId, np.type, false)
             return false
         }
@@ -1317,7 +1317,7 @@ class Device : PacketReceiver {
         ) {
             // Notification artwork is optional. The notification itself must
             // still synchronize when its icon does not fit the event channel.
-            np.payload?.close()
+            np.payload?.release()
             np.payload = null
             np.payloadTransferInfo = org.json.JSONObject()
         }

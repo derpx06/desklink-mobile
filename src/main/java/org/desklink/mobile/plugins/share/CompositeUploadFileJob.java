@@ -176,7 +176,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                     android.net.Uri source = TransferHistory.INSTANCE.peekSource(networkPacket);
                     if (source != null) ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
                 }
-                if (networkPacket.getPayload() != null) networkPacket.getPayload().close();
+                if (networkPacket.getPayload() != null) networkPacket.getPayload().release();
             }
             networkPacketList.clear();
         }

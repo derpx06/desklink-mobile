@@ -288,6 +288,12 @@ class NetworkPacket private constructor(
             this.closeAction = null
         }
 
+        /** Closes the stream and also gives back the file it reads (its descriptor and any persisted grant): for a packet that will not be sent. */
+        fun release() {
+            close()
+            runCatching { source?.close() }
+        }
+
         fun close() {
             // TODO: If socket only close socket if that also closes the streams that is
             try {

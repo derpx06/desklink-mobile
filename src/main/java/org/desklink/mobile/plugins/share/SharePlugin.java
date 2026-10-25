@@ -300,7 +300,7 @@ public class SharePlugin extends Plugin {
         }
     }
 
-    private void sendUriListLocked(final ArrayList<Uri> uriList) {
+    private void sendUriListLocked(ArrayList<Uri> uriList) {
         CompositeUploadFileJob job;
         int unreadable = 0;
 
@@ -310,6 +310,11 @@ public class SharePlugin extends Plugin {
             job = uploadFileJob;
         }
 
+        // At most this many files of one share are opened (each holds a descriptor): the rest are left out, and said.
+        if (uriList.size() > ShareQueue.MAX_PER_DEVICE) {
+            uriList = new ArrayList<>(uriList.subList(0, ShareQueue.MAX_PER_DEVICE));
+            handler.post(() -> Toast.makeText(context, context.getString(R.string.share_queue_full, ShareQueue.MAX_PER_DEVICE), Toast.LENGTH_LONG).show());
+        }
         // Queued by source, so a drop or a restart keeps the files after the one in flight (see onFeatureReady).
         ArrayList<String> asStrings = new ArrayList<>();
         for (Uri uri : uriList) asStrings.add(uri.toString());
