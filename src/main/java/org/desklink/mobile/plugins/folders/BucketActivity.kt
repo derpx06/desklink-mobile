@@ -142,15 +142,9 @@ class BucketActivity : AppCompatActivity() {
 
     /** The share sheet (one or several files, or text and links). */
     private fun takeShare(intent: Intent) {
-        @Suppress("DEPRECATION")
-        when (intent.action) {
-            Intent.ACTION_SEND -> {
-                val stream = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)?.takeIf { org.desklink.mobile.plugins.share.ShareUris.isAllowedFromOutside(this, it) }
-                if (stream != null) pendingUris.value = listOf(stream)
-                else intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.let { pendingText.value = it }
-            }
-            Intent.ACTION_SEND_MULTIPLE -> pendingUris.value = org.desklink.mobile.plugins.share.ShareUris.fromOutside(this, intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty()).take(MAX_SHARED)
-        }
+        val proposal = org.desklink.mobile.plugins.share.ShareIntake.forBucket(this, intent)
+        if (proposal.uris.isNotEmpty()) pendingUris.value = proposal.uris
+        proposal.text?.let { pendingText.value = it }
     }
 
     /** The desk to use: the one asked for, else the one with a Bucket, else the first paired. */

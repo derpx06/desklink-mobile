@@ -16,10 +16,14 @@ object ShareUris {
         uris.filterNotNull().filter { isAllowedFromOutside(context, it) }
 
     fun isAllowedFromOutside(context: Context, uri: Uri): Boolean =
-        uri.scheme == "content" && !isOurOwn(context, uri.authority)
+        uri.scheme.equals("content", ignoreCase = true) && !isOurOwn(context, authority(uri))
+
+    /** The provider named by the URI: userinfo and port taken off (`content://0@pkg.fileprovider/..` is `pkg.fileprovider`), lowercase. */
+    internal fun authority(uri: Uri): String? =
+        uri.authority?.substringAfterLast('@')?.substringBefore(':')?.lowercase(java.util.Locale.ROOT)
 
     private fun isOurOwn(context: Context, authority: String?): Boolean =
-        authority != null && (authority == "${context.packageName}.fileprovider" || authority.startsWith(context.packageName))
+        authority == null || authority.startsWith(context.packageName.lowercase(java.util.Locale.ROOT)) || authority.isEmpty()
 
     /** Whether [file] lies in this app's private storage (by canonical path, so `..` and links do not hide it). */
     fun isInsideAppData(context: Context, file: File): Boolean {

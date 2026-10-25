@@ -123,18 +123,22 @@ class NotesActivity : AppCompatActivity() {
         outState.putInt(STATE_TAB, tab.value)
     }
 
+    private val pendingShare = mutableStateOf<Pair<String, String>?>(null)
+
+    private fun saveShared(subject: String, text: String) {
+        val (body, cut) = NotesStore.fit(text)
+        val id = NotesStore.newNote(this, subject.lineSequence().first(), body)
+        // A text that is too long is never cut without saying so.
+        Toast.makeText(this, if (id == null) R.string.notes_full else if (cut) R.string.notes_saved_shared_cut else R.string.notes_saved_shared, if (cut) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+        tab.value = TAB_NOTES
+        editing.value = id
+    }
+
     private fun handle(intent: Intent) {
         when {
             intent.action == Intent.ACTION_SEND -> {
-                val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty()
-                val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT).orEmpty()
-                if (text.isBlank() && subject.isBlank()) return
-                val (body, cut) = NotesStore.fit(text)
-                val id = NotesStore.newNote(this, subject.lineSequence().first(), body)
-                // A text that is too long is never cut without saying so.
-                Toast.makeText(this, if (id == null) R.string.notes_full else if (cut) R.string.notes_saved_shared_cut else R.string.notes_saved_shared, if (cut) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
-                tab.value = TAB_NOTES
-                editing.value = id
+                // Any app can send this intent: asked first (see Root), saved only on a yes.
+                pendingShare.value = org.desklink.mobile.plugins.share.ShareIntake.forNotes(intent) ?: return
             }
             intent.getBooleanExtra(EXTRA_NEW, false) -> {
                 tab.value = TAB_NOTES
@@ -153,6 +157,19 @@ class NotesActivity : AppCompatActivity() {
 
     @Composable
     private fun Root() {
+        pendingShare.value?.let { (subject, text) ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { pendingShare.value = null },
+                title = { androidx.compose.material3.Text(stringResource(R.string.notes_confirm_save_title)) },
+                text = { androidx.compose.material3.Text((subject.ifBlank { text }).take(200)) },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { pendingShare.value = null; saveShared(subject, text) }) { androidx.compose.material3.Text(stringResource(R.string.notes_confirm_save)) }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { pendingShare.value = null }) { androidx.compose.material3.Text(stringResource(R.string.cancel)) }
+                },
+            )
+        }
         val id = editing.value
         if (id == null) {
             Lists()

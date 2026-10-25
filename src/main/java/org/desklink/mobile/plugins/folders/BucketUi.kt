@@ -87,6 +87,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -195,14 +196,26 @@ class BucketUi(
             }
         }
 
-        // Shared in: added as soon as the Bucket is on.
-        LaunchedEffect(on, pendingUris.value, pendingText.value) {
-            if (!on) return@LaunchedEffect
-            pendingUris.value.takeIf { it.isNotEmpty() }?.let { BucketEngine.add(deviceId, it, path, ::report); pendingUris.value = emptyList() }
-            pendingText.value?.let { text ->
-                BucketEngine.addText(deviceId, text, path) { ok -> runOnUiThread { toast(getString(if (ok) R.string.bucket_text_added else R.string.bucket_text_failed)) } }
-                pendingText.value = null
-            }
+        // Shared in from another app: never added on its own (any app can send this intent, and what is added reaches the
+        // computer). Asked first, naming what it is; only then added.
+        val shared = pendingUris.value
+        val sharedText = pendingText.value
+        if (on && (shared.isNotEmpty() || sharedText != null)) {
+            AlertDialog(
+                onDismissRequest = { pendingUris.value = emptyList(); pendingText.value = null },
+                title = { Text(if (shared.isNotEmpty()) pluralStringResource(R.plurals.bucket_confirm_add_title, shared.size, shared.size) else stringResource(R.string.bucket_confirm_add_text_title)) },
+                text = { Text(if (shared.isNotEmpty()) stringResource(R.string.bucket_confirm_add_body) else sharedText.orEmpty().take(200)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val uris = pendingUris.value
+                        val text = pendingText.value
+                        pendingUris.value = emptyList(); pendingText.value = null
+                        if (uris.isNotEmpty()) BucketEngine.add(deviceId, uris, path, ::report)
+                        if (text != null) BucketEngine.addText(deviceId, text, path) { ok -> runOnUiThread { toast(getString(if (ok) R.string.bucket_text_added else R.string.bucket_text_failed)) } }
+                    }) { Text(stringResource(R.string.bucket_confirm_add)) }
+                },
+                dismissButton = { TextButton(onClick = { pendingUris.value = emptyList(); pendingText.value = null }) { Text(stringResource(R.string.cancel)) } },
+            )
         }
 
         if (newFolder) {

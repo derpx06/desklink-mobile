@@ -795,4 +795,13 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_update_deskLink">Update DeskLink on %1$s</string>
     <string name="feature_stopped_title">Something stopped. Tap to restart</string>
     <string name="feature_stopped_summary">%1$s hit an error and was stopped; the rest of DeskLink goes on. A report was kept.</string>
+    <plurals name="bucket_confirm_add_title">
+        <item quantity="one">Add %1$d item to the Bucket?</item>
+        <item quantity="other">Add %1$d items to the Bucket?</item>
+    </plurals>
+    <string name="bucket_confirm_add_body">Another app wants to put this in the Bucket. Whatever is added is also sent to your computer.</string>
+    <string name="bucket_confirm_add_text_title">Save this text in the Bucket?</string>
+    <string name="bucket_confirm_add">Add</string>
+    <string name="notes_confirm_save_title">Save this text to your notes?</string>
+    <string name="notes_confirm_save">Save</string>
 </resources>
