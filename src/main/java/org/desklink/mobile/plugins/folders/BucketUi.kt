@@ -549,6 +549,9 @@ class BucketUi(
             if (view.phase == Phase.NO_ACCESS) {
                 item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_no_access), warn = true) }
             }
+            if (view.phase == Phase.LISTING_FAILED) {
+                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_listing_failed), warn = true) }
+            }
             if (view.phase == Phase.NOT_ON_DESK) {
                 item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_not_on_desk, desk), warn = true) }
             }

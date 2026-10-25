@@ -21,6 +21,9 @@ import java.util.UUID
  * the picked folder, created on first use. Documents are found by name segment by segment from the
  * root, so nothing outside it is ever reached.
  */
+/** The provider could not list a folder just now; what was listed so far is not a picture of the folder. */
+class SafListingException : java.io.IOException("The folder could not be listed")
+
 class SafTree(private val resolver: ContentResolver, val tree: Uri, private val folder: String? = null) {
     data class Item(val documentId: String, val dir: Boolean, val size: Long, val mtime: Long)
 
@@ -43,9 +46,15 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
         Document.COLUMN_SIZE, Document.COLUMN_LAST_MODIFIED,
     )
 
+    /**
+     * The entries of one folder. A listing that fails (a null cursor, an exception) THROWS: it must never read as an empty
+     * folder, because an empty folder means "everything was deleted" to the sync.
+     */
     private fun children(documentId: String): Map<String, Item> {
         val out = HashMap<String, Item>()
-        resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, documentId), projection, null, null, null)?.use { c ->
+        val cursor = resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, documentId), projection, null, null, null)
+            ?: throw SafListingException()
+        cursor.use { c ->
             while (c.moveToNext()) {
                 val name = c.getString(1) ?: continue
                 out[name] = Item(c.getString(0), c.getString(2) == Document.MIME_TYPE_DIR, c.getLong(3), c.getLong(4))

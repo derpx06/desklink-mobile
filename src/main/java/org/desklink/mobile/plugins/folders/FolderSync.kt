@@ -346,6 +346,16 @@ object FolderSync {
     /** [path] is a left-out item or lies below one. */
     fun isLeftOut(path: String, losers: Set<String>): Boolean = path in losers || underLoser(path, losers)
 
+    /**
+     * A scan that lost more than a fifth of what the manifest still expects to find (at least ten files) is more likely a
+     * partial listing than that many deletions: it is not applied until a second scan agrees on the same missing files.
+     */
+    fun suspiciousShrink(expected: Set<String>, found: Set<String>): Set<String>? {
+        if (expected.size < 10) return null
+        val missing = expected - found
+        return missing.takeIf { it.size * 5 > expected.size }
+    }
+
     /** F8b: an incoming file of [size] fits when [free] keeps [MIN_FREE_BYTES] after it. */
     fun enoughSpace(free: Long, size: Long): Boolean = size in 0..MAX_BUCKET_FILE_BYTES && free - size >= MIN_FREE_BYTES
 

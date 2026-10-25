@@ -43,10 +43,11 @@ class SafCaseClashTest {
                 .add(Document.COLUMN_SIZE, f.length()).add(Document.COLUMN_LAST_MODIFIED, f.lastModified())
                 .add(Document.COLUMN_FLAGS, Document.FLAG_SUPPORTS_WRITE or Document.FLAG_SUPPORTS_DELETE or Document.FLAG_SUPPORTS_RENAME or Document.FLAG_DIR_SUPPORTS_CREATE)
         }
-        override fun query(uri: Uri, projection: Array<String>?, selection: String?, args: Array<String>?, order: String?): Cursor {
+        override fun query(uri: Uri, projection: Array<String>?, selection: String?, args: Array<String>?, order: String?): Cursor? {
             val c = MatrixCursor(projection ?: cols)
             if (uri.pathSegments.contains("children")) {
                 val parent = DocumentsContract.getDocumentId(uri)
+                if (failListingOf == parent) return null
                 file(parent).listFiles().orEmpty().forEach { row(c, if (parent == "root") it.name else "$parent/${it.name}") }
             } else {
                 row(c, DocumentsContract.getDocumentId(uri))
@@ -91,7 +92,7 @@ class SafCaseClashTest {
         override fun insert(uri: Uri, values: android.content.ContentValues?): Uri? = null
         override fun delete(uri: Uri, selection: String?, args: Array<String>?) = 0
         override fun update(uri: Uri, values: android.content.ContentValues?, selection: String?, args: Array<String>?) = 0
-        companion object { lateinit var root: File }
+        companion object { lateinit var root: File; @Volatile var failListingOf: String? = null }
     }
 
     private lateinit var tree: SafTree

@@ -78,7 +78,7 @@ data class BucketView(
     val userPaused: Boolean = false,
 )
 
-enum class Phase { OFF, ASKING, WAITING, NOT_ON_DESK, SCANNING, SYNCING, UP_TO_DATE, TOO_MANY, NO_ACCESS, HELD_EMPTY }
+enum class Phase { OFF, ASKING, WAITING, NOT_ON_DESK, SCANNING, SYNCING, UP_TO_DATE, TOO_MANY, NO_ACCESS, HELD_EMPTY, LISTING_FAILED }
 
 /**
  * F8b, the Bucket (contract "DeskLink 1.2 — F8b the Bucket", files only for now): one shared folder
@@ -100,6 +100,8 @@ object BucketEngine {
     const val RESCAN_SCREEN_OFF_MS = 15 * 60_000L
     /** Packets a minute from one desk (the desk's own bound). */
     const val MAX_PACKETS_PER_MINUTE = 1200
+    /** A listing that failed, or a scan that lost a fifth of the files: looked at again after this long. */
+    const val LISTING_RETRY_MS = 15_000L
 
     private val worker = Executors.newSingleThreadScheduledExecutor()
     private val limiter = RateLimiter(MAX_PACKETS_PER_MINUTE, 60_000, TAG)
@@ -123,6 +125,8 @@ object BucketEngine {
         var scannedAt: Long? = null
         var onDesk = true
         var confirmedEmpty = false
+        /** The files a scan found missing in one go, until a second scan names the same ones. */
+        var shrinkSeen: Set<String>? = null
         var notSynced = emptyList<Pair<String, Skip>>()
         var storageFull = false
         val incoming = sortedMapOf<Int, List<Pair<String, Entry>>>()
@@ -849,7 +853,7 @@ object BucketEngine {
         setAside(partial, stash)
         worker.execute {
             try {
-                place(deviceId, ref, stash, sha256, size)
+                runCatching { place(deviceId, ref, stash, sha256, size) }.onFailure { Log.w(TAG, "A received Bucket file could not be placed (${it.javaClass.simpleName})") }
             } finally {
                 stash.delete()
             }
@@ -917,8 +921,14 @@ object BucketEngine {
         live.scannedAt = now0
         val tree = tree(live) ?: return
         live.phase = Phase.SCANNING
-        val scan = runCatching { tree.scan() }.getOrElse {
-            live.phase = Phase.NO_ACCESS
+        val scan = runCatching { tree.scan() }.getOrElse { error ->
+            if (error is SafListingException) {
+                // A listing that failed is not an empty folder: nothing is tombstoned; looked at again shortly.
+                live.phase = Phase.LISTING_FAILED
+                live.dirtyAt = now0 + LISTING_RETRY_MS - SETTLE_MS
+            } else {
+                live.phase = Phase.NO_ACCESS
+            }
             return
         }
         // W3 case clashes: the first name in UTF-8 byte order syncs; the others, and what is below a left-out folder, never
@@ -955,6 +965,17 @@ object BucketEngine {
         // A path already synced that now loses a clash is kept as it is, never tombstoned.
         val leftOutSynced = live.manifest.filter { (path, entry) -> !entry.deleted && path !in found && FolderSync.isLeftOut(path, clashes) }.keys
         val keep = live.toRequest.toSet() + live.outstanding + settling.filter { live.manifest[it]?.deleted == false } + leftOutSynced
+        // Many files "gone" at once is more likely a partial listing than that many deletions: held until a second scan
+        // names the same missing files.
+        val expected = live.manifest.filter { (path, entry) -> !entry.deleted && path !in keep }.keys
+        val missing = FolderSync.suspiciousShrink(expected, found.keys)
+        if (missing != null && live.shrinkSeen != missing) {
+            live.shrinkSeen = missing
+            live.phase = Phase.LISTING_FAILED
+            live.dirtyAt = now0 + LISTING_RETRY_MS - SETTLE_MS
+            return
+        }
+        live.shrinkSeen = null
         val before = live.manifest.filterValues { !it.deleted }.keys
         val changed = FolderSync.applyScan(Side.PHONE, live.manifest, stats, { path -> found[path]?.let(tree::sha256) }, System.currentTimeMillis(), keep)
         live.manifest.filterValues { !it.deleted }.keys.filter { it !in before && it !in live.from }.forEach { live.from[it] = Side.PHONE }
