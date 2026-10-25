@@ -74,8 +74,18 @@ class DeviceStorageDestination(private val context: Context) : ReceiveDestinatio
     }
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
-    private fun viaMediaStore(source: File, name: String, lastModified: Long?, type: String): Published {
+    private fun viaMediaStore(source: File, wanted: String, lastModified: Long?, type: String): Published {
         val resolver = context.contentResolver
+        // Named by the one rule ("name (2)"), before MediaStore would pick its own "name (1)".
+        val name = uniqueName(wanted) { candidate ->
+            runCatching {
+                resolver.query(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI, arrayOf(MediaStore.Downloads._ID),
+                    "${MediaStore.Downloads.DISPLAY_NAME} = ? AND ${MediaStore.Downloads.RELATIVE_PATH} LIKE ?",
+                    arrayOf(candidate, Environment.DIRECTORY_DOWNLOADS + "%"), null,
+                )?.use { it.count > 0 } == true
+            }.getOrDefault(false)
+        }
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, name)
             put(MediaStore.Downloads.MIME_TYPE, type)
@@ -116,14 +126,27 @@ class DeviceStorageDestination(private val context: Context) : ReceiveDestinatio
     }
 
     companion object {
-        /** `name`, else `name (1)`, `name (2)`… with the extension kept. */
+        /** [name], else `name (2)`, `name (3)`… until [taken] says no. Pure apart from [taken]. */
+        fun uniqueName(name: String, taken: (String) -> Boolean): String {
+            val clean = name.trimEnd('.').ifEmpty { "bad_name_file" }
+            val base = File(clean).nameWithoutExtension
+            val ext = File(clean).extension.let { if (it.isEmpty()) "" else ".$it" }
+            var n = 0
+            while (true) {
+                val candidate = if (n == 0) clean else "$base (${n + 1})$ext"
+                if (!taken(candidate) || n > 10_000) return candidate
+                n++
+            }
+        }
+
+        /** `name`, else `name (2)`, `name (3)`… with the extension kept (the computer's rule: the second file is "(2)"). */
         fun uniqueIn(dir: File, name: String): String {
             val clean = name.trimEnd('.').ifEmpty { "bad_name_file" }
             val base = File(clean).nameWithoutExtension
             val ext = File(clean).extension.let { if (it.isEmpty()) "" else ".$it" }
             var n = 0
             while (true) {
-                val candidate = if (n == 0) clean else "$base ($n)$ext"
+                val candidate = if (n == 0) clean else "$base (${n + 1})$ext"
                 if (!File(dir, candidate).exists()) return candidate
                 n++
             }

@@ -42,7 +42,7 @@ object FilesHelper {
         var num = 0
 
         do {
-            val suffix = if (num == 0) "" else " ($num)"
+            val suffix = if (num == 0) "" else " (${num + 1})" // the second file is "(2)", as on the computer
             validFilename = if (ext.isEmpty()) {
                 buildValidFatFilename("$baseName$suffix")
             } else {

@@ -234,7 +234,6 @@ private fun ConnectionGroup(desk: DeskSettings?, actions: SettingsActions, prefs
     val context = LocalContext.current
     val t = tokens
     var editingName by rememberSaveable { mutableStateOf(false) }
-    var confirmUnpair by rememberSaveable { mutableStateOf(false) }
     RowGroup {
         GroupRow(
             stringResource(R.string.settings_phone_name),
@@ -266,15 +265,6 @@ private fun ConnectionGroup(desk: DeskSettings?, actions: SettingsActions, prefs
             }
         }
         GroupRow(stringResource(R.string.home_pair_another), icon = R.drawable.sym_add, onClick = actions.onPairAnother) { Chevron() }
-        if (desk != null) {
-            GroupRow(
-                stringResource(R.string.device_menu_unpair),
-                icon = R.drawable.sym_link_off,
-                titleColor = t.red,
-                iconTint = t.red,
-                onClick = { confirmUnpair = true },
-            )
-        }
     }
     val invalidName = stringResource(R.string.invalid_device_name)
     if (editingName) {
@@ -294,20 +284,6 @@ private fun ConnectionGroup(desk: DeskSettings?, actions: SettingsActions, prefs
                 changed()
             }
         }
-    }
-    if (confirmUnpair && desk != null) {
-        AlertDialog(
-            onDismissRequest = { confirmUnpair = false },
-            title = { Text(stringResource(R.string.device_unpair_title, desk.name)) },
-            text = { Text(stringResource(R.string.device_unpair_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = { confirmUnpair = false; actions.onUnpair() },
-                    colors = ButtonDefaults.textButtonColors(contentColor = t.red),
-                ) { Text(stringResource(R.string.device_menu_unpair)) }
-            },
-            dismissButton = { TextButton(onClick = { confirmUnpair = false }) { Text(stringResource(R.string.cancel)) } },
-        )
     }
 }
 
@@ -682,10 +658,40 @@ private fun PrivacyGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
                 onClick = actions.onEncryptionInfo,
             ) { Chevron() }
         }
+        // Unpair lives here, as on the computer (Privacy & security).
+        UnpairRow(desk, actions)
         val privacyUrl = stringResource(R.string.privacy_policy_url)
         GroupRow(stringResource(R.string.privacy_policy), icon = R.drawable.sym_open_in_new, subtitle = stringResource(R.string.privacy_policy_summary), onClick = {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, privacyUrl.toUri())) }
         })
+    }
+}
+
+@Composable
+private fun UnpairRow(desk: DeskSettings?, actions: SettingsActions) {
+    val t = tokens
+    var confirmUnpair by rememberSaveable { mutableStateOf(false) }
+    if (desk == null) return
+    GroupRow(
+        stringResource(R.string.device_menu_unpair),
+        icon = R.drawable.sym_link_off,
+        titleColor = t.red,
+        iconTint = t.red,
+        onClick = { confirmUnpair = true },
+    )
+    if (confirmUnpair) {
+        AlertDialog(
+            onDismissRequest = { confirmUnpair = false },
+            title = { Text(stringResource(R.string.device_unpair_title, desk.name)) },
+            text = { Text(stringResource(R.string.device_unpair_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirmUnpair = false; actions.onUnpair() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = t.red),
+                ) { Text(stringResource(R.string.device_menu_unpair)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmUnpair = false }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 }
 

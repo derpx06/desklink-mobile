@@ -250,7 +250,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="accessibility_setup_ask">%1$s wants to control this phone</string>
     <string name="accessibility_setup_ask_text">Tap to turn on DeskLink in Accessibility</string>
     <string name="settings_desk_notifications_summary">Reply from the computer</string>
-    <string name="settings_relay_not_set_up">No relay server set up. Enter one in More → Advanced network</string>
+    <string name="settings_relay_not_set_up">No relay server set up. Enter one in Settings → Advanced</string>
     <string name="settings_reach_anywhere_summary">Encrypted relay when off Wi‑Fi</string>
     <string name="settings_paired_key">Paired · key %1$s</string>
 
@@ -680,7 +680,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="sg_control_summary">Glide, typing, the desk screen</string>
     <string name="sg_files">Files</string>
     <string name="sg_files_summary">The Bucket and where received files go</string>
-    <string name="sg_privacy">Privacy and security</string>
+    <string name="sg_privacy">Privacy &amp; security</string>
     <string name="sg_privacy_summary">Fingerprint check, unlocking, encryption</string>
     <string name="sg_appearance">Appearance</string>
     <string name="sg_appearance_summary">Theme and colours</string>

@@ -31,7 +31,7 @@ class ReceivedFilesTest {
         val first = destination.viaFile(dir, source, "report.pdf", 1_700_000_000_000, "application/pdf")
         val second = destination.viaFile(dir, source, "report.pdf", null, "application/pdf")
         assertEquals("report.pdf", first.name)
-        assertEquals("report (1).pdf", second.name)
+        assertEquals("report (2).pdf", second.name)
         assertArrayEquals(source.readBytes(), File(dir, "report.pdf").readBytes())
         assertEquals(1_700_000_000_000, File(dir, "report.pdf").lastModified())
         assertEquals(source.length(), first.size)
@@ -89,8 +89,8 @@ class ReceivedFilesTest {
     fun namesAreUniqueWithTheLastExtensionKept() {
         val dir = tmp.newFolder("names")
         File(dir, "a.tar.gz").writeText("x")
-        File(dir, "a.tar (1).gz").writeText("x")
-        assertEquals("a.tar (2).gz", DeviceStorageDestination.uniqueIn(dir, "a.tar.gz"))
+        File(dir, "a.tar (2).gz").writeText("x")
+        assertEquals("a.tar (3).gz", DeviceStorageDestination.uniqueIn(dir, "a.tar.gz"))
         assertEquals("fresh.txt", DeviceStorageDestination.uniqueIn(dir, "fresh.txt"))
         assertEquals("bad_name_file", DeviceStorageDestination.uniqueIn(dir, "..."))
     }

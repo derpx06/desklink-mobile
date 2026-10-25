@@ -22,8 +22,8 @@ class FilesHelperTest {
         val fileName = "$baseName.$extension"
 
         val firstFile = temporaryTestFolder.resolve(fileName).toFile()
-        val secondFile = temporaryTestFolder.resolve("$baseName (1).$extension").toFile()
-        val thirdFile = temporaryTestFolder.resolve("$baseName (2).$extension").toFile()
+        val secondFile = temporaryTestFolder.resolve("$baseName (2).$extension").toFile()
+        val thirdFile = temporaryTestFolder.resolve("$baseName (3).$extension").toFile()
 
         firstFile.delete()
         secondFile.delete()
@@ -38,15 +38,15 @@ class FilesHelperTest {
 
         firstFile.createNewFile()
         val result2 = FilesHelper.findValidNonExistingFileName(folder, fileName)
-        Assert.assertEquals("$baseName (1).$extension", result2)
+        Assert.assertEquals("$baseName (2).$extension", result2)
 
         secondFile.createNewFile()
         val result3 = FilesHelper.findValidNonExistingFileName(folder, fileName)
-        Assert.assertEquals("$baseName (2).$extension", result3)
+        Assert.assertEquals("$baseName (3).$extension", result3)
 
         thirdFile.createNewFile()
         val result4 = FilesHelper.findValidNonExistingFileName(folder, fileName)
-        Assert.assertEquals("$baseName (3).$extension", result4)
+        Assert.assertEquals("$baseName (4).$extension", result4)
 
         val invalidCharsFileName1 = "test%cfile%cname%c.txt".format(0x00, 0x1F, 0x7F)
         val result5 = FilesHelper.findValidNonExistingFileName(folder, invalidCharsFileName1)
