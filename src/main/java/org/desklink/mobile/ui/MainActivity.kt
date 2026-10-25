@@ -747,6 +747,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     },
             onCode = ::onQrCode,
             onPairNearby = { id ->
+                org.desklink.mobile.backends.lan.UnpairedLimits.shared.reserve(id)
                 DeskLinkApplication.getInstance().getDevice(id)?.requestPairing()
                 push(pairRoute(id))
             },

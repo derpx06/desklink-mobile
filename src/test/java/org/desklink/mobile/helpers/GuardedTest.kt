@@ -95,4 +95,16 @@ class GuardedTest {
         assertFalse(kept.first().readText().contains("192.168.1.20"))
         dir.deleteRecursively()
     }
+
+    @Test
+    fun aPoolOfFourCoreThreadsReallyRunsFourAtOnce() {
+        val pool = Guarded.Pool(4, 4, 1000, java.util.concurrent.LinkedBlockingQueue(16), "t-four")
+        pool.allowCoreThreadTimeOut(true)
+        val started = CountDownLatch(4)
+        val release = CountDownLatch(1)
+        repeat(4) { pool.execute { started.countDown(); release.await(10, TimeUnit.SECONDS) } }
+        assertTrue("four tasks run at the same time", started.await(10, TimeUnit.SECONDS))
+        release.countDown()
+        pool.shutdown()
+    }
 }

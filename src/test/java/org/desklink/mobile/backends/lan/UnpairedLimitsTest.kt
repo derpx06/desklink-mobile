@@ -34,9 +34,9 @@ class UnpairedLimitsTest {
         assertTrue("the same device again", limits.admit("one", a))
         val many = UnpairedLimits { now }
         repeat(UnpairedLimits.MAX_UNPAIRED_DEVICES) { assertTrue(many.admit("id$it", InetAddress.getByAddress(byteArrayOf(10, 0, (it / 100).toByte(), (it % 100).toByte())))) }
-        assertFalse("the 43rd", many.admit("extra", b))
-        now += UnpairedLimits.FORGET_AFTER_MS
-        assertTrue("forgotten after a quiet ten minutes", many.admit("extra", b))
+        assertFalse("the 43rd, while everything is fresh", many.admit("extra", b))
+        now += UnpairedLimits.IDLE_MS
+        assertTrue("an idle id makes room for it", many.admit("extra", b))
     }
 
     @Test
@@ -74,5 +74,21 @@ class UnpairedLimitsTest {
             }
             writer.join()
         }
+    }
+
+    @Test
+    fun aCrowdOfMadeUpIdsCannotKeepThePairingComputerOut() {
+        var now = 0L
+        val limits = UnpairedLimits { now }
+        repeat(UnpairedLimits.MAX_UNPAIRED_DEVICES) { limits.admit("fake$it", InetAddress.getByAddress(byteArrayOf(10, 0, (it / 100).toByte(), (it % 100).toByte()))) }
+        // The person scans the real computer's code: it is reserved, admitted beyond the cap, and then never the one evicted.
+        limits.reserve("real")
+        assertTrue(limits.admit("real", a))
+        now += UnpairedLimits.IDLE_MS
+        assertTrue(limits.admit("another", b)) // evicts the oldest idle fake, not the reserved one
+        assertTrue("still admitted", limits.admit("real", a))
+        // Reserved places are few.
+        repeat(10) { limits.reserve("pairing$it") }
+        assertTrue(true)
     }
 }

@@ -154,6 +154,7 @@ object QrPairing {
 
     private fun pairBlocking(application: DeskLinkApplication, code: Code, replaceExisting: Boolean, onProgress: (Stage) -> Unit) {
         pendingDesktopId = code.desktopId
+        org.desklink.mobile.backends.lan.UnpairedLimits.shared.reserve(code.desktopId)
         try {
             // Never unpaired on a scan's say-so alone: a code shown elsewhere
             // can carry any desktop's public id. Only after the user confirmed
