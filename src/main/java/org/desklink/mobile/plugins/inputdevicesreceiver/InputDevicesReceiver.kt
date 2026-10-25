@@ -69,7 +69,7 @@ class InputDevicesReceiverPlugin : Plugin() {
      * could be taken. Sent on every feature-ready and whenever the switch or the service changes.
      */
     fun reportAllowed() {
-        device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES).apply { this["allowed"] = glideAllowed() })
+        device.sendPacket(statePacket(glideAllowed(), entered = false))
     }
 
     override fun onFeatureReady() = reportAllowed()
@@ -85,10 +85,7 @@ class InputDevicesReceiverPlugin : Plugin() {
     }
 
     private fun sendRelease(dx: Int, dy: Int) {
-        device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES).apply {
-            this["releaseDeltax"] = dx
-            this["releaseDeltay"] = dy
-        })
+        device.sendPacket(releasePacket(dx, dy))
     }
 
     /** The glide ends here: the pointer hides, and (unless the desk ended it) the desk gets it back. */
@@ -154,10 +151,7 @@ class InputDevicesReceiverPlugin : Plugin() {
 
     /** `desklink.shareinputdevices {allowed: true, entered: true}`: a state report that also answers the enter. */
     private fun sendAccept() {
-        device.sendPacket(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES).apply {
-            this["allowed"] = true
-            this["entered"] = true
-        })
+        device.sendPacket(statePacket(allowed = true, entered = true))
     }
 
     private fun screenIsOn() = context.getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
@@ -181,6 +175,22 @@ class InputDevicesReceiverPlugin : Plugin() {
 
     companion object {
         private const val TAG = "DeskLink/Glide"
+
+        /** A state report (never a command): `entered` is only ever said together with `allowed`. Shared fixture glide_bodies.json. */
+        @JvmStatic
+        fun statePacket(allowed: Boolean, entered: Boolean): NetworkPacket =
+            NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES).apply {
+                this["allowed"] = allowed
+                if (entered && allowed) this["entered"] = true
+            }
+
+        /** The pointer reached the edge it came in by: where the desk's pointer goes on. */
+        @JvmStatic
+        fun releasePacket(dx: Int, dy: Int): NetworkPacket =
+            NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES).apply {
+                this["releaseDeltax"] = dx
+                this["releaseDeltay"] = dy
+            }
 
         /**
          * Ends whatever glide is on, whichever desk: the screen went off, or the accessibility service went away.

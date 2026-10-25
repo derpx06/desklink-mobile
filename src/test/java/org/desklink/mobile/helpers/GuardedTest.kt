@@ -57,7 +57,7 @@ class GuardedTest {
 
     @Test
     fun aThrowingCoroutineInAnOwnedScopeIsRecordedAndTheScopeLives() {
-        val scope = CoroutineScope(Dispatchers.IO + Guarded.handler("t-scope"))
+        val scope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO + Guarded.handler("t-scope"))
         scope.launch { throw IllegalArgumentException("x") }
         val ran = CountDownLatch(1)
         scope.launch { ran.countDown() }
