@@ -39,6 +39,11 @@ class StartActivityAlertDialogFragment : AlertDialogFragment() {
         setCallback(object : Callback() {
             override fun onPositiveButtonClicked(): Boolean {
                 val activity = requireActivity()
+                // Accessibility has its own screens: what the service can see and do is explained, and agreed to, first.
+                if (intentAction == android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS) {
+                    org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.open(activity)
+                    return true
+                }
                 val requestedIntent =
                     SettingsIntentFactory.buildRequestedIntent(intentAction, intentUrl)
                 val launchIntent = SettingsIntentFactory.bestAvailableIntent(

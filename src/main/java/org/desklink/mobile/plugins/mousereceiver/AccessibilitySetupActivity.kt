@@ -36,6 +36,20 @@ class AccessibilitySetupActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.accessibility_setup_done, Toast.LENGTH_SHORT).show()
             return finish()
         }
+        // Prominent disclosure and consent first: nothing sends the person to Accessibility settings before they said yes.
+        if (!disclosureAccepted(this)) {
+            dialog = AlertDialog.Builder(this)
+                .setTitle(R.string.accessibility_disclosure_title)
+                .setMessage(R.string.accessibility_disclosure_body)
+                .setPositiveButton(R.string.accessibility_disclosure_agree) { _, _ ->
+                    acceptDisclosure(this)
+                    onResume()
+                }
+                .setNegativeButton(R.string.accessibility_disclosure_deny) { _, _ -> finish() }
+                .setOnCancelListener { finish() }
+                .show()
+            return
+        }
         val steps = buildString {
             append(getString(if (enabled(this@AccessibilitySetupActivity)) R.string.accessibility_setup_restart else R.string.accessibility_setup_step))
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) append("\n\n").append(getString(R.string.accessibility_setup_restricted))
@@ -63,6 +77,16 @@ class AccessibilitySetupActivity : AppCompatActivity() {
 
     companion object {
         private const val NOTIFICATION_ASK = 1739
+
+        private const val PREFS = "accessibility_disclosure"
+        private const val KEY_ACCEPTED_AT = "accepted_at"
+
+        /** The person read what the service can see and do, and agreed. */
+        fun disclosureAccepted(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_ACCEPTED_AT, 0L) > 0L
+
+        fun acceptDisclosure(context: Context) =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_ACCEPTED_AT, System.currentTimeMillis()).apply()
 
         /** Bound and working: what every feature actually needs. */
         fun running() = MouseReceiverService.instance != null

@@ -1037,7 +1037,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     device?.let { org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.setAllowed(this, it.deviceId, on) }
                     // The accessibility service is asked for only now, when the person turns this on.
                     if (on && org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance == null) {
-                        runCatching { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                        org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.open(this)
                     }
                     tick++
                 },
