@@ -132,7 +132,7 @@ class BucketActivity : AppCompatActivity() {
             return finish()
         }
         if (savedInstanceState == null) takeShare(intent)
-        setContent { DeskLinkTheme(this) { Screen(deviceId) } }
+        setContent { DeskLinkTheme(this) { org.desklink.mobile.ui.compose.SecureWindow(); Screen(deviceId) } }
     }
 
     override fun onNewIntent(intent: Intent) {

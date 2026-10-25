@@ -85,9 +85,16 @@ class BackgroundService : Service() {
         if (NotificationHelper.isPersistentNotificationEnabled(this)) {
             // Update the foreground notification with the currently connected device list
             val notificationManager = getSystemService<NotificationManager>()
-            notificationManager?.notify(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
+            val notification = createForegroundNotification()
+            // Re-posting an identical notification only costs a binder call and a flicker: only a change of what it says goes out.
+            val shown = visibleKey(notification)
+            if (shown == lastForegroundKey) return
+            lastForegroundKey = shown
+            notificationManager?.notify(FOREGROUND_NOTIFICATION_ID, notification)
         }
     }
+
+    private var lastForegroundKey: String? = null
 
     private fun registerLinkProviders() {
         // Debug "Force relay": no LAN links at all, so every
@@ -382,6 +389,7 @@ class BackgroundService : Service() {
 
     fun changePersistentNotificationVisibility(visible: Boolean) {
         if (visible) {
+            lastForegroundKey = null // it may have been removed: post it again
             updateForegroundNotification()
         }
         else {
@@ -580,6 +588,14 @@ class BackgroundService : Service() {
 
         const val UPDATE_IMMUTABLE_FLAGS = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         private const val FOREGROUND_NOTIFICATION_ID = 1
+
+        /** What a notification shows: its title, text and button labels. */
+        fun visibleKey(notification: android.app.Notification): String = listOf(
+            notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE),
+            notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT),
+            notification.extras.getCharSequence(android.app.Notification.EXTRA_BIG_TEXT),
+            notification.actions?.joinToString("|") { it.title.toString() },
+        ).joinToString("\u0000")
 
         /** One hold lasts at most this long; renewed every [WORK_LEASE_CHECK_MS] while working. */
         const val WORK_LEASE_MS = 60_000L
