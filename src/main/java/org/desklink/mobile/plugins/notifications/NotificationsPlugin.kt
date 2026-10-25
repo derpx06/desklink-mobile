@@ -284,6 +284,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     private fun privacyOf(notification: Notification): NotificationPrivacy.Mirror = NotificationPrivacy.decide(
         notification.visibility, keyguardManager.isKeyguardSecure, NotificationPrivacy.showPrivate(context, device.deviceId),
+        NotificationPrivacy.systemAllowsPrivate(context),
     )
 
     /** Whether Android lets this phone read notifications; reported with every snapshot so the computer can say why none come. */
@@ -339,7 +340,9 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         val hideContents = privacyOf(notification) == NotificationPrivacy.Mirror.HIDDEN
         if (hideContents) {
             // PRIVATE on a secured lock screen: what the lock screen itself shows (the public version), else only the app.
-            val shown = notification.publicVersion
+            // Nothing but the app when the person blocked this app's contents; no buttons or reply either.
+            val shown = notification.publicVersion.takeIf { !appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS) }
+            np["actions"] = org.json.JSONArray()
             np["title"] = shown?.let { extractStringFromExtra(it.extras, NotificationCompat.EXTRA_TITLE) } ?: (appName ?: packageName)
             np["text"] = shown?.let { extractText(it) } ?: context.getString(R.string.notification_private_hidden)
         } else if (!appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS)) {
