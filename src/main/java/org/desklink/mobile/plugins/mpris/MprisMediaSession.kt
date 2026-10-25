@@ -349,7 +349,7 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
     private fun button(context: Context, np: NowPlaying, action: String): PendingIntent = PendingIntent.getBroadcast(
         context,
         0,
-        Intent(context, MprisMediaNotificationReceiver::class.java)
+        Intent(context, MprisNotificationActionReceiver::class.java)
             .setAction(action)
             .putExtra(MprisMediaNotificationReceiver.EXTRA_DEVICE_ID, np.deviceId)
             .putExtra(MprisMediaNotificationReceiver.EXTRA_MPRIS_PLAYER, np.player),

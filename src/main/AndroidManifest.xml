@@ -180,7 +180,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.mousereceiver.TypeOnPhoneAllowReceiver"
             android:exported="false" />
         <receiver android:name="org.desklink.mobile.DeskLinkBroadcastReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
             </intent-filter>
@@ -230,7 +230,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:exported="false" />
 
         <receiver android:name="org.desklink.mobile.plugins.findmyphone.FindMyPhoneReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="org.desklink.mobile.plugins.findmyphone.foundIt" />
             </intent-filter>
@@ -244,6 +244,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:taskAffinity=""
             android:excludeFromRecents="true"/>
 
+        <receiver
+            android:name="org.desklink.mobile.plugins.mpris.MprisNotificationActionReceiver"
+            android:exported="false" />
         <receiver android:name="org.desklink.mobile.plugins.mpris.MprisMediaNotificationReceiver"
             android:exported="true">
             <intent-filter>
@@ -346,7 +349,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:exported="false" />
 
         <receiver android:name="org.desklink.mobile.plugins.share.ShareBroadcastReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="org.desklink.mobile.plugins.share.CancelShare" />
             </intent-filter>

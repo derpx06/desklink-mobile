@@ -16,12 +16,12 @@ import org.desklink.mobile.DeskLinkApplication;
 public class ShareBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        switch (intent.getAction()) {
-            case SharePlugin.ACTION_CANCEL_SHARE:
-                cancelShare(context, intent);
-                break;
-            default:
-                Log.d("ShareBroadcastReceiver", "Unhandled Action received: " + intent.getAction());
+        String action = intent.getAction();
+        // No action (an explicit intent from anywhere) is ignored, never a crash.
+        if (SharePlugin.ACTION_CANCEL_SHARE.equals(action)) {
+            cancelShare(context, intent);
+        } else {
+            Log.d("ShareBroadcastReceiver", "Unhandled action ignored");
         }
     }
 

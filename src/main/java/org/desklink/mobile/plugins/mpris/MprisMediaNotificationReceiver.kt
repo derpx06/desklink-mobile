@@ -17,32 +17,11 @@ import org.desklink.mobile.extensions.getParcelableCompat
  */
 class MprisMediaNotificationReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        // First case: buttons send by other applications via the media session APIs. They don't target a specific device.
-        if (Intent.ACTION_MEDIA_BUTTON == intent.action) {
-            // Route these buttons to the media session, which will handle them
-            val mediaSession = MprisMediaSession.getMediaSession() ?: return
-            mediaSession.controller.dispatchMediaButtonEvent(intent.getParcelableCompat(Intent.EXTRA_KEY_EVENT))
-        } else {
-            // Second case: buttons on the notification, which we created ourselves
-            // Get the correct device, the mpris plugin and the mpris player
-
-            val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID)
-            val plugin = DeskLinkApplication.getInstance().getDevicePlugin(deviceId, MprisPlugin::class.java) ?: return
-            val player = plugin.getPlayerStatus(intent.getStringExtra(EXTRA_MPRIS_PLAYER))
-                ?: return
-
-            when (intent.action) {
-                ACTION_PLAY -> player.sendPlay()
-                ACTION_PAUSE -> player.sendPause()
-                ACTION_PREVIOUS -> player.sendPrevious()
-                ACTION_NEXT -> player.sendNext()
-                ACTION_CLOSE_NOTIFICATION ->                     //The user dismissed the notification: actually handle its removal correctly
-                    MprisMediaSession.instance.closeMediaNotification()
-                else -> {
-                    Log.w(TAG, "Unknown action: ${intent.action}, ignore.")
-                }
-            }
-        }
+        // Only the system's media buttons arrive here (this receiver is exported for them): any other action is ignored.
+        // The notification's own buttons go to [MprisNotificationActionReceiver], which is not exported.
+        if (Intent.ACTION_MEDIA_BUTTON != intent.action) return
+        val mediaSession = MprisMediaSession.getMediaSession() ?: return
+        mediaSession.controller.dispatchMediaButtonEvent(intent.getParcelableCompat(Intent.EXTRA_KEY_EVENT))
     }
 
     companion object {
