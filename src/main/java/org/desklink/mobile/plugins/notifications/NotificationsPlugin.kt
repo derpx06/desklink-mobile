@@ -180,9 +180,9 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     /** [resync]: a new link, where the desk may already hold exactly this set. */
     private fun sendSnapshot(ids: List<String>, resync: Boolean = false) {
         if (resync) {
-            device.sendSnapshot(SyncDigest.NOTIFICATIONS, snapshotRev(ids.map { it to 0L }), listOf(snapshotPacket(ids)))
+            device.sendSnapshot(SyncDigest.NOTIFICATIONS, snapshotRev(ids.map { it to 0L }) + accessRevSuffix(), listOf(snapshotPacket(ids, accessGranted())))
         } else {
-            device.sendPacket(snapshotPacket(ids))
+            device.sendPacket(snapshotPacket(ids, accessGranted()))
         }
     }
 
@@ -285,6 +285,12 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private fun privacyOf(notification: Notification): NotificationPrivacy.Mirror = NotificationPrivacy.decide(
         notification.visibility, keyguardManager.isKeyguardSecure, NotificationPrivacy.showPrivate(context, device.deviceId),
     )
+
+    /** Whether Android lets this phone read notifications; reported with every snapshot so the computer can say why none come. */
+    private fun accessGranted() = NotificationReceiver.hasReadNotificationsPermission(context)
+
+    /** A change of the access flips the revision, so a snapshot with the new state is never skipped as "already held". */
+    private fun accessRevSuffix() = if (accessGranted()) "+a" else "-a"
 
     private fun isCallNotification(statusBarNotification: StatusBarNotification): Boolean {
         val category = statusBarNotification.notification.category
@@ -558,7 +564,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             // A new link where the desk already holds this exact set (same ids, same post times): nothing to send.
             val rev = snapshotRev(mirrored.map { getNotificationKeyCompat(it) to it.postTime })
             if (!device.sync.shouldSend(SyncDigest.NOTIFICATIONS, rev)) return
-            device.sendSnapshot(SyncDigest.NOTIFICATIONS, rev, listOf(snapshotPacket(ids)))
+            device.sendSnapshot(SyncDigest.NOTIFICATIONS, rev + accessRevSuffix(), listOf(snapshotPacket(ids, accessGranted())))
         } else {
             sendSnapshot(ids)
         }
@@ -683,8 +689,10 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             SyncDigest.rev(entries.sortedBy { it.first }.map { "${it.first}@${it.second}" })
 
         /** S1: every posted id. Ids past [SNAPSHOT_BUDGET] are left out (a packet must cross the data channel). */
-        fun snapshotPacket(ids: List<String>) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_NOTIFICATION).apply {
+        fun snapshotPacket(ids: List<String>, accessGranted: Boolean? = null) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_NOTIFICATION).apply {
             this["snapshot"] = true
+            // W7 "notification access state": whether Android lets this phone read notifications at all (optional, additive).
+            accessGranted?.let { this["accessGranted"] = it }
             var size = 0
             this["ids"] = org.json.JSONArray(ids.takeWhile { id -> (size + org.json.JSONObject.quote(id).length + 1).also { size = it } <= SNAPSHOT_BUDGET })
         }

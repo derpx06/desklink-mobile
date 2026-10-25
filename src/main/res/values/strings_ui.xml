@@ -777,4 +777,12 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_perm_contacts">Contacts</string>
     <string name="settings_perm_contacts_summary">Share contacts and caller names with %1$s</string>
     <string name="qr_error_generic">Pairing did not work. Check that this phone and the computer are on the same Wi-Fi, then scan the code again.</string>
+    <string name="welcome_install_title">Install DeskLink on your computer</string>
+    <string name="welcome_install_text">DeskLink needs its Linux app on your computer too: %1$s</string>
+    <string name="welcome_install_copy">Copy link</string>
+    <string name="welcome_install_share">Send to my computer</string>
+    <string name="welcome_install_copied">Link copied</string>
+    <string name="welcome_install_message">Install DeskLink on your computer: %1$s</string>
+    <string name="settings_desk_shows_notifications">%1$s shows them</string>
+    <string name="settings_desk_shows_notifications_summary">Off hides this phone\'s notifications on %1$s (they are still sent while the switch above is on)</string>
 </resources>

@@ -344,6 +344,8 @@ private fun NotificationsGroup(desk: DeskSettings?, actions: SettingsActions, pr
                 subtitle = stringResource(R.string.sg_choose_apps_summary),
                 onClick = actions.onChooseNotificationApps,
             ) { Chevron() }
+            // The computer's own switch for showing this phone's notifications (it was only reachable on the computer).
+            DeskSwitch(desk, actions, DeskSettingsPlugin.NOTIFICATIONS, stringResource(R.string.settings_desk_shows_notifications, desk.name), R.drawable.sym_notifications_active, stringResource(R.string.settings_desk_shows_notifications_summary, desk.name), desk.remote?.notifications == true)
             val defaultPrefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
             val privateKey = org.desklink.mobile.plugins.notifications.NotificationPrivacy.key(desk.id)
             var showPrivate by remember { mutableStateOf(defaultPrefs.getBoolean(privateKey, false)) }
