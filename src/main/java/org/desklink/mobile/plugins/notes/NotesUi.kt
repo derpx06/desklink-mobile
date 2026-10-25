@@ -91,6 +91,13 @@ import org.desklink.mobile.plugins.notes.NotesActivity.Companion.NEW
 import org.desklink.mobile.plugins.notes.NotesActivity.Companion.copy
 import org.desklink.mobile.plugins.notes.NotesActivity.Companion.pinClipboard
 
+/** Saved-state saver for text: kept only up to [SAVED_STATE_CAP] chars; a longer one is not saved, so the caller's default (the store) applies. */
+internal const val SAVED_STATE_CAP = 20_000
+internal val CappedText: androidx.compose.runtime.saveable.Saver<String, Any> = androidx.compose.runtime.saveable.Saver(
+    save = { if (it.length <= SAVED_STATE_CAP) it else null },
+    restore = { it as? String },
+)
+
 /**
  * The notes and snippets screens as a reusable piece: [NotesActivity] hosts them full screen, and the Notes
  * tab hosts them under its own header. [editing] is the note being edited ([NEW], an id) or null.
@@ -210,7 +217,9 @@ class NotesUi(
         var id by rememberSaveable { mutableStateOf(start.takeIf { it != NEW }) }
         val first = remember { id?.let { NotesStore.note(context, it) } }
         var title by rememberSaveable { mutableStateOf(first?.title.orEmpty()) }
-        var body by rememberSaveable { mutableStateOf(first?.body.orEmpty()) }
+        // A big note in the saved-state Bundle crashes the activity stop (TransactionTooLarge): only a small body goes in it, and a
+        // large one is restored from the notes store (flushed at onStop).
+        var body by rememberSaveable(stateSaver = CappedText) { mutableStateOf(first?.body.orEmpty()) }
         var pinned by rememberSaveable { mutableStateOf(first?.pinned ?: false) }
         var reading by rememberSaveable { mutableStateOf(first != null && first.body.isNotBlank()) }
         /** The version shown: a newer one from the desk replaces it while nothing here is unsaved. */

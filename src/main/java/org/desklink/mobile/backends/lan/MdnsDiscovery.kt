@@ -34,9 +34,25 @@ class MdnsDiscovery {
         multicastLock = wifiManager.createMulticastLock("deskLinkMdnsMulticastLock")
     }
 
+    /**
+     * The multicast lock keeps Wi-Fi from filtering multicast (a battery cost) and is needed only to find a computer. While a LAN
+     * link is up it is let go; discovery goes on, and the lock is taken again when the last link goes or the network changes.
+     */
+    @Volatile private var linkUp = false
+
+    internal val lockHeld: Boolean get() = multicastLock.isHeld
+
+    @Synchronized
+    fun setLinkUp(up: Boolean) {
+        linkUp = up
+        if (discoveryListener == null) return
+        if (up && multicastLock.isHeld) multicastLock.release()
+        if (!up && !multicastLock.isHeld) multicastLock.acquire()
+    }
+
     fun startDiscovering() {
         if (discoveryListener == null) {
-            multicastLock.acquire()
+            if (!linkUp) multicastLock.acquire()
             discoveryListener = createDiscoveryListener()
             mNsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
         }

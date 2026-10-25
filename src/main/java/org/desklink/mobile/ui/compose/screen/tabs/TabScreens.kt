@@ -315,14 +315,14 @@ fun TerminalsTab(
     val connected = state.link == TerminalLinkState.CONNECTED
     val locked = state.passwordNeeded != null
     // Sessions can also start at the desk, which is not announced: look again while this tab is on screen.
-    LaunchedEffect(client, connected, locked) {
+    org.desklink.mobile.ui.compose.components.StartedEffect(client, connected, locked) {
         while (client != null && connected && !locked) {
             client.refresh()
             kotlinx.coroutines.delay(REFRESH_MS)
         }
     }
     var tick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
+    org.desklink.mobile.ui.compose.components.StartedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(PREVIEW_MS)
             tick++

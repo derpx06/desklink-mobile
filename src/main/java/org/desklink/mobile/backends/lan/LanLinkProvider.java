@@ -108,6 +108,7 @@ public class LanLinkProvider extends BaseLinkProvider {
         // already been installed. Do not let that stale callback remove the
         // current bootstrap link from discovery state.
         if (visibleDevices.remove(deviceId, link)) linkRace.forget(deviceId);
+        mdnsDiscovery.setLinkUp(!visibleDevices.isEmpty());
         super.onConnectionLost(link);
         if (listening) {
             ThreadHelper.execute(() -> {
@@ -607,6 +608,7 @@ public class LanLinkProvider extends BaseLinkProvider {
             visibleDevices.put(deviceInfo.id, link);
             onConnectionReceived(link);
         }
+        mdnsDiscovery.setLinkUp(true); // found: the multicast lock is not needed while linked
         // Remembered only now, after the pinned handshake proved who is at this address. The port is
         // known when we dialed (it is the desk's listener); an accepted socket's port is not.
         LastLanAddress.INSTANCE.remember(context, deviceInfo.id, socket.getInetAddress(), weDialed ? socket.getPort() : 0);

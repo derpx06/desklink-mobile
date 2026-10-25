@@ -751,6 +751,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 push(pairRoute(id))
             },
             onClose = ::pop,
+            onCameraError = { showMessage(getString(R.string.scan_camera_error)) },
         )
         QrProgress()
         qrConflict?.let { (code, name) ->

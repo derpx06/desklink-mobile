@@ -417,7 +417,7 @@ class TerminalActivity : AppCompatActivity() {
         val t = tokens
         // Sessions can also start at the desk, which the desktop does not announce: look again
         // while the list is on screen. Not while it is locked: only the person retries that.
-        LaunchedEffect(connected, locked) {
+        org.desklink.mobile.ui.compose.components.StartedEffect(connected, locked) {
             while (connected && !locked) {
                 client.refresh()
                 kotlinx.coroutines.delay(LIST_REFRESH_MS)

@@ -18,28 +18,30 @@ import java.util.Date
  * through a share sheet. Nothing is uploaded; the person decides where it goes.
  */
 object CrashReporter {
-    private const val FILE_NAME = "crash-report.txt"
     // A notification's PendingIntent travels through binder; keep its extras small.
     private const val MAX_CHARS = 32 * 1024
     private const val NOTIFICATION_ID = 0x0C4A54
 
+    const val MAX_REPORTS = 5
+
     fun install(context: Context) {
-        val file = File(context.filesDir, FILE_NAME)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            runCatching { file.writeText(report(thread, error)) }
-            if (survivable(thread, error, android.os.Looper.getMainLooper().thread)) {
-                // A worker thread's bug: that thread ends, the app keeps running (and the report is
-                // still offered at the next start), instead of a crash that restarts into the same bug.
-                runCatching { android.util.Log.e("DeskLink/Crash", "Uncaught on ${thread.name}; the thread ends, the app goes on", error) }
-            } else {
-                previous?.uncaughtException(thread, error)
-            }
+            // Recorded, then the system's own handling: a bug on a worker thread is not hidden (it used to end that thread and carry on).
+            runCatching { keep(context.filesDir, report(thread, error)) }
+            previous?.uncaughtException(thread, error)
         }
     }
 
-    /** Off the main thread an Exception (not an Error such as OutOfMemoryError) only ends that thread. */
-    internal fun survivable(thread: Thread, error: Throwable, main: Thread): Boolean = thread !== main && error is Exception
+    /** One file per crash (the next one no longer overwrites the last), the newest [MAX_REPORTS] kept. */
+    internal fun keep(dir: File, text: String, now: Long = System.currentTimeMillis()) {
+        File(dir, "crash-report-$now.txt").writeText(text)
+        reports(dir).drop(MAX_REPORTS).forEach { it.delete() }
+    }
+
+    /** The kept reports, newest first. */
+    internal fun reports(dir: File): List<File> =
+        dir.listFiles { f -> f.name.startsWith("crash-report-") && f.name.endsWith(".txt") }.orEmpty().sortedByDescending { it.name.removePrefix("crash-report-").removeSuffix(".txt").toLongOrNull() ?: 0L }
 
     internal fun report(thread: Thread, error: Throwable): String =
         "DeskLink ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n" +
@@ -50,13 +52,13 @@ object CrashReporter {
     /** Posts the share offer for a crash recorded by an earlier process, if any. */
     @SuppressLint("MissingPermission") // areNotificationsEnabled() covers POST_NOTIFICATIONS
     fun offerPendingReport(context: Context) {
-        val file = File(context.filesDir, FILE_NAME)
-        if (!file.exists()) return
+        val all = reports(context.filesDir)
+        if (all.isEmpty()) return
         val notifications = NotificationManagerCompat.from(context)
         // Kept until it can be offered: notifications may be off for now.
         if (!notifications.areNotificationsEnabled()) return
-        val text = runCatching { file.readText().take(MAX_CHARS) }.getOrNull()
-        file.delete()
+        val text = runCatching { all.first().readText().take(MAX_CHARS) }.getOrNull()
+        all.forEach { it.delete() }
         if (text.isNullOrEmpty()) return
 
         val send = Intent(Intent.ACTION_SEND).apply {

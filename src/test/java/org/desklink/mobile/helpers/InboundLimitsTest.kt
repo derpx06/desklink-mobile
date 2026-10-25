@@ -24,11 +24,12 @@ class InboundLimitsTest {
     }
 
     @Test
-    fun onlyAWorkerThreadsExceptionIsSurvivable() {
-        val main = Thread()
-        val worker = Thread()
-        assertTrue(CrashReporter.survivable(worker, IllegalStateException(), main))
-        assertFalse(CrashReporter.survivable(main, IllegalStateException(), main))
-        assertFalse(CrashReporter.survivable(worker, OutOfMemoryError(), main))
+    fun crashReportsAreKeptSeparatelyAndBounded() {
+        val dir = java.nio.file.Files.createTempDirectory("crash").toFile()
+        repeat(8) { i -> CrashReporter.keep(dir, "report $i", now = 1_000L + i) }
+        val kept = CrashReporter.reports(dir)
+        assertEquals(CrashReporter.MAX_REPORTS, kept.size)
+        assertEquals("the newest comes first", "report 7", kept.first().readText())
+        dir.deleteRecursively()
     }
 }

@@ -8,6 +8,7 @@ package org.desklink.mobile.ui.compose.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,12 +34,19 @@ fun rememberHaptics(): (HapticFeedbackType) -> Unit {
 /** Numbers that line up and do not jitter as they change: battery, round trip, sizes. */
 val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
 
+/** A [LaunchedEffect] that runs only while the screen is STARTED: a poll loop in it stops in the background and starts again on return. */
+@Composable
+fun StartedEffect(vararg keys: Any?, block: suspend kotlinx.coroutines.CoroutineScope.() -> Unit) {
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(*keys, lifecycle) { lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED, block) }
+}
+
 /** The live WebRTC path and round trip for [deviceId], polled while on screen; null until known. */
 @Composable
 fun rememberConnectionStats(deviceId: String?): WebRtcConnectionStats? {
     var stats by remember(deviceId) { mutableStateOf<WebRtcConnectionStats?>(null) }
     val view = LocalView.current
-    LaunchedEffect(deviceId) {
+    StartedEffect(deviceId) {
         while (true) {
             DeskLinkApplication.getInstance().getDevice(deviceId)?.requestConnectionStats { s -> view.post { stats = s } }
             delay(STATS_POLL_MS)

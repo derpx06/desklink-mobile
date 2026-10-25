@@ -201,10 +201,12 @@ fun ScanScreen(
     onCode: (String) -> Unit,
     onPairNearby: (String) -> Unit,
     onClose: () -> Unit,
+    /** The camera could not start (another app holds it, or none): said, not a black square. */
+    onCameraError: (() -> Unit)? = null,
 ) {
     DarkSystemBars()
     Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF2A2C31), Color(0xFF0B0B0C))))) {
-        if (camera) androidx.compose.runtime.key(attempt) { QrCamera(onCode = onCode) }
+        if (camera) androidx.compose.runtime.key(attempt) { QrCamera(onError = onCameraError, onCode = onCode) }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {

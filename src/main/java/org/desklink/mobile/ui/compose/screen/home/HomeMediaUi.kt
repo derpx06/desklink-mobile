@@ -421,7 +421,7 @@ private fun Equalizer(moving: Boolean, color: Color) {
 private fun SeekBar(media: HomeMedia, palette: MediaPalette, onSeek: (Long) -> Unit, compact: Boolean) {
     val t = tokens
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(media.reportedPlaying, media.positionAt) {
+    org.desklink.mobile.ui.compose.components.StartedEffect(media.reportedPlaying, media.positionAt) {
         while (media.reportedPlaying) {
             now = System.currentTimeMillis()
             delay(250)
