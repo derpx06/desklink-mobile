@@ -264,6 +264,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
         val packageName = statusBarNotification.packageName
         if (!appDatabase.isEnabled(packageName)) return false
+        // Android's own "secret" mark: never copied (one-time codes, banking).
+        if (privacyOf(notification) == NotificationPrivacy.Mirror.SKIP) return false
         if ("com.android.systemui" == packageName) {
             if ("low_battery" == statusBarNotification.tag) return false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && "MediaOngoingActivity" == notification.channelId) return false
@@ -278,6 +280,10 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
         return true
     }
+
+    private fun privacyOf(notification: Notification): NotificationPrivacy.Mirror = NotificationPrivacy.decide(
+        notification.visibility, keyguardManager.isKeyguardSecure, NotificationPrivacy.showPrivate(context, device.deviceId),
+    )
 
     private fun isCallNotification(statusBarNotification: StatusBarNotification): Boolean {
         val category = statusBarNotification.notification.category
@@ -341,7 +347,13 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         np["time"] = statusBarNotification.postTime.toString()
         np["silent"] = isPreexisting
 
-        if (!appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS)) {
+        val hideContents = privacyOf(notification) == NotificationPrivacy.Mirror.HIDDEN
+        if (hideContents) {
+            // PRIVATE on a secured lock screen: what the lock screen itself shows (the public version), else only the app.
+            val shown = notification.publicVersion
+            np["title"] = shown?.let { extractStringFromExtra(it.extras, NotificationCompat.EXTRA_TITLE) } ?: (appName ?: packageName)
+            np["text"] = shown?.let { extractText(it) } ?: context.getString(R.string.notification_private_hidden)
+        } else if (!appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS)) {
             val rn = extractRepliableNotification(statusBarNotification)
             if (rn != null) {
                 np["requestReplyId"] = rn.id

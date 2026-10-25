@@ -344,6 +344,16 @@ private fun NotificationsGroup(desk: DeskSettings?, actions: SettingsActions, pr
                 subtitle = stringResource(R.string.sg_choose_apps_summary),
                 onClick = actions.onChooseNotificationApps,
             ) { Chevron() }
+            val defaultPrefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+            val privateKey = org.desklink.mobile.plugins.notifications.NotificationPrivacy.key(desk.id)
+            var showPrivate by remember { mutableStateOf(defaultPrefs.getBoolean(privateKey, false)) }
+            GroupRow(
+                stringResource(R.string.settings_private_notifications, desk.name),
+                icon = R.drawable.sym_lock,
+                subtitle = stringResource(R.string.settings_private_notifications_summary),
+                checked = showPrivate,
+                onClick = { showPrivate = !showPrivate; defaultPrefs.edit { putBoolean(privateKey, showPrivate) } },
+            )
             if (!org.desklink.mobile.plugins.notifications.NotificationReceiver.hasReadNotificationsPermission(context)) {
                 AllowRow(stringResource(R.string.settings_perm_notification_access), stringResource(R.string.settings_perm_notification_access_summary, desk.name)) {
                     runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
