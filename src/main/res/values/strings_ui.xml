@@ -813,4 +813,5 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="other">%1$d files could not be read any more. Share them again.</item>
     </plurals>
     <string name="settings_turn_on_at">Turn on at %1$s</string>
+    <string name="bucket_skip_fetch">Couldn\'t fetch</string>
 </resources>

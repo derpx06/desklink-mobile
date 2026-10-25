@@ -502,6 +502,8 @@ class WebRtcFileTransferManager(
         if (stored == null && ref != null && receives.size < FileV2.ACTIVE_PER_DIRECTION) stored = adoptBucketCheckpoint(wire, message)
         if (receives.size >= FileV2.ACTIVE_PER_DIRECTION) {
             link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.BUSY, message = "The phone is receiving other files."))
+            // A Bucket file that was refused is asked for again later, not waited on for ever.
+            if (ref != null) BucketEngine.receiveEnded(wire.peerDeviceId, ref.relpath)
             return
         }
         val receiver = FileReceiver(wire, store, link, clock, freeSpace, receiverListener, message) { task -> runner.post(Runnable(task)) }
@@ -611,7 +613,12 @@ class WebRtcFileTransferManager(
             }
             if (outcome == FileReceiver.Outcome.CANCELLED) synchronized(savingNotes) { savingNotes.remove(receiver.id) }?.let { runCatching { it.cancel() } }
             if (receives[receiver.id] === receiver) receives.remove(receiver.id)
-            folderOffers.remove(receiver.id)
+            // A Bucket file that did not arrive (the delivered one was taken out of the map when it was handed over).
+            folderOffers.remove(receiver.id)?.let { ref ->
+                if (outcome != FileReceiver.Outcome.DELIVERED && outcome != FileReceiver.Outcome.SUSPENDED) {
+                    BucketEngine.receiveEnded(receiver.wire.peerDeviceId, ref.relpath)
+                }
+            }
             clipboardOffers.remove(receiver.id)
         }
     }

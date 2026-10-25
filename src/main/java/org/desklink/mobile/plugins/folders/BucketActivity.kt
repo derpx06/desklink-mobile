@@ -176,6 +176,7 @@ class BucketActivity : AppCompatActivity() {
             Skip.INVALID_NAME -> R.string.bucket_skip_invalid
             Skip.CASE_CLASH -> R.string.bucket_skip_case
             Skip.TOO_LARGE -> R.string.bucket_skip_large
+            Skip.COULDNT_FETCH -> R.string.bucket_skip_fetch
         }
 
         /** "Syncing 3 files · 1.1 GB of 2.4 GB · about 4 min left" (Paused while the link or the person pauses it). */

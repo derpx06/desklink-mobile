@@ -26,7 +26,7 @@ data class Entry(val size: Long, val mtime: Long, val sha256: String, val delete
 data class Stat(val size: Long, val mtime: Long, val dir: Boolean = false)
 
 /** Why something in the Bucket folder is not synced (listed as "Not synced (N)"). */
-enum class Skip { TOO_DEEP, NAME_TOO_LONG, INVALID_NAME, CASE_CLASH, TOO_LARGE }
+enum class Skip { TOO_DEEP, NAME_TOO_LONG, INVALID_NAME, CASE_CLASH, TOO_LARGE, COULDNT_FETCH }
 
 /** One step of a plan, for the side that made it (P3). */
 sealed interface Step {

@@ -152,6 +152,9 @@ object BucketEngine {
         val tracks = HashMap<String, Track>()
         /** Files moved since the Bucket was last up to date, for "3 files synced". */
         val burst = HashSet<String>()
+        /** Asked for at (elapsedRealtime), and tries per path: an outstanding request that goes quiet is retried. */
+        val requestedAt = HashMap<String, Long>()
+        val fetches = FetchTracker()
         var userPaused = false
         /** Folders the desk holds. */
         var remoteDirs = emptySet<String>()
@@ -160,6 +163,7 @@ object BucketEngine {
     private class Track(val total: Long, val sending: Boolean, startedAt: Long) {
         var done = 0L
         var paused = false
+        var at = startedAt
         val meter = SpeedMeter(startedAt)
 
         fun progress(now: Long) = Progress(done, total, meter.etaSeconds(total - done, now), meter.bytesPerSecond(now), paused)
@@ -743,8 +747,38 @@ object BucketEngine {
         if (live.userPaused) return
         // F8c: two files in flight at a time; the rest wait their turn.
         val batch = FolderSync.nextBatch(live.toRequest.toList(), live.outstanding.size)
-        batch.forEach { live.toRequest.remove(it); live.outstanding += it }
+        val asked = SystemClock.elapsedRealtime()
+        batch.forEach { live.toRequest.remove(it); live.outstanding += it; live.requestedAt[it] = asked }
         if (batch.isNotEmpty()) send(live.deviceId, packet("request").apply { this["id"] = FolderSync.BUCKET_ID; this["paths"] = batch })
+    }
+
+    /**
+     * Every Bucket receive that ends without the file (refused, failed, cancelled; the transfer layer says so) comes here: the slot is
+     * freed at once, the path is asked for again after a backoff, and after three tries it is listed as "couldn't fetch".
+     */
+    fun receiveEnded(deviceId: String, path: String) {
+        worker.execute {
+            val live = buckets[deviceId] ?: return@execute
+            retryFetch(live, path)
+            publish()
+        }
+    }
+
+    private fun retryFetch(live: Live, path: String) {
+        live.outstanding -= path
+        live.requestedAt.remove(path)
+        live.tracks.remove(path)
+        synchronized(wanted) { wanted.remove(live.deviceId to path) }
+        when (val decision = live.fetches.failed(path)) {
+            FetchTracker.Decision.GiveUp ->
+                live.notSynced = live.notSynced.filter { it.first != path } + (path to Skip.COULDNT_FETCH)
+            is FetchTracker.Decision.Retry -> runCatching {
+                worker.schedule({ live.dirtyAt = SystemClock.elapsedRealtime() }, decision.afterMs, TimeUnit.MILLISECONDS)
+            }
+        }
+        // The next file does not wait on this one.
+        requestMore(live)
+        if (live.toRequest.isEmpty() && live.outstanding.isEmpty()) settle(live)
     }
 
     private fun settle(live: Live) {
@@ -835,6 +869,7 @@ object BucketEngine {
             val live = buckets[deviceId] ?: return@execute
             val track = live.tracks.getOrPut(path) { Track(total, sending, now) }
             track.done = done.coerceIn(0, total)
+            track.at = now
             track.paused = false
             track.meter.update(track.done, now)
             live.burst += path
@@ -893,10 +928,7 @@ object BucketEngine {
                 runCatching { place(deviceId, ref, stash, sha256, size) }.onFailure {
                     Log.w(TAG, "A received Bucket file could not be placed (${it.javaClass.simpleName})")
                     // Not a silent hole: nothing is outstanding for it now, and the next scan re-plans (the file is still missing here).
-                    buckets[deviceId]?.let { live ->
-                        live.outstanding -= ref.relpath
-                        live.dirtyAt = SystemClock.elapsedRealtime()
-                    }
+                    buckets[deviceId]?.let { live -> retryFetch(live, ref.relpath) }
                     publish()
                 }
             } finally {
@@ -915,6 +947,8 @@ object BucketEngine {
         val live = buckets[deviceId] ?: return
         if (!entry.sha256.equals(sha256, true) || entry.size != size) return
         live.outstanding -= ref.relpath
+        live.requestedAt.remove(ref.relpath)
+        live.fetches.succeeded(ref.relpath)
         finished(live, ref.relpath)
         live.storageFull = false
         val tree = tree(live)
@@ -956,6 +990,9 @@ object BucketEngine {
             val every = if (screenOn) RESCAN_SCREEN_ON_MS else RESCAN_SCREEN_OFF_MS
             val due = live.dirtyAt?.let { now - it >= SETTLE_MS } == true || live.scannedAt?.let { now - it >= every } != false
             if (due) { rescan(live); changed = true }
+            // A request nothing has been heard of for two minutes is lost: freed and asked for again (or given up).
+            val quiet = FetchTracker.silent(live.outstanding, live.requestedAt, live.tracks.mapValues { it.value.at }, now)
+            if (quiet.isNotEmpty()) { quiet.forEach { retryFetch(live, it) }; changed = true }
             if (live.tracks.isNotEmpty() || live.outstanding.isNotEmpty() || live.sendActive.isNotEmpty()) changed = true
         }
         // Only when something moved or was scanned: an idle Bucket builds no views every five seconds.
