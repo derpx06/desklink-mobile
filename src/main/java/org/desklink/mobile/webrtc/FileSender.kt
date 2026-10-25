@@ -299,13 +299,15 @@ class FileSender(
 
     private fun ackedBytes(): Long = minOf(totalSize, ackedBlocks.toLong() * FileV2.BLOCK_BYTES)
 
+    private var spare: ByteArray? = null
+
     /** Reads and hashes block [cursor] straight from the source; false if the transfer ended instead. */
     private fun prepareBlock(): Boolean {
         if (!sourceUnchanged()) return false
         val offset = cursor.toLong() * FileV2.BLOCK_BYTES
         val length = minOf(FileV2.BLOCK_BYTES.toLong(), totalSize - offset).toInt()
         val input = stream ?: source.open(offset).also { stream = it }
-        val buffer = block?.takeIf { it.size >= length } ?: ByteArray(FileV2.BLOCK_BYTES)
+        val buffer = block?.takeIf { it.size >= length } ?: spare?.takeIf { it.size >= length } ?: ByteArray(FileV2.BLOCK_BYTES)
         val readStart = System.nanoTime()
         var read = 0
         while (read < length) {
@@ -342,6 +344,7 @@ class FileSender(
         emitted += count
         if (last) {
             cursor++
+            spare = block // the next block is read into the same 1 MiB, not a fresh one
             block = null
             emitted = 0
         }
@@ -451,6 +454,7 @@ class FileSender(
         runCatching { stream?.close() }
         stream = null
         block = null
+        spare = null
     }
 
     private fun send(control: WebRtcFileControl) {

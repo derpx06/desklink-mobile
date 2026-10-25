@@ -872,7 +872,15 @@ object BucketEngine {
         setAside(partial, stash)
         worker.execute {
             try {
-                runCatching { place(deviceId, ref, stash, sha256, size) }.onFailure { Log.w(TAG, "A received Bucket file could not be placed (${it.javaClass.simpleName})") }
+                runCatching { place(deviceId, ref, stash, sha256, size) }.onFailure {
+                    Log.w(TAG, "A received Bucket file could not be placed (${it.javaClass.simpleName})")
+                    // Not a silent hole: nothing is outstanding for it now, and the next scan re-plans (the file is still missing here).
+                    buckets[deviceId]?.let { live ->
+                        live.outstanding -= ref.relpath
+                        live.dirtyAt = SystemClock.elapsedRealtime()
+                    }
+                    publish()
+                }
             } finally {
                 stash.delete()
             }
