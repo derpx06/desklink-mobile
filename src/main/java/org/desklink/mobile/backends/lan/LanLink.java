@@ -39,6 +39,8 @@ import java.security.cert.CertificateException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
+import org.desklink.mobile.helpers.TrustedDevices;
+
 import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLSocket;
 
@@ -46,7 +48,8 @@ import kotlin.text.Charsets;
 
 public class LanLink extends BaseLink {
 
-    final static int MAX_PACKET_SIZE = 32 * 1024 * 1024;
+    /** What a paired peer may send in one line; a peer that is not paired gets {@link UnpairedLimits#MAX_UNPAIRED_LINE}. */
+    final static int MAX_PACKET_SIZE = UnpairedLimits.MAX_PAIRED_LINE;
     /**
      * How long the link may hear nothing at all before it is declared dead.
      *
@@ -60,6 +63,7 @@ public class LanLink extends BaseLink {
      * this side ignored the desktop's beacons and signaled into the dead link.
      */
     final static long IDLE_TIMEOUT_MILLIS = 35_000L;
+    final static long UNPAIRED_LINK_LIFETIME_MILLIS = 5 * 60_000L;
     final static long MAX_PAYLOAD_SIZE = 4L * 1024L * 1024L * 1024L;
     public enum ConnectionStarted {
         Locally, Remotely
@@ -109,10 +113,15 @@ public class LanLink extends BaseLink {
                 // truncated. See readLineBounded.
                 ByteArrayOutputStream carry = new ByteArrayOutputStream(1024);
                 long lastActivityAt = SystemClock.elapsedRealtime();
+                final long startedAt = lastActivityAt;
                 while (true) {
+                    // A stranger that keeps answering heartbeats but never pairs does not hold a slot for ever.
+                    if (SystemClock.elapsedRealtime() - startedAt > UNPAIRED_LINK_LIFETIME_MILLIS && !TrustedDevices.isTrustedDevice(context, deviceInfo.id)) {
+                        throw new IOException("An unpaired link that did not pair");
+                    }
                     String packet;
                     try {
-                        packet = readLineBounded(stream, MAX_PACKET_SIZE, carry);
+                        packet = readLineBounded(stream, maxLineNow(), carry);
                     } catch (SocketTimeoutException e) {
                         // SslHelper sets a 10s soTimeout, and this used to
                         // `continue` unconditionally. A peer that vanished
@@ -151,6 +160,11 @@ public class LanLink extends BaseLink {
         });
 
         return oldSocket;
+    }
+
+    /** The paired state is read per line, as the computer does: a link that pairs gets its larger limit at once. */
+    private int maxLineNow() {
+        return TrustedDevices.isTrustedDevice(context, deviceInfo.id) ? MAX_PACKET_SIZE : UnpairedLimits.MAX_UNPAIRED_LINE;
     }
 
     @WorkerThread

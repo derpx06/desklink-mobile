@@ -45,6 +45,10 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.SocketFactory;
 import javax.net.ssl.SSLSocket;
@@ -69,8 +73,8 @@ public class LanLinkProvider extends BaseLinkProvider {
     public static volatile LanLinkProvider instance;
     final static int PAYLOAD_TRANSFER_MIN_PORT = 1739;
 
-    final static int MAX_IDENTITY_PACKET_SIZE = 1024 * 512;
-    final static int MAX_UDP_PACKET_SIZE = 1024 * 512;
+    final static int MAX_IDENTITY_PACKET_SIZE = UnpairedLimits.MAX_IDENTITY_PACKET;
+    final static int MAX_UDP_PACKET_SIZE = UnpairedLimits.MAX_IDENTITY_PACKET;
     /** How long to wait before rebuilding a UDP socket that errored. */
     final static long UDP_RECOVERY_DELAY_MILLIS = 1000L;
 
@@ -157,8 +161,21 @@ public class LanLinkProvider extends BaseLinkProvider {
             return null;
         }
 
+        // A stranger costs a Device, a session and a link: only so many, and only so many from one address.
+        if (!deviceTrusted && !unpairedLimits.admit(deviceId, source instanceof InetAddress ? (InetAddress) source : (source instanceof Socket ? ((Socket) source).getInetAddress() : null))) {
+            Log.i("DeskLink/LanLinkProvider", "Too many unpaired devices: ignoring one");
+            return null;
+        }
+        if (deviceTrusted) unpairedLimits.release(deviceId);
+
         return new Pair<>(identityPacket, deviceTrusted);
     }
+
+    private final UnpairedLimits unpairedLimits = new UnpairedLimits();
+
+    /** Looking at discovery beacons: four at a time, sixteen waiting, the rest dropped. */
+    private final ThreadPoolExecutor discoveryExecutor = new ThreadPoolExecutor(
+            1, 4, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(16), new ThreadPoolExecutor.AbortPolicy());
 
     //They received my UDP broadcast and are connecting to me. The first thing they send should be their identity packet.
     @WorkerThread
@@ -379,26 +396,7 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     //I've received their broadcast and should connect to their TCP socket and send my identity.
     @WorkerThread
-    private void udpPacketReceived(DatagramPacket packet) {
-
-        final InetAddress address = packet.getAddress();
-
-        // Our own announce, heard back on one of our interfaces (rmnet, hotspot): not a peer.
-        if (isOwnAddress(address)) {
-            return;
-        }
-
-        if (!isPrivateAddress(address)) {
-            Log.i("LanLinkProvider", "Discarding UDP packet from a non-local IP");
-            return;
-        }
-
-        if (rateLimitByIp(address)) {
-            Log.i("LanLinkProvider", "Discarding second UDP packet from the same ip " + address + " received too quickly");
-            return;
-        }
-
-        String message = new String(packet.getData(), Charsets.UTF_8);
+    private void udpPacketReceived(InetAddress address, String message) {
 
         final Pair<NetworkPacket, Boolean> pair = unserializeReceivedIdentityPacket(message, address);
         if (pair == null) {
@@ -637,17 +635,30 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
         ThreadHelper.execute(() -> {
             Log.i("UdpListener", "Starting UDP listener");
+            // One small buffer for the life of the listener: receive() fills it, and what is kept is copied out.
+            final DatagramPacket packet = new DatagramPacket(new byte[MAX_UDP_PACKET_SIZE], MAX_UDP_PACKET_SIZE);
             while (listening) {
+                packet.setLength(MAX_UDP_PACKET_SIZE);
                 try {
-                    DatagramPacket packet = new DatagramPacket(new byte[MAX_UDP_PACKET_SIZE], MAX_UDP_PACKET_SIZE);
                     udpServer.receive(packet);
-                    ThreadHelper.execute(() -> {
-                        try {
-                            udpPacketReceived(packet);
-                        } catch (Exception e) {
-                            Log.e("LanLinkProvider", "Unhandled exception receiving incoming UDP connection", e);
-                        }
-                    });
+                    final InetAddress from = packet.getAddress();
+                    // Cheap checks on the receive thread, before anything is copied or queued: a flood of datagrams from
+                    // one source, our own beacon, or a public address costs nothing more.
+                    if (from == null || isOwnAddress(from) || !isPrivateAddress(from) || rateLimitByIp(from)) {
+                        continue;
+                    }
+                    final String message = new String(packet.getData(), 0, packet.getLength(), Charsets.UTF_8);
+                    try {
+                        discoveryExecutor.execute(() -> {
+                            try {
+                                udpPacketReceived(from, message);
+                            } catch (Exception e) {
+                                Log.e("LanLinkProvider", "Unhandled exception receiving incoming UDP connection", e);
+                            }
+                        });
+                    } catch (RejectedExecutionException full) {
+                        // More beacons than can be looked at: the rest are dropped (the next one comes in seconds).
+                    }
                 } catch (IOException e) {
                     Log.e("LanLinkProvider", "UdpReceive exception", e);
                     // Rebuild the socket instead of retrying it. An errored
