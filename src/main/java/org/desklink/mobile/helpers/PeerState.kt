@@ -35,6 +35,7 @@ object PeerState {
             org.desklink.mobile.plugins.receivenotifications.DeskNotification.stale(posted, deviceId, emptySet()).forEach { manager?.cancel(it, 7330) }
         }
         runCatching { org.desklink.mobile.plugins.share.SendAgain.forgetDevice(app, deviceId) }
+        runCatching { org.desklink.mobile.plugins.share.ShareQueue.forgetDevice(app, deviceId) }
         runCatching { org.desklink.mobile.plugins.folders.BucketEngine.forgetPeer(app, deviceId) }
         runCatching { org.desklink.mobile.webrtc.DeliveredTransfers.forgetDevice(app, deviceId) }
         runCatching { org.desklink.mobile.webrtc.FileTransferStore.forgetDevice(app, deviceId) }

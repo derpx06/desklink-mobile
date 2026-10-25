@@ -99,6 +99,19 @@ public class SharePlugin extends Plugin {
         return true;
     }
 
+    /** Files of a share that a drop or a restart interrupted go on from the queue (the one in flight resumes by itself). */
+    @Override
+    public void onFeatureReady() {
+        if (uploadFileJob != null) return;
+        List<String> pending = ShareQueue.pending(context, device.getDeviceId());
+        if (pending.isEmpty()) return;
+        new Thread(() -> {
+            ArrayList<Uri> uris = new ArrayList<>();
+            for (String text : pending) uris.add(Uri.parse(text));
+            sendUriList(uris);
+        }, "desklink-share-queue").start();
+    }
+
     @Override
     public void onDestroy() {
         for (ShortcutInfoCompat shortcut : ShortcutManagerCompat.getDynamicShortcuts(context)) {
@@ -283,6 +296,13 @@ public class SharePlugin extends Plugin {
             job = uploadFileJob;
         }
 
+        // Queued by source, so a drop or a restart keeps the files after the one in flight (see onFeatureReady).
+        ArrayList<String> asStrings = new ArrayList<>();
+        for (Uri uri : uriList) asStrings.add(uri.toString());
+        int dropped = ShareQueue.add(context, device.getDeviceId(), asStrings);
+        if (dropped > 0) {
+            handler.post(() -> Toast.makeText(context, context.getString(R.string.share_queue_full, ShareQueue.MAX_PER_DEVICE), Toast.LENGTH_LONG).show());
+        }
         //Read all the data early, as we only have permissions to do it while the activity is alive
         for (Uri uri : uriList) {
             NetworkPacket np = FilesHelper.uriToNetworkPacket(context, uri, PACKET_TYPE_SHARE_REQUEST);
@@ -290,6 +310,9 @@ public class SharePlugin extends Plugin {
             if (np != null) {
                 TransferHistory.rememberSource(np, uri);
                 job.addNetworkPacket(np);
+            } else {
+                ShareQueue.remove(context, device.getDeviceId(), uri.toString());
+                SendAgain.add(context, device, java.util.UUID.randomUUID().toString(), device.getDeviceId(), uri.getLastPathSegment() == null ? "file" : uri.getLastPathSegment(), true);
             }
         }
 

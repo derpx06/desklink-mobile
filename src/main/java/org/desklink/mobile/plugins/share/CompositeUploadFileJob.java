@@ -105,9 +105,15 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
 
                 // We set sendPayloadFromSameThread to true so this call blocks until the payload
                 // has been received by the other end,  so payloads are sent one by one.
+                android.net.Uri source = TransferHistory.INSTANCE.peekSource(currentNetworkPacket);
                 if (!getDevice().sendPacketBlocking(currentNetworkPacket, sendPacketStatusCallback, true)) {
+                    // A file the transfer manager took (it resumes by itself) is no longer ours to queue; the rest stay queued.
+                    if (source != null && lastFailure instanceof org.desklink.mobile.webrtc.TransferResumingException) {
+                        ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
+                    }
                     throw new RuntimeException("Sending packet failed");
                 }
+                if (source != null) ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
                 TransferHistory.recordSent(getDevice().getContext(), getDevice().getDeviceId(), currentNetworkPacket);
 
                 synchronized (lock) {
@@ -132,6 +138,11 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                 reportError(e);
                 return;
             }
+            // A real failure ends the share: what was still queued would only fail the same way.
+            for (NetworkPacket left : networkPacketList) {
+                android.net.Uri source = TransferHistory.INSTANCE.peekSource(left);
+                if (source != null) ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
+            }
             int failedFiles;
             synchronized (lock) {
                 failedFiles = (totalNumFiles - currentFileNum + 1);
@@ -147,6 +158,10 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
             isRunning = false;
 
             for (NetworkPacket networkPacket : networkPacketList) {
+                if (isCancelled()) {
+                    android.net.Uri source = TransferHistory.INSTANCE.peekSource(networkPacket);
+                    if (source != null) ShareQueue.remove(getDevice().getContext(), getDevice().getDeviceId(), source.toString());
+                }
                 networkPacket.getPayload().close();
             }
             networkPacketList.clear();

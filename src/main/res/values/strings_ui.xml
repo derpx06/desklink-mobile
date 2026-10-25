@@ -785,4 +785,5 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="welcome_install_message">Install DeskLink on your computer: %1$s</string>
     <string name="settings_desk_shows_notifications">%1$s shows them</string>
     <string name="settings_desk_shows_notifications_summary">Off hides this phone\'s notifications on %1$s (they are still sent while the switch above is on)</string>
+    <string name="share_queue_full">Only %1$d files are kept waiting for the computer. Send the rest again afterwards.</string>
 </resources>
