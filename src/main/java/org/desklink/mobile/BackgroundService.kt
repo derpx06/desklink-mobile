@@ -350,7 +350,9 @@ class BackgroundService : Service() {
             terminalAttached = applicationInstance.terminalClient(id)?.state?.value?.sessions?.any { it.attached && !it.gone } == true,
             deskScreen = screen?.remoteLive == true,
             phoneScreenShared = org.desklink.mobile.plugins.screen.PhoneScreenCaptureService.sharingDeviceId == id,
-            transferring = org.desklink.mobile.plugins.share.TransferProgress.visibleFor(id)?.finished == false,
+            transferring = org.desklink.mobile.plugins.share.TransferProgress.visibleFor(id)?.let {
+                bytesMoving(it.finished, it.resuming, it.updatedAt, android.os.SystemClock.elapsedRealtime())
+            } == true || org.desklink.mobile.plugins.folders.BucketEngine.moving(id),
             gliding = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.activeDesk == id,
         )
     }
@@ -582,6 +584,11 @@ class BackgroundService : Service() {
         /** One hold lasts at most this long; renewed every [WORK_LEASE_CHECK_MS] while working. */
         const val WORK_LEASE_MS = 60_000L
         const val WORK_LEASE_CHECK_MS = 20_000L
+
+        /** Bytes are moving: not finished, not waiting for the computer to come back (a resuming send holds nothing), and progress seen lately. */
+        const val PROGRESS_LEASE_MS = 5 * 60_000L
+        fun bytesMoving(finished: Boolean, resuming: Boolean, updatedAt: Long, now: Long): Boolean =
+            !finished && !resuming && now - updatedAt < PROGRESS_LEASE_MS
 
         /** Work that needs the CPU with the screen off; being connected is not work. */
         fun isActiveWork(terminalAttached: Boolean, deskScreen: Boolean, phoneScreenShared: Boolean, transferring: Boolean, gliding: Boolean = false): Boolean =

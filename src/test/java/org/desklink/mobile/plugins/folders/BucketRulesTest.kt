@@ -276,9 +276,9 @@ class BucketRulesTest {
     @Test
     fun onlyTwoTransfersAreInFlightPerDirection() {
         val waiting = List(5) { "f$it" }
-        assertEquals(listOf("f0", "f1"), FolderSync.nextBatch(waiting, 0))
-        assertEquals(listOf("f0"), FolderSync.nextBatch(waiting, 1))
-        assertEquals(emptyList<String>(), FolderSync.nextBatch(waiting, 2))
+        assertEquals(listOf("f0"), FolderSync.nextBatch(waiting, 0))
+        assertEquals("a slot stays free for a share", true, FolderSync.MAX_IN_FLIGHT < org.desklink.mobile.webrtc.FileV2.ACTIVE_PER_DIRECTION)
+        assertEquals(emptyList<String>(), FolderSync.nextBatch(waiting, 1))
         assertEquals(emptyList<String>(), FolderSync.nextBatch(waiting, 7))
     }
 

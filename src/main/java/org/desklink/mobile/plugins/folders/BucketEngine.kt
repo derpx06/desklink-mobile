@@ -158,6 +158,12 @@ object BucketEngine {
         fun progress(now: Long) = Progress(done, total, meter.etaSeconds(total - done, now), meter.bytesPerSecond(now), paused)
     }
 
+    /** When bytes of a Bucket file last moved, per desk: the wake lock's lease (renewed by progress, not by being synced). */
+    private val lastMoved = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /** Bucket bytes moved in the last 30 s: sync takes the work lease while it transfers. */
+    fun moving(deviceId: String): Boolean = lastMoved[deviceId]?.let { SystemClock.elapsedRealtime() - it < 30_000L } == true
+
     private val buckets = LinkedHashMap<String, Live>()
     private val ready = HashSet<String>()
     /** The phone asked the desk to turn the Bucket on: device → (tree, at). */
@@ -809,6 +815,7 @@ object BucketEngine {
      */
     fun progress(deviceId: String, path: String, done: Long, total: Long, sending: Boolean) {
         val now = SystemClock.elapsedRealtime()
+        if (done < total) lastMoved[deviceId] = now
         val key = deviceId to path
         val last = lastPosted[key]
         if (last != null && now - last < BucketProgress.UPDATE_EVERY_MS && done < total && done > 0) return

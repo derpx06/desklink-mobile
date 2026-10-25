@@ -56,4 +56,12 @@ class ReleaseHygieneTest {
     fun theWelcomeScreenSaysWhereToGetTheComputersApp() {
         assertTrue("https://github.com/derpx06/DeskLink/releases" == org.desklink.mobile.ui.compose.screen.pairing.DESKTOP_APP_URL)
     }
+
+    @Test
+    fun aSendWaitingForTheComputerHoldsNoWakeLockAndAStalledOneLetsGo() {
+        assertTrue(BackgroundService.bytesMoving(finished = false, resuming = false, updatedAt = 1_000, now = 60_000))
+        assertFalse("resuming: waiting for the laptop to wake", BackgroundService.bytesMoving(false, true, 1_000, 2_000))
+        assertFalse("finished", BackgroundService.bytesMoving(true, false, 1_000, 2_000))
+        assertFalse("no progress for the whole lease", BackgroundService.bytesMoving(false, false, 0, BackgroundService.PROGRESS_LEASE_MS + 1))
+    }
 }

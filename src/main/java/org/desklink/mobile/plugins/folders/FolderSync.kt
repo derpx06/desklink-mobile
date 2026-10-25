@@ -261,8 +261,11 @@ object FolderSync {
     /** F8c: one add (a share, a pick, a folder): at most this many items and bytes; the rest are left out. */
     const val MAX_ADD_ITEMS = 500
     const val MAX_ADD_BYTES = 5L shl 30
-    /** F8c: transfers in flight per direction; the rest wait. */
-    const val MAX_IN_FLIGHT = 2
+    /**
+     * Bucket transfers in flight per direction; the rest wait. The transfer manager runs two per direction, so one is always left
+     * for a share or an insert-from-phone: a person's send never queues behind a background sync (I16).
+     */
+    const val MAX_IN_FLIGHT = 1
     /** F8b: a pasted text or link saved as a file. */
     const val MAX_TEXT_BYTES = 1024 * 1024
     /** F8b: free space kept on the phone beyond an incoming file. */
