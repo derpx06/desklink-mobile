@@ -1,0 +1,2041 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 9.1.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.1.1)" variant="all" version="9.1.1">
+
+    <issue
+        id="MissingLeanbackLauncher"
+        message="Expecting an activity to have `android.intent.category.LEANBACK_LAUNCHER` intent filter"
+        errorLine1="&lt;manifest xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2=" ~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="9"
+            column="2"/>
+    </issue>
+
+    <issue
+        id="ScopedStorage"
+        message="WRITE_EXTERNAL_STORAGE no longer provides write access when targeting Android 10, unless you use `requestLegacyExternalStorage`"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.WRITE_EXTERNAL_STORAGE&quot; android:maxSdkVersion=&quot;29&quot; />"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="74"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="ResourceType"
+        message="Comparing resource types (`@DrawableRes`) other than equality is dangerous and usually wrong;  some resource types set top bit which turns the value negative"
+        errorLine1="            painterResource(if (icon > 0) icon else R.drawable.ic_device_desktop_32dp),"
+        errorLine2="                                ~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/compose/components/DeskLinkComponents.kt"
+            line="112"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `toLowerCase(Locale)` instead. For strings meant to be internal use `Locale.ROOT`, otherwise `Locale.getDefault()`."
+        errorLine1="            np.set(&quot;key&quot;, chars.subSequence(0, 1).toString().toLowerCase());"
+        errorLine2="                                                             ~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousepad/KeyListenerView.java"
+            line="122"
+            column="62"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `toLowerCase(Locale)` instead. For strings meant to be internal use `Locale.ROOT`, otherwise `Locale.getDefault()`."
+        errorLine1="            np.set(&quot;key&quot;, String.valueOf(keyCharacter).toLowerCase());"
+        errorLine2="                                                       ~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousepad/KeyListenerView.java"
+            line="205"
+            column="56"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `toLowerCase(Locale)` instead. For strings meant to be internal use `Locale.ROOT`, otherwise `Locale.getDefault()`."
+        errorLine1="                        if (s.name.toLowerCase().contains(newText.toLowerCase().trim()))"
+        errorLine2="                                   ~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/notifications/NotificationFilterActivity.java"
+            line="367"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="DefaultLocale"
+        message="Implicitly using the default locale is a common source of bugs: Use `toLowerCase(Locale)` instead. For strings meant to be internal use `Locale.ROOT`, otherwise `Locale.getDefault()`."
+        errorLine1="                        if (s.name.toLowerCase().contains(newText.toLowerCase().trim()))"
+        errorLine2="                                                                  ~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/notifications/NotificationFilterActivity.java"
+            line="367"
+            column="67"/>
+    </issue>
+
+    <issue
+        id="ExifInterface"
+        message="Avoid using `android.media.ExifInterface`; use `androidx.exifinterface.media.ExifInterface` instead"
+        errorLine1="import android.media.ExifInterface"
+        errorLine2="       ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/capture/ScanImage.kt"
+            line="14"
+            column="8"/>
+    </issue>
+
+    <issue
+        id="ExifInterface"
+        message="Avoid using `android.media.ExifInterface`; use `androidx.exifinterface.media.ExifInterface` instead"
+        errorLine1="                when (ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {"
+        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/capture/ScanImage.kt"
+            line="58"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 24 (current min is 23): `android.service.quicksettings.Tile#STATE_UNAVAILABLE`"
+        errorLine1="        if (desk == null) return TileUi(Tile.STATE_UNAVAILABLE, notConnected)"
+        errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/surfaces/DeskSurfaces.kt"
+            line="69"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 24 (current min is 23): `android.service.quicksettings.Tile#STATE_UNAVAILABLE`"
+        errorLine1="        if (!desk.ready) return TileUi(Tile.STATE_UNAVAILABLE, notConnected)"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/surfaces/DeskSurfaces.kt"
+            line="70"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 24 (current min is 23): `android.service.quicksettings.Tile#STATE_UNAVAILABLE`"
+        errorLine1="                null -> TileUi(Tile.STATE_UNAVAILABLE, desk.name)"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/surfaces/DeskSurfaces.kt"
+            line="73"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 24 (current min is 23): `android.service.quicksettings.Tile#STATE_ACTIVE`"
+        errorLine1="                else -> TileUi(if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE, if (desk.keepAwakePending) saving else desk.name)"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/surfaces/DeskSurfaces.kt"
+            line="74"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 24 (current min is 23): `android.service.quicksettings.Tile#STATE_INACTIVE`"
+        errorLine1="                else -> TileUi(if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE, if (desk.keepAwakePending) saving else desk.name)"
+        errorLine2="                                                              ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/surfaces/DeskSurfaces.kt"
+            line="74"
+            column="63"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 24 (current min is 23): `android.service.quicksettings.Tile#STATE_INACTIVE`"
+        errorLine1="            else -> TileUi(Tile.STATE_INACTIVE, desk.name)"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/surfaces/DeskSurfaces.kt"
+            line="76"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 26 (current min is 23): `android.content.Intent#EXTRA_COMPONENT_NAME`"
+        errorLine1="        val tile = intent.getParcelableExtra&lt;android.content.ComponentName>(Intent.EXTRA_COMPONENT_NAME)"
+        errorLine2="                                                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/MainActivity.kt"
+            line="239"
+            column="77"/>
+    </issue>
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 28 (current min is 23): `android.accessibilityservice.AccessibilityService#GLOBAL_ACTION_LOCK_SCREEN`"
+        errorLine1="        return s.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
+            line="395"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="LocaleFolder"
+        message="The locale folder &quot;`id`&quot; should be called &quot;`in`&quot; instead; see the `java.util.Locale` documentation">
+        <location
+            file="src/main/res/values-id"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="`&lt;org.desklink.mobile.plugins.clipboard.ClipboardTileService>` requires API level 24 (current min is 23)"
+        errorLine1="        &lt;service"
+        errorLine2="        ^">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="431"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Class requires API level 24 (current min is 23): `ClipboardTileService`"
+        errorLine1="        return tile?.className == org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java.name"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/MainActivity.kt"
+            line="240"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `android.accessibilityservice.AccessibilityService#dispatchGesture`"
+        errorLine1="        dispatchGesture(new GestureDescription.Builder()"
+        errorLine2="        ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
+            line="348"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `new android.accessibilityservice.GestureDescription.Builder`"
+        errorLine1="        dispatchGesture(new GestureDescription.Builder()"
+        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
+            line="348"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `android.accessibilityservice.GestureDescription.Builder#addStroke`"
+        errorLine1="                .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))"
+        errorLine2="                 ~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
+            line="349"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `new android.accessibilityservice.GestureDescription.StrokeDescription`"
+        errorLine1="                .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
+            line="349"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `android.accessibilityservice.GestureDescription.Builder#build`"
+        errorLine1="                .build(), null, null);"
+        errorLine2="                 ~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
+            line="350"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `android.content.Context#deleteSharedPreferences`"
+        errorLine1="                app.deleteSharedPreferences(name)"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/helpers/RemovedFeatures.kt"
+            line="105"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture()`"
+        errorLine1="        val completion = CompletableFuture&lt;Boolean>()"
+        errorLine2="                         ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="197"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#get`"
+        errorLine1="                return completion.get(250, TimeUnit.MILLISECONDS)"
+        errorLine2="                                  ~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="225"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
+        errorLine1="                    entry.completion.complete(true)"
+        errorLine2="                                     ~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="324"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
+        errorLine1="                    entry.completion.complete(false)"
+        errorLine2="                                     ~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="329"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
+        errorLine1="                        entry.completion.complete(false)"
+        errorLine2="                                         ~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="348"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
+        errorLine1="                        entry.completion.complete(false)"
+        errorLine2="                                         ~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="357"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
+        errorLine1="                    entry.completion.complete(false)"
+        errorLine2="                                     ~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="371"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture()`"
+        errorLine1="            val entry = SendEntry(sender, callback, CompletableFuture(), null)"
+        errorLine2="                                                    ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="807"
+            column="53"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture()`"
+        errorLine1="            val completion = CompletableFuture&lt;Unit>()"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
+            line="2038"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
+        errorLine1="                        completion.complete(Unit)"
+        errorLine2="                                   ~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
+            line="2046"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#completeExceptionally`"
+        errorLine1="                        completion.completeExceptionally(error)"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
+            line="2050"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="NewApi"
+        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#get`"
+        errorLine1="                completion.get(10, TimeUnit.SECONDS)"
+        errorLine2="                           ~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
+            line="2055"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="OldTargetApi"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+        errorLine1="        targetSdk = 36"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="38"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `networkSecurityConfig` is only used in API level 24 and higher (current min is 23)"
+        errorLine1="        android:networkSecurityConfig=&quot;@xml/network_security_config&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="98"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `enableOnBackInvokedCallback` is only used in API level 33 and higher (current min is 23)"
+        errorLine1="        android:enableOnBackInvokedCallback=&quot;true&quot;>"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="101"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `maxResizeHeight` is only used in API level 31 and higher (current min is 23)"
+        errorLine1="    android:maxResizeHeight=&quot;300dp&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/desk_widget_info.xml"
+            line="6"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `maxResizeWidth` is only used in API level 31 and higher (current min is 23)"
+        errorLine1="    android:maxResizeWidth=&quot;400dp&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/desk_widget_info.xml"
+            line="7"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `previewLayout` is only used in API level 31 and higher (current min is 23)"
+        errorLine1="    android:previewLayout=&quot;@layout/widget_desk_small&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/desk_widget_info.xml"
+            line="13"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `targetCellHeight` is only used in API level 31 and higher (current min is 23)"
+        errorLine1="    android:targetCellHeight=&quot;2&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/desk_widget_info.xml"
+            line="15"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `targetCellWidth` is only used in API level 31 and higher (current min is 23)"
+        errorLine1="    android:targetCellWidth=&quot;2&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/desk_widget_info.xml"
+            line="16"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `canPerformGestures` is only used in API level 24 and higher (current min is 23)"
+        errorLine1="    android:canPerformGestures=&quot;true&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/mouse_receiver_service.xml"
+            line="14"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `shortcutId` is only used in API level 25 and higher (current min is 23)"
+        errorLine1="        android:shortcutId=&quot;quit&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/debug/res/xml/shortcuts.xml"
+            line="8"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `shortcutShortLabel` is only used in API level 25 and higher (current min is 23)"
+        errorLine1="        android:shortcutShortLabel=&quot;@string/quit_app_shortcut&quot;>"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/debug/res/xml/shortcuts.xml"
+            line="11"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="WrongThread"
+        message="Method sendPacketBlocking must be called from the worker thread, currently inferred thread is any thread"
+        errorLine1="        return sendPacketBlocking(np, callback, false)"
+        errorLine2="               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/Device.kt"
+            line="1246"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="AppBundleLocaleChanges"
+        message="Found dynamic locale changes, but did not find corresponding Play Core library calls for downloading languages and splitting by language is not disabled in the `bundle` configuration"
+        errorLine1="        config.locale = locale"
+        errorLine2="               ~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/helpers/security/SslHelper.kt"
+            line="177"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="BatteryLife"
+        message="Use of `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` violates the Play Store Content Policy regarding acceptable use cases, as described in https://developer.android.com/training/monitoring-device-state/doze-standby.html"
+        errorLine1="                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/BackgroundService.kt"
+            line="467"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="BatteryLife"
+        message="Use of `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` violates the Play Store Content Policy regarding acceptable use cases, as described in https://developer.android.com/training/monitoring-device-state/doze-standby.html"
+        errorLine1="            allow = open(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, &quot;package:${context.packageName}&quot;.toUri())),"
+        errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/compose/screen/settings/SettingsScreens.kt"
+            line="407"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="QueryPermissionsNeeded"
+        message="As of Android 11, this method no longer returns information about all apps; see https://g.co/dev/packagevisibility for details"
+        errorLine1="            List&lt;ApplicationInfo> appList = packageManager.getInstalledApplications(0);"
+        errorLine2="                                                           ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/notifications/NotificationFilterActivity.java"
+            line="144"
+            column="60"/>
+    </issue>
+
+    <issue
+        id="RedundantLabel"
+        message="Redundant label can be removed"
+        errorLine1="            android:label=&quot;@string/app_name&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="169"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of Gradle than 9.5.1 is available: 9.8.2"
+        errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-9.5.1-bin.zip"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="gradle/wrapper/gradle-wrapper.properties"
+            line="3"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.application than 9.1.1 is available: 9.4.1"
+        errorLine1="androidGradlePlugin = &quot;9.1.1&quot;"
+        errorLine2="                      ~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="4"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of com.android.tools.build:gradle than 9.1.1 is available: 9.4.1"
+        errorLine1="androidGradlePlugin = &quot;9.1.1&quot;"
+        errorLine2="                      ~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="4"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.appcompat:appcompat than 1.7.1 is available: 1.8.0"
+        errorLine1="appcompat = &quot;1.7.1&quot;"
+        errorLine2="            ~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="5"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.constraintlayout:constraintlayout-compose than 1.1.1 is available: 1.1.2"
+        errorLine1="constraintlayoutCompose = &quot;1.1.1&quot;"
+        errorLine2="                          ~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="12"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.19.0 is available: 1.19.1"
+        errorLine1="coreKtx = &quot;1.19.0&quot;"
+        errorLine2="          ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="13"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-common-java8 than 2.10.0 is available: 2.11.0"
+        errorLine1="lifecycleRuntimeKtx = &quot;2.10.0&quot;"
+        errorLine2="                      ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="25"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.10.0 is available: 2.11.0"
+        errorLine1="lifecycleRuntimeKtx = &quot;2.10.0&quot;"
+        errorLine2="                      ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="25"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.lifecycle:lifecycle-viewmodel-ktx than 2.10.0 is available: 2.11.0"
+        errorLine1="lifecycleRuntimeKtx = &quot;2.10.0&quot;"
+        errorLine2="                      ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="25"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose.ui:ui-test-junit4 than 1.11.2 is available: 1.12.1"
+        errorLine1="uiToolingPreview = &quot;1.11.2&quot;"
+        errorLine2="                   ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="39"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose.ui:ui-test-manifest than 1.11.2 is available: 1.12.1"
+        errorLine1="uiToolingPreview = &quot;1.11.2&quot;"
+        errorLine2="                   ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="39"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose.ui:ui-tooling than 1.11.2 is available: 1.12.1"
+        errorLine1="uiToolingPreview = &quot;1.11.2&quot;"
+        errorLine2="                   ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="39"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.compose.ui:ui-tooling-preview than 1.11.2 is available: 1.12.1"
+        errorLine1="uiToolingPreview = &quot;1.11.2&quot;"
+        errorLine2="                   ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="39"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.bouncycastle:bcpkix-jdk18on than 1.78.1 is available: 1.86"
+        errorLine1="bcpkixJdk18on = &quot;1.78.1&quot;"
+        errorLine2="                ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="7"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.apache.commons:commons-collections4 than 4.5.0 is available: 4.6.0"
+        errorLine1="commonsCollections4 = &quot;4.5.0&quot;"
+        errorLine2="                      ~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="9"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.apache.commons:commons-lang3 than 3.20.0 is available: 3.21.0"
+        errorLine1="commonsLang3 = &quot;3.20.0&quot;"
+        errorLine2="               ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="11"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.4.0 is available: 2.4.21"
+        errorLine1="kotlin = &quot;2.4.0&quot;"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="21"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.robolectric:robolectric than 4.16.1 is available: 4.17"
+        errorLine1="robolectric = &quot;4.16.1&quot;"
+        errorLine2="              ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="34"
+            column="15"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.slf4j:slf4j-api than 2.0.18 is available: 2.0.20"
+        errorLine1="slf4j = &quot;2.0.18&quot;"
+        errorLine2="        ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="36"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.slf4j:slf4j-simple than 2.0.18 is available: 2.0.20"
+        errorLine1="slf4j = &quot;2.0.18&quot;"
+        errorLine2="        ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="36"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.gitlab.mvysny.slf4j:slf4j-handroid than 2.0.13 is available: 2.0.20"
+        errorLine1="slf4j-handroid = &quot;2.0.13&quot;"
+        errorLine2="                 ~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="37"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.squareup.okhttp3:okhttp than 5.3.0 is available: 5.5.1"
+        errorLine1="okhttp = &quot;5.3.0&quot;"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="41"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.google.zxing:core than 3.3.0 is available: 3.5.4"
+        errorLine1="zxingCore = &quot;3.3.0&quot;"
+        errorLine2="            ~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="45"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of io.github.webrtc-sdk:android than 144.7559.05 is available: 150.7871.04"
+        errorLine1="webrtc = &quot;144.7559.05&quot;"
+        errorLine2="         ~~~~~~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="46"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.ow2.asm:asm-util than 9.6 is available: 9.11.1"
+        errorLine1="        classpath(&quot;org.ow2.asm:asm-util:9.6&quot;)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="settings.gradle.kts"
+            line="28"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="VisibleForTests"
+        message="This method should only be accessed from tests or within private scope"
+        errorLine1="        devices.values.forEach(Device::closeLifecycle)"
+        errorLine2="                               ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/DeskLinkApplication.kt"
+            line="216"
+            column="32"/>
+    </issue>
+
+    <issue
+        id="VisibleForTests"
+        message="This method should only be accessed from tests or within private scope"
+        errorLine1="            device.pairingHandler.requestPairingWithProof(mac, device.certificate)"
+        errorLine2="                   ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/QrPairing.kt"
+            line="201"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="VisibleForTests"
+        message="This method should only be accessed from tests or within private scope"
+        errorLine1="        require(WebRtcFeatureProfile.handoverListIsConsistent(message.incomingCapabilities, device.deviceInfo.incomingCapabilities)) {"
+        errorLine2="                                                                                                   ~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
+            line="2127"
+            column="100"/>
+    </issue>
+
+    <issue
+        id="VisibleForTests"
+        message="This method should only be accessed from tests or within private scope"
+        errorLine1="        require(WebRtcFeatureProfile.handoverListIsConsistent(message.outgoingCapabilities, device.deviceInfo.outgoingCapabilities)) {"
+        errorLine2="                                                                                                   ~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
+            line="2130"
+            column="100"/>
+    </issue>
+
+    <issue
+        id="VisibleForTests"
+        message="This method should only be accessed from tests or within private scope"
+        errorLine1="    private fun remoteAcceptsSignal(): Boolean = device.deviceInfo.incomingCapabilities"
+        errorLine2="                                                        ~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
+            line="2591"
+            column="57"/>
+    </issue>
+
+    <issue
+        id="ModifierParameter"
+        message="Modifier parameter should be the first optional parameter"
+        errorLine1="        modifier: Modifier = Modifier,"
+        errorLine2="        ~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/terminal/TerminalActivity.kt"
+            line="1306"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libtermux.so` (from `com.github.termux.termux-app:terminal-emulator:v0.118.1`) is not 16 KB aligned"
+        errorLine1="termux-terminal-emulator = { module = &quot;com.github.termux.termux-app:terminal-emulator&quot;, version.ref = &quot;termux&quot; }"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="gradle/libs.versions.toml"
+            line="99"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libtermux.so` (from `com.github.termux.termux-app:terminal-emulator:v0.118.1`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/9.5.1/transforms/f827ff7ed7f21c99aff811beead84421/transformed/terminal-emulator-v0.118.1/jni/arm64-v8a/libtermux.so"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libtermux.so` (from `com.github.termux.termux-app:terminal-emulator:v0.118.1`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/9.5.1/transforms/f827ff7ed7f21c99aff811beead84421/transformed/terminal-emulator-v0.118.1/jni/arm64-v8a/libtermux.so"/>
+    </issue>
+
+    <issue
+        id="Deprecated"
+        message="ChooserTargetService` is deprecated: Please see https://developer.android.com/training/sharing/receive.html?source=studio#providing-direct-share-targets"
+        errorLine1="            android:permission=&quot;android.permission.BIND_CHOOSER_TARGET_SERVICE&quot;>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="377"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="Deprecated"
+        message="`ShareChooserTargetService` extends the deprecated `ChooserTargetService`: Use the Share API instead"
+        errorLine1="public class ShareChooserTargetService extends ChooserTargetService {"
+        errorLine2="             ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/share/ShareChooserTargetService.java"
+            line="24"
+            column="14"/>
+    </issue>
+
+    <issue
+        id="DiscouragedApi"
+        message="Use of `scheduleAtFixedRate` is strongly discouraged because it can lead to unexpected behavior when Android processes become cached (tasks may unexpectedly execute hundreds or thousands of times in quick succession when a process changes from cached to uncached); prefer using `scheduleWithFixedDelay`"
+        errorLine1="        remoteHeartbeat = recoveryExecutor.scheduleAtFixedRate({"
+        errorLine2="                          ^">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
+            line="1885"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="UseCompatLoadingForDrawables"
+        message="Use `ResourcesCompat.getDrawable()`"
+        errorLine1="            val foreignIcon = foreignResources.getDrawable(notification.icon) // Might throw Resources.NotFoundException"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/notifications/NotificationsPlugin.kt"
+            line="472"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="MissingTranslation"
+        message="&quot;quit_app_shortcut&quot; is not translated in &quot;en&quot; (English)"
+        errorLine1="    &lt;string name=&quot;quit_app_shortcut&quot;>Quit&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/debug/res/values/strings.xml"
+            line="5"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;devices&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;custom_devices_settings_summary&quot;>%d devices added manually&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="172"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;milliseconds&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;ping_result&quot;>Pinged in %1$d milliseconds&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="361"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="ChromeOsAbiSupport"
+        message="Missing x86_64 ABI support for ChromeOS"
+        errorLine1="            if (!providers.gradleProperty(&quot;allAbis&quot;).isPresent) ndk { abiFilters += listOf(&quot;arm64-v8a&quot;, &quot;armeabi-v7a&quot;) }"
+        errorLine2="                                                                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="126"
+            column="85"/>
+    </issue>
+
+    <issue
+        id="TrustAllX509TrustManager"
+        message="`checkServerTrusted` is empty, which could cause insecure network traffic due to trusting arbitrary TLS/SSL certificates presented by peers">
+        <location
+            file="$GRADLE_USER_HOME/caches/modules-2/files-2.1/org.bouncycastle/bcpkix-jdk18on/1.78.1/17b3541f736df97465f87d9f5b5dfa4991b37bb3/bcpkix-jdk18on-1.78.1.jar"/>
+    </issue>
+
+    <issue
+        id="DataExtractionRules"
+        message="The attribute `android:dataExtractionRules` only applies for Android 12 and higher; since `minSdkVersion` is API 23 you should also set `android:fullBackupContent`"
+        errorLine1="        android:dataExtractionRules=&quot;@xml/data_extraction_rules&quot;"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="97"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="NotifyDataSetChanged"
+        message="It will always be more efficient to use more specific change events if you can. Rely on `notifyDataSetChanged` as a last resort."
+        errorLine1="            runOnUiThread(() -> customDevicesAdapter.notifyDataSetChanged());"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/CustomDevicesActivity.java"
+            line="83"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="NotifyDataSetChanged"
+        message="It will always be more efficient to use more specific change events if you can. Rely on `notifyDataSetChanged` as a last resort."
+        errorLine1="        notifyDataSetChanged();"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/CustomDevicesAdapter.java"
+            line="41"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 23"
+        errorLine1="        val charging = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &amp;&amp; manager?.isCharging == true"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/surfaces/DeskSurfaces.kt"
+            line="191"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 23"
+        errorLine1="        get() = Build.VERSION.SDK_INT >= minSdk"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/Plugin.kt"
+            line="139"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="This folder configuration (`v23`) is unnecessary; `minSdkVersion` is 23. Merge all the resources in this folder into `values`.">
+        <location
+            file="src/main/res/values-v23"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `BucketEngine` which has field `app` pointing to `Context`); this is a memory leak"
+        errorLine1="/**"
+        errorLine2="^">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/folders/BucketEngine.kt"
+            line="83"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields; this is a memory leak"
+        errorLine1="    private lateinit var app: Context"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/folders/BucketEngine.kt"
+            line="108"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `ClipboardListener` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="        private var _instance: ClipboardListener? = null"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/clipboard/ClipboardListener.kt"
+            line="259"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `LanLinkProvider` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="    public static volatile LanLinkProvider instance;"
+        errorLine2="           ~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/backends/lan/LanLinkProvider.java"
+            line="73"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `MouseReceiverService` which has field `cursorView` pointing to `View`); this is a memory leak"
+        errorLine1="    public static volatile MouseReceiverService instance;"
+        errorLine2="           ~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
+            line="37"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `JavaAudioDeviceModule` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="    @Volatile private var module: JavaAudioDeviceModule? = null"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/PhoneAudioEngine.kt"
+            line="33"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `RelayLinkProvider` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="        /** The running provider, for TURN credentials and resets; null while the service is stopped. */"
+        errorLine2="        ^">
+        <location
+            file="src/main/java/org/desklink/mobile/backends/relay/RelayLinkProvider.kt"
+            line="527"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseCompoundDrawables"
+        message="This tag and its children can be replaced by one `&lt;TextView/>` and a compound drawable"
+        errorLine1="    &lt;LinearLayout"
+        errorLine2="     ~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/widget_desk_small.xml"
+            line="13"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="            var dragging by remember { mutableStateOf(-1) }"
+        errorLine2="                                       ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/capture/CaptureActivity.kt"
+            line="337"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
+        errorLine1="        var lastUse by remember { mutableStateOf(0L) }"
+        errorLine2="                                  ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousepad/MousePadActivity.kt"
+            line="649"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    private val tab = mutableStateOf(TAB_NOTES)"
+        errorLine2="                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/notes/NotesActivity.kt"
+            line="98"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableLongStateOf` instead of `mutableStateOf`"
+        errorLine1="        var shown by rememberSaveable { mutableStateOf(first?.modified ?: 0L) }"
+        errorLine2="                                        ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/notes/NotesUi.kt"
+            line="217"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var remoteScreenCount by mutableStateOf(1)"
+        errorLine2="                             ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/screen/ScreenControlPlugin.kt"
+            line="34"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var remoteScreenWidth by mutableStateOf(0)"
+        errorLine2="                             ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/screen/ScreenControlPlugin.kt"
+            line="49"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="    var remoteScreenHeight by mutableStateOf(0)"
+        errorLine2="                              ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/screen/ScreenControlPlugin.kt"
+            line="51"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="        var latestFrameWidth: Int by mutableStateOf(1280)"
+        errorLine2="                                     ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/screen/ScreenControlPlugin.kt"
+            line="424"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="AutoboxingStateCreation"
+        message="Prefer `mutableIntStateOf` instead of `mutableStateOf`"
+        errorLine1="        var latestFrameHeight: Int by mutableStateOf(720)"
+        errorLine2="                                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/screen/ScreenControlPlugin.kt"
+            line="427"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="DisableBaselineAlignment"
+        message="Set `android:baselineAligned=&quot;false&quot;` on this element for better performance"
+        errorLine1="    &lt;LinearLayout"
+        errorLine2="     ~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/widget_desk_large.xml"
+            line="160"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.dimen.layout_match_parent` appears to be unused"
+        errorLine1="    &lt;item name=&quot;layout_match_parent&quot; type=&quot;dimen&quot;>-1&lt;/item>"
+        errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/consts.xml"
+            line="14"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.dimen.layout_wrap_content` appears to be unused"
+        errorLine1="    &lt;item name=&quot;layout_wrap_content&quot; type=&quot;dimen&quot;>-2&lt;/item>"
+        errorLine2="          ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/consts.xml"
+            line="15"
+            column="11"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.layout.preference_checkbox` appears to be unused"
+        errorLine1="&lt;CheckBox"
+        errorLine2="^">
+        <location
+            file="src/main/res/layout/preference_checkbox.xml"
+            line="9"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.layout.preference_widget_material_switch` appears to be unused"
+        errorLine1="&lt;com.google.android.material.materialswitch.MaterialSwitch"
+        errorLine2="^">
+        <location
+            file="src/main/res/layout/preference_widget_material_switch.xml"
+            line="9"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.kde_connect` appears to be unused"
+        errorLine1="    &lt;string name=&quot;kde_connect&quot;>Debug DeskLink Mobile&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/debug/res/values/strings.xml"
+            line="4"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.PreferenceThemeOverlay` appears to be unused"
+        errorLine1="    &lt;style name=&quot;PreferenceThemeOverlay&quot; parent=&quot;BasePreferenceThemeOverlay&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values-v27/styles.xml"
+            line="18"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.Preference_SwitchPreferenceMaterial` appears to be unused"
+        errorLine1="    &lt;style name=&quot;Preference.SwitchPreferenceMaterial&quot; parent=&quot;Preference.SwitchPreference.Material&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values-v27/styles.xml"
+            line="24"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.DeskLinkTheme_Toolbar` appears to be unused"
+        errorLine1="    &lt;style name=&quot;DeskLinkTheme.Toolbar&quot; parent=&quot;Widget.AppCompat.Toolbar&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="62"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.MainNavigationView` appears to be unused"
+        errorLine1="    &lt;style name=&quot;MainNavigationView&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="78"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.DeskLinkButton_IconButton` appears to be unused"
+        errorLine1="    &lt;style name=&quot;DeskLinkButton.IconButton&quot; parent=&quot;Widget.Material3.Button.IconButton.Filled&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="81"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.DeskLinkButton_IconButton_Secondary` appears to be unused"
+        errorLine1="    &lt;style name=&quot;DeskLinkButton.IconButton.Secondary&quot; parent=&quot;Widget.Material3.Button.IconButton.Filled.Tonal&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="86"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.ActionModeStyle` appears to be unused"
+        errorLine1="    &lt;style name=&quot;ActionModeStyle&quot; parent=&quot;Widget.AppCompat.ActionMode&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="91"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.AboutButton` appears to be unused"
+        errorLine1="    &lt;style name=&quot;AboutButton&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="102"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.style.AboutButton_TextView` appears to be unused"
+        errorLine1="    &lt;style name=&quot;AboutButton.TextView&quot;>"
+        errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/styles.xml"
+            line="108"
+            column="12"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.layout.zxing_barcode_scanner` appears to be unused"
+        errorLine1="&lt;merge xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/layout/zxing_barcode_scanner.xml"
+            line="9"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UselessLeaf"
+        message="This `FrameLayout` view is unnecessary (no children, no `background`, no `id`, no `style`)"
+        errorLine1="    &lt;FrameLayout"
+        errorLine2="     ~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/widget_desk_large.xml"
+            line="154"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="UselessLeaf"
+        message="This `FrameLayout` view is unnecessary (no children, no `background`, no `id`, no `style`)"
+        errorLine1="    &lt;FrameLayout"
+        errorLine2="     ~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/widget_desk_small.xml"
+            line="53"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="RedundantNamespace"
+        message="This namespace declaration is redundant"
+        errorLine1="        xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/drawable/mouse_pointer_clicked.xml"
+            line="6"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="RedundantNamespace"
+        message="This namespace declaration is redundant"
+        errorLine1="        xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/drawable/mouse_pointer_clicked.xml"
+            line="25"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="  &lt;string name=&quot;share_to&quot;>Berbagi Ke...&lt;/string>"
+        errorLine2="                          ~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values-id/strings.xml"
+            line="73"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="  &lt;string name=&quot;share_to&quot;>共有先...&lt;/string>"
+        errorLine2="                          ~~~~~~">
+        <location
+            file="src/main/res/values-ja/strings.xml"
+            line="95"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="  &lt;string name=&quot;share_to&quot;>Споделяне към...&lt;/string>"
+        errorLine2="                          ~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values-bg/strings.xml"
+            line="103"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="  &lt;string name=&quot;share_to&quot;>Compartilhar com...&lt;/string>"
+        errorLine2="                          ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values-pt-rBR/strings.xml"
+            line="106"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="  &lt;string name=&quot;share_to&quot;>Sdílet s...&lt;/string>"
+        errorLine2="                          ~~~~~~~~~~~">
+        <location
+            file="src/main/res/values-cs/strings.xml"
+            line="122"
+            column="27"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="  &lt;string name=&quot;ping_in_progress&quot;>Interrogation par ping en cours...&lt;/string>"
+        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values-fr/strings.xml"
+            line="210"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="  &lt;string name=&quot;ping_in_progress&quot;>Pingando...&lt;/string>"
+        errorLine2="                                  ~~~~~~~~~~~">
+        <location
+            file="src/main/res/values-pt-rBR/strings.xml"
+            line="210"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="TypographyEllipsis"
+        message="Replace &quot;...&quot; with ellipsis character (…, &amp;#8230;) ?"
+        errorLine1="  &lt;string name=&quot;ping_in_progress&quot;>Pinguji...&lt;/string>"
+        errorLine2="                                  ~~~~~~~~~~">
+        <location
+            file="src/main/res/values-cs/strings.xml"
+            line="226"
+            column="35"/>
+    </issue>
+
+    <issue
+        id="AlwaysShowAction"
+        message="Prefer &quot;`SHOW_AS_ACTION_IF_ROOM`&quot; instead of &quot;`SHOW_AS_ACTION_ALWAYS`&quot;"
+        errorLine1="        mitem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/notifications/NotificationFilterActivity.java"
+            line="350"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_ACCEPTED_AT, System.currentTimeMillis()).apply()"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/AccessibilitySetupActivity.kt"
+            line="89"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    Uri.parse(&quot;package:$packageName&quot;),"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/BackgroundService.kt"
+            line="468"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { app.contentResolver.releasePersistableUriPermission(Uri.parse(tree), Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }"
+        errorLine2="                                                                          ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/folders/BucketEngine.kt"
+            line="539"
+            column="75"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val uri = Uri.parse(live.treeUri)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/folders/BucketEngine.kt"
+            line="1013"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val uri = Uri.parse(live.treeUri)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/folders/BucketEngine.kt"
+            line="1025"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                val tree = Uri.parse(live.treeUri)"
+        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/folders/BucketEngine.kt"
+            line="1143"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="            val scaled = if (w == bitmap.width &amp;&amp; h == bitmap.height) bitmap else Bitmap.createScaledBitmap(bitmap, w, h, true)"
+        errorLine2="                                                                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/contacts/ContactsPlugin.kt"
+            line="278"
+            column="83"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),"
+        errorLine2="                                       ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/share/LinkFromDesk.kt"
+            line="39"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        return chosen?.let { android.net.Uri.parse(it).lastPathSegment?.substringAfterLast(&apos;:&apos;)?.substringAfterLast(&apos;/&apos;) }?.takeIf { it.isNotBlank() }"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/MainActivity.kt"
+            line="530"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val uri = android.net.Uri.parse(record.uri)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/MainActivity.kt"
+            line="907"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        fun open(url: String?) = url?.let { runCatching { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(it))) } }"
+        errorLine2="                                                                                                   ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/MainActivity.kt"
+            line="1128"
+            column="100"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="                color = art?.let { MediaColors.vibrant(IntArray(16 * 16).also { px -> Bitmap.createScaledBitmap(art, 16, 16, true).getPixels(px, 0, 16, 0, 0, 16, 16) }) },"
+        errorLine2="                                                                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/debug/java/org/desklink/mobile/ui/compose/screen/home/MediaCardPreviewActivity.kt"
+            line="81"
+            column="87"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        return Bitmap.createBitmap(side.toInt(), side.toInt(), Bitmap.Config.ARGB_8888).also { bmp ->"
+        errorLine2="               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/debug/java/org/desklink/mobile/ui/compose/screen/home/MediaCardPreviewActivity.kt"
+            line="89"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="        val small = Bitmap.createScaledBitmap(bitmap, 16, 16, true)"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mpris/MprisArt.kt"
+            line="51"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="            art = if (scale >= 1f) source else Bitmap.createScaledBitmap("
+        errorLine2="                                               ^">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mpris/MprisMediaSession.kt"
+            line="250"
+            column="48"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="                val scaled = if (scale &lt; 1f) Bitmap.createScaledBitmap(art, maxOf(1, (art.width * scale).toInt()), maxOf(1, (art.height * scale).toInt()), true) else art"
+        errorLine2="                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/mprisreceiver/MprisReceiverCallback.kt"
+            line="173"
+            column="46"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val uri = Uri.parse(text)"
+        errorLine2="                  ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/QrPairing.kt"
+            line="51"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="        return Bitmap.createScaledBitmap(bitmap, max(1, (bitmap.width * scale).toInt()), max(1, (bitmap.height * scale).toInt()), true)"
+        errorLine2="               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/capture/ScanImage.kt"
+            line="43"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="        val small = Bitmap.createScaledBitmap(bitmap, w, h, true)"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/capture/ScanImage.kt"
+            line="125"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/capture/ScanImage.kt"
+            line="145"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        val out = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/capture/ScanImage.kt"
+            line="167"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, array.toString()).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/share/SendAgain.kt"
+            line="69"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                        Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse(&quot;package:${context.packageName}&quot;)),"
+        errorLine2="                                                                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/compose/screen/settings/SettingsScreens.kt"
+            line="288"
+            column="92"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="    val where = if (custom) prefs.getString(&quot;share_destination_folder_uri&quot;, null)?.let { Uri.parse(it).path } else null"
+        errorLine2="                                                                                         ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/compose/screen/settings/SettingsTab.kt"
+            line="583"
+            column="90"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        mSharedPrefs.edit().putStringSet(key, newUrlSet).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/share/ShareActivity.kt"
+            line="127"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withScale` instead?"
+        errorLine1="            canvas.save()"
+        errorLine2="            ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/terminal/TerminalView.kt"
+            line="336"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val uri = Uri.parse(record.uri)"
+        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/compose/screen/transfers/Thumbnails.kt"
+            line="48"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/compose/screen/transfers/Thumbnails.kt"
+            line="102"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            || runCatching { Uri.parse(checkpoint.uri) }.getOrNull() == null"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/helpers/TransferCheckpointStore.kt"
+            line="74"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        return preferences.edit()"
+        errorLine2="               ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/helpers/TransferCheckpointStore.kt"
+            line="76"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        return preferences.edit()"
+        errorLine2="               ~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/helpers/TransferCheckpointStore.kt"
+            line="98"
+            column="16"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        resumeSources(context).edit().putString(transferId, uri.toString()).apply()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/share/TransferHistory.kt"
+            line="182"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="    fun forgetResumable(context: Context, transferId: String) = resumeSources(context).edit().remove(transferId).apply()"
+        errorLine2="                                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/plugins/share/TransferHistory.kt"
+            line="184"
+            column="65"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        value = withContext(Dispatchers.IO) { runCatching { Thumbnails.decodeSampled(context, Uri.parse(record.uri), 1600) }.getOrNull() }"
+        errorLine2="                                                                                              ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/compose/screen/transfers/TransfersScreen.kt"
+            line="369"
+            column="95"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    setVideoURI(Uri.parse(record.uri))"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/ui/compose/screen/transfers/TransfersScreen.kt"
+            line="418"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val uri = stored.sourceUri?.let { runCatching { android.net.Uri.parse(it) }.getOrNull() } ?: return null"
+        errorLine2="                                                        ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
+            line="820"
+            column="57"/>
+    </issue>
+
+    <issue
+        id="RtlSymmetry"
+        message="When you define `paddingStart` you should probably also define `paddingEnd` for right-to-left symmetry"
+        errorLine1="        android:paddingStart=&quot;12dp&quot;>"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/widget_desk_large.xml"
+            line="123"
+            column="9"/>
+    </issue>
+
+</issues>

@@ -127,8 +127,12 @@ android {
         }
     }
     lint {
-        abortOnError = false
+        // Lint fails the build on any NEW error; what already exists is in lint-baseline.xml (regenerate it only by
+        // fixing issues: delete the file and run lintDebug once, then review the diff). Warnings never fail it.
+        abortOnError = true
+        warningsAsErrors = false
         checkReleaseBuilds = false
+        baseline = file("lint-baseline.xml")
     }
 }
 

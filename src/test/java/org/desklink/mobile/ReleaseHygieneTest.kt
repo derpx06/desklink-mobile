@@ -43,4 +43,12 @@ class ReleaseHygieneTest {
         }
         assertFalse("the manifest permission is not claimed", "MANAGE_EXTERNAL_STORAGE" in project("PRIVACY.md").readText())
     }
+
+    @Test
+    fun lintFailsOnNewErrorsAgainstABaseline() {
+        val gradle = project("build.gradle.kts").readText()
+        assertTrue("abortOnError = true" in gradle)
+        assertTrue("lint-baseline.xml" in gradle)
+        assertTrue(project("lint-baseline.xml").length() > 0)
+    }
 }
