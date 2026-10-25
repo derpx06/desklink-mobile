@@ -26,6 +26,10 @@ class ScreenControlPlugin : Plugin() {
     var remoteControlEnabled by mutableStateOf(false)
         private set
 
+    /** The desktop refused control: the screen stops asking by itself until the person asks again (a menu entry), never a 3-second loop. */
+    var remoteControlRefused by mutableStateOf(false)
+        private set
+
     /** True once a frame of the current view has reached a renderer. */
     var remoteLive by mutableStateOf(false)
         private set
@@ -177,11 +181,13 @@ class ScreenControlPlugin : Plugin() {
 
     fun onRemoteControlGranted() {
         remoteControlEnabled = true
+        remoteControlRefused = false
         latestStatus = context.getString(R.string.remote_control_enabled)
     }
 
     fun onRemoteControlDenied(reason: String?) {
         remoteControlEnabled = false
+        remoteControlRefused = true
         latestStatus = reason?.takeIf(String::isNotBlank)?.let {
             context.getString(R.string.remote_control_denied_reason, it)
         } ?: context.getString(R.string.remote_control_denied)
@@ -258,7 +264,11 @@ class ScreenControlPlugin : Plugin() {
         )
     }
 
+    /** The person asked for control again. */
+    fun askControlAgain() { remoteControlRefused = false }
+
     private fun resetView() {
+        remoteControlRefused = false
         desktopTextFocused = false
         frameSeen.set(false)
         remoteLive = false

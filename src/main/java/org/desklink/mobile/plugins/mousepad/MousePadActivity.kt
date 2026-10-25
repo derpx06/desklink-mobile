@@ -247,9 +247,10 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         // in the same dialog as the screen. Not while the password is being
         // asked for, nor once the person declined to give it.
         val viewOnly = controlMode == ControlMode.View
-        LaunchedEffect(live, controlEnabled, prompt, controlPasswordDeclined, viewOnly) {
+        val refused = plugin?.remoteControlRefused == true
+        LaunchedEffect(live, controlEnabled, prompt, controlPasswordDeclined, viewOnly, refused) {
             var first = true
-            while (live && !controlEnabled && prompt == null && !controlPasswordDeclined && !viewOnly) {
+            while (live && !controlEnabled && prompt == null && !controlPasswordDeclined && !viewOnly && !refused) {
                 // Retries keep quiet: a refusal's reason (e.g. "allow remote
                 // interaction on the computer") must stay shown.
                 if (DeskLinkApplication.getInstance().requestRemoteControl(deviceId) && first) {
@@ -751,8 +752,11 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                             },
                         )
                         androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(stringResource(R.string.remote_screen_retry)) },
-                            onClick = { more = false; requestDesktopScreen() },
+                            text = { Text(stringResource(if (screenControlPlugin()?.remoteControlRefused == true) R.string.remote_control_ask_again else R.string.remote_screen_retry)) },
+                            onClick = {
+                                more = false
+                                val control = screenControlPlugin(); if (control?.remoteControlRefused == true) control.askControlAgain() else requestDesktopScreen()
+                            },
                         )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(stringResource(R.string.settings)) },

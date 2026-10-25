@@ -32,6 +32,17 @@ class ScreenControlPluginRemoteViewTest {
     }
 
     @Test
+    fun `a refusal stops the automatic asking until the person asks again`() {
+        plugin.onRemoteControlDenied("allow it on the computer")
+        assertTrue(plugin.remoteControlRefused)
+        plugin.askControlAgain()
+        assertFalse(plugin.remoteControlRefused)
+        plugin.onRemoteControlDenied(null)
+        plugin.onRemoteControlGranted()
+        assertFalse("a grant clears it", plugin.remoteControlRefused)
+    }
+
+    @Test
     fun `no geometry is known until the desktop reports it`() {
         assertEquals(0, plugin.remoteScreenWidth)
         assertEquals(0, plugin.remoteScreenHeight)
