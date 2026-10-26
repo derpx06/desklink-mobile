@@ -15,6 +15,7 @@ class IdleTimersTest {
     private val periodic = Regex("""scheduleWithFixedDelay|scheduleAtFixedRate|\bTimer\(""")
 
     private val allowed = mapOf(
+        "helpers/Guarded.kt" to "the guard around every periodic task of the owners below: it starts no timer of its own",
         "webrtc/WebRtcSessionCoordinator.kt" to "the link's heartbeat and liveness probes: the one thing that runs while connected",
         "webrtc/WebRtcTransport.kt" to "debug-only stats logs: each starts with the first decoded frame (or a screen share) and ends two polls after the pictures stop, so nothing polls getStats while idle",
         "plugins/folders/BucketEngine.kt" to "the Bucket's tick: returns at once when there is no Bucket, link or offer, and rescans rarely with the screen off",

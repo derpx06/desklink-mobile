@@ -22,6 +22,11 @@ class WiringTest {
 
     @Test
     fun theStaleAlarmOfTheRemovedAutomationsIsCancelled() {
+        // The application's own start-up thread also runs runOnce(): the lock keeps it from cancelling the alarm under this test.
+        synchronized(RemovedFeatures) { staleAlarm() }
+    }
+
+    private fun staleAlarm() {
         val intent = Intent().setClassName(app.packageName, RemovedFeatures.ALARM_RECEIVER).setAction(RemovedFeatures.ALARM_ACTION)
         val pending = PendingIntent.getBroadcast(app, 0, intent, PendingIntent.FLAG_IMMUTABLE)
         app.getSystemService(AlarmManager::class.java).set(AlarmManager.RTC, System.currentTimeMillis() + 3_600_000, pending)

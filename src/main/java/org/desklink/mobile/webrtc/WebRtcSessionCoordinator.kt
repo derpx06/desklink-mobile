@@ -105,6 +105,19 @@ class WebRtcSessionCoordinator(
     private val recovery = WebRtcRecoveryPolicy()
     private val recoveryExecutor = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-WebRTC-Recovery-${device.deviceId}")
     private val pendingInitiation = ExpeditableTask(recoveryExecutor)
+
+    init {
+        // Heartbeat and liveness tasks that keep failing: the peer is rebuilt (also what "Tap to restart" runs for this device).
+        recoveryExecutor.owner = ::restartAfterFailures
+    }
+
+    /** The liveness or heartbeat task failed repeatedly: rebuild the peer, since a dead peer would otherwise never be noticed. */
+    internal fun restartAfterFailures() {
+        val (binding, attempt) = synchronized(lock) { activeBinding to activeAttemptId }
+        if (binding != null && attempt != null) {
+            scheduleRecovery(binding, attempt, "periodic task failing repeatedly", notifyPeer = false)
+        }
+    }
     private val transportCleanup = DeferredTaskExecutor(
         "DeskLink-WebRTC-Cleanup-${device.deviceId}",
     ) { error -> Log.w(TAG, "Failed to dispose the previous WebRTC transport", error) }

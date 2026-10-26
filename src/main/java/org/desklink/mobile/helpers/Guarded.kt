@@ -39,21 +39,56 @@ object Guarded {
     val stopped: StateFlow<Set<String>> = _stopped
 
     fun restartStopped() {
+        val failed = _stopped.value
         _stopped.value = emptySet()
+        // The failed periodic owners first (a peer whose liveness task died is rebuilt), then the plugins.
+        failed.forEach { name -> owners[name]?.let { owner -> runCatching { owner() } } }
         runCatching { restart() }
     }
 
     fun clearStopped() { _stopped.value = emptySet() }
 
+    /** The clock the report rate limit uses (a test replaces it). */
+    @Volatile
+    var clock: () -> Long = System::currentTimeMillis
+
+    private val lastReportAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /** At most one kept report per feature per minute: a task failing every second must not fill the report slots. */
+    const val REPORT_EVERY_MS = 60_000L
+
+    /** Who restarts a failed periodic owner ("Tap to restart" and the give-up path): by the name of its executor. */
+    val owners = java.util.concurrent.ConcurrentHashMap<String, () -> Unit>()
+
     /** Records [error] for [name] and lists the feature as stopped. Never throws. */
     fun record(name: String, error: Throwable) {
         runCatching { Log.e(TAG, "$name failed: ${error.javaClass.name}: ${LogExport.redact(error.message.orEmpty())}") }
         _stopped.value = _stopped.value + name
+        val now = clock()
+        val last = lastReportAt[name]
+        if (last != null && now - last in 0 until REPORT_EVERY_MS) return
+        lastReportAt[name] = now
         runCatching { sink(name, error) }
     }
 
-    /** True for what must not be swallowed. */
+    /**
+     * True for what must not be swallowed: [OutOfMemoryError] (nothing safe can be done after it; [onOutOfMemory] hands it on) and
+     * cancellation. (Rethrowing from inside an UncaughtExceptionHandler does nothing: the VM ignores it.)
+     */
     fun fatal(error: Throwable): Boolean = error is OutOfMemoryError || error is CancellationException
+
+    private val oomMarker = "DeskLink: out of memory in an owned thread\n".toByteArray()
+    @Volatile
+    var oomFile: java.io.File? = null
+
+    /** Out of memory on a thread we own: a minimal marker (pre-allocated bytes, no new objects of size), then the previous handler. */
+    fun onOutOfMemory(thread: Thread, error: OutOfMemoryError) {
+        try {
+            oomFile?.let { java.io.FileOutputStream(it, true).use { out -> out.write(oomMarker) } }
+        } catch (_: Throwable) {
+        }
+        Thread.getDefaultUncaughtExceptionHandler()?.uncaughtException(thread, error)
+    }
 
     fun wrap(name: String, task: Runnable): Runnable = Runnable {
         try {
@@ -78,7 +113,9 @@ object Guarded {
     fun threadFactory(name: String, daemon: Boolean = true): ThreadFactory = ThreadFactory { runnable ->
         Thread(runnable, name).apply {
             isDaemon = daemon
-            setUncaughtExceptionHandler { _, error -> if (!fatal(error)) record(name, error) else throw error }
+            setUncaughtExceptionHandler { thread, error ->
+                if (error is OutOfMemoryError) onOutOfMemory(thread, error) else if (!fatal(error)) record(name, error)
+            }
         }
     }
 
@@ -93,7 +130,59 @@ object Guarded {
         }
     }
 
+    /**
+     * A periodic task that throws is caught per run, recorded, and runs again: backing off (skipping 1, 3, 7, 15 runs) while it keeps
+     * failing, and after [MAX_CONSECUTIVE_FAILURES] in a row the owner is restarted (the peer rebuilt, the ticker re-armed). A task
+     * that threw used to be cancelled silently by the executor and never ran again.
+     */
+    class PeriodicGuard(private val name: String, private val task: Runnable, private val giveUp: () -> Unit) : Runnable {
+        private var failures = 0
+        private var skip = 0
+        override fun run() {
+            if (skip > 0) { skip--; return }
+            try {
+                task.run()
+                failures = 0
+            } catch (error: Throwable) {
+                if (fatal(error)) throw error
+                failures++
+                record(name, error)
+                if (failures >= MAX_CONSECUTIVE_FAILURES) {
+                    failures = 0; skip = 0
+                    runCatching(giveUp)
+                } else {
+                    skip = ((1 shl (failures - 1)) - 1).coerceAtMost(15)
+                }
+            }
+        }
+
+        companion object { const val MAX_CONSECUTIVE_FAILURES = 5 }
+    }
+
     class Scheduled(private val name: String) : ScheduledThreadPoolExecutor(1, threadFactory(name)) {
+        /** Restarts whatever owns this executor's periodic tasks; also what "Tap to restart" runs. */
+        var owner: (() -> Unit)? = null
+            set(value) {
+                field = value
+                if (value != null) owners[name] = value else owners.remove(name)
+            }
+
+        override fun scheduleAtFixedRate(command: Runnable, initialDelay: Long, period: Long, unit: TimeUnit) =
+            super.scheduleAtFixedRate(PeriodicGuard(name, command) { owner?.invoke() }, initialDelay, period, unit)
+
+        override fun scheduleWithFixedDelay(command: Runnable, initialDelay: Long, delay: Long, unit: TimeUnit) =
+            super.scheduleWithFixedDelay(PeriodicGuard(name, command) { owner?.invoke() }, initialDelay, delay, unit)
+
+        override fun shutdown() {
+            owners.remove(name)
+            super.shutdown()
+        }
+
+        override fun shutdownNow(): MutableList<Runnable> {
+            owners.remove(name)
+            return super.shutdownNow()
+        }
+
         override fun afterExecute(runnable: Runnable?, throwable: Throwable?) {
             super.afterExecute(runnable, throwable)
             reportFuture(name, runnable)

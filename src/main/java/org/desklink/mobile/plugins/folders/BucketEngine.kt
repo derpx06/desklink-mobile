@@ -200,7 +200,9 @@ object BucketEngine {
             buckets.values.forEach { live -> runCatching { tree(live)?.cleanTemps() } }
             File(app.cacheDir, "bucket-stash").listFiles()?.forEach { it.delete() }
         }
-        worker.scheduleWithFixedDelay({ runCatching { tick() }.onFailure { Log.w(TAG, "Bucket tick failed (${it.javaClass.simpleName})") } }, 5, 5, TimeUnit.SECONDS)
+        // A tick that throws is recorded by the executor and the next one still runs (backing off while it keeps failing).
+        worker.owner = { runCatching { worker.execute { tick() } } }
+        worker.scheduleWithFixedDelay({ tick() }, 5, 5, TimeUnit.SECONDS)
     }
 
     fun link(deviceId: String, up: Boolean) = worker.execute {

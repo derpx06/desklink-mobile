@@ -92,6 +92,7 @@ object RemovedFeatures {
     }
 
     /** Runs the cleanup the first time this version starts. Safe to call on every start. */
+    @Synchronized
     fun runOnce(context: Context) {
         val app = context.applicationContext
         val marker = app.getSharedPreferences(MARKER_PREFS, Context.MODE_PRIVATE)

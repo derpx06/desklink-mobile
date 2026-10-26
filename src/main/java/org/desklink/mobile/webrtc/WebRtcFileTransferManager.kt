@@ -49,8 +49,18 @@ class ThreadFileRunner : FileRunner {
 
     override fun tickWhile(periodMs: Long, step: () -> Boolean) {
         val loop = object : Runnable {
+            private var failures = 0
             override fun run() {
-                if (runCatching(step).getOrDefault(false)) runCatching { executor.schedule(this, periodMs, TimeUnit.MILLISECONDS) }
+                // A step that throws is recorded and tried again (it used to end the ticker silently); after five in a row the
+                // ticker stops and the next transfer arms it again.
+                val again = try {
+                    step().also { failures = 0 }
+                } catch (error: Throwable) {
+                    if (org.desklink.mobile.helpers.Guarded.fatal(error)) throw error
+                    org.desklink.mobile.helpers.Guarded.record("DeskLink-file", error)
+                    ++failures < org.desklink.mobile.helpers.Guarded.PeriodicGuard.MAX_CONSECUTIVE_FAILURES
+                }
+                if (again) runCatching { executor.schedule(this, periodMs, TimeUnit.MILLISECONDS) }
             }
         }
         runCatching { executor.schedule(loop, periodMs, TimeUnit.MILLISECONDS) }
