@@ -102,13 +102,21 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     private volatile boolean listening = false;
 
+    /** Every paired computer has a LAN link: nothing left to find by multicast (a second computer's discovery needs the lock). */
+    private boolean allPairedLinked() {
+        java.util.List<String> paired = TrustedDevices.INSTANCE.getAllTrustedDevices(context);
+        if (paired.isEmpty()) return !visibleDevices.isEmpty();
+        for (String id : paired) if (!visibleDevices.containsKey(id)) return false;
+        return true;
+    }
+
     public void onConnectionLost(BaseLink link) {
         String deviceId = link.getDeviceId();
         // A replaced socket can finish its reader after the replacement has
         // already been installed. Do not let that stale callback remove the
         // current bootstrap link from discovery state.
         if (visibleDevices.remove(deviceId, link)) linkRace.forget(deviceId);
-        mdnsDiscovery.setLinkUp(!visibleDevices.isEmpty());
+        mdnsDiscovery.updateLinkState(() -> allPairedLinked());
         super.onConnectionLost(link);
         if (listening) {
             ThreadHelper.execute(() -> {
@@ -615,7 +623,7 @@ public class LanLinkProvider extends BaseLinkProvider {
             visibleDevices.put(deviceInfo.id, link);
             onConnectionReceived(link);
         }
-        mdnsDiscovery.setLinkUp(true); // found: the multicast lock is not needed while linked
+        mdnsDiscovery.updateLinkState(() -> allPairedLinked()); // the multicast lock is let go only when every paired computer is linked
         // Remembered only now, after the pinned handshake proved who is at this address. The port is
         // known when we dialed (it is the desk's listener); an accepted socket's port is not.
         LastLanAddress.INSTANCE.remember(context, deviceInfo.id, socket.getInetAddress(), weDialed ? socket.getPort() : 0);

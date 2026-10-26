@@ -42,6 +42,10 @@ class MdnsDiscovery {
 
     internal val lockHeld: Boolean get() = multicastLock.isHeld
 
+    /** Decides under the lock, so a link that comes or goes meanwhile cannot leave it wrong: held while any paired computer has no link. */
+    @Synchronized
+    fun updateLinkState(allLinked: () -> Boolean) = setLinkUp(allLinked())
+
     @Synchronized
     fun setLinkUp(up: Boolean) {
         linkUp = up

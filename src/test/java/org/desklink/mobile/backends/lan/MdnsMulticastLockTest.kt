@@ -25,4 +25,18 @@ class MdnsMulticastLockTest {
         discovery.stopDiscovering()
         assertFalse(discovery.lockHeld)
     }
+
+    @Test
+    fun theLockStaysHeldWhileAnyPairedComputerHasNoLink() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val discovery = MdnsDiscovery(app, mockk(relaxed = true))
+        discovery.startDiscovering()
+        discovery.updateLinkState { false } // one of two computers is linked, the other is not
+        assertTrue("held: the second computer's discovery needs it", discovery.lockHeld)
+        discovery.updateLinkState { true }
+        assertFalse(discovery.lockHeld)
+        discovery.updateLinkState { false } // the last link dropped
+        assertTrue(discovery.lockHeld)
+        discovery.stopDiscovering()
+    }
 }

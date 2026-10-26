@@ -36,4 +36,21 @@ class PairingBackupTest {
         assertEquals("Work Laptop", prefs.getString("deviceName", null))
         assertEquals(9, prefs.getInt("protocolVersion", 0))
     }
+
+    @Test
+    fun aFailedReplaceAlsoGetsBackThePhonesChoicesForThatComputer() {
+        org.desklink.mobile.helpers.PrivacyDefaults.grandfather(context, emptyList())
+        TrustedDevices.addTrustedDevice(context, id)
+        val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+        prefs.edit().putBoolean("glide_allowed_$id", true).putBoolean("private_notifications_$id", true).putBoolean("dynamic_colors", true).commit()
+        val backup = PairingBackup.capture(context, id)
+
+        org.desklink.mobile.helpers.PeerState.forget(context, id) // the unpair a replace starts with
+        assertFalse(prefs.contains("glide_allowed_$id"))
+
+        backup.restore(context) // the scan failed
+        assertTrue(prefs.getBoolean("glide_allowed_$id", false))
+        assertTrue(prefs.getBoolean("private_notifications_$id", false))
+        assertTrue("and what is not that computer's is untouched", prefs.getBoolean("dynamic_colors", false))
+    }
 }
