@@ -63,7 +63,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private val pendingActions = ArrayListValuedHashMap<String, Notification.Action>()
     private var serviceReady = false
     private lateinit var sharedPreferences: SharedPreferences
-    private lateinit var keyguardManager: KeyguardManager
+    private val keyguardManager: KeyguardManager by lazy { context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
     private lateinit var mainHandler: Handler
     private val postedNotificationsLock = Any()
 
@@ -111,7 +111,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         appDatabase = AppDatabase.getInstance(context)
         // The per-app tables into memory, off the main thread: the listener asks about every notification there.
         sharedPreferences = context.getSharedPreferences(sharedPreferencesName, Context.MODE_PRIVATE)
-        keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         mainHandler = Handler(Looper.getMainLooper())
         NotificationReceiver.WithService(context) { service ->
             service.addListener(this@NotificationsPlugin)
@@ -266,7 +265,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         val packageName = statusBarNotification.packageName
         if (!appDatabase.isEnabled(packageName)) return false
         // Android's own "secret" mark: never copied (one-time codes, banking).
-        if (privacyOf(notification) == NotificationPrivacy.Mirror.SKIP) return false
+        if (privacyOf(statusBarNotification) == NotificationPrivacy.Mirror.SKIP) return false
         if ("com.android.systemui" == packageName) {
             if ("low_battery" == statusBarNotification.tag) return false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && "MediaOngoingActivity" == notification.channelId) return false
@@ -282,9 +281,14 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         return true
     }
 
-    private fun privacyOf(notification: Notification): NotificationPrivacy.Mirror = NotificationPrivacy.decide(
-        notification.visibility, keyguardManager.isKeyguardSecure, NotificationPrivacy.showPrivate(context, device.deviceId),
-        NotificationPrivacy.systemAllowsPrivate(context),
+    /** The channel's own lock-screen setting for a notification; replaced by a test. */
+    @androidx.annotation.VisibleForTesting
+    internal var channelVisibilityOf: (StatusBarNotification) -> Int = NotificationReceiver::channelLockscreenVisibility
+
+    @androidx.annotation.VisibleForTesting
+    internal fun privacyOf(sbn: StatusBarNotification): NotificationPrivacy.Mirror = NotificationPrivacy.decide(
+        sbn.notification.visibility, keyguardManager.isKeyguardSecure, NotificationPrivacy.showPrivate(context, device.deviceId),
+        NotificationPrivacy.systemAllowsPrivate(context), channelVisibilityOf(sbn),
     )
 
     /** Whether Android lets this phone read notifications; reported with every snapshot so the computer can say why none come. */
@@ -337,7 +341,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         np["time"] = statusBarNotification.postTime.toString()
         np["silent"] = isPreexisting
 
-        val hideContents = privacyOf(notification) == NotificationPrivacy.Mirror.HIDDEN
+        val hideContents = privacyOf(statusBarNotification) == NotificationPrivacy.Mirror.HIDDEN
         if (hideContents) {
             // PRIVATE on a secured lock screen: what the lock screen itself shows (the public version), else only the app.
             // Nothing but the app when the person blocked this app's contents; no buttons or reply either.

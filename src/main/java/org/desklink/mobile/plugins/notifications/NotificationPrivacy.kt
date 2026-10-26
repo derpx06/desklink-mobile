@@ -47,10 +47,13 @@ object NotificationPrivacy {
         }
     }
 
-    /** `lock_screen_allow_private_notifications` (hidden constant; readable; absent means allowed). */
-    fun systemAllowsPrivate(context: Context): Boolean = runCatching {
-        android.provider.Settings.Secure.getInt(context.contentResolver, "lock_screen_allow_private_notifications", 1) != 0
-    }.getOrDefault(true)
+    /** `lock_screen_allow_private_notifications` (hidden constant; absent means allowed; unreadable means NOT allowed). */
+    fun systemAllowsPrivate(context: Context): Boolean = systemAllowsPrivate {
+        android.provider.Settings.Secure.getInt(context.contentResolver, "lock_screen_allow_private_notifications", 1)
+    }
+
+    /** The reading of that setting, pure for the test: a reader that throws means "not allowed". */
+    fun systemAllowsPrivate(read: () -> Int): Boolean = runCatching { read() != 0 }.getOrDefault(false) // unreadable: the careful answer (a PRIVATE notification stays hidden), never the open one
 
     /** Per computer, off unless the person turned it on in Settings. */
     fun key(deviceId: String) = "private_notifications_$deviceId"

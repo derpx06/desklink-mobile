@@ -44,6 +44,29 @@ public class NotificationReceiver extends NotificationListenerService {
 
     private final ArrayList<NotificationListener> listeners = new ArrayList<>();
 
+    /** The connected listener, for reading the ranking (a channel's lock-screen setting) of a notification. */
+    private static volatile NotificationReceiver connectedInstance;
+
+    /**
+     * The lock-screen visibility of the notification's channel as the person set it (API 26+), or
+     * {@link NotificationPrivacy#CHANNEL_NO_OVERRIDE} when it is not set or cannot be read.
+     */
+    public static int channelLockscreenVisibility(StatusBarNotification sbn) {
+        NotificationReceiver service = connectedInstance;
+        if (service == null || sbn == null || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
+            return NotificationPrivacy.CHANNEL_NO_OVERRIDE;
+        }
+        try {
+            RankingMap map = service.getCurrentRanking();
+            Ranking ranking = new Ranking();
+            if (map != null && map.getRanking(sbn.getKey(), ranking) && ranking.getChannel() != null) {
+                return ranking.getChannel().getLockscreenVisibility();
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return NotificationPrivacy.CHANNEL_NO_OVERRIDE;
+    }
+
     public void addListener(NotificationListener listener) {
         listeners.add(listener);
     }
@@ -70,6 +93,7 @@ public class NotificationReceiver extends NotificationListenerService {
     @Override
     public void onListenerConnected() {
         super.onListenerConnected();
+        connectedInstance = this;
         // Android guarantees that querying active notifications is safe only
         // after this lifecycle callback. Publish the state before notifying
         // DeskLink plugins so their initial WebRTC resync cannot race a
@@ -82,6 +106,7 @@ public class NotificationReceiver extends NotificationListenerService {
 
     @Override
     public void onListenerDisconnected() {
+        if (connectedInstance == this) connectedInstance = null;
         super.onListenerDisconnected();
         connected = false;
     }
