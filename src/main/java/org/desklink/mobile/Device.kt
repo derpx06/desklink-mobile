@@ -571,6 +571,7 @@ class Device : PacketReceiver {
      * [setWebRtcTransport] starts, so a plugin loaded by it is included.
      */
     fun onFeatureReady() {
+        org.desklink.mobile.helpers.AppLog.event("link", "feature-ready ${org.desklink.mobile.helpers.AppLog.id(deviceId)}")
         // Say what this phone already holds of the desk's state. The desk's own `have` may already
         // be here (it is kept for this connection): then the snapshots go at once; otherwise they
         // wait at most a second for it, without holding the lifecycle worker.

@@ -770,7 +770,7 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
             val ok = runCatching {
                 val process = Runtime.getRuntime().exec(org.desklink.mobile.helpers.LogExport.command())
                 output.use {
-                    org.desklink.mobile.helpers.LogExport.write(
+                    org.desklink.mobile.helpers.LogExport.export(
                         "DeskLink ${BuildConfig.VERSION_NAME}\nAndroid ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})",
                         InputStreamReader(process.inputStream, Charsets.UTF_8).buffered().lineSequence(), it,
                     )

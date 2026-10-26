@@ -434,6 +434,7 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         Log.i("PairingHandler", "Pairing done")
         state = PairState.Paired
         kotlin.runCatching {
+            org.desklink.mobile.helpers.AppLog.event("pairing", "paired ${org.desklink.mobile.helpers.AppLog.id(device.deviceId)}")
             callback.pairingSuccessful()
         }.onFailure { e ->
             Log.e("PairingHandler", "Exception in pairingSuccessful callback, unpairing", e)

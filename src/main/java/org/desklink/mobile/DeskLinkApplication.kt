@@ -117,6 +117,8 @@ class DeskLinkApplication : Application() {
         super.onCreate()
         _instance = this
         CrashReporter.install(this)
+        org.desklink.mobile.helpers.AppLog.init(this)
+        org.desklink.mobile.helpers.AppLog.event("app", "started ${BuildConfig.VERSION_NAME}")
         // "Stopped, tap to restart": a feature that threw is reloaded from its settings.
         org.desklink.mobile.helpers.Guarded.restart = {
             kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("restart")).launch {

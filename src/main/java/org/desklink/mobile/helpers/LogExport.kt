@@ -19,6 +19,10 @@ object LogExport {
     fun command(pid: Int = Process.myPid()): Array<String> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) arrayOf("logcat", "-d", "--pid=$pid") else arrayOf("logcat", "-d")
 
+    /** What "Export logs" writes: the app's own event log (all that a release build keeps), then [logcat] lines when there are any. */
+    fun export(header: String, logcat: Sequence<String>, output: java.io.OutputStream) =
+        write(header, AppLog.lines() + logcat, output)
+
     /** Writes the header and the redacted lines to [output]; throws if logcat could not be read. */
     fun write(header: String, lines: Sequence<String>, output: java.io.OutputStream) {
         output.write((header + "\n").toByteArray(Charsets.UTF_8))

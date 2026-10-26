@@ -318,6 +318,7 @@ class WebRtcFileTransferManager(
 
         override fun ended(sender: FileSender, outcome: FileSender.Outcome, message: String?) {
             val id = sender.transferId
+            org.desklink.mobile.helpers.AppLog.event("transfer", "send ${outcome.name.lowercase()}")
             val entry = sends[id] ?: return
             if (entry.sender !== sender) return
             sends.remove(id)
@@ -606,6 +607,7 @@ class WebRtcFileTransferManager(
         }
 
         override fun ended(receiver: FileReceiver, outcome: FileReceiver.Outcome, message: String?) {
+            org.desklink.mobile.helpers.AppLog.event("transfer", "receive ${outcome.name.lowercase()}")
             if (!folderOffers.containsKey(receiver.id)) {
                 val job = receiveJob(receiver.id)
                 when (outcome) {

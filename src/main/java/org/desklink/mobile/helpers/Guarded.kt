@@ -64,6 +64,7 @@ object Guarded {
     fun record(name: String, error: Throwable) {
         runCatching { Log.e(TAG, "$name failed: ${error.javaClass.name}: ${LogExport.redact(error.message.orEmpty())}") }
         _stopped.value = _stopped.value + name
+        AppLog.event("error", "$name ${error.javaClass.simpleName}")
         val now = clock()
         val last = lastReportAt[name]
         if (last != null && now - last in 0 until REPORT_EVERY_MS) return
