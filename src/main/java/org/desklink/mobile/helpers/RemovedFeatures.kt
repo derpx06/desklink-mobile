@@ -65,8 +65,8 @@ object RemovedFeatures {
     internal const val COMMANDS_PREFIX = "commands_preference_"
 
     /** The class the automation alarm was delivered to, and its action. */
-    private const val ALARM_RECEIVER = "org.desklink.mobile.plugins.automations.AutomationAlarms\$Receiver"
-    private const val ALARM_ACTION = "org.desklink.mobile.plugins.automations.TIME"
+    internal const val ALARM_RECEIVER = "org.desklink.mobile.plugins.automations.AutomationAlarms\$Receiver"
+    internal const val ALARM_ACTION = "org.desklink.mobile.plugins.automations.TIME"
 
     /** The preference keys among [all] that a removed feature wrote. */
     fun staleKeys(all: Collection<String>): List<String> = all.filter { it in KEYS || it.startsWith(COMMANDS_PREFIX) }
