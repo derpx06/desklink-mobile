@@ -137,6 +137,21 @@ object QrPairing {
     fun failureText(failure: Throwable, generic: String): String =
         failure.takeIf { it is IllegalStateException }?.message?.takeIf { it.isNotBlank() } ?: generic
 
+    /** One pairing attempt that the person can cancel: it stops dialling and waiting, takes back what it did, and reports nothing. */
+    class Attempt {
+        @Volatile
+        var cancelled = false
+            private set
+        internal var undo: (() -> Unit)? = null
+
+        fun cancel() {
+            cancelled = true
+            runCatching { undo?.invoke() }
+        }
+    }
+
+    private class Cancelled : Exception("cancelled")
+
     @JvmStatic
     fun pair(
         application: DeskLinkApplication,
@@ -144,15 +159,20 @@ object QrPairing {
         replaceExisting: Boolean,
         onProgress: (Stage) -> Unit = {},
         onResult: (String?) -> Unit,
-    ) {
+    ): Attempt {
+        val attempt = Attempt()
+        // Cancel after the proof went out: the negotiation is ended (pair:false), and a pairing that already completed is undone.
+        attempt.undo = { application.getDevice(code.desktopId)?.pairingHandler?.cancelPairing() }
         org.desklink.mobile.helpers.ThreadHelper.execute {
             // Any throwable is a failure, and what the person reads is one of our own sentences, never a raw exception.
-            val failure = runCatching { pairBlocking(application, code, replaceExisting, onProgress) }.exceptionOrNull()
+            val failure = runCatching { pairBlocking(application, code, replaceExisting, onProgress, attempt) }.exceptionOrNull()
+            if (attempt.cancelled) return@execute // the person walked away: no message, no navigation
             onResult(failure?.let { failureText(it, application.getString(R.string.qr_error_generic)) })
         }
+        return attempt
     }
 
-    private fun pairBlocking(application: DeskLinkApplication, code: Code, replaceExisting: Boolean, onProgress: (Stage) -> Unit) {
+    private fun pairBlocking(application: DeskLinkApplication, code: Code, replaceExisting: Boolean, onProgress: (Stage) -> Unit, attempt: Attempt) {
         pendingDesktopId = code.desktopId
         org.desklink.mobile.backends.lan.UnpairedLimits.shared.reserve(code.desktopId)
         try {
@@ -173,7 +193,7 @@ object QrPairing {
                 existing.unpair()
             }
             try {
-                connectAndProve(application, code, onProgress)
+                connectAndProve(application, code, onProgress, attempt)
             } catch (error: Throwable) {
                 backup?.let { it.restore(application); application.loadRememberedDevice(it.deviceId) }
                 throw error
@@ -183,7 +203,7 @@ object QrPairing {
         }
     }
 
-    private fun connectAndProve(application: DeskLinkApplication, code: Code, onProgress: (Stage) -> Unit) {
+    private fun connectAndProve(application: DeskLinkApplication, code: Code, onProgress: (Stage) -> Unit, attempt: Attempt) {
         run {
             onProgress(Stage.CONNECTING)
             // QR v2: dial the desk's addresses ourselves (pinned to the code's fingerprint below),
@@ -195,8 +215,9 @@ object QrPairing {
             code.host?.let { BackgroundService.instance?.sendIdentityTo(it) }
                 ?: BackgroundService.instance?.refreshDiscovery()
 
-            val device = waitForLink(application, code)
-                ?: error(application.getString(R.string.qr_error_not_reached))
+            val device = waitForLink(application, code, attempt)
+                ?: if (attempt.cancelled) throw Cancelled() else error(application.getString(R.string.qr_error_not_reached))
+            if (attempt.cancelled) throw Cancelled()
             val mac = proof(
                 code.secret,
                 code.desktopId,
@@ -207,6 +228,7 @@ object QrPairing {
             onProgress(Stage.VERIFYING)
             Log.i(TAG, "Sending QR pairing proof to ${code.desktopId}")
             device.pairingHandler.requestPairingWithProof(mac, device.certificate)
+            if (attempt.cancelled) device.pairingHandler.cancelPairing()
         }
     }
 
@@ -216,16 +238,21 @@ object QrPairing {
      * first under the desktop's public id is not fatal: keep waiting for the
      * real one until the deadline.
      */
-    private fun waitForLink(application: DeskLinkApplication, code: Code): Device? {
-        val deadline = SystemClock.elapsedRealtime() + LINK_WAIT_MS
-        while (SystemClock.elapsedRealtime() < deadline) {
+    private fun waitForLink(application: DeskLinkApplication, code: Code, attempt: Attempt): Device? =
+        waitFor(LINK_WAIT_MS, { attempt.cancelled }) {
             application.getDevice(code.desktopId)
                 ?.takeIf { device ->
                     device.hasLanLink &&
                         fingerprint(device.certificate).contentEquals(code.fingerprint)
                 }
-                ?.let { return it }
-            Thread.sleep(200)
+        }
+
+    /** Polls [probe] until it finds something, [waitMs] pass, or [cancelled] says stop (then null at once). */
+    internal fun <T : Any> waitFor(waitMs: Long, cancelled: () -> Boolean, pollMs: Long = 200, probe: () -> T?): T? {
+        val deadline = SystemClock.elapsedRealtime() + waitMs
+        while (SystemClock.elapsedRealtime() < deadline && !cancelled()) {
+            probe()?.let { return it }
+            Thread.sleep(pollMs)
         }
         return null
     }

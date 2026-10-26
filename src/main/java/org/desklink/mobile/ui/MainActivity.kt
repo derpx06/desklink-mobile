@@ -776,9 +776,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     /** A scanned code being paired: which desk, and how far (null stage: scanning). */
     private var qrProgress by mutableStateOf<Pair<String, QrPairing.Stage>?>(null)
 
+    private var qrAttempt: QrPairing.Attempt? = null
+
     private fun startQrPairing(code: QrPairing.Code, replaceExisting: Boolean) {
         qrProgress = code.desktopId to QrPairing.Stage.CONNECTING
-        QrPairing.pair(
+        qrAttempt = QrPairing.pair(
             DeskLinkApplication.getInstance(),
             code,
             replaceExisting,
@@ -859,7 +861,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             confirmButton = {},
             // A way out whatever stage it hangs at (it used to be a dialog nothing could dismiss).
             dismissButton = {
-                TextButton(onClick = { qrProgress = null; scanAttempt++ }) { Text(stringResource(R.string.cancel)) }
+                // Really cancels: the dial and the wait stop, a negotiation is ended, a pairing that completed meanwhile is undone.
+                TextButton(onClick = { qrAttempt?.cancel(); qrAttempt = null; qrProgress = null; scanAttempt++ }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

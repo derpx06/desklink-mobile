@@ -73,3 +73,23 @@ class QrPairingTest {
         assertEquals("Couldn't reach the computer.", QrPairing.failureText(IllegalStateException("Couldn't reach the computer."), generic))
     }
 }
+
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+class QrPairingCancelTest {
+    @org.junit.Test
+    fun cancellingStopsTheWaitAtOnce() {
+        val attempt = QrPairing.Attempt()
+        val started = System.nanoTime()
+        Thread { Thread.sleep(100); attempt.cancel() }.start()
+        val found = QrPairing.waitFor<Any>(60_000, { attempt.cancelled }, pollMs = 10) { null }
+        org.junit.Assert.assertNull(found)
+        org.junit.Assert.assertTrue("stopped long before the 60 s deadline", (System.nanoTime() - started) / 1_000_000 < 5_000)
+        org.junit.Assert.assertTrue(attempt.cancelled)
+    }
+
+    @org.junit.Test
+    fun aLinkFoundBeforeCancelIsReturned() {
+        val attempt = QrPairing.Attempt()
+        org.junit.Assert.assertEquals("link", QrPairing.waitFor(1_000, { attempt.cancelled }, pollMs = 5) { "link" })
+    }
+}
