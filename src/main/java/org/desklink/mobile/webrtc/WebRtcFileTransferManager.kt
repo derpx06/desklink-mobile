@@ -518,7 +518,7 @@ class WebRtcFileTransferManager(
             return
         }
         val receiver = FileReceiver(wire, store, link, clock, freeSpace, receiverListener, message) { task -> runner.post(Runnable(task)) }
-        if (ref != null) folderOffers[id] = ref
+        if (ref != null) { folderOffers[id] = ref; BucketEngine.receiveStarted(wire.peerDeviceId, ref.relpath) }
         if (message.clipboard == true && message.mimeType == org.desklink.mobile.plugins.clipboard.ClipboardImages.MIME &&
             totalSize <= org.desklink.mobile.plugins.clipboard.ClipboardImages.MAX_BYTES
         ) clipboardOffers.add(id)

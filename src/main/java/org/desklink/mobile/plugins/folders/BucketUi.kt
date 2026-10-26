@@ -603,10 +603,15 @@ class BucketUi(
                     val reasons = view.notSynced.groupBy { it.second }.map { (why, list) ->
                         stringResource(skipText(why), list.size) + ": " + list.take(3).joinToString(", ") { it.first.substringAfterLast('/') } + if (list.size > 3) "…" else ""
                     }
-                    Text(
-                        stringResource(R.string.bucket_not_synced, view.notSynced.size) + "\n" + reasons.joinToString("\n"),
-                        fontSize = 12.sp, lineHeight = 17.sp, color = t.textFaint, modifier = Modifier.padding(top = 8.dp),
-                    )
+                    Column {
+                        Text(
+                            stringResource(R.string.bucket_not_synced, view.notSynced.size) + "\n" + reasons.joinToString("\n"),
+                            fontSize = 12.sp, lineHeight = 17.sp, color = t.textFaint, modifier = Modifier.padding(top = 8.dp),
+                        )
+                        if (view.notSynced.any { it.second == Skip.COULDNT_FETCH }) {
+                            TextButton(onClick = { BucketEngine.retryGaveUp(deviceId) }) { Text(stringResource(R.string.bucket_retry_fetch)) }
+                        }
+                    }
                 }
             }
             below?.invoke(this)

@@ -26,6 +26,15 @@ class FetchTrackerTest {
     }
 
     @Test
+    fun aLiveReceiveOrAPausedSyncIsNeverJudgedSilent() {
+        val now = 10 * 60_000L
+        // The caller leaves out paths whose receive is live (or tracked); nothing quiet is left to judge for them.
+        val outstanding = listOf("live", "quiet")
+        val judged = FetchTracker.silent(outstanding - setOf("live"), mapOf("live" to 0L, "quiet" to 0L), emptyMap(), now)
+        assertEquals(listOf("quiet"), judged)
+    }
+
+    @Test
     fun aRequestNothingIsHeardOfForTwoMinutesIsLost() {
         val now = 10 * 60_000L
         val lost = FetchTracker.silent(
@@ -35,5 +44,20 @@ class FetchTrackerTest {
             now = now,
         )
         assertEquals(listOf("quiet"), lost)
+    }
+
+    @Test
+    fun aGiveUpSurvivesRescansUntilTheFileChangesOrRetry() {
+        val gaveUp = mutableMapOf("a.txt" to "h1")
+        // The same file is wanted again by the next scan: still given up.
+        assertEquals(setOf("a.txt"), FetchTracker.keepGivenUp(mapOf("a.txt" to "h1", "b.txt" to "h2"), gaveUp))
+        assertEquals(mapOf("a.txt" to "h1"), gaveUp)
+        // It changed on the computer: a new chance.
+        assertEquals(emptySet<String>(), FetchTracker.keepGivenUp(mapOf("a.txt" to "h9"), gaveUp))
+        assertEquals(emptyMap<String, String>(), gaveUp)
+        // No longer wanted at all (deleted, or already here): forgotten.
+        val other = mutableMapOf("c.txt" to "h3")
+        assertEquals(emptySet<String>(), FetchTracker.keepGivenUp(emptyMap(), other))
+        assertEquals(emptyMap<String, String>(), other)
     }
 }

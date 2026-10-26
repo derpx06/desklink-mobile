@@ -31,6 +31,16 @@ class FetchTracker {
         const val MAX_TRIES = 3
         const val BACKOFF_MS = 2_000L
 
+        /**
+         * A rescan wants [wanted] (path to content hash). Paths given up on whose content is unchanged stay given up (returned: not
+         * to be asked for); a path whose content changed gets a new chance; a path no longer wanted is forgotten.
+         */
+        fun keepGivenUp(wanted: Map<String, String>, gaveUp: MutableMap<String, String>): Set<String> {
+            gaveUp.entries.removeAll { (p, sha) -> wanted[p] != null && wanted[p] != sha }
+            gaveUp.keys.retainAll { wanted[it] == gaveUp[it] }
+            return gaveUp.keys.toSet()
+        }
+
         /** A request with no progress for this long is taken as lost. */
         const val SILENT_MS = 2 * 60_000L
 

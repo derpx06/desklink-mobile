@@ -827,4 +827,5 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="shortcut_send_clipboard_long">Send the clipboard to the computer</string>
     <string name="settings_bucket_with">Bucket with %1$s</string>
     <string name="settings_downloads_folder">Downloads folder</string>
+    <string name="bucket_retry_fetch">Try the files that could not be fetched again</string>
 </resources>

@@ -155,6 +155,12 @@ object BucketEngine {
         /** Asked for at (elapsedRealtime), and tries per path: an outstanding request that goes quiet is retried. */
         val requestedAt = HashMap<String, Long>()
         val fetches = FetchTracker()
+        /** Paths given up on after three failed fetches, with the content they were given up for: durable until the file changes or the person taps Retry. */
+        val gaveUp = HashMap<String, String>()
+        /** The entries of those paths (memory only), so Retry can ask for just them without a scan. */
+        val gaveUpEntries = HashMap<String, Entry>()
+        /** Paths whose receive is live in the transfer layer right now: never judged silent. */
+        val receiving = HashSet<String>()
         var userPaused = false
         /** Folders the desk holds. */
         var remoteDirs = emptySet<String>()
@@ -715,6 +721,13 @@ object BucketEngine {
         live.remoteClashes.clear()
         live.remoteClashes += clashing
         live.notSynced = live.notSynced.filterNot { it.second == Skip.CASE_CLASH && it.first in before } + clashing.sorted().map { it to Skip.CASE_CLASH }
+        // Given up on, and the file has not changed since: not asked for again by a rescan (only Retry does that). A changed file is
+        // a new chance; a path the plan no longer wants is forgotten.
+        val wasGivenUp = FetchTracker.keepGivenUp(downloads.associate { it.first to it.second.sha256 }, live.gaveUp)
+        live.gaveUpEntries.keys.retainAll(wasGivenUp)
+        downloads.removeAll { it.first in wasGivenUp }
+        synchronized(wanted) { wasGivenUp.forEach { wanted.remove(live.deviceId to it) } }
+        live.notSynced = live.notSynced.filterNot { it.second == Skip.COULDNT_FETCH } + live.gaveUp.keys.sorted().map { it to Skip.COULDNT_FETCH }
         live.toRequest.clear()
         live.toRequest.addAll(downloads.map { it.first })
         live.outstanding.clear()
@@ -766,14 +779,48 @@ object BucketEngine {
         }
     }
 
+    /** The transfer layer accepted a Bucket receive for [path] (it is live until it ends): not to be judged silent meanwhile. */
+    fun receiveStarted(deviceId: String, path: String) {
+        worker.execute { buckets[deviceId]?.receiving?.add(path) }
+    }
+
+    /**
+     * "Retry" on the files that could not be fetched: just those paths are asked for again (no tree scan) when their entries are
+     * known; otherwise the next scan finds them. Clears the durable give-up.
+     */
+    fun retryGaveUp(deviceId: String) {
+        worker.execute {
+            val live = buckets[deviceId] ?: return@execute
+            val paths = live.gaveUp.keys.toList()
+            paths.forEach { path ->
+                val entry = live.gaveUpEntries[path]
+                live.gaveUp.remove(path); live.gaveUpEntries.remove(path); live.fetches.forget(path)
+                live.notSynced = live.notSynced.filterNot { it.first == path && it.second == Skip.COULDNT_FETCH }
+                if (entry != null) {
+                    synchronized(wanted) { wanted[deviceId to path] = entry }
+                    live.toRequest.add(path)
+                } else {
+                    live.dirtyAt = SystemClock.elapsedRealtime()
+                }
+            }
+            requestMore(live)
+            save()
+            publish()
+        }
+    }
+
     private fun retryFetch(live: Live, path: String) {
         live.outstanding -= path
         live.requestedAt.remove(path)
+        live.receiving.remove(path)
         live.tracks.remove(path)
-        synchronized(wanted) { wanted.remove(live.deviceId to path) }
+        val entry = synchronized(wanted) { wanted.remove(live.deviceId to path) }
         when (val decision = live.fetches.failed(path)) {
-            FetchTracker.Decision.GiveUp ->
+            FetchTracker.Decision.GiveUp -> {
                 live.notSynced = live.notSynced.filter { it.first != path } + (path to Skip.COULDNT_FETCH)
+                if (entry != null) { live.gaveUp[path] = entry.sha256; live.gaveUpEntries[path] = entry }
+                save()
+            }
             is FetchTracker.Decision.Retry -> runCatching {
                 worker.schedule({ live.dirtyAt = SystemClock.elapsedRealtime() }, decision.afterMs, TimeUnit.MILLISECONDS)
             }
@@ -950,6 +997,8 @@ object BucketEngine {
         if (!entry.sha256.equals(sha256, true) || entry.size != size) return
         live.outstanding -= ref.relpath
         live.requestedAt.remove(ref.relpath)
+        live.receiving.remove(ref.relpath)
+        live.gaveUp.remove(ref.relpath); live.gaveUpEntries.remove(ref.relpath)
         live.fetches.succeeded(ref.relpath)
         finished(live, ref.relpath)
         live.storageFull = false
@@ -993,7 +1042,8 @@ object BucketEngine {
             val due = live.dirtyAt?.let { now - it >= SETTLE_MS } == true || live.scannedAt?.let { now - it >= every } != false
             if (due) { rescan(live); changed = true }
             // A request nothing has been heard of for two minutes is lost: freed and asked for again (or given up).
-            val quiet = FetchTracker.silent(live.outstanding, live.requestedAt, live.tracks.mapValues { it.value.at }, now)
+            // (Never while the person has paused the sync, and never for a receive that is live: the transfer layer has no deadline.)
+            val quiet = if (live.userPaused) emptyList() else FetchTracker.silent(live.outstanding - live.receiving - live.tracks.keys, live.requestedAt, live.tracks.mapValues { it.value.at }, now)
             if (quiet.isNotEmpty()) { quiet.forEach { retryFetch(live, it) }; changed = true }
             if (live.tracks.isNotEmpty() || live.outstanding.isNotEmpty() || live.sendActive.isNotEmpty()) changed = true
         }
@@ -1173,6 +1223,7 @@ object BucketEngine {
             live.lastSync = o.optLong("lastSync").takeIf { it > 0 }
             live.manifest = HashMap(entries(o.optJSONArray("entries") ?: JSONArray(), fromDesk = false).toMap())
             o.optJSONObject("from")?.let { f -> f.keys().forEach { k -> if (k in live.manifest) live.from[k] = if (f.optString(k) == "desk") Side.DESK else Side.PHONE } }
+            o.optJSONObject("gaveUp")?.let { g -> g.keys().asSequence().take(200).forEach { k -> live.gaveUp[k] = g.optString(k) } }
             o.optJSONArray("conflicts")?.let { c -> (0 until minOf(c.length(), 200)).forEach { live.conflicts += c.optString(it) } }
             buckets[deviceId] = live
             watch(live)
@@ -1185,6 +1236,7 @@ object BucketEngine {
                 put(JSONObject().put("deviceId", l.deviceId).put("treeUri", l.treeUri).put("computer", l.computer ?: "").put("lastSync", l.lastSync ?: 0)
                     .put("entries", JSONArray().apply { l.manifest.forEach { (p, e) -> put(entryJson(p, e)) } })
                     .put("from", JSONObject().apply { l.from.forEach { (p, s) -> put(p, if (s == Side.DESK) "desk" else "phone") } })
+                    .put("gaveUp", JSONObject().apply { l.gaveUp.forEach { (p, sha) -> put(p, sha) } })
                     .put("conflicts", JSONArray(l.conflicts.toList())))
             }
         })
