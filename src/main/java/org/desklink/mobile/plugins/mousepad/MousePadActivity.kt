@@ -145,6 +145,8 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The computer's screen is on this window: no screenshot, recording or recents thumbnail of it by another app.
+        org.desklink.mobile.ui.compose.SecureWindows.enter(this)
         deviceId = intent.getStringExtra("deviceId")
         displayDpiMultiplier = STANDARD_DPI / resources.displayMetrics.xdpi
         statusText = getString(R.string.remote_screen_requesting)
@@ -224,6 +226,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     override fun onDestroy() {
         backgroundHandler.removeCallbacks(endInBackground)
         prefs.unregisterOnSharedPreferenceChangeListener(this)
+        org.desklink.mobile.ui.compose.SecureWindows.leave(this)
         if (isFinishing && !isChangingConfigurations) {
             sendStopScreen()
             SessionLiveNotification.refresh(this, deviceId)

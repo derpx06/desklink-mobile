@@ -2,6 +2,7 @@
 
 ## 1.3.0
 
+- Needs Android 7.0 (API 24) or newer; Android 6.0 is no longer supported.
 - Connection: comes back by itself after sleep, a network change or a restart; says clearly when it cannot.
 - The Bucket: one folder kept in step with the computer, two folders deep, with progress and resume; a failed
   listing is never read as "everything was deleted"; names that differ only in capitals are not synced.

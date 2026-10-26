@@ -174,6 +174,6 @@ Decisions that are the owner's, with the facts:
   them. Real-phone check V14 in the workspace list covers it if you want to try.
 - **Unused dependencies** (done in 1.3): rxjava, reactive-streams, swiperefreshlayout, gridlayout and lifecycle-extensions had no users
   and were removed; `lifecycle-process` (for `ProcessLifecycleOwner`) is declared directly.
-- **minSdk 23 and API 24 calls.** Lint finds calls newer than API 23 (about 20 `NewApi` entries in `lint-baseline.xml`, the
-  baseline the build now fails against for anything new). Options: raise `minSdk` to 24 (drops Android 6.0, under 1% of devices,
-  and lets the baseline shrink) or guard each call with `Build.VERSION.SDK_INT`. Not changed: it is the owner's call.
+- **minSdk 24 (decided for 1.3).** Android 7.0 is the minimum: it drops Android 6.0 (well under 1% of devices), removes the API-24
+  `NewApi` lint errors and the guards they asked for, and Termux's terminal libraries already declared 24. The 20 moot entries
+  were deleted from `lint-baseline.xml`; the build still fails on any new lint error.

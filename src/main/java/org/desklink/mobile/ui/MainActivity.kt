@@ -287,6 +287,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     override fun onStart() {
         super.onStart()
+        org.desklink.mobile.helpers.CrashLoop.clear(this)
         BackgroundService.Start(applicationContext)
     }
 

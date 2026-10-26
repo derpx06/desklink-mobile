@@ -34,7 +34,7 @@ android {
     compileSdk = 37
     defaultConfig {
         applicationId = "org.desklink.mobile"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 36
         // 1.3.0: versionCode is 20000 + minor * 100 + patch (the first build was numbered 2.0.0 / 20000, so the number only goes up).
         versionCode = 20300

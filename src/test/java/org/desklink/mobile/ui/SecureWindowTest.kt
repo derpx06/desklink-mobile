@@ -29,4 +29,11 @@ class SecureWindowTest {
         assertFalse(secure(activity))
         assertEquals(0, SecureWindows.count(activity))
     }
+
+    @Test
+    fun theDeskScreenAndTheBucketAreSecureScreens() {
+        fun source(path: String) = listOf(java.io.File(path), java.io.File("desklink-mobile/$path")).first { it.exists() }.readText()
+        assertTrue(source("src/main/java/org/desklink/mobile/plugins/mousepad/MousePadActivity.kt").contains("SecureWindows.enter(this)"))
+        assertTrue(source("src/main/java/org/desklink/mobile/plugins/folders/BucketActivity.kt").contains("SecureWindow()"))
+    }
 }

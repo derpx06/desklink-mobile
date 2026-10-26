@@ -195,225 +195,25 @@
             file="src/main/res/values-id"/>
     </issue>
 
-    <issue
-        id="NewApi"
-        message="`&lt;org.desklink.mobile.plugins.clipboard.ClipboardTileService>` requires API level 24 (current min is 23)"
-        errorLine1="        &lt;service"
-        errorLine2="        ^">
-        <location
-            file="src/main/AndroidManifest.xml"
-            line="431"
-            column="9"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Class requires API level 24 (current min is 23): `ClipboardTileService`"
-        errorLine1="        return tile?.className == org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java.name"
-        errorLine2="                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/ui/MainActivity.kt"
-            line="240"
-            column="35"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `android.accessibilityservice.AccessibilityService#dispatchGesture`"
-        errorLine1="        dispatchGesture(new GestureDescription.Builder()"
-        errorLine2="        ~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
-            line="348"
-            column="9"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `new android.accessibilityservice.GestureDescription.Builder`"
-        errorLine1="        dispatchGesture(new GestureDescription.Builder()"
-        errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
-            line="348"
-            column="25"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `android.accessibilityservice.GestureDescription.Builder#addStroke`"
-        errorLine1="                .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))"
-        errorLine2="                 ~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
-            line="349"
-            column="18"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `new android.accessibilityservice.GestureDescription.StrokeDescription`"
-        errorLine1="                .addStroke(new GestureDescription.StrokeDescription(path, 0, duration))"
-        errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
-            line="349"
-            column="28"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `android.accessibilityservice.GestureDescription.Builder#build`"
-        errorLine1="                .build(), null, null);"
-        errorLine2="                 ~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/plugins/mousereceiver/MouseReceiverService.java"
-            line="350"
-            column="18"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `android.content.Context#deleteSharedPreferences`"
-        errorLine1="                app.deleteSharedPreferences(name)"
-        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/helpers/RemovedFeatures.kt"
-            line="105"
-            column="21"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture()`"
-        errorLine1="        val completion = CompletableFuture&lt;Boolean>()"
-        errorLine2="                         ~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
-            line="197"
-            column="26"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#get`"
-        errorLine1="                return completion.get(250, TimeUnit.MILLISECONDS)"
-        errorLine2="                                  ~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
-            line="225"
-            column="35"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
-        errorLine1="                    entry.completion.complete(true)"
-        errorLine2="                                     ~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
-            line="324"
-            column="38"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
-        errorLine1="                    entry.completion.complete(false)"
-        errorLine2="                                     ~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
-            line="329"
-            column="38"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
-        errorLine1="                        entry.completion.complete(false)"
-        errorLine2="                                         ~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
-            line="348"
-            column="42"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
-        errorLine1="                        entry.completion.complete(false)"
-        errorLine2="                                         ~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
-            line="357"
-            column="42"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
-        errorLine1="                    entry.completion.complete(false)"
-        errorLine2="                                     ~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
-            line="371"
-            column="38"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture()`"
-        errorLine1="            val entry = SendEntry(sender, callback, CompletableFuture(), null)"
-        errorLine2="                                                    ~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt"
-            line="807"
-            column="53"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture()`"
-        errorLine1="            val completion = CompletableFuture&lt;Unit>()"
-        errorLine2="                             ~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
-            line="2038"
-            column="30"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#complete`"
-        errorLine1="                        completion.complete(Unit)"
-        errorLine2="                                   ~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
-            line="2046"
-            column="36"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#completeExceptionally`"
-        errorLine1="                        completion.completeExceptionally(error)"
-        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
-            line="2050"
-            column="36"/>
-    </issue>
 
-    <issue
-        id="NewApi"
-        message="Call requires API level 24 (current min is 23): `java.util.concurrent.CompletableFuture#get`"
-        errorLine1="                completion.get(10, TimeUnit.SECONDS)"
-        errorLine2="                           ~~~">
-        <location
-            file="src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt"
-            line="2055"
-            column="28"/>
-    </issue>
 
     <issue
         id="OldTargetApi"

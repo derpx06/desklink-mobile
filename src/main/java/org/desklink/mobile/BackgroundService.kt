@@ -561,6 +561,16 @@ class BackgroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(LOG_TAG, "onStartCommand")
+        if (org.desklink.mobile.helpers.CrashLoop.safeMode(this)) {
+            // Three crashes in two minutes: do not start the features again by ourselves. The report is offered; opening the app
+            // is the person's own start and clears this.
+            Log.w(LOG_TAG, "Safe mode after repeated crashes: the service stays down")
+            runCatching { org.desklink.mobile.helpers.CrashReporter.offerPendingReport(this) }
+            startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
