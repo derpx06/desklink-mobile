@@ -729,6 +729,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         var camera by androidx.compose.runtime.remember { mutableStateOf(granted) }
         val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
             camera = ok
+            org.desklink.mobile.helpers.PermissionRecovery.onResult(this, ok)
             if (!ok) showMessage(getString(R.string.scan_camera_denied))
         }
         LaunchedEffect(Unit) {
@@ -1238,6 +1239,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        org.desklink.mobile.helpers.PermissionRecovery.onResult(this, ArrayUtils.contains(grantResults, PackageManager.PERMISSION_GRANTED))
         if (!ArrayUtils.contains(grantResults, PackageManager.PERMISSION_GRANTED)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isPermissionGranted(permissions, grantResults, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
             // Android 10+ needs a writable folder chosen by hand for received files.

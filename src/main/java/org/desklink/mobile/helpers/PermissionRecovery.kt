@@ -24,6 +24,30 @@ object PermissionRecovery {
     /** Pure: the system will not ask again when we asked before and it offers no rationale. */
     fun mustOpenSettings(askedBefore: Boolean, showsRationale: Boolean): Boolean = askedBefore && !showsRationale
 
+    @Volatile private var launchedAt = 0L
+
+    /** Pure: an answer that comes back this fast with nothing granted was not asked of the person: the system had already said no for good. */
+    fun systemDidNotAsk(elapsedMs: Long, anyGranted: Boolean): Boolean = !anyGranted && elapsedMs in 0..FAST_ANSWER_MS
+
+    const val FAST_ANSWER_MS = 350L
+
+    /**
+     * Call with the result of a request made through [requestOrExplain]. If the system gave its "no" without asking (it remembered
+     * one from before this app knew, e.g. after the app's data was cleared), the app's permission page opens now, not on the next tap.
+     */
+    fun onResult(context: Context, anyGranted: Boolean, now: Long = android.os.SystemClock.elapsedRealtime()) {
+        val started = launchedAt
+        launchedAt = 0L
+        if (started != 0L && systemDidNotAsk(now - started, anyGranted)) openSettings(context)
+    }
+
+    fun openSettings(context: Context) {
+        Toast.makeText(context, R.string.permission_blocked_hint, Toast.LENGTH_LONG).show()
+        runCatching {
+            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
     fun markAsked(context: Context, permissions: Collection<String>) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { permissions.forEach { putBoolean(it, true) } }
 
@@ -53,13 +77,11 @@ object PermissionRecovery {
      */
     fun requestOrExplain(context: Context, permissions: Array<String>, launch: (Array<String>) -> Unit): Boolean {
         if (blocked(context, permissions.toList()).isNotEmpty()) {
-            Toast.makeText(context, R.string.permission_blocked_hint, Toast.LENGTH_LONG).show()
-            runCatching {
-                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }
+            openSettings(context)
             return false
         }
         markAsked(context, permissions.toList())
+        launchedAt = android.os.SystemClock.elapsedRealtime()
         launch(permissions)
         return true
     }

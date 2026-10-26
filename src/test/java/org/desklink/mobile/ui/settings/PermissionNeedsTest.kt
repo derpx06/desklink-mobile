@@ -41,4 +41,11 @@ class PermissionNeedsTest {
         assertFalse("denied once: Android still asks", PermissionRecovery.mustOpenSettings(askedBefore = true, showsRationale = true))
         assertEquals(emptyList<String>(), PermissionRecovery.blocked(app, listOf("android.permission.CAMERA")))
     }
+
+    @Test
+    fun anAnswerThatCameBackBeforeAnyoneCouldReadADialogMeansTheSystemDidNotAsk() {
+        assertTrue(PermissionRecovery.systemDidNotAsk(elapsedMs = 80, anyGranted = false))
+        assertFalse("a person took a second to answer", PermissionRecovery.systemDidNotAsk(elapsedMs = 1_500, anyGranted = false))
+        assertFalse("granted is granted", PermissionRecovery.systemDidNotAsk(elapsedMs = 80, anyGranted = true))
+    }
 }

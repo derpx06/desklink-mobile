@@ -364,6 +364,7 @@ internal fun PermissionsSection(desk: DeskSettings?) {
     }
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         asked++
+        org.desklink.mobile.helpers.PermissionRecovery.onResult(context, result.values.any { it })
         if (result.values.any { it }) {
             // Plugins that waited for the permission (Share, Find my phone…) load now.
             CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
