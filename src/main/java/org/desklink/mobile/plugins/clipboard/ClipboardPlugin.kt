@@ -42,7 +42,7 @@ class ClipboardPlugin : Plugin() {
             (PACKET_TYPE_CLIPBOARD_CONNECT) -> {
                 val packetTime = np.getLong("timestamp")
                 // If the packetTime is 0, it means the timestamp is unknown (so do nothing).
-                if (packetTime == 0L || packetTime < ClipboardListener.instance(context).updateTimestamp) {
+                if (packetTime == 0L || packetTime < maxOf(ClipboardListener.instance(context).updateTimestamp, ClipboardListener.instance(context).copiedAt)) {
                     return false
                 }
                 if ("content" in np) { // change clipboard if content is in NetworkPacket
@@ -62,7 +62,10 @@ class ClipboardPlugin : Plugin() {
         override fun clipboardImage(png: ByteArray) {
             val name = device.name
             device.sendPacket(ClipboardImages.packet(png), object : Device.SendPacketStatusCallback() {
-                override fun onSuccess() { Log.i(TAG, "clipboard: image sent to $name") }
+                override fun onSuccess() {
+                    Log.i(TAG, "clipboard: image sent to $name")
+                    ClipboardStatus.sent(context, device.deviceId)
+                }
                 override fun onFailure(e: Throwable) { Log.w(TAG, "clipboard: image not sent to $name (${e.javaClass.simpleName})") }
             })
         }
@@ -78,7 +81,10 @@ class ClipboardPlugin : Plugin() {
         np["content"] = content
         val name = device.name
         device.sendPacket(np, object : Device.SendPacketStatusCallback() {
-            override fun onSuccess() { Log.i(TAG, "clipboard: sent to $name") }
+            override fun onSuccess() {
+                Log.i(TAG, "clipboard: sent to $name")
+                ClipboardStatus.sent(context, device.deviceId)
+            }
             override fun onFailure(e: Throwable) { Log.w(TAG, "clipboard: not sent to $name (${e.javaClass.simpleName})") }
         })
     }

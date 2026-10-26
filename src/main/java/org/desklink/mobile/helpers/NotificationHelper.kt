@@ -39,6 +39,7 @@ object NotificationHelper {
             // Registered here, not lazily by the terminal code: the delete below would remove it at every start.
             channel(Channels.TERMINAL_ATTENTION, NotificationManagerCompat.IMPORTANCE_HIGH, R.string.terminal_attention_channel),
             channel(Channels.DIAGNOSTICS, NotificationManagerCompat.IMPORTANCE_LOW, R.string.channel_diagnostics),
+            channel(Channels.CLIPBOARD, NotificationManagerCompat.IMPORTANCE_LOW, R.string.channel_clipboard, quiet = true),
         )
 
         val nm = NotificationManagerCompat.from(context)
@@ -58,7 +59,7 @@ object NotificationHelper {
     internal val ALL_CHANNEL_IDS = listOf(
         Channels.PERSISTENT, Channels.PAIRING, Channels.REQUESTS, Channels.CALLS, Channels.FIND_PHONE, Channels.MEDIA_CONTROL,
         Channels.FILETRANSFER_DOWNLOAD, Channels.FILETRANSFER_COMPLETE, Channels.FILETRANSFER_UPLOAD, Channels.FILETRANSFER_ERROR,
-        Channels.BUCKET, Channels.CONTINUEWATCHING, Channels.TERMINAL_ATTENTION, Channels.DIAGNOSTICS,
+        Channels.BUCKET, Channels.CONTINUEWATCHING, Channels.TERMINAL_ATTENTION, Channels.DIAGNOSTICS, Channels.CLIPBOARD,
     )
 
     /** A channel no current code creates: safe to delete. */
@@ -90,6 +91,7 @@ object NotificationHelper {
         const val FIND_PHONE: String = "find_phone"
         const val BUCKET: String = "bucket"
         const val DIAGNOSTICS: String = "diagnostics"
+        const val CLIPBOARD: String = "clipboard_offer"
         const val MEDIA_CONTROL: String = "media_control"
 
         const val FILETRANSFER_DOWNLOAD: String = "filetransfer"

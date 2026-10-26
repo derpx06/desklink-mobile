@@ -4,4 +4,16 @@
         <data android:mimeType="*/*" />
         <category android:name="org.desklink.mobile.category.SHARE_TARGET" />
     </share-target>
+    <!-- Long-press the app icon: send what is on the clipboard now (the activity has focus, so Android lets it read). -->
+    <shortcut
+        android:shortcutId="send_clipboard"
+        android:enabled="true"
+        android:icon="@drawable/sym_content_paste"
+        android:shortcutShortLabel="@string/shortcut_send_clipboard"
+        android:shortcutLongLabel="@string/shortcut_send_clipboard_long">
+        <intent
+            android:action="org.desklink.mobile.action.SEND_CLIPBOARD"
+            android:targetPackage="org.desklink.mobile"
+            android:targetClass="org.desklink.mobile.plugins.clipboard.ClipboardFloatingActivity" />
+    </shortcut>
 </shortcuts>

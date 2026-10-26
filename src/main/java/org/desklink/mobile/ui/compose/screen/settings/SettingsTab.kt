@@ -403,11 +403,37 @@ private fun ClipboardGroup(desk: DeskSettings?, actions: SettingsActions, prefs:
             onClick = { actions.onPhoneClipboard(!desk.clipboardOn) },
         )
         if (desk.clipboardOn && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Why the phone's copies need a tap on Android 10+, what to do about it, and what happened last.
+            val context = LocalContext.current
+            var offer by remember { mutableStateOf(org.desklink.mobile.plugins.clipboard.ClipboardOffer.enabled(context, desk.id)) }
+            GroupRow(
+                stringResource(R.string.settings_clipboard_offer, desk.name),
+                icon = R.drawable.sym_notifications,
+                subtitle = stringResource(R.string.settings_clipboard_offer_summary),
+                checked = offer,
+                onClick = { offer = !offer; org.desklink.mobile.plugins.clipboard.ClipboardOffer.setEnabled(context, desk.id, offer) },
+            )
+            GroupRow(clipboardStatus(desk), icon = R.drawable.sym_info)
             ClipboardAutoSyncRows(desk.name, prefs, actions.onMessage, changed)
         }
         DeskSwitch(desk, actions, DeskSettingsPlugin.CLIPBOARD, stringResource(R.string.settings_desk_clipboard, desk.name), R.drawable.sym_content_paste, stringResource(R.string.settings_desk_clipboard_summary, desk.name), desk.remote?.clipboard == true)
         if (desk.clipboardOn) {
             GroupRow(stringResource(R.string.home_send_clipboard, desk.name), icon = R.drawable.sym_upload, onClick = actions.onSendClipboard) { Chevron() }
+        }
+    }
+}
+
+/** One line: when the phone's clipboard last reached the computer, or why it would not. */
+@Composable
+private fun clipboardStatus(desk: DeskSettings): String {
+    val context = LocalContext.current
+    return when (org.desklink.mobile.plugins.clipboard.ClipboardStatus.why(desk.clipboardOn, desk.ready)) {
+        org.desklink.mobile.plugins.clipboard.ClipboardStatus.Why.SHARING_OFF -> stringResource(R.string.settings_clipboard_status_off, desk.name)
+        org.desklink.mobile.plugins.clipboard.ClipboardStatus.Why.NOT_CONNECTED -> stringResource(R.string.settings_clipboard_status_offline, desk.name)
+        org.desklink.mobile.plugins.clipboard.ClipboardStatus.Why.OK -> {
+            val at = org.desklink.mobile.plugins.clipboard.ClipboardStatus.lastSent(context, desk.id)
+            if (at == 0L) stringResource(R.string.settings_clipboard_status_never)
+            else stringResource(R.string.settings_clipboard_status_last, android.text.format.DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS))
         }
     }
 }

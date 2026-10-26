@@ -56,6 +56,7 @@ public class ClipboardFloatingActivity extends AppCompatActivity {
             // widget) sends whatever is there; the automatic path sends only a new copy.
             boolean asked = shouldShowToast();
             boolean sent = ClipboardListener.instance(this).sync(asked);
+            ClipboardOffer.INSTANCE.cancel(this);
             if (asked) {
                 Toast.makeText(this, sent ? R.string.pref_plugin_clipboard_sent : R.string.clipboard_nothing_sent, Toast.LENGTH_SHORT).show();
             }
@@ -75,8 +76,11 @@ public class ClipboardFloatingActivity extends AppCompatActivity {
         getWindow().setAttributes(wlp);
     }
 
+    /** The static shortcut starts this with the action; the tile, widget and notification button with the extra. */
+    static final String ACTION_SEND_CLIPBOARD = "org.desklink.mobile.action.SEND_CLIPBOARD";
+
     private boolean shouldShowToast() {
-        return getIntent().getBooleanExtra(KEY_SHOW_TOAST, false);
+        return getIntent().getBooleanExtra(KEY_SHOW_TOAST, false) || ACTION_SEND_CLIPBOARD.equals(getIntent().getAction());
     }
 }
 

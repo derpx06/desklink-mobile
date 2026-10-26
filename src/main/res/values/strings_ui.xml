@@ -814,4 +814,15 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     </plurals>
     <string name="settings_turn_on_at">Turn on at %1$s</string>
     <string name="bucket_skip_fetch">Couldn\'t fetch</string>
+    <string name="clipboard_offer_title">Copied something</string>
+    <string name="clipboard_offer_action">Send to %1$s</string>
+    <string name="settings_clipboard_offer">Offer to send copied text to %1$s</string>
+    <string name="settings_clipboard_offer_summary">Android only lets an app read the clipboard while it is on screen. To avoid that, DeskLink shows a Send button when you copy something. Nothing is read or sent until you tap it.</string>
+    <string name="settings_clipboard_status_never">Nothing sent yet</string>
+    <string name="settings_clipboard_status_last">Last sent %1$s</string>
+    <string name="settings_clipboard_status_off">Not sending: clipboard sharing is off for %1$s</string>
+    <string name="settings_clipboard_status_offline">Not sending: %1$s is not connected</string>
+    <string name="clipboard_many_computers">your computers</string>
+    <string name="shortcut_send_clipboard">Send clipboard</string>
+    <string name="shortcut_send_clipboard_long">Send the clipboard to the computer</string>
 </resources>

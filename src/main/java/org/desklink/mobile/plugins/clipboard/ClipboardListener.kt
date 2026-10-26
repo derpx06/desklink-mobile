@@ -66,19 +66,57 @@ class ClipboardListener private constructor(ctx: Context) {
     @Volatile var updateTimestamp: Long = 0
         private set
 
+    /** When something was last copied on this phone, read or not (a background copy cannot be read, but it is newer than the desk's). */
+    @Volatile var copiedAt: Long = 0
+        private set
+
+    /** The newest time this phone holds a copy of its own. */
+    fun newestLocalCopy(): Long = maxOf(updateTimestamp, copiedAt)
+
     /** The system's stamp of the last clip looked at, so a refocus reads (and toasts) only new copies. */
     private var lastClipStamp = 0L
     /** When the desk's copy last landed here: the system's denial of our own write is not a phone copy. */
     @Volatile private var remoteSetAt = 0L
     private var lastAutoRead = 0L
+    private var lastSyncAt = 0L
+    private var pacedSync = false
     private var logcat: Process? = null
 
     init {
-        main.post { cm.addPrimaryClipChangedListener { sync(force = false) } }
+        main.post { cm.addPrimaryClipChangedListener { onPrimaryClipChanged() } }
         // Deliberately no automatic-sync start here: running logcat is what makes Android 13+ ask "Allow
         // DeskLink to access all device logs?", and that question belongs to the person turning the
         // setting on, never to a cold start.
     }
+
+    /** Something was copied (the system says THAT, not what). In front: read and sync now. Behind: only an offer, never a read. */
+    @MainThread
+    private fun onPrimaryClipChanged() {
+        // Something was copied here (we may not be allowed to read it): the computer's older copy must not overwrite it on reconnect.
+        if (remoteSetAt == 0L || SystemClock.elapsedRealtime() - remoteSetAt >= 2_000) copiedAt = System.currentTimeMillis()
+        val inFront = runCatching {
+            androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+        }.getOrDefault(false)
+        if (inFront) {
+            ClipboardOffer.cancel(context)
+            sync(force = false)
+            return
+        }
+        val description = try { cm.primaryClipDescription } catch (_: Exception) { null }
+        val own = remoteSetAt != 0L && SystemClock.elapsedRealtime() - remoteSetAt < 2_000
+        val names = offerTargets()
+        if (ClipboardOffer.shouldOffer(false, own, description != null && isSensitive(description), names.size, watching)) {
+            ClipboardOffer.show(context, ClipboardOffer.target(names, context.getString(org.desklink.mobile.R.string.clipboard_many_computers)))
+        }
+    }
+
+    /** Names of the computers that have clipboard sharing on and want the offer. */
+    private fun offerTargets(): List<String> = runCatching {
+        val key = org.desklink.mobile.plugins.Plugin.getPluginKey(ClipboardPlugin::class.java)
+        org.desklink.mobile.DeskLinkApplication.getInstance().devices.values
+            .filter { it.isPaired && it.isPluginEnabled(key) && ClipboardOffer.enabled(context, it.deviceId) }
+            .map { it.name }
+    }.getOrDefault(emptyList())
 
     fun registerObserver(observer: ClipboardObserver) {
         observers.add(observer)
@@ -121,6 +159,15 @@ class ClipboardListener private constructor(ctx: Context) {
             if (force) Log.i(TAG, "clipboard: no desk has clipboard sync on")
             return false
         }
+        // At most one send in 500 ms: a burst of copies (a selection being adjusted) goes out once, the last, a moment later.
+        if (!force) {
+            val wait = SendPacing.waitMs(lastSyncAt, SystemClock.elapsedRealtime())
+            if (wait > 0) {
+                if (!pacedSync) { pacedSync = true; main.postDelayed({ pacedSync = false; sync(force = false) }, wait) }
+                return false
+            }
+        }
+        lastSyncAt = SystemClock.elapsedRealtime()
         val description = try { cm.primaryClipDescription } catch (_: Exception) { null } ?: return false
         val stamp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) description.timestamp else 0L
         if (!force && stamp != 0L && stamp == lastClipStamp) return false
@@ -132,7 +179,10 @@ class ClipboardListener private constructor(ctx: Context) {
         val content = readNow() ?: return false
         if (!force && content == previous) return false
         Log.i(TAG, "clipboard: ${content.length} chars to ${observers.size} desk(s) (${if (force) "asked" else "new copy"})")
-        observers.forEach { it.clipboardChanged(content) }
+        ClipboardOffer.cancel(context)
+        val targets = observers.toList()
+        // Off the main thread: sizing and queueing a megabyte of text is not the UI's work.
+        execute { targets.forEach { it.clipboardChanged(content) } }
         return true
     }
 
@@ -145,6 +195,7 @@ class ClipboardListener private constructor(ctx: Context) {
         currentContent = key
         updateTimestamp = System.currentTimeMillis()
         val targets = observers.toList()
+        ClipboardOffer.cancel(context)
         Log.i(TAG, "clipboard: image to ${targets.size} desk(s) (${if (force) "asked" else "new copy"})")
         execute {
             val png = ClipboardImages.encodePng(context, uri) ?: return@execute
@@ -249,6 +300,18 @@ class ClipboardListener private constructor(ctx: Context) {
         runCatching { wm.addView(view, params) }.onFailure { return }
         // Focus never came: do not leave a window behind.
         main.postDelayed({ if (!view.done) { view.done = true; runCatching { wm.removeView(view) } } }, 1_500)
+    }
+
+    @VisibleForTesting
+    fun clipChangedForTest() = onPrimaryClipChanged()
+
+    @VisibleForTesting
+    fun resetPacing() { lastSyncAt = 0L; pacedSync = false }
+
+    /** The 500 ms pacing, pure for the test. */
+    object SendPacing {
+        const val MIN_GAP_MS = 500L
+        fun waitMs(lastAt: Long, now: Long): Long = if (lastAt == 0L) 0L else (MIN_GAP_MS - (now - lastAt)).coerceIn(0L, MIN_GAP_MS)
     }
 
     companion object {

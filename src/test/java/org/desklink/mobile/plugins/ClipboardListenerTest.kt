@@ -19,7 +19,13 @@ import org.robolectric.shadows.ShadowLooper
 class ClipboardListenerTest {
     private lateinit var context: Application
     private lateinit var listener: ClipboardListener
-    private val sent = mutableListOf<String>()
+    private val sent = java.util.concurrent.CopyOnWriteArrayList<String>()
+
+    /** The fan-out to the desks runs off the main thread: wait for it. */
+    private fun awaitSent(count: Int) {
+        val end = System.currentTimeMillis() + 5_000
+        while (sent.size < count && System.currentTimeMillis() < end) Thread.sleep(5)
+    }
     private val observer = object : ClipboardListener.ClipboardObserver {
         override fun clipboardChanged(content: String) { sent += content }
     }
@@ -28,6 +34,7 @@ class ClipboardListenerTest {
     fun setup() {
         context = ApplicationProvider.getApplicationContext()
         listener = ClipboardListener.instance(context)
+        listener.resetPacing()
         listener.registerObserver(observer)
         ShadowLooper.idleMainLooper()
     }
@@ -45,6 +52,7 @@ class ClipboardListenerTest {
     @Test
     fun aPhoneCopyGoesOutOnce() {
         copyElsewhere("from the phone")
+        awaitSent(1)
         assertEquals(listOf("from the phone"), sent)
         // Refocusing DeskLink with the same copy sends nothing more.
         assertFalse(listener.sync(force = false))
@@ -66,6 +74,7 @@ class ClipboardListenerTest {
         listener.setText("from the desk")
         ShadowLooper.idleMainLooper()
         assertTrue(listener.sync(force = true))
+        awaitSent(1)
         assertEquals(listOf("from the desk"), sent)
     }
 
@@ -88,5 +97,15 @@ class ClipboardListenerTest {
         assertFalse("without the grant nothing runs and nothing is asked", ClipboardListener.shouldWatch(34, readLogsGranted = false, requestedByPerson = true))
         assertFalse("below Android 10 there is nothing to watch", ClipboardListener.shouldWatch(q - 1, readLogsGranted = true, requestedByPerson = true))
         assertFalse("a new listener is not watching", listener.watching)
+    }
+
+    @Test
+    fun aCopyTheListenerCouldNotReadStillProtectsItFromTheDesksOlderCopy() {
+        val before = listener.newestLocalCopy()
+        Thread.sleep(5)
+        context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("other app", "copied in the background"))
+        ShadowLooper.idleMainLooper()
+        listener.clipChangedForTest() // the system's change callback
+        assertTrue("a copy newer than the desk's reconnect packet wins", listener.newestLocalCopy() > before)
     }
 }
