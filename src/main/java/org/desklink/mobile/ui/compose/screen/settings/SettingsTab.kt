@@ -252,6 +252,10 @@ private fun ConnectionGroup(desk: DeskSettings?, actions: SettingsActions, prefs
             checked = prefs.getBoolean(KEY_CONNECT_ON_STARTUP, true),
             onClick = { prefs.edit { putBoolean(KEY_CONNECT_ON_STARTUP, !prefs.getBoolean(KEY_CONNECT_ON_STARTUP, true)) }; changed() },
         )
+        // Where the computer has it too (Connection): ask it to stay awake while this phone is connected, if it allows that.
+        if (desk != null) {
+            DeskSwitch(desk, actions, DeskSettingsPlugin.KEEP_AWAKE, stringResource(R.string.settings_keep_awake, desk.name), R.drawable.sym_coffee, stringResource(R.string.settings_keep_awake_summary), desk.remote?.keepAwake == true, notAllowedHere = !DeskSettingsPlugin.keepAwakeUsable(desk.remote))
+        }
     }
     RowGroup {
         desk?.let {
@@ -569,10 +573,6 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
             onClick = { prefs.edit { putBoolean(scrollKey, !prefs.getBoolean(scrollKey, false)) }; changed() },
         )
     }
-    SectionLabel(desk.name)
-    RowGroup {
-        DeskSwitch(desk, actions, DeskSettingsPlugin.KEEP_AWAKE, stringResource(R.string.settings_keep_awake, desk.name), R.drawable.sym_coffee, stringResource(R.string.settings_keep_awake_summary), desk.remote?.keepAwake == true, notAllowedHere = !DeskSettingsPlugin.keepAwakeUsable(desk.remote))
-    }
     if (choosingSpeed) {
         ChoiceDialog(
             title = stringResource(R.string.mousepad_sensitivity_settings_title),
@@ -600,10 +600,10 @@ private fun FilesGroup(desk: DeskSettings?, actions: SettingsActions, prefs: and
     val where = if (custom) prefs.getString("share_destination_folder_uri", null)?.let { Uri.parse(it).path } else null
     RowGroup {
         if (desk != null) {
-            GroupRow(stringResource(R.string.more_bucket), icon = R.drawable.sym_inventory, subtitle = stringResource(R.string.more_bucket_summary), onClick = actions.onOpenBucket) { Chevron() }
+            GroupRow(stringResource(R.string.settings_bucket_with, desk.name), icon = R.drawable.sym_inventory, subtitle = stringResource(R.string.more_bucket_summary), onClick = actions.onOpenBucket) { Chevron() }
         }
         GroupRow(
-            stringResource(R.string.share_destination_folder_preference),
+            stringResource(R.string.settings_downloads_folder),
             icon = R.drawable.sym_folder_zip,
             subtitle = where ?: org.desklink.mobile.plugins.share.ShareDestination.getDefaultDestinationDirectory().absolutePath,
             monoSubtitle = true,

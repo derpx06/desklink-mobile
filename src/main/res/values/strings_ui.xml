@@ -218,7 +218,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <!-- UI v4: settings -->
     <string name="settings_phone_name">Phone name</string>
-    <string name="settings_theme">Theme</string>
+    <string name="settings_theme">Style</string>
     <string name="settings_dynamic_colors_summary">Off keeps DeskLink\'s own colours</string>
     <string name="settings_connect_on_startup">Connect on startup</string>
     <string name="settings_connect_on_startup_summary">After the phone restarts</string>
@@ -351,9 +351,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_job_finished_after">%1$s finished after %2$s</string>
     <string name="terminal_job_finished">%1$s finished</string>
 
-    <string name="settings_keep_awake">Keep %1$s awake</string>
+    <string name="settings_keep_awake">Keep %1$s awake while connected</string>
     <string name="settings_keep_awake_summary">While this phone is connected</string>
-    <string name="settings_command_alerts">Tell me when commands finish</string>
+    <string name="settings_command_alerts">Command alerts</string>
     <string name="settings_command_alerts_summary">Long-running commands in shared terminals</string>
     <string name="settings_unlock_nearby">Unlock with this phone</string>
     <string name="settings_unlock_nearby_on">On. Turn it off on %1$s.</string>
@@ -387,7 +387,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_phone_clipboard">Share this phone\'s clipboard</string>
     <string name="settings_phone_notifications">Send this phone\'s notifications to %1$s</string>
     <string name="settings_phone_relay">Use the relay from this phone</string>
-    <string name="settings_desk_relay">%1$s reachable from anywhere</string>
+    <string name="settings_desk_relay">Reach %1$s from anywhere</string>
     <string name="settings_desk_clipboard_summary">%1$s shares its clipboard with this phone</string>
     <string name="settings_waiting_for">Waiting for %1$s…</string>
     <string name="settings_saving">Saving…</string>
@@ -825,4 +825,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="clipboard_many_computers">your computers</string>
     <string name="shortcut_send_clipboard">Send clipboard</string>
     <string name="shortcut_send_clipboard_long">Send the clipboard to the computer</string>
+    <string name="settings_bucket_with">Bucket with %1$s</string>
+    <string name="settings_downloads_folder">Downloads folder</string>
 </resources>
