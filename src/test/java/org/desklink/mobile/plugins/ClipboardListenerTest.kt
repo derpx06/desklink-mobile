@@ -27,7 +27,7 @@ class ClipboardListenerTest {
         while (sent.size < count && System.currentTimeMillis() < end) Thread.sleep(5)
     }
     private val observer = object : ClipboardListener.ClipboardObserver {
-        override fun clipboardChanged(content: String) { sent += content }
+        override fun clipboardChanged(content: String, copiedAt: Long) { sent += content }
     }
 
     @Before

@@ -79,8 +79,9 @@ object ClipboardImages {
     }.onFailure { Log.w(TAG, "clipboard image unreadable: ${it.javaClass.simpleName}") }.getOrNull()
 
     /** The share packet that carries [png] as a clipboard image. */
-    fun packet(png: ByteArray) = NetworkPacket(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
+    fun packet(png: ByteArray, copiedAt: Long = System.currentTimeMillis()) = NetworkPacket(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
         this["filename"] = "clipboard.png"
+        this["copiedAt"] = copiedAt.coerceIn(0L, System.currentTimeMillis())
         this["clipboard"] = true
         this["mimeType"] = MIME
         payload = NetworkPacket.Payload(png)

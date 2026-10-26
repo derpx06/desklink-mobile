@@ -55,13 +55,13 @@ class ClipboardPlugin : Plugin() {
     }
 
     private val observer: ClipboardObserver = object : ClipboardObserver {
-        override fun clipboardChanged(content: String) {
-            return this@ClipboardPlugin.propagateClipboard(content)
+        override fun clipboardChanged(content: String, copiedAt: Long) {
+            return this@ClipboardPlugin.propagateClipboard(content, copiedAt)
         }
 
-        override fun clipboardImage(png: ByteArray) {
+        override fun clipboardImage(png: ByteArray, copiedAt: Long) {
             val name = device.name
-            device.sendPacket(ClipboardImages.packet(png), object : Device.SendPacketStatusCallback() {
+            device.sendPacket(ClipboardImages.packet(png, copiedAt), object : Device.SendPacketStatusCallback() {
                 override fun onSuccess() {
                     Log.i(TAG, "clipboard: image sent to $name")
                     ClipboardStatus.sent(context, device.deviceId)
@@ -72,13 +72,12 @@ class ClipboardPlugin : Plugin() {
     }
 
     @VisibleForTesting
-    fun propagateClipboard(content: String) {
+    fun propagateClipboard(content: String, copiedAt: Long = System.currentTimeMillis()) {
         if (!fitsWire(content)) {
             Log.w(TAG, "clipboard: ${content.length} chars is too large for one message, not sent")
             return
         }
-        val np = NetworkPacket(PACKET_TYPE_CLIPBOARD)
-        np["content"] = content
+        val np = plainPacket(content, copiedAt)
         val name = device.name
         device.sendPacket(np, object : Device.SendPacketStatusCallback() {
             override fun onSuccess() {
@@ -97,6 +96,7 @@ class ClipboardPlugin : Plugin() {
         val np = NetworkPacket(PACKET_TYPE_CLIPBOARD_CONNECT)
         val timestamp = ClipboardListener.instance(context).updateTimestamp
         np["timestamp"] = timestamp
+        np["copiedAt"] = timestamp.coerceIn(0L, System.currentTimeMillis()) // the same moment, under the name the plain packet uses
         np["content"] = content
         device.sendPacket(np)
     }
@@ -122,6 +122,13 @@ class ClipboardPlugin : Plugin() {
     companion object {
         /** Clipboard text shared with the desk, as escaped JSON: one packet must cross the data channel (wire size fix). */
         const val MAX_SHARED_TEXT_BYTES = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET - 2 * 1024
+
+        /** The plain `desklink.clipboard` packet: [content] and when it was copied (W11), never later than now. */
+        fun plainPacket(content: String, copiedAt: Long, now: Long = System.currentTimeMillis()) =
+            NetworkPacket(PACKET_TYPE_CLIPBOARD).apply {
+                this["content"] = content
+                this["copiedAt"] = copiedAt.coerceIn(0L, now)
+            }
 
         /** Too large → not shared (contract "Wire size"). */
         fun fitsWire(content: String) = org.json.JSONObject.quote(content).toByteArray().size <= MAX_SHARED_TEXT_BYTES

@@ -11,6 +11,7 @@ import io.mockk.spyk
 import io.mockk.verify
 import org.junit.After
 import org.junit.Assert
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -139,5 +140,45 @@ class ClipboardPluginTest {
         val sentPacket = checkNotNull(packet)
         Assert.assertEquals("desklink.clipboard", sentPacket.type)
         Assert.assertEquals(content, sentPacket.getString("content"))
+    }
+
+    // W11: every outgoing clipboard packet carries when it was copied, never later than now (shared fixture clipboard_bodies.json).
+    private fun cases() = org.json.JSONObject(javaClass.getResourceAsStream("/shared/clipboard_bodies.json")!!.bufferedReader().readText())
+        .getJSONArray("cases").let { a -> (0 until a.length()).map { a.getJSONObject(it) } }
+
+    @Test
+    fun everyOutgoingClipboardPacketCarriesWhenItWasCopied() {
+        for (case in cases()) {
+            val now = System.currentTimeMillis()
+            packet = null
+            when (case.getString("type")) {
+                "desklink.clipboard" -> clipboardPlugin.propagateClipboard(case.getString("content"), now - case.getLong("copiedAtMsBeforeNow"))
+                "desklink.clipboard.connect" -> {
+                    every { clipboardListener.currentContent } returns case.getString("content")
+                    every { clipboardListener.updateTimestamp } returns now - case.getLong("timestampMsBeforeNow")
+                    clipboardPlugin.onFeatureReady()
+                }
+                else -> {
+                    packet = org.desklink.mobile.plugins.clipboard.ClipboardImages.packet(ByteArray(8), now - case.getLong("copiedAtMsBeforeNow"))
+                }
+            }
+            val sent = checkNotNull(packet) { case.getString("name") }
+            assertEquals(case.getString("name"), case.getString("type"), sent.type)
+            val keys = case.getJSONArray("expectKeys")
+            for (i in 0 until keys.length()) Assert.assertTrue("${case.getString("name")} has ${keys.getString(i)}", sent.has(keys.getString(i)))
+            val copiedAt = sent.getLong("copiedAt")
+            Assert.assertTrue("${case.getString("name")}: copiedAt $copiedAt is not in the future", copiedAt in 1..System.currentTimeMillis())
+            if (case.has("expectCopiedAtMsBeforeNow")) Assert.assertTrue(now - copiedAt <= 2_000)
+            if (case.optBoolean("copiedAtEqualsTimestamp")) assertEquals(sent.getLong("timestamp"), copiedAt)
+            if (case.has("copiedAtMsBeforeNow") && !case.has("expectCopiedAtMsBeforeNow")) assertEquals(now - case.getLong("copiedAtMsBeforeNow"), copiedAt)
+        }
+    }
+
+    @Test
+    fun theCopyTimeIsTheClipsOwnStampThenWhenItWasSeenAndNeverInTheFuture() {
+        assertEquals(1_000L, ClipboardListener.CopyTime.of(clipStamp = 1_000, seenAt = 2_000, now = 5_000))
+        assertEquals(2_000L, ClipboardListener.CopyTime.of(0, 2_000, 5_000))
+        assertEquals(5_000L, ClipboardListener.CopyTime.of(0, 0, 5_000))
+        assertEquals(5_000L, ClipboardListener.CopyTime.of(9_999, 0, 5_000))
     }
 }

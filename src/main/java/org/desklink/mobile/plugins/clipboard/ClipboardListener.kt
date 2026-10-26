@@ -46,10 +46,11 @@ import java.util.Locale
  */
 class ClipboardListener private constructor(ctx: Context) {
     interface ClipboardObserver {
-        fun clipboardChanged(content: String)
+        /** [copiedAt]: when the person copied it (Unix ms, this phone's clock), not when it is sent; 0 when unknown. */
+        fun clipboardChanged(content: String, copiedAt: Long = 0L)
 
         /** An image copy, already a PNG (contract C3). Called off the main thread. */
-        fun clipboardImage(png: ByteArray) {}
+        fun clipboardImage(png: ByteArray, copiedAt: Long = 0L) {}
     }
 
     // Concurrent: registerObserver runs on the packet-dispatch thread while
@@ -87,6 +88,16 @@ class ClipboardListener private constructor(ctx: Context) {
         // Deliberately no automatic-sync start here: running logcat is what makes Android 13+ ask "Allow
         // DeskLink to access all device logs?", and that question belongs to the person turning the
         // setting on, never to a cold start.
+    }
+
+    /**
+     * When this clip was copied: the system's stamp on it (API 26+), else the time the change callback saw it, else now; never in
+     * the future. The computer orders copies by this, so a copy that waited to be sent cannot replace a newer one made there.
+     */
+    private fun copyTime(description: ClipDescription): Long {
+        val now = System.currentTimeMillis()
+        val stamp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) description.timestamp else 0L
+        return CopyTime.of(stamp, copiedAt, now)
     }
 
     /** Something was copied (the system says THAT, not what). In front: read and sync now. Behind: only an offer, never a read. */
@@ -182,7 +193,8 @@ class ClipboardListener private constructor(ctx: Context) {
         ClipboardOffer.cancel(context)
         val targets = observers.toList()
         // Off the main thread: sizing and queueing a megabyte of text is not the UI's work.
-        execute { targets.forEach { it.clipboardChanged(content) } }
+        val at = copyTime(description)
+        execute { targets.forEach { it.clipboardChanged(content, at) } }
         return true
     }
 
@@ -190,6 +202,7 @@ class ClipboardListener private constructor(ctx: Context) {
     @MainThread
     private fun syncImage(force: Boolean): Boolean {
         val uri = try { cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri } catch (_: Exception) { null } ?: return false
+        val at = cm.primaryClipDescription?.let { copyTime(it) } ?: System.currentTimeMillis()
         val key = "image:$uri"
         if (!force && key == currentContent) return false
         currentContent = key
@@ -199,7 +212,7 @@ class ClipboardListener private constructor(ctx: Context) {
         Log.i(TAG, "clipboard: image to ${targets.size} desk(s) (${if (force) "asked" else "new copy"})")
         execute {
             val png = ClipboardImages.encodePng(context, uri) ?: return@execute
-            targets.forEach { it.clipboardImage(png) }
+            targets.forEach { it.clipboardImage(png, at) }
         }
         return true
     }
@@ -307,6 +320,11 @@ class ClipboardListener private constructor(ctx: Context) {
 
     @VisibleForTesting
     fun resetPacing() { lastSyncAt = 0L; pacedSync = false }
+
+    object CopyTime {
+        /** The best known copy time: the clip's own stamp, else when the change was seen; clamped to [now]; [now] when neither is known. */
+        fun of(clipStamp: Long, seenAt: Long, now: Long): Long = (clipStamp.takeIf { it > 0 } ?: seenAt.takeIf { it > 0 } ?: now).coerceAtMost(now)
+    }
 
     /** The 500 ms pacing, pure for the test. */
     object SendPacing {

@@ -84,7 +84,7 @@ class ClipboardOfferTest {
         val got = CountDownLatch(1)
         var text: String? = null
         val observer = object : ClipboardListener.ClipboardObserver {
-            override fun clipboardChanged(content: String) {
+            override fun clipboardChanged(content: String, copiedAt: Long) {
                 text = content
                 got.countDown()
             }
