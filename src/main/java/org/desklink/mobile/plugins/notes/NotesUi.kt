@@ -216,20 +216,24 @@ class NotesUi(
         val context = LocalContext.current
         var id by rememberSaveable { mutableStateOf(start.takeIf { it != NEW }) }
         val first = remember { id?.let { NotesStore.note(context, it) } }
-        var title by rememberSaveable { mutableStateOf(first?.title.orEmpty()) }
+        // A draft the store does not have (a body over the cap, kept across a rotation) wins over the stored note.
+        val draft = remember { NoteDrafts.get(NoteDrafts.key(id)) }
+        var title by rememberSaveable { mutableStateOf(draft?.title ?: first?.title.orEmpty()) }
         // A big note in the saved-state Bundle crashes the activity stop (TransactionTooLarge): only a small body goes in it, and a
         // large one is restored from the notes store (flushed at onStop).
-        var body by rememberSaveable(stateSaver = CappedText) { mutableStateOf(first?.body.orEmpty()) }
-        var pinned by rememberSaveable { mutableStateOf(first?.pinned ?: false) }
+        var body by rememberSaveable(stateSaver = CappedText) { mutableStateOf(draft?.body ?: first?.body.orEmpty()) }
+        var pinned by rememberSaveable { mutableStateOf(draft?.pinned ?: first?.pinned ?: false) }
         var reading by rememberSaveable { mutableStateOf(first != null && first.body.isNotBlank()) }
         /** The version shown: a newer one from the desk replaces it while nothing here is unsaved. */
         var shown by rememberSaveable { mutableStateOf(first?.modified ?: 0L) }
         var dirty by remember { mutableStateOf(false) }
 
         fun save() {
-            // Over the cap: kept in the editor, not saved (the banner says why).
+            // Over the cap: kept in the editor and in memory, not saved (the banner says why).
+            if (dirty && !Shelf.syncable(body)) NoteDrafts.put(NoteDrafts.key(id), NoteDrafts.Draft(title, body, pinned))
             if (!dirty || !Shelf.syncable(body)) return
             dirty = false
+            NoteDrafts.clear(NoteDrafts.key(id))
             val current = id
             if (current == null) {
                 if (title.isBlank() && body.isBlank()) return
@@ -242,6 +246,7 @@ class NotesUi(
 
         // Autosave half a second after the last keystroke, and on leaving.
         LaunchedEffect(title, body, pinned) {
+            if (dirty && !Shelf.syncable(body)) NoteDrafts.put(NoteDrafts.key(id), NoteDrafts.Draft(title, body, pinned))
             if (dirty) {
                 delay(500)
                 save()
@@ -286,6 +291,7 @@ class NotesUi(
                 IconButton(
                     onClick = {
                         id?.let { NotesStore.editNote(context, it) { note -> note.copy(deleted = true) } }
+                        NoteDrafts.clear(NoteDrafts.key(id))
                         dirty = false
                         Toast.makeText(context, R.string.notes_deleted, Toast.LENGTH_SHORT).show()
                         onDone()
