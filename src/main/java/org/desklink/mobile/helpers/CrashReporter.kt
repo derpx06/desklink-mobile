@@ -34,7 +34,7 @@ object CrashReporter {
         dir = context.filesDir
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            runCatching { keep(context.filesDir, report(thread, error)) }
+            runCatching { keep(context.filesDir, LogExport.redact(report(thread, error))) }
             CrashLoop.recordCrash(context)
             previous?.uncaughtException(thread, error)
         }

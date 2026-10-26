@@ -50,6 +50,17 @@ class ExportedComponentsTest {
     }
 
     @Test
+    fun aLongPressOnTheClipboardTileIsRecognisedForOnNewIntentToo() {
+        val tile = android.content.ComponentName(app, org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java)
+        val press = Intent("android.service.quicksettings.action.QS_TILE_PREFERENCES").putExtra(Intent.EXTRA_COMPONENT_NAME, tile)
+        assertTrue(org.desklink.mobile.ui.MainActivity.isClipboardTileLongPress(press))
+        assertEquals(false, org.desklink.mobile.ui.MainActivity.isClipboardTileLongPress(Intent(Intent.ACTION_MAIN)))
+        val source = java.io.File("src/main/java/org/desklink/mobile/ui/MainActivity.kt").takeIf { it.exists() } ?: java.io.File("desklink-mobile/src/main/java/org/desklink/mobile/ui/MainActivity.kt")
+        val onNewIntent = source.readText().substringAfter("override fun onNewIntent").substringBefore("handleIntent(intent)")
+        assertTrue("onNewIntent handles it too", onNewIntent.contains("clipboardTileLongPress(intent)"))
+    }
+
+    @Test
     fun anIntentWithoutAnActionIsIgnoredNotACrash() {
         ShareBroadcastReceiver().onReceive(app as Context, Intent())
         assertTrue(true)

@@ -53,4 +53,14 @@ class PrivacyDefaultsTest {
         PeerState.forget(app, id)
         assertTrue(FirstShare.needed(app, id))
     }
+
+    @Test
+    fun grandfatheringIsDoneBeforeAnyPluginCanLoad() {
+        fun source(path: String) = listOf(java.io.File(path), java.io.File("desklink-mobile/$path")).first { it.exists() }.readText()
+        val app = source("src/main/java/org/desklink/mobile/DeskLinkApplication.kt")
+        val grandfather = app.indexOf("PrivacyDefaults.grandfather(this)")
+        assertTrue("grandfather is called", grandfather > 0)
+        assertTrue("before the remembered devices (and so their plugins) load", grandfather < app.indexOf("loadRememberedDevicesFromSettings() }"))
+        assertEquals("and only there, not on a background thread", 1, Regex("PrivacyDefaults\\.grandfather\\(this\\)").findAll(app).count())
+    }
 }

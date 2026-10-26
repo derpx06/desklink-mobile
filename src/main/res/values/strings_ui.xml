@@ -668,7 +668,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="files_unsaved_done">Saved %1$s</string>
     <string name="home_more_actions">More actions</string>
     <!-- W5: Settings, grouped by feature in the desk's order -->
-    <string name="sg_connection_summary">This phone\'s name, %1$s, unpairing</string>
+    <string name="sg_connection_summary">This phone\'s name, %1$s, connecting</string>
     <string name="sg_notifications_summary">Phone notifications, %1$s\'s here, ring sound</string>
     <string name="sg_clipboard">Clipboard</string>
     <string name="sg_clipboard_summary">Share copies with %1$s</string>

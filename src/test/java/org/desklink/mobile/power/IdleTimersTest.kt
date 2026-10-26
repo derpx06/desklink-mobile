@@ -57,4 +57,44 @@ class IdleTimersTest {
             .toSortedSet()
         assertEquals("a delay loop or self-posting Handler was added or removed: update the list with its reason", allowedLoops.keys.toSortedSet(), found)
     }
+
+    /** The text of every `LaunchedEffect(...) { ... }` block of [source] (braces matched), with where it starts. */
+    private fun launchedEffects(source: String): List<Pair<Int, String>> {
+        val found = mutableListOf<Pair<Int, String>>()
+        var from = 0
+        while (true) {
+            val at = source.indexOf("LaunchedEffect(", from)
+            if (at < 0) break
+            from = at + 1
+            val open = source.indexOf('{', at)
+            if (open < 0) continue
+            var depth = 0
+            var i = open
+            while (i < source.length) {
+                if (source[i] == '{') depth++ else if (source[i] == '}') { depth--; if (depth == 0) break }
+                i++
+            }
+            found += source.substring(at, minOf(i + 1, source.length)).let { at to it }
+        }
+        return found
+    }
+
+    // A poll loop in a LaunchedEffect keeps running behind another app unless it is tied to the lifecycle (StartedEffect wraps
+    // repeatOnLifecycle). These loops are the ones that are not, each with why.
+    private val loopsAllowedUngated = mapOf(
+        "plugins/mousepad/MousePadActivity.kt" to "the control retry: ends at the first grant or refusal, and the whole screen is gone when the activity stops",
+    )
+
+    @Test
+    fun aPollLoopInAComposableIsTiedToTheLifecycle() {
+        val root = File("src/main/java")
+        val offenders = root.walkTopDown().filter { it.isFile && it.extension == "kt" }.flatMap { file ->
+            val relative = file.relativeTo(File(root, "org/desklink/mobile")).path
+            launchedEffects(file.readText()).filter { (_, block) ->
+                Regex("""while \(""").containsMatchIn(block) && block.contains("delay(") &&
+                    !block.contains("repeatOnLifecycle") && !block.contains("collectAsStateWithLifecycle")
+            }.map { relative }
+        }.toSortedSet()
+        assertEquals("a LaunchedEffect with a delay loop must be a StartedEffect (or be listed with its reason)", loopsAllowedUngated.keys.toSortedSet(), offenders)
+    }
 }

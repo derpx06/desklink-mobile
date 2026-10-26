@@ -73,4 +73,22 @@ class ReleaseHygieneTest {
             .filter { it.readText().contains("printStackTrace(") }.map { it.name }.toList()
         assertEquals("printStackTrace bypasses the stripping", emptyList<String>(), offenders)
     }
+
+    @Test
+    fun versionCodeFollowsTheDocumentedFormulaAndOnlyGoesUp() {
+        val gradle = project("build.gradle.kts").readText()
+        val name = Regex("""versionName = "(\d+)\.(\d+)\.(\d+)"""").find(gradle)!!.groupValues.drop(1).map(String::toInt)
+        val code = Regex("""versionCode = (\d+)""").find(gradle)!!.groupValues[1].toInt()
+        fun formula(major: Int, minor: Int, patch: Int): Int {
+            require(major == 1) { "a 2.0.0 needs a new versionCode formula (this one is 20000 + minor * 100 + patch for 1.x)" }
+            require(minor < 100 && patch < 100)
+            return 20000 + minor * 100 + patch
+        }
+        assertEquals("versionCode matches versionName", formula(name[0], name[1], name[2]), code)
+        // Strictly increasing over the planned versions.
+        val planned = listOf(Triple(1, 3, 0), Triple(1, 3, 1), Triple(1, 3, 99), Triple(1, 4, 0), Triple(1, 4, 1), Triple(1, 10, 0))
+        val codes = planned.map { (a, b, c) -> formula(a, b, c) }
+        assertEquals(codes.sorted(), codes)
+        assertEquals(codes.size, codes.toSet().size)
+    }
 }

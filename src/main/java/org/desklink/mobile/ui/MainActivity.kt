@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -234,15 +235,15 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // A long-press on the clipboard tile while this activity is already up arrives here, not in onCreate.
+        if (clipboardTileLongPress(intent)) {
+            startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, snippets = true))
+            return
+        }
         handleIntent(intent)
     }
 
-    private fun clipboardTileLongPress(intent: Intent): Boolean {
-        if (intent.action != "android.service.quicksettings.action.QS_TILE_PREFERENCES") return false
-        @Suppress("DEPRECATION")
-        val tile = intent.getParcelableExtra<android.content.ComponentName>(Intent.EXTRA_COMPONENT_NAME)
-        return tile?.className == org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java.name
-    }
+    private fun clipboardTileLongPress(intent: Intent): Boolean = isClipboardTileLongPress(intent)
 
     /** Launcher, notifications and shortcuts: which computer, and the pairing screen if one waits. */
     private fun handleIntent(intent: Intent) {
@@ -481,11 +482,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 androidx.compose.foundation.layout.Column {
                     Text(stringResource(R.string.first_share_body, device.name))
                     androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
-                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().clickable { clipboard = !clipboard }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().toggleable(value = clipboard, role = androidx.compose.ui.semantics.Role.Checkbox, onValueChange = { clipboard = it }).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.material3.Checkbox(checked = clipboard, onCheckedChange = null)
                         Text(stringResource(R.string.first_share_clipboard), Modifier.padding(start = 8.dp))
                     }
-                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().clickable { notifications = !notifications }.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().toggleable(value = notifications, role = androidx.compose.ui.semantics.Role.Checkbox, onValueChange = { notifications = it }).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.material3.Checkbox(checked = notifications, onCheckedChange = null)
                         Text(stringResource(R.string.first_share_notifications, device.name), Modifier.padding(start = 8.dp))
                     }
@@ -1256,6 +1257,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     }
 
     companion object {
+        /** The system's "tile preferences" intent for the clipboard tile (a long-press on it). */
+        @JvmStatic
+        fun isClipboardTileLongPress(intent: Intent): Boolean {
+            if (intent.action != "android.service.quicksettings.action.QS_TILE_PREFERENCES") return false
+            @Suppress("DEPRECATION")
+            val tile = intent.getParcelableExtra<android.content.ComponentName>(Intent.EXTRA_COMPONENT_NAME)
+            return tile?.className == org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java.name
+        }
         /** Launcher shortcuts (res/xml/shortcuts.xml). */
         const val ACTION_NEW_NOTE = "org.desklink.mobile.action.NEW_NOTE"
         const val ACTION_ADD_TO_BUCKET = "org.desklink.mobile.action.ADD_TO_BUCKET"

@@ -143,6 +143,9 @@ class DeskLinkApplication : Application() {
         org.desklink.mobile.plugins.screen.ScreenControlPlugin.latestStatus
         org.desklink.mobile.plugins.screen.PhoneScreenCaptureService.sharingDeviceId
         org.desklink.mobile.plugins.share.TransferProgress.current
+        // Before any plugin can load: an upgraded phone keeps its clipboard and notification sharing from the very first session
+        // (a background thread could lose the race with plugin loading and leave them off for one run).
+        step("Privacy defaults") { runCatching { org.desklink.mobile.helpers.PrivacyDefaults.grandfather(this) } }
         step("Remembered devices") { loadRememberedDevicesFromSettings() }
         // The transfer history keeps 30 days: prune it once per start, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute { org.desklink.mobile.plugins.share.TransferHistory.store(this).prune() }
@@ -173,7 +176,6 @@ class DeskLinkApplication : Application() {
         // 1.3 removed several features: what they stored is deleted once, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute {
             org.desklink.mobile.helpers.RemovedFeatures.runOnce(this)
-            runCatching { org.desklink.mobile.helpers.PrivacyDefaults.grandfather(this) }
             runCatching { org.desklink.mobile.plugins.findmyphone.RingVolume.restoreIfLeft(this) }
         }
         // Received files that could not be saved are kept a week; leftovers of a crash a day. Not only when a transfer starts.

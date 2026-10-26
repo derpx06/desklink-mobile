@@ -469,7 +469,7 @@ class TerminalActivity : AppCompatActivity() {
                     else -> {
                         // Previews re-read the screens now and then: output arrives without a state change.
                         var tick by remember { mutableIntStateOf(0) }
-                        LaunchedEffect(Unit) {
+                        org.desklink.mobile.ui.compose.components.StartedEffect(Unit) {
                             while (true) {
                                 kotlinx.coroutines.delay(PREVIEW_REFRESH_MS)
                                 tick++
