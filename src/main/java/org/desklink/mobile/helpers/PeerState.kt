@@ -42,5 +42,15 @@ object PeerState {
         runCatching { org.desklink.mobile.webrtc.FileTransferStore.forgetDevice(app, deviceId) }
     }
 
+    /**
+     * The second sweep, after the transports are closed. Only if the computer is still unpaired under the generation that was
+     * current when the unpair began: a fast re-pair of the same computer (a QR scan) has its consents, share queue and Bucket
+     * state of the NEW pairing, and a late sweep must not wipe them.
+     */
+    fun forgetLate(context: Context, deviceId: String, unpairedGeneration: Long, currentGeneration: Long, paired: Boolean) {
+        if (paired || currentGeneration != unpairedGeneration) return
+        forget(context, deviceId)
+    }
+
     private const val MIN_ID_LENGTH = 8
 }

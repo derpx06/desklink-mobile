@@ -74,4 +74,20 @@ class PeerStateTest {
     fun aShortIdNeverMatchesByAccident() {
         assertEquals(emptyList<String>(), PeerState.preferenceKeys(listOf("glide_allowed_x", "x"), "x"))
     }
+
+    @Test
+    fun aLateSweepAfterAFastRePairLeavesTheNewPairingsChoicesAlone() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(app)
+        // Unpair began at generation 5; the same computer was paired again (generation 6) and has new consents.
+        prefs.edit { putBoolean("glide_allowed_$desk", true) }
+        PeerState.forgetLate(app, desk, unpairedGeneration = 5, currentGeneration = 6, paired = true)
+        assertTrue("the new pairing's consent survives", prefs.getBoolean("glide_allowed_$desk", false))
+        // Not re-paired: the sweep runs.
+        PeerState.forgetLate(app, desk, unpairedGeneration = 5, currentGeneration = 5, paired = false)
+        assertEquals(false, prefs.contains("glide_allowed_$desk"))
+        // Re-paired but the generation did not move (cannot happen), or paired again: still skipped.
+        prefs.edit { putBoolean("glide_allowed_$desk", true) }
+        PeerState.forgetLate(app, desk, 5, 5, paired = true)
+        assertTrue(prefs.getBoolean("glide_allowed_$desk", false))
+    }
 }
