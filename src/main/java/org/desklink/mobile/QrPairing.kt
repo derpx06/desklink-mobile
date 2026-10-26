@@ -144,9 +144,13 @@ object QrPairing {
             private set
         internal var undo: (() -> Unit)? = null
 
+        /** The pairing a replace dropped to make room: put back when the replace is cancelled, as when it fails. */
+        internal var restoreOld: (() -> Unit)? = null
+
         fun cancel() {
             cancelled = true
             runCatching { undo?.invoke() }
+            runCatching { restoreOld?.invoke() }
         }
     }
 
@@ -189,11 +193,15 @@ object QrPairing {
             var backup: PairingBackup? = null
             conflictingPairing(application, code)?.let { existing ->
                 if (!replaceExisting) throw ReplacesPairing(existing.name)
-                backup = PairingBackup.capture(application, existing.deviceId)
+                backup = PairingBackup.capture(application, existing.deviceId).also { saved ->
+                    attempt.restoreOld = { saved.restore(application); application.loadRememberedDevice(saved.deviceId) }
+                }
                 existing.unpair()
             }
             try {
                 connectAndProve(application, code, onProgress, attempt)
+                // Cancelled while it was completing: the new pairing is undone (see Attempt.cancel) and the old one comes back.
+                if (attempt.cancelled) backup?.let { it.restore(application); application.loadRememberedDevice(it.deviceId) }
             } catch (error: Throwable) {
                 backup?.let { it.restore(application); application.loadRememberedDevice(it.deviceId) }
                 throw error

@@ -48,6 +48,15 @@ class ClipboardOfferTest {
     }
 
     @Test
+    fun aComputerThatIsNotConnectedOrNotSharingGetsNoOffer() {
+        assertTrue(ClipboardOffer.eligible(paired = true, sharing = true, ready = true, offerOn = true))
+        assertFalse("not connected", ClipboardOffer.eligible(true, true, false, true))
+        assertFalse("sharing off", ClipboardOffer.eligible(true, false, true, true))
+        assertFalse("offer off", ClipboardOffer.eligible(true, true, true, false))
+        assertFalse("not paired", ClipboardOffer.eligible(false, true, true, true))
+    }
+
+    @Test
     fun theOfferNamesTheComputers() {
         assertEquals("Dell", ClipboardOffer.target(listOf("Dell"), "your computers"))
         assertEquals("Dell / Arch", ClipboardOffer.target(listOf("Dell", "Arch"), "your computers"))

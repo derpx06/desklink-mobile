@@ -216,11 +216,16 @@ class BackgroundService : Service() {
         }
     }
 
+    /** Created in safe mode (three crashes in two minutes): nothing was set up, and nothing is torn down. */
+    private var safeStart = false
+
     /** This will called only once, even if we launch the service intent several times */
     @MainThread
     override fun onCreate() {
         super.onCreate()
         Log.d("DeskLink/BgService", "onCreate")
+        // Before anything is started or registered (the sticky restart of a crashing service is what makes the loop).
+        if (org.desklink.mobile.helpers.CrashLoop.safeMode(this)) { safeStart = true; return }
         this.applicationInstance = DeskLinkApplication.getInstance()
         instance = this
 
@@ -514,6 +519,7 @@ class BackgroundService : Service() {
 
     override fun onDestroy() {
         Log.d("DeskLink/BgService", "onDestroy")
+        if (safeStart) return super.onDestroy()
         initialized = false
         leaseRecheck.removeCallbacks(leaseRecheckTask)
         networkMovedDebounce.removeCallbacks(networkMovedTask)

@@ -39,4 +39,15 @@ class MdnsMulticastLockTest {
         assertTrue(discovery.lockHeld)
         discovery.stopDiscovering()
     }
+
+    @Test
+    fun aComputerNotSeenForTenMinutesDoesNotHoldTheLock() {
+        val now = 100 * 60_000L
+        val seen = mapOf("near" to now - 60_000, "gone" to now - 3 * 60 * 60_000L)
+        // "near" is expected and unlinked: held. "gone" alone (not seen for hours) is not expected: the lock may go.
+        assertFalse(MulticastPolicy.allExpectedLinked(listOf("a", "near"), setOf("a"), { seen[it] ?: 0L }, now))
+        assertTrue(MulticastPolicy.allExpectedLinked(listOf("a", "gone"), setOf("a"), { seen[it] ?: 0L }, now))
+        assertTrue(MulticastPolicy.allExpectedLinked(listOf("a", "near"), setOf("a", "near"), { seen[it] ?: 0L }, now))
+        assertFalse("nothing linked at all: looking", MulticastPolicy.allExpectedLinked(listOf("gone"), emptySet(), { 0L }, now))
+    }
 }

@@ -33,4 +33,15 @@ class CrashLoopTest {
         CrashLoop.clear(app)
         assertFalse(CrashLoop.safeMode(app, t0 + 21_000))
     }
+
+    @Test
+    fun aServiceCreatedInSafeModeSetsNothingUp() {
+        CrashLoop.clear(app)
+        val t = System.currentTimeMillis()
+        repeat(3) { CrashLoop.recordCrash(app, t + it) }
+        val controller = org.robolectric.Robolectric.buildService(org.desklink.mobile.BackgroundService::class.java).create()
+        assertTrue("no instance was registered", org.desklink.mobile.BackgroundService.instance == null)
+        controller.destroy()
+        CrashLoop.clear(app)
+    }
 }

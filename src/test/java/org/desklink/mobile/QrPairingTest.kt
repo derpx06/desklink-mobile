@@ -92,4 +92,16 @@ class QrPairingCancelTest {
         val attempt = QrPairing.Attempt()
         org.junit.Assert.assertEquals("link", QrPairing.waitFor(1_000, { attempt.cancelled }, pollMs = 5) { "link" })
     }
+
+    @org.junit.Test
+    fun cancellingAReplaceRestoresTheOldPairingEvenAfterItCompleted() {
+        val attempt = QrPairing.Attempt()
+        var restored = 0
+        var undone = 0
+        attempt.undo = { undone++ }
+        attempt.restoreOld = { restored++ }
+        attempt.cancel()
+        org.junit.Assert.assertEquals("the new pairing is undone", 1, undone)
+        org.junit.Assert.assertEquals("and the old one comes back", 1, restored)
+    }
 }

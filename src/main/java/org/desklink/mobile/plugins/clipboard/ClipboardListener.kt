@@ -97,8 +97,13 @@ class ClipboardListener private constructor(ctx: Context) {
     private fun copyTime(description: ClipDescription): Long {
         val now = System.currentTimeMillis()
         val stamp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) description.timestamp else 0L
-        return CopyTime.of(stamp, copiedAt, now)
+        return CopyTime.of(stamp, copiedAt, now, lastCopiedAtSent).also { lastCopiedAtSent = it }
     }
+
+    /** The newest copiedAt this process has sent: copy times never go backwards, even if the system clock is set back. */
+    @Volatile
+    var lastCopiedAtSent: Long = 0L
+        private set
 
     /** Something was copied (the system says THAT, not what). In front: read and sync now. Behind: only an offer, never a read. */
     @MainThread
@@ -125,7 +130,7 @@ class ClipboardListener private constructor(ctx: Context) {
     private fun offerTargets(): List<String> = runCatching {
         val key = org.desklink.mobile.plugins.Plugin.getPluginKey(ClipboardPlugin::class.java)
         org.desklink.mobile.DeskLinkApplication.getInstance().devices.values
-            .filter { it.isPaired && it.isPluginEnabled(key) && ClipboardOffer.enabled(context, it.deviceId) }
+            .filter { ClipboardOffer.eligible(it.isPaired, it.isPluginEnabled(key), it.hasActiveWebRtcFeatureTransport, ClipboardOffer.enabled(context, it.deviceId)) }
             .map { it.name }
     }.getOrDefault(emptyList())
 
@@ -323,7 +328,8 @@ class ClipboardListener private constructor(ctx: Context) {
 
     object CopyTime {
         /** The best known copy time: the clip's own stamp, else when the change was seen; clamped to [now]; [now] when neither is known. */
-        fun of(clipStamp: Long, seenAt: Long, now: Long): Long = (clipStamp.takeIf { it > 0 } ?: seenAt.takeIf { it > 0 } ?: now).coerceAtMost(now)
+        fun of(clipStamp: Long, seenAt: Long, now: Long, lastSent: Long = 0L): Long =
+            (clipStamp.takeIf { it > 0 } ?: seenAt.takeIf { it > 0 } ?: now).coerceAtMost(now).coerceAtLeast(lastSent)
     }
 
     /** The 500 ms pacing, pure for the test. */

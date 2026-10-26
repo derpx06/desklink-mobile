@@ -38,6 +38,9 @@ object ClipboardOffer {
     fun shouldOffer(appInFront: Boolean, ownCopy: Boolean, sensitive: Boolean, computers: Int, automaticWatchRunning: Boolean): Boolean =
         !appInFront && !ownCopy && !sensitive && computers > 0 && !automaticWatchRunning
 
+    /** A computer the offer is for: paired, sharing the clipboard, connected and feature-ready, and the person wants the offer. */
+    fun eligible(paired: Boolean, sharing: Boolean, ready: Boolean, offerOn: Boolean) = paired && sharing && ready && offerOn
+
     /** "Dell", "Dell and Arch", "your computers": no clipboard content, ever, in the offer. */
     fun target(names: List<String>, many: String): String = when (names.size) {
         0 -> many

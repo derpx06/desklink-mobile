@@ -217,7 +217,11 @@ class NotesUi(
         var id by rememberSaveable { mutableStateOf(start.takeIf { it != NEW }) }
         val first = remember { id?.let { NotesStore.note(context, it) } }
         // A draft the store does not have (a body over the cap, kept across a rotation) wins over the stored note.
-        val draft = remember { NoteDrafts.get(NoteDrafts.key(id)) }
+        val hadDraft = remember { NoteDrafts.get(NoteDrafts.key(id)) != null }
+        val draft = remember { NoteDrafts.valid(NoteDrafts.key(id), first?.modified ?: 0L) }
+        if (hadDraft && draft == null) {
+            LaunchedEffect(Unit) { Toast.makeText(context, R.string.notes_draft_discarded, Toast.LENGTH_LONG).show() }
+        }
         var title by rememberSaveable { mutableStateOf(draft?.title ?: first?.title.orEmpty()) }
         // A big note in the saved-state Bundle crashes the activity stop (TransactionTooLarge): only a small body goes in it, and a
         // large one is restored from the notes store (flushed at onStop).
@@ -230,7 +234,7 @@ class NotesUi(
 
         fun save() {
             // Over the cap: kept in the editor and in memory, not saved (the banner says why).
-            if (dirty && !Shelf.syncable(body)) NoteDrafts.put(NoteDrafts.key(id), NoteDrafts.Draft(title, body, pinned))
+            if (dirty && !Shelf.syncable(body)) NoteDrafts.put(NoteDrafts.key(id), NoteDrafts.Draft(title, body, pinned, shown))
             if (!dirty || !Shelf.syncable(body)) return
             dirty = false
             NoteDrafts.clear(NoteDrafts.key(id))
@@ -246,7 +250,7 @@ class NotesUi(
 
         // Autosave half a second after the last keystroke, and on leaving.
         LaunchedEffect(title, body, pinned) {
-            if (dirty && !Shelf.syncable(body)) NoteDrafts.put(NoteDrafts.key(id), NoteDrafts.Draft(title, body, pinned))
+            if (dirty && !Shelf.syncable(body)) NoteDrafts.put(NoteDrafts.key(id), NoteDrafts.Draft(title, body, pinned, shown))
             if (dirty) {
                 delay(500)
                 save()

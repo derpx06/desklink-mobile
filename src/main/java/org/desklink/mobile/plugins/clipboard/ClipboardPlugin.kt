@@ -77,7 +77,7 @@ class ClipboardPlugin : Plugin() {
             Log.w(TAG, "clipboard: ${content.length} chars is too large for one message, not sent")
             return
         }
-        val np = plainPacket(content, copiedAt)
+        val np = plainPacket(content, copiedAt, floor = ClipboardListener.instance(context).lastCopiedAtSent)
         val name = device.name
         device.sendPacket(np, object : Device.SendPacketStatusCallback() {
             override fun onSuccess() {
@@ -124,10 +124,11 @@ class ClipboardPlugin : Plugin() {
         const val MAX_SHARED_TEXT_BYTES = org.desklink.mobile.webrtc.WebRtcEnvelope.FEATURE_PACKET_BUDGET - 2 * 1024
 
         /** The plain `desklink.clipboard` packet: [content] and when it was copied (W11), never later than now. */
-        fun plainPacket(content: String, copiedAt: Long, now: Long = System.currentTimeMillis()) =
+        fun plainPacket(content: String, copiedAt: Long, now: Long = System.currentTimeMillis(), floor: Long = 0L) =
             NetworkPacket(PACKET_TYPE_CLIPBOARD).apply {
                 this["content"] = content
-                this["copiedAt"] = copiedAt.coerceIn(0L, now)
+                // Never in the future, and never below the newest this process has sent (a clock set back must not reorder copies).
+                this["copiedAt"] = copiedAt.coerceIn(0L, now).coerceAtLeast(floor)
             }
 
         /** Too large → not shared (contract "Wire size"). */

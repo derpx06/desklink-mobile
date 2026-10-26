@@ -105,9 +105,10 @@ public class LanLinkProvider extends BaseLinkProvider {
     /** Every paired computer has a LAN link: nothing left to find by multicast (a second computer's discovery needs the lock). */
     private boolean allPairedLinked() {
         java.util.List<String> paired = TrustedDevices.INSTANCE.getAllTrustedDevices(context);
-        if (paired.isEmpty()) return !visibleDevices.isEmpty();
-        for (String id : paired) if (!visibleDevices.containsKey(id)) return false;
-        return true;
+        android.content.SharedPreferences seen = context.getSharedPreferences(org.desklink.mobile.helpers.PerPeerState.INSTANCE.SURFACES, Context.MODE_PRIVATE);
+        return MulticastPolicy.INSTANCE.allExpectedLinked(
+                paired, new java.util.HashSet<>(visibleDevices.keySet()),
+                id -> seen.getLong(org.desklink.mobile.helpers.PerPeerState.INSTANCE.seenKey(id), 0L), System.currentTimeMillis());
     }
 
     public void onConnectionLost(BaseLink link) {

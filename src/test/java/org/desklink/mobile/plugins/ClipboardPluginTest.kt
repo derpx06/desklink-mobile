@@ -180,5 +180,10 @@ class ClipboardPluginTest {
         assertEquals(2_000L, ClipboardListener.CopyTime.of(0, 2_000, 5_000))
         assertEquals(5_000L, ClipboardListener.CopyTime.of(0, 0, 5_000))
         assertEquals(5_000L, ClipboardListener.CopyTime.of(9_999, 0, 5_000))
+        // The system clock was set back after a copy was sent at 8_000: the next copy time does not go below it.
+        assertEquals(8_000L, ClipboardListener.CopyTime.of(clipStamp = 0, seenAt = 0, now = 3_000, lastSent = 8_000))
+        assertEquals(8_000L, ClipboardListener.CopyTime.of(clipStamp = 2_000, seenAt = 0, now = 3_000, lastSent = 8_000))
+        assertEquals("a later copy is later", 9_000L, ClipboardListener.CopyTime.of(0, 0, 9_000, lastSent = 8_000))
+        assertEquals("the packet keeps the floor too", 8_000L, ClipboardPlugin.plainPacket("x", copiedAt = 2_000, now = 3_000, floor = 8_000).getLong("copiedAt"))
     }
 }
