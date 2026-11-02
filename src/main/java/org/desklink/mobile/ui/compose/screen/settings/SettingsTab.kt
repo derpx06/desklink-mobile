@@ -361,6 +361,20 @@ private fun NotificationsGroup(desk: DeskSettings?, actions: SettingsActions, pr
             }
         }
         DeskSwitch(desk, actions, keys.COMMAND_ALERTS, stringResource(R.string.settings_command_alerts), R.drawable.sym_notifications_active, stringResource(R.string.settings_command_alerts_summary), desk.remote?.commandAlerts == true)
+        // W14: the switch lives at the computer; the phone shows it, and asks for Do Not Disturb access only once it is on.
+        val dndSync = desk.remote?.dndSync == true
+        GroupRow(
+            stringResource(R.string.settings_dnd_share, desk.name),
+            icon = R.drawable.sym_notifications,
+            subtitle = stringResource(if (!desk.ready || desk.remote == null) R.string.settings_waiting_for else if (dndSync) R.string.settings_dnd_share_on else R.string.settings_turn_on_at, desk.name),
+            checked = dndSync,
+            enabled = false,
+        )
+        if (dndSync && !org.desklink.mobile.plugins.battery.DndSync.canSet(context)) {
+            AllowRow(stringResource(R.string.settings_dnd_access), stringResource(R.string.settings_dnd_access_summary, desk.name)) {
+                runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
+            }
+        }
         // Where the ring sound lives: the desk "rings" this phone through Notifications.
         GroupRow(
             stringResource(R.string.select_ringtone),

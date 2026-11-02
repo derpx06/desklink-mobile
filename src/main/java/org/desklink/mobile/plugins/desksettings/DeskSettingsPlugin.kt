@@ -31,6 +31,10 @@ data class DeskSettingsState(
     val sessionPasswordSet: Boolean? = null,
     /** W10: whether the computer lets this phone keep it awake (its own per-phone switch, off by default); null from a desk that does not say. */
     val keepAwakeAllowed: Boolean? = null,
+    /** W14: the computer's "Share Do Not Disturb with <phone>" switch; null from a desk that does not say. */
+    val dndSync: Boolean? = null,
+    /** W14: the computer's Do Not Disturb, sent only while [dndSync] is true. */
+    val dnd: Boolean? = null,
 )
 
 /**
@@ -68,6 +72,7 @@ class DeskSettingsPlugin : Plugin() {
         parse(np)?.let {
             settings = it
             pending = emptyMap()
+            device.getPlugin(org.desklink.mobile.plugins.battery.BatteryPlugin::class.java)?.deskDndChanged(it.dndSync == true, it.dnd)
             org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
         }
         return true
@@ -113,6 +118,8 @@ class DeskSettingsPlugin : Plugin() {
                 unlockNearby = np.getBoolean("unlockNearby"),
                 sessionPasswordSet = if (np.has("sessionPasswordSet")) np.getBoolean("sessionPasswordSet") else null,
                 keepAwakeAllowed = if (np.has("keepAwakeAllowed")) np.getBoolean("keepAwakeAllowed") else null,
+                dndSync = if (np.has("dndSync")) np.getBoolean("dndSync") else null,
+                dnd = if (np.has("dndSync") && np.getBoolean("dndSync") && np.has("dnd")) np.getBoolean("dnd") else null,
             )
         }
 

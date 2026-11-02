@@ -5,6 +5,7 @@
  */
 package org.desklink.mobile.plugins.battery
 
+import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -20,6 +21,41 @@ import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 @LoadablePlugin
 class BatteryPlugin : Plugin() {
     private val batteryInfo = NetworkPacket(PACKET_TYPE_BATTERY)
+
+    /** W14: what the computer told the phone about Do Not Disturb sync, and the guards that keep the two ends from echoing. */
+    private val dndLoop = DndSync.Loop()
+    @Volatile private var dndSyncOn = false
+
+    /** The state packet: the charge, and `dnd` / `dndCanSet` only while the computer's Do Not Disturb switch is on. */
+    private fun outgoing(): NetworkPacket = NetworkPacket(PACKET_TYPE_BATTERY).also { np ->
+        np["currentCharge"] = batteryInfo.getInt("currentCharge")
+        np["isCharging"] = batteryInfo.getBoolean("isCharging")
+        np["thresholdEvent"] = batteryInfo.getInt("thresholdEvent")
+        np["chargeTimeRemaining"] = batteryInfo.getLong("chargeTimeRemaining", -1)
+        DndSync.keys(dndSyncOn, DndSync.phoneDnd(context), DndSync.canSet(context)).forEach { (k, v) -> np[k] = v }
+    }
+
+    /** The computer's `dndSync` / `dnd` arrived (every settings report): report ours, and follow its change when allowed. */
+    fun deskDndChanged(syncOn: Boolean, deskDnd: Boolean?) {
+        val was = dndSyncOn
+        dndSyncOn = syncOn
+        if (!syncOn) {
+            dndLoop.reset()
+            if (was) device.sendPacket(outgoing()) // the keys go away: the computer stops following this phone
+            return
+        }
+        val toSet = dndLoop.fromDesk(deskDnd, DndSync.phoneDnd(context), DndSync.canSet(context))
+        if (toSet != null) DndSync.apply(context, toSet)
+        if (!was) device.sendPacket(outgoing()) // the first report after the switch turned on
+    }
+
+    private val dndReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!dndSyncOn) return
+            val granted = intent.action == NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED
+            if (granted || dndLoop.localChange(DndSync.phoneDnd(context))) device.sendPacket(outgoing())
+        }
+    }
 
     /**
      * The latest battery information about the linked device. Will be null if the linked device
@@ -81,7 +117,7 @@ class BatteryPlugin : Plugin() {
                 batteryInfo["chargeTimeRemaining"] = chargeTime
                 // The widget shows this phone's battery too.
                 org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
-                device.sendPacket(batteryInfo)
+                device.sendPacket(outgoing())
 
                 // We just send a possible threshold event so reset it so we not create notifications on each change
                 thresholdEvent = THRESHOLD_EVENT_NONE
@@ -97,13 +133,18 @@ class BatteryPlugin : Plugin() {
         }
         val currentState = context.registerReceiver(receiver, intentFilter)
         receiver.onReceive(context, currentState)
+        dndSyncOn = device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.dndSync == true
+        context.registerReceiver(dndReceiver, IntentFilter().apply {
+            addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
+            addAction(NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED)
+        })
         return true
     }
 
     /** Feature-ready: the current state, even when nothing changed since the last send (S2). */
     override fun onFeatureReady() {
         context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let { receiver.onReceive(context, it) }
-        device.sendPacket(batteryInfo)
+        device.sendPacket(outgoing())
     }
 
     /** Turned off: the desk stops showing this phone's battery. */
@@ -114,6 +155,7 @@ class BatteryPlugin : Plugin() {
     override fun onDestroy() {
         // It's okay to call this only once, even though we registered it for two filters
         context.unregisterReceiver(receiver)
+        runCatching { context.unregisterReceiver(dndReceiver) }
     }
 
     override fun onPacketReceived(np: NetworkPacket): Boolean {
