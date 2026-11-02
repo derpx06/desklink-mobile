@@ -1030,6 +1030,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 contactsReadable = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED,
                 accessibilityOn = org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance != null,
                 deskNotificationsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java)),
+                activityOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.activity.ActivityPlugin::class.java)),
                 ready = it.hasActiveWebRtcFeatureTransport,
             )
         }
@@ -1046,6 +1047,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 // switches go through onDeskSetting only.
                 onPhoneClipboard = { on -> device?.let { setPluginEnabled(it, HomeModel.clipboardKey, on) } },
                 onPhoneNotifications = { on -> device?.let { setPluginEnabled(it, Plugin.getPluginKey(NotificationsPlugin::class.java), on) } },
+                onActivity = { on ->
+                    device?.let { setPluginEnabled(it, Plugin.getPluginKey(org.desklink.mobile.plugins.activity.ActivityPlugin::class.java), on) }
+                    // Notification access is asked for only now, when the person turns this on.
+                    if (on && !org.desklink.mobile.plugins.notifications.NotificationReceiver.hasReadNotificationsPermission(this)) {
+                        runCatching { startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                    }
+                },
                 onDeskSetting = { key, on -> deskSet(key, on) },
                 onPhoneMedia = { on ->
                     device?.let { setPluginEnabled(it, Plugin.getPluginKey(MprisReceiverPlugin::class.java), on) }

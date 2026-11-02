@@ -140,6 +140,7 @@ class SyncDigest(private val myInstance: () -> String) {
         const val NOTES = "notes"
         const val SNIPPETS = "snippets"
         const val SETTINGS = "settings"
+        const val ACTIVITY = "activity"
 
         /** The digested feature a snapshot packet belongs to, or null. */
         fun featureOf(packet: NetworkPacket): String? = when (packet.type) {

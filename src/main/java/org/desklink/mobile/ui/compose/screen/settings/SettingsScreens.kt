@@ -160,6 +160,8 @@ data class DeskSettings(
     /** F5: "Share contacts with <desk>" (phone-owned, off by default), and whether Android lets DeskLink read them. */
     val contactsOn: Boolean = false,
     val contactsReadable: Boolean = true,
+    /** W13: "Show ongoing items on <desk>" (phone-owned, off by default). */
+    val activityOn: Boolean = false,
 )
 
 @androidx.compose.runtime.Stable
@@ -180,6 +182,7 @@ class SettingsActions(
     val onDeskMayPlay: (Boolean) -> Unit = {},
     val onMicConsent: (Boolean) -> Unit = {},
     val onContacts: (Boolean) -> Unit = {},
+    val onActivity: (Boolean) -> Unit = {},
     val onPairAnother: () -> Unit = {},
     val onSendClipboard: () -> Unit = {},
     val onChooseNotificationApps: () -> Unit = {},

@@ -361,6 +361,14 @@ private fun NotificationsGroup(desk: DeskSettings?, actions: SettingsActions, pr
             }
         }
         DeskSwitch(desk, actions, keys.COMMAND_ALERTS, stringResource(R.string.settings_command_alerts), R.drawable.sym_notifications_active, stringResource(R.string.settings_command_alerts_summary), desk.remote?.commandAlerts == true)
+        // W13: phone-only; the computer shows the items while "Show <computer>'s notifications here" is on.
+        GroupRow(
+            stringResource(R.string.settings_activity_on, desk.name),
+            icon = R.drawable.sym_notifications_active,
+            subtitle = stringResource(R.string.settings_activity_on_summary),
+            checked = desk.activityOn,
+            onClick = { actions.onActivity(!desk.activityOn) },
+        )
         // W14: the switch lives at the computer; the phone shows it, and asks for Do Not Disturb access only once it is on.
         val dndSync = desk.remote?.dndSync == true
         GroupRow(
