@@ -67,6 +67,11 @@ class RoomHold {
 
     fun clear() = held.clear()
 
+    /** Keeps only the paths in [wanted]. */
+    fun retain(wanted: Set<String>) { held.keys.retainAll(wanted) }
+
+    fun forgetWhere(match: (String) -> Boolean) { held.keys.removeAll(match) }
+
     /** The held files that fit in [free] (taken out of the hold), smallest first. */
     fun risen(free: Long): List<Pair<String, Entry>> {
         val fits = held.entries.filter { FolderSync.enoughSpace(free, it.value.size) }.sortedBy { it.value.size }.map { it.key to it.value }

@@ -77,4 +77,16 @@ class FetchTrackerTest {
         val tracker = FetchTracker()
         assertTrue(tracker.failed("big.bin") is FetchTracker.Decision.Retry)
     }
+
+    @Test
+    fun heldFilesTheComputerNoLongerWantsAreDroppedFromTheHold() {
+        val hold = RoomHold()
+        listOf("a", "b/c", "b/d").forEach { hold.hold(it, Entry(1, 1, "x".repeat(64))) }
+        hold.retain(setOf("a", "b/c"))
+        assertTrue(hold.holds("a") && hold.holds("b/c") && !hold.holds("b/d"))
+        hold.forgetWhere { it == "b/c" || it.startsWith("b/c/") }
+        assertTrue(hold.holds("a") && !hold.holds("b/c"))
+        hold.forgetWhere { true }
+        assertTrue(hold.isEmpty)
+    }
 }

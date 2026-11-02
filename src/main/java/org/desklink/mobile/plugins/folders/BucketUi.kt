@@ -173,9 +173,15 @@ class BucketUi(
             tree ?: return@rememberLauncherForActivityResult
             if (!BucketEngine.turnOn(host, deviceId, tree)) toast(getString(R.string.bucket_folder_failed))
         }
+        // Decided when the banner is tapped (a missing folder starts fresh, a revoked grant keeps its records), not when the picker returns.
+        var fixFresh by rememberSaveable { mutableStateOf(false) }
         val pickFix = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
             tree ?: return@rememberLauncherForActivityResult
-            if (!BucketEngine.fix(host, deviceId, tree)) toast(getString(R.string.bucket_folder_failed))
+            when (BucketEngine.fix(host, deviceId, tree, fixFresh)) {
+                BucketEngine.FixResult.OK -> Unit
+                BucketEngine.FixResult.FAILED -> toast(getString(R.string.bucket_folder_failed))
+                BucketEngine.FixResult.OTHER_FOLDER -> toast(getString(R.string.bucket_fix_other_folder))
+            }
         }
         val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             if (uris.isNotEmpty()) BucketEngine.add(deviceId, uris.take(MAX_SHARED), path, ::report)
@@ -319,7 +325,7 @@ class BucketUi(
                         onDecline = { BucketEngine.decline(deviceId) },
                         below = below,
                     )
-                    else -> Content(view!!, desk, deviceId, path, selected, onFix = { pickFix.launch(BucketActivity.fixUri()) }, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p }, below = below)
+                    else -> Content(view!!, desk, deviceId, path, selected, onFix = { fresh -> fixFresh = fresh; pickFix.launch(BucketActivity.fixUri()) }, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p }, below = below)
                 }
                 if (on && !selecting) {
                     Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) {
@@ -540,7 +546,7 @@ class BucketUi(
     }
 
     @Composable
-    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onFix: () -> Unit, onOpen: (String) -> Unit, onSelect: (String) -> Unit, below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null) {
+    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onFix: (Boolean) -> Unit, onOpen: (String) -> Unit, onSelect: (String) -> Unit, below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null) {
         val t = tokens
         var menuFor by remember { mutableStateOf<BucketItem?>(null) }
         var renaming by remember { mutableStateOf<BucketItem?>(null) }
@@ -560,11 +566,11 @@ class BucketUi(
             }
             if (view.phase == Phase.HELD_EMPTY) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    Banner(stringResource(R.string.bucket_held_empty, desk), action = stringResource(R.string.bucket_held_confirm), warn = true, action2 = stringResource(R.string.bucket_fix), onAction2 = onFix) { BucketEngine.confirmEmpty(deviceId) }
+                    Banner(stringResource(R.string.bucket_held_empty, desk), action = stringResource(R.string.bucket_held_confirm), warn = true, action2 = stringResource(R.string.bucket_fix), onAction2 = { onFix(BucketFix.startsFresh(Phase.HELD_EMPTY)) }) { BucketEngine.confirmEmpty(deviceId) }
                 }
             }
             if (view.phase == Phase.NO_ACCESS) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_no_access, desk), action = stringResource(R.string.bucket_fix), warn = true, onAction = onFix) }
+                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_no_access, desk), action = stringResource(R.string.bucket_fix), warn = true, onAction = { onFix(BucketFix.startsFresh(Phase.NO_ACCESS)) }) }
             }
             if (view.phase == Phase.LISTING_FAILED) {
                 item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_listing_failed), warn = true) }

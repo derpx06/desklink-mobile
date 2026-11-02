@@ -128,4 +128,34 @@ class PeerStateTest {
         assertEquals(false, File(app.filesDir, "gallery/$desk.json").exists())
         assertTrue("another computer's record stays", File(app.filesDir, "gallery/$other.json").exists())
     }
+
+    private fun waitFor(what: String, condition: () -> Boolean) {
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+        while (!condition() && System.nanoTime() < deadline) Thread.sleep(20)
+        assertTrue(what, condition())
+    }
+
+    @Test
+    fun anUnpairBeforeStartDoesNotStopTheEngineFromStartingAfterwards() {
+        val state = File(app.filesDir, "bucket/state.json").apply { parentFile!!.mkdirs() }
+        fun record(id: String) = org.json.JSONObject().put("deviceId", id).put("treeUri", "content://tree/$id").put("computer", id).put("entries", org.json.JSONArray())
+        state.writeText(org.json.JSONObject().put("version", 1).put("buckets", org.json.JSONArray().put(record(desk)).put(record(other))).toString())
+        org.desklink.mobile.plugins.folders.BucketEngine.resetForTest(app, loaded = false)
+        waitFor("reset") { !org.desklink.mobile.plugins.folders.BucketEngine.isStarted }
+        PeerState.forget(app, desk)
+        org.desklink.mobile.plugins.folders.BucketEngine.start(app)
+        waitFor("the engine loaded the state it was kept from") { org.desklink.mobile.plugins.folders.BucketEngine.isStarted }
+        waitFor("with the other computer's Bucket only") { org.desklink.mobile.plugins.folders.BucketEngine.views.value.keys == setOf(other) }
+    }
+
+    @Test
+    fun theRecordDroppedBeforeStartNamesItsFolderForReleaseUnlessAnotherRecordUsesIt() {
+        val state = File(app.filesDir, "bucket/state.json").apply { parentFile!!.mkdirs() }
+        fun record(id: String, tree: String) = org.json.JSONObject().put("deviceId", id).put("treeUri", tree).put("computer", id).put("entries", org.json.JSONArray())
+        org.desklink.mobile.plugins.folders.BucketEngine.resetForTest(app, loaded = false)
+        state.writeText(org.json.JSONObject().put("version", 1).put("buckets", org.json.JSONArray().put(record(desk, "content://own")).put(record(other, "content://shared"))).toString())
+        assertEquals("content://own", org.desklink.mobile.plugins.folders.BucketEngine.dropRecord(desk))
+        state.writeText(org.json.JSONObject().put("version", 1).put("buckets", org.json.JSONArray().put(record(desk, "content://shared")).put(record(other, "content://shared"))).toString())
+        assertEquals("a folder another computer also uses keeps its grant", null, org.desklink.mobile.plugins.folders.BucketEngine.dropRecord(desk))
+    }
 }

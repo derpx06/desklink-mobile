@@ -21,4 +21,10 @@ object BucketFix {
      * because the folder and its files are still there.
      */
     fun startsFresh(phase: Phase): Boolean = phase == Phase.HELD_EMPTY
+
+    /** A revoked grant is given again for the same folder (the same tree document), or the records kept for it would not match. */
+    fun sameTree(old: String?, picked: android.net.Uri): Boolean =
+        old == null || runCatching {
+            android.provider.DocumentsContract.getTreeDocumentId(picked) == android.provider.DocumentsContract.getTreeDocumentId(android.net.Uri.parse(old))
+        }.getOrDefault(false)
 }

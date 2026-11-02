@@ -200,9 +200,13 @@ object BucketEngine {
 
     // ---- lifecycle -------------------------------------------------------------------------------------------
 
+    /** `start` runs once per process; an unpair that came first sets [app] but must not stop it. */
+    private val startQueued = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val tickScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
+
     @Synchronized
     fun start(context: Context) {
-        if (::app.isInitialized) return
+        if (!startQueued.compareAndSet(false, true)) return
         app = context.applicationContext
         worker.execute {
             load()
@@ -212,8 +216,10 @@ object BucketEngine {
             File(app.cacheDir, "bucket-stash").listFiles()?.forEach { it.delete() }
         }
         // A tick that throws is recorded by the executor and the next one still runs (backing off while it keeps failing).
-        worker.owner = { runCatching { worker.execute { tick() } } }
-        worker.scheduleWithFixedDelay({ tick() }, 5, 5, TimeUnit.SECONDS)
+        if (tickScheduled.compareAndSet(false, true)) {
+            worker.owner = { runCatching { worker.execute { tick() } } }
+            worker.scheduleWithFixedDelay({ tick() }, 5, 5, TimeUnit.SECONDS)
+        }
     }
 
     fun link(deviceId: String, up: Boolean) = worker.execute {
@@ -245,7 +251,7 @@ object BucketEngine {
             it.phase = Phase.WAITING
             // Shown "Paused": each resumes from its checkpoint on the next connection.
             it.tracks.values.forEach { track -> track.paused = true }
-            it.incoming.clear(); it.toRequest.clear(); it.outstanding.clear(); it.sending.clear(); it.sendQueue.clear(); it.sendActive.clear(); it.roomHold.clear()
+            it.incoming.clear(); it.toRequest.clear(); it.outstanding.clear(); it.sending.clear(); it.sendQueue.clear(); it.sendActive.clear(); it.roomHold.clear(); it.storageFull = false
         }
         synchronized(wanted) { wanted.keys.removeAll { it.first == deviceId } }
     }
@@ -302,22 +308,34 @@ object BucketEngine {
             live?.let(::unwatch)
             tree?.let(::release)
             // Not loaded yet (an unpair before start): saving the empty list would wipe the other computers' records, so the file is edited.
-            if (live != null || started) save() else dropRecord(deviceId)
+            val dropped = if (live != null || started) { save(); null } else dropRecord(deviceId)
+            dropped?.let(::release)
             publish()
         }
     }
 
+    enum class FixResult { OK, FAILED, OTHER_FOLDER }
+
     /**
-     * "Fix" on a held Bucket: the person picked the folder again. The grant is taken again, the folder is watched and scanned, and
-     * the sync resumes. Nothing is deleted on either side (see [BucketFix.startsFresh] for what a missing folder starts from).
+     * "Fix" on a held Bucket: the person picked the folder again. [fresh] is decided when the banner was tapped (a missing folder:
+     * [BucketFix.startsFresh]), never from the phase at the time this runs, which a link drop turns into WAITING. A revoked grant
+     * ([fresh] false) must be given for the same folder, because its records are kept and a different folder would read as
+     * "everything else was deleted". The grant is taken again, the folder watched and scanned, and the sync resumes.
      */
-    fun fix(context: Context, deviceId: String, tree: Uri): Boolean {
-        if (!keepGrant(context, tree)) return false
+    fun fix(context: Context, deviceId: String, tree: Uri, fresh: Boolean): FixResult {
+        val old = _views.value[deviceId]?.treeUri
+        if (!fresh && !BucketFix.sameTree(old, tree)) return FixResult.OTHER_FOLDER
+        if (!keepGrant(context, tree)) return FixResult.FAILED
         worker.execute {
-            val old = buckets[deviceId] ?: return@execute
-            val live = if (BucketFix.startsFresh(old.phase)) Live(deviceId, tree.toString(), old.computer) else old
-            val oldTree = old.treeUri
-            unwatch(old)
+            val oldLive = buckets[deviceId]
+            if (oldLive == null) {
+                // Turned off or unpaired while the picker was open: the grant just taken is not kept.
+                release(tree.toString())
+                return@execute
+            }
+            val live = if (fresh) Live(deviceId, tree.toString(), oldLive.computer).also { it.userPaused = oldLive.userPaused; it.lastSync = oldLive.lastSync } else oldLive
+            val oldTree = oldLive.treeUri
+            unwatch(oldLive)
             live.treeUri = tree.toString()
             live.phase = Phase.WAITING
             live.dirtyAt = 0
@@ -329,7 +347,7 @@ object BucketEngine {
             save()
             publish()
         }
-        return true
+        return FixResult.OK
     }
 
     fun decline(deviceId: String) = worker.execute {
@@ -497,6 +515,8 @@ object BucketEngine {
         fun hit(p: String) = p == path || p.startsWith(prefix)
         live.toRequest.removeAll(::hit)
         live.sendQueue.removeAll(::hit)
+        live.roomHold.forgetWhere(::hit)
+        if (live.roomHold.isEmpty) live.storageFull = false
         val arriving = live.outstanding.filter(::hit)
         live.outstanding.removeAll(arriving.toSet())
         arriving.forEach { p ->
@@ -763,6 +783,9 @@ object BucketEngine {
         downloads.removeAll { it.first in wasGivenUp }
         synchronized(wanted) { wasGivenUp.forEach { wanted.remove(live.deviceId to it) } }
         live.notSynced = live.notSynced.filterNot { it.second == Skip.COULDNT_FETCH } + live.gaveUp.keys.sorted().map { it to Skip.COULDNT_FETCH }
+        // A file held for room that the plan no longer wants (gone on the computer, changed): not asked for later.
+        live.roomHold.retain(downloads.map { it.first }.toSet())
+        if (live.roomHold.isEmpty) live.storageFull = false
         live.toRequest.clear()
         live.toRequest.addAll(downloads.map { it.first })
         live.outstanding.clear()
@@ -1287,10 +1310,14 @@ object BucketEngine {
         }
     }
 
+    @androidx.annotation.VisibleForTesting
+    internal val isStarted get() = started
+
     /** A test's way to make the engine look freshly started (state read) or not started yet, on the worker, before what the test does next. */
     @androidx.annotation.VisibleForTesting
     internal fun resetForTest(context: Context, loaded: Boolean) {
         app = context.applicationContext
+        startQueued.set(false)
         worker.execute {
             buckets.clear()
             started = false
@@ -1300,18 +1327,25 @@ object BucketEngine {
     }
 
     /** Removes [deviceId]'s record from the saved state without loading it (the files in its folder are not touched). */
-    private fun dropRecord(deviceId: String) {
+    @androidx.annotation.VisibleForTesting
+    internal fun dropRecord(deviceId: String): String? {
         val file = AtomicFile(File(app.filesDir, STATE_FILE))
-        if (!file.baseFile.exists()) return
-        val json = runCatching { JSONObject(String(file.readFully(), Charsets.UTF_8)) }.getOrNull() ?: return
+        if (!file.baseFile.exists()) return null
+        val json = runCatching { JSONObject(String(file.readFully(), Charsets.UTF_8)) }.getOrNull() ?: return null
         val kept = JSONArray()
-        val all = json.optJSONArray("buckets") ?: return
-        (0 until all.length()).forEach { i -> all.optJSONObject(i)?.takeIf { it.optString("deviceId") != deviceId }?.let(kept::put) }
+        val all = json.optJSONArray("buckets") ?: return null
+        var tree: String? = null
+        (0 until all.length()).forEach { i ->
+            val record = all.optJSONObject(i) ?: return@forEach
+            if (record.optString("deviceId") == deviceId) tree = record.optString("treeUri").takeIf(String::isNotEmpty) else kept.put(record)
+        }
         json.put("buckets", kept)
         runCatching {
             val out = file.startWrite()
             try { out.write(json.toString().toByteArray(Charsets.UTF_8)); file.finishWrite(out) } catch (e: Exception) { file.failWrite(out); throw e }
         }
+        // The folder's grant goes unless another computer's record uses the same one.
+        return tree?.takeIf { gone -> (0 until kept.length()).none { kept.getJSONObject(it).optString("treeUri") == gone } }
     }
 
     private fun save() {
