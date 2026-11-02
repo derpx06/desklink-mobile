@@ -53,6 +53,9 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_TELEPHONY_REQUEST = "desklink.telephony.request"
     /** W2: what this side already holds of the peer's snapshots (revs), sent first on every feature-ready. */
     const val PACKET_TYPE_SYNC_HAVE = "desklink.sync.have"
+
+    /** W18: a marker in the profile, never a packet: this build can carry a file over the pinned LAN fast lane. */
+    const val PACKET_TYPE_FILELANE_V1 = "desklink.filelane.v1"
     const val PACKET_TYPE_WEBRTC_SIGNAL_V1 = "desklink.webrtc.signal.v1"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES = "desklink.shareinputdevices"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST = "desklink.shareinputdevices.request"

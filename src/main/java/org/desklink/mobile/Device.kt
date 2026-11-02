@@ -501,7 +501,10 @@ class Device : PacketReceiver {
     fun requestConnectionStats(callback: org.desklink.mobile.webrtc.WebRtcConnectionStatsCallback) {
         val transport = webRtcTransport ?: return callback.onStats(null)
         transport.requestConnectionStats(!hasLanLink && relayLink != null) { stats ->
-            if (webRtcTransport === transport) connectionPath = stats?.path
+            if (webRtcTransport === transport) {
+                connectionPath = stats?.path
+                selectedRemoteAddress = stats?.remoteAddress
+            }
             callback.onStats(stats)
         }
     }
@@ -513,6 +516,17 @@ class Device : PacketReceiver {
     @Volatile
     var connectionPath: org.desklink.mobile.webrtc.WebRtcConnectionPath? = null
         private set
+
+    /** The selected ICE pair's remote address as last measured; with [connectionPath], all the fast lane trusts. */
+    @Volatile
+    private var selectedRemoteAddress: String? = null
+
+    /**
+     * Where the fast lane dials this computer: the SELECTED ICE pair's remote address when that pair is host/prflx on the LAN, private and
+     * on a subnet this phone is attached to; never a discovery or peer-supplied address. Null otherwise.
+     */
+    fun lanAddress(): java.net.InetAddress? =
+        if (connectionPath == org.desklink.mobile.webrtc.WebRtcConnectionPath.LAN) org.desklink.mobile.webrtc.FileLaneProtocol.laneAddress(selectedRemoteAddress) else null
 
     /** The preferred link is pinned TLS over the LAN (the relay is the other). */
     /** Whether [packetType] is in the feature set shared with this computer (both profiles agree). */
@@ -611,6 +625,7 @@ class Device : PacketReceiver {
         if (webRtcTransport === transport) return
         webRtcTransport = transport
         connectionPath = null
+        selectedRemoteAddress = null
         if (transport?.isReadyForPackets() == true) requestConnectionStats { }
         if (transport?.isReadyForPackets() == true) flushPendingFeaturePackets()
         // Plugin availability is calculated from reachability. Re-evaluate it

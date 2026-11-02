@@ -49,7 +49,10 @@ enum class WebRtcFileAction(val wireName: String) {
     DONE("done"),
     COMPLETE("complete"),
     CANCEL("cancel"),
-    ERROR("error");
+    ERROR("error"),
+
+    /** W18: "from now on I send from block n at this pass over this lane" (sender to receiver). */
+    LANE("lane");
 
     companion object {
         fun fromWireName(value: String): WebRtcFileAction =
@@ -115,6 +118,8 @@ data class WebRtcFileControl(
     val folder: String? = null,
     val relpath: String? = null,
     val contentSha256: String? = null,
+    /** W18: the fast lane. An offer carries `{v}`, an accept `{v, port, token, ttlMs}`, a `lane` action `{kind, startBlock, pass}`. */
+    val lane: FileLaneSpec? = null,
 ) {
     fun validate(wire: WebRtcWireBinding) {
         require(protocolVersion == VERSION) { "Unsupported DeskLink WebRTC file version" }
@@ -160,7 +165,9 @@ data class WebRtcFileControl(
             WebRtcFileAction.COMPLETE -> require(fileHash != null) { "Malformed DeskLink WebRTC complete" }
             // Any code: an unknown one ends the transfer like any other, and frees its slot and partial file.
             WebRtcFileAction.CANCEL, WebRtcFileAction.ERROR -> Unit
+            WebRtcFileAction.LANE -> require(lane?.kind in FileLaneSpec.KINDS && lane?.startBlock != null && lane.pass != null) { "Malformed DeskLink file lane" }
         }
+        lane?.validate()
     }
 
     fun toJson(): JSONObject = JSONObject()
@@ -194,6 +201,7 @@ data class WebRtcFileControl(
             folder?.let { value.put("folder", it) }
             relpath?.let { value.put("relpath", it) }
             contentSha256?.let { value.put("contentSha256", it) }
+            lane?.let { value.put("lane", it.toJson()) }
         }
 
     companion object {
@@ -237,8 +245,46 @@ data class WebRtcFileControl(
                 folder = str("folder"),
                 relpath = str("relpath"),
                 contentSha256 = str("contentSha256"),
+                lane = value.optJSONObject("lane")?.let(FileLaneSpec::fromJson),
             )
         }
+    }
+}
+
+/**
+ * The `lane` field of a file control message (W18). Offer: [v]. Accept: [v], [port], [token], [ttlMs]. A `lane` action: [kind],
+ * [startBlock], [pass]. Every field is optional on the wire and bounded here.
+ */
+data class FileLaneSpec(
+    val v: Int? = null, val port: Int? = null, val token: String? = null, val ttlMs: Long? = null,
+    val kind: String? = null, val startBlock: Int? = null, val pass: Int? = null,
+) {
+    fun validate() {
+        require(v == null || v == 1) { "Unsupported DeskLink file lane version" }
+        require(port == null || port in 1..65535) { "Invalid DeskLink file lane port" }
+        require(token == null || FileLaneProtocol.validToken(token)) { "Invalid DeskLink file lane token" }
+        require(ttlMs == null || ttlMs in 1..FileLaneProtocol.TOKEN_TTL_MS) { "Invalid DeskLink file lane lifetime" }
+        require(kind == null || kind in KINDS) { "Invalid DeskLink file lane kind" }
+        require(startBlock == null || startBlock in 0..WebRtcFileControl.MAX_BLOCKS) { "Invalid DeskLink file lane start" }
+        require(pass == null || pass in 0..255) { "Invalid DeskLink file lane pass" }
+    }
+
+    fun toJson(): JSONObject = JSONObject().also { o ->
+        v?.let { o.put("v", it) }; port?.let { o.put("port", it) }; token?.let { o.put("token", it) }; ttlMs?.let { o.put("ttlMs", it) }
+        kind?.let { o.put("kind", it) }; startBlock?.let { o.put("startBlock", it) }; pass?.let { o.put("pass", it) }
+    }
+
+    companion object {
+        const val TCP = "tcp"
+        const val WEBRTC = "webrtc"
+        val KINDS = setOf(TCP, WEBRTC)
+
+        fun fromJson(o: JSONObject) = FileLaneSpec(
+            v = if (o.has("v")) o.getInt("v") else null, port = if (o.has("port")) o.getInt("port") else null,
+            token = if (o.has("token")) o.getString("token") else null, ttlMs = if (o.has("ttlMs")) o.getLong("ttlMs") else null,
+            kind = if (o.has("kind")) o.getString("kind") else null, startBlock = if (o.has("startBlock")) o.getInt("startBlock") else null,
+            pass = if (o.has("pass")) o.getInt("pass") else null,
+        )
     }
 }
 

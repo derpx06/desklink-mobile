@@ -226,7 +226,7 @@ class FileProtocolV2Test {
     @Test
     fun theWireNamesAreTheContractedOnes() {
         assertEquals(
-            listOf("offer", "accept", "block-ack", "block-nack", "pause", "resume", "done", "complete", "cancel", "error"),
+            listOf("offer", "accept", "block-ack", "block-nack", "pause", "resume", "done", "complete", "cancel", "error", "lane"),
             WebRtcFileAction.entries.map { it.wireName },
         )
         assertEquals("desklink.file.control.v2", WebRtcFileControl.CONTROL_MESSAGE_TYPE)

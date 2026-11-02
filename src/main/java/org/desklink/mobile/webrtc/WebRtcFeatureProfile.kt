@@ -51,6 +51,8 @@ object WebRtcFeatureProfile {
         DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
         // Delta resync (W2): the revs of the snapshots this side already holds.
         DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE,
+        // Bulk lanes (W18): a marker; both sides must list it for the fast lane to be offered.
+        DeskLinkProtocol.PACKET_TYPE_FILELANE_V1,
         DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST,
         // Glide (F4): the desk's pointer enters, and the phone hands it back.
         DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES,

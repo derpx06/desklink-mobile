@@ -17,6 +17,8 @@ data class WebRtcConnectionStats(
     val path: WebRtcConnectionPath,
     val roundTripTimeMs: Long?,
     val availableOutgoingBitrateBps: Long?,
+    /** The remote candidate's address of the selected pair, as libwebrtc reports it (the fast lane dials only this; never a peer-supplied field). */
+    val remoteAddress: String? = null,
 )
 
 /** Delivered on libwebrtc's signaling thread; post to the UI thread yourself. */
@@ -72,5 +74,6 @@ internal fun connectionStatsFrom(
         path = connectionPath(localType, remoteType, bootstrapViaRelay),
         roundTripTimeMs = (pair["currentRoundTripTime"] as? Number)?.let { Math.round(it.toDouble() * 1000) },
         availableOutgoingBitrateBps = (pair["availableOutgoingBitrate"] as? Number)?.toLong(),
+        remoteAddress = report[pair["remoteCandidateId"] as? String]?.members.let { (it?.get("address") ?: it?.get("ip")) as? String },
     )
 }

@@ -160,6 +160,9 @@ object DeviceHelper {
         // never lists it, and the desk (which sends only what the phone confirmed) never sent its own.
         incoming += DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE
         outgoing += DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE
+        // Bulk lanes (W18) are a marker, not a plugin: both lists, so the handover intersection can contain it.
+        incoming += DeskLinkProtocol.PACKET_TYPE_FILELANE_V1
+        outgoing += DeskLinkProtocol.PACKET_TYPE_FILELANE_V1
         return DeviceInfo(
             getDeviceId(context),
             SslHelper.certificate,

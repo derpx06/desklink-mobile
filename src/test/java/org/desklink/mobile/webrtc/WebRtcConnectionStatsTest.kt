@@ -67,6 +67,17 @@ class WebRtcConnectionStatsTest {
     }
 
     @Test
+    fun theSelectedRemoteCandidatesAddressIsKept() {
+        val report = mapOf(
+            stats("T1", "transport", "selectedCandidatePairId" to "CP"),
+            stats("CP", "candidate-pair", "localCandidateId" to "L", "remoteCandidateId" to "R", "currentRoundTripTime" to 0.004),
+            stats("L", "local-candidate", "candidateType" to "host", "address" to "192.168.1.3"),
+            stats("R", "remote-candidate", "candidateType" to "host", "address" to "192.168.1.9"),
+        )
+        assertEquals("192.168.1.9", connectionStatsFrom(report, bootstrapViaRelay = false)?.remoteAddress)
+    }
+
+    @Test
     fun noSelectedPairMeansNoStats() {
         assertNull(connectionStatsFrom(mapOf(stats("T1", "transport")), bootstrapViaRelay = false))
     }

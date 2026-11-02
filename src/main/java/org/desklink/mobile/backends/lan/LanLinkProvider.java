@@ -211,12 +211,6 @@ public class LanLinkProvider extends BaseLinkProvider {
         // timeout a silent connection pinned this thread and socket forever.
         socket.setSoTimeout(5000);
 
-        if (rateLimit(lastTcpConnectionTimeByIp, address)) {
-            Log.i("LanLinkProvider", "Discarding second TCP packet from the same ip " + address + " received too quickly");
-            closeQuietly(socket);
-            return;
-        }
-
         String message;
         try {
             // We don't use a BufferedInputStream on purpose, since BufferedReader reads ahead and would require
@@ -226,6 +220,19 @@ public class LanLinkProvider extends BaseLinkProvider {
             //Log.e("TcpListener", "Received TCP packet: " + message);
         } catch (Exception e) {
             Log.e("DeskLink/LanLinkProvider", "Exception while receiving TCP packet", e);
+            closeQuietly(socket);
+            return;
+        }
+
+        // W18: a bulk-transfer lane from a paired computer takes this connection over; it never becomes a link and never reaches the
+        // dispatcher. It has its own limits (paired only, a one-time token, two per peer), so the identity rate limit below does not apply.
+        if (org.desklink.mobile.webrtc.FileLaneProtocol.INSTANCE.parseFirst(message) != null) {
+            org.desklink.mobile.webrtc.RealFileLanes.Companion.accept(context, socket, message);
+            return;
+        }
+
+        if (rateLimit(lastTcpConnectionTimeByIp, address)) {
+            Log.i("LanLinkProvider", "Discarding second TCP packet from the same ip " + address + " received too quickly");
             closeQuietly(socket);
             return;
         }
@@ -708,6 +715,7 @@ public class LanLinkProvider extends BaseLinkProvider {
     private void setupTcpListener() {
         try {
             tcpServer = openServerSocketOnFreePort(MIN_PORT);
+            org.desklink.mobile.webrtc.RealFileLanes.Companion.setListenPort(tcpServer.getLocalPort());
         } catch (IOException e) {
             Log.e("LanLinkProvider", "Error creating tcp server", e);
             throw new RuntimeException(e);
@@ -936,6 +944,7 @@ public class LanLinkProvider extends BaseLinkProvider {
             mdnsDiscovery.stopDiscovering();
         }
         try {
+            org.desklink.mobile.webrtc.RealFileLanes.Companion.setListenPort(0);
             tcpServer.close();
         } catch (Exception e) {
             Log.e("LanLink", "Exception", e);
