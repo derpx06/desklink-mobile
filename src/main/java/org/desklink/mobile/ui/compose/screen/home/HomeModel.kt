@@ -60,7 +60,8 @@ object HomeModel {
                         tr.resuming -> context.getString(R.string.home_transfer_resuming)
                         tr.failed -> context.getString(R.string.home_transfer_failed)
                         tr.finished -> context.getString(if (tr.upload) R.string.home_transfer_sent else R.string.home_transfer_received)
-                        else -> tr.percent?.let { "$it%" } ?: context.getString(if (tr.upload) R.string.home_transfer_sending else R.string.home_transfer_receiving)
+                        else -> (tr.percent?.let { "$it%" } ?: context.getString(if (tr.upload) R.string.home_transfer_sending else R.string.home_transfer_receiving)) +
+                            (org.desklink.mobile.plugins.share.TransferNotification.laneWord(context, id, tr.upload, tr.title)?.let { " · $it" } ?: "")
                     },
                     progress = if (tr.finished) 1f else tr.percent?.let { it / 100f },
                     upload = tr.upload,

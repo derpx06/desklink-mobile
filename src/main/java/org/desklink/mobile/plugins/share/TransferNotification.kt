@@ -214,6 +214,13 @@ object TransferNotification {
         refresh(id)
     }
 
+    /** A receive cut by a lost link: its row goes, but the same transfer comes back on resume, so nothing is tombstoned. */
+    fun suspended(jobId: Long) {
+        val (id, d) = deskOfJob(jobId) ?: return
+        synchronized(d) { d.jobs.remove(jobId) }
+        refresh(id)
+    }
+
     fun cancelled(jobId: Long) {
         val (id, d) = deskOfJob(jobId) ?: return
         synchronized(d) { d.jobs.remove(jobId); tombstone(d, jobId) }
@@ -380,7 +387,17 @@ object TransferNotification {
         waitingFor = context.getString(R.string.transfer_note_waiting), paused = context.getString(R.string.transfer_note_paused),
         storageFull = context.getString(R.string.transfer_note_storage_full), publicText = context.getString(R.string.transfer_note_public),
         eta = org.desklink.mobile.plugins.folders.BucketSyncNotification.words(context),
+        laneFast = context.getString(R.string.transfer_lane_fast), laneWebRtc = context.getString(R.string.transfer_lane_webrtc),
+        laneRelay = context.getString(R.string.transfer_lane_relay),
     )
+
+    /** The lane a moving file is on, in words, for Home's row; null when not known. */
+    fun laneWord(context: Context, deviceId: String, upload: Boolean, name: String): String? = when (laneKinds["$deviceId|$upload|$name"]) {
+        LANE_FAST -> context.getString(R.string.transfer_lane_fast)
+        LANE_WEBRTC -> context.getString(R.string.transfer_lane_webrtc)
+        LANE_RELAY -> context.getString(R.string.transfer_lane_relay)
+        else -> null
+    }
 
     /** Cancel (the whole set), Pause sync and Resume from the notification. Not exported: only our PendingIntent reaches it. */
     class Receiver : BroadcastReceiver() {

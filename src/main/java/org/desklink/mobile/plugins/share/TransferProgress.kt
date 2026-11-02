@@ -90,6 +90,13 @@ object TransferProgress {
         notify { TransferNotification.dropWaiting(deviceId) }
     }
 
+    /** A receive cut by a lost link: gone from the row, but the same id comes back when it resumes (not a cancel). */
+    @JvmStatic
+    fun suspended(jobId: Long) {
+        if (current?.jobId == jobId) current = null
+        notify { TransferNotification.suspended(jobId) }
+    }
+
     @JvmStatic
     fun cancel(jobId: Long) {
         if (current?.jobId == jobId) current = null

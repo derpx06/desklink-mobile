@@ -167,6 +167,34 @@ class TransferNotificationTest {
     }
 
     @Test
+    fun aReceiveCutByALostLinkComesBackUnderTheSameIdBecauseOnlyACancelTombstones() {
+        val desk = "77777777-aaaa-bbbb-cccc-777777777777"
+        TransferProgress.update(desk, 5L, false, "r.bin", 30, 1_000_000)
+        assertEquals(listOf(5L), TransferNotification.jobIds(desk))
+        TransferProgress.suspended(5L) // the link dropped; the same transfer id returns on resume
+        assertEquals(emptyList<Long>(), TransferNotification.jobIds(desk))
+        TransferProgress.update(desk, 5L, false, "r.bin", 40, 1_000_000)
+        later(1_100)
+        assertEquals("the resumed receive shows again", listOf(5L), TransferNotification.jobIds(desk))
+        assertTrue(text(posted().single()).startsWith("Receiving r.bin"))
+        TransferProgress.cancel(5L) // a real cancel is final
+        TransferProgress.update(desk, 5L, false, "r.bin", 50, 1_000_000)
+        assertEquals(emptyList<Long>(), TransferNotification.jobIds(desk))
+    }
+
+    @Test
+    fun theLaneWordsComeFromTheResourcesAndAreForgottenWhenTheFileIsDone() {
+        val words = TransferNotification.words(app)
+        assertEquals("fast lane", words.laneFast); assertEquals("over WebRTC", words.laneWebRtc); assertEquals("through a relay", words.laneRelay)
+        val desk = "88888888-aaaa-bbbb-cccc-888888888888"
+        TransferNotification.lane(desk, "a.bin", true, TransferNotification.LANE_FAST)
+        assertEquals("fast lane", TransferNotification.laneWord(app, desk, true, "a.bin"))
+        assertNull("another direction or name is not that file", TransferNotification.laneWord(app, desk, false, "a.bin"))
+        TransferNotification.lane(desk, "a.bin", true, null)
+        assertNull(TransferNotification.laneWord(app, desk, true, "a.bin"))
+    }
+
+    @Test
     fun aPausedBucketOrAFullDiskIsTheBucketsNotAPlainFilesAndSavingHasNoButton() {
         val plain = listOf(item("a.bin", true, 1, 10))
         assertTrue(TransferNotification.note("Dell", plain, 0, 0, userPaused = true, storageFull = true, size = size)!!.text.startsWith("Sending a.bin"))
