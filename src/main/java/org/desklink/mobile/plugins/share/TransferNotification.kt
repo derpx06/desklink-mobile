@@ -37,6 +37,7 @@ object TransferNotification {
     private const val ACTION_PAUSE = "org.desklink.mobile.plugins.folders.PAUSE_SYNC"
     private const val ACTION_RESUME = "org.desklink.mobile.plugins.folders.RESUME_SYNC"
     private const val EXTRA_DEVICE = "deviceId"
+    private const val EXTRA_SET = "set"
 
     /** One file moving: its numbers, as the notification needs them. */
     data class Item(
@@ -45,7 +46,7 @@ object TransferNotification {
         val waiting: Boolean, val saving: Boolean = false, val bucket: Boolean = false,
     )
 
-    enum class Action { CANCEL, PAUSE_SYNC, RESUME_SYNC }
+    enum class Action { CANCEL, PAUSE_SYNC, RESUME_SYNC, NONE }
 
     data class Note(val text: String, val fraction: Float, val indeterminate: Boolean, val action: Action)
 
@@ -69,6 +70,10 @@ object TransferNotification {
     ): Note? {
         if (items.isEmpty()) return null
         val sum = BucketProgress.summary(items.map { Progress(it.done, it.total, it.etaSeconds, it.bytesPerSecond, it.waiting) }) ?: return null
+        // "Paused" and "Storage is full" are the Bucket's: they say nothing about a plain file moving beside it.
+        val bucketOnly = items.all { it.bucket }
+        val userPaused = userPaused && bucketOnly
+        val storageFull = storageFull && bucketOnly
         val total = sum.total + finishedBytes
         val fraction = if (total <= 0) 0f else ((sum.done + finishedBytes).toFloat() / total).coerceIn(0f, 1f)
         val action = when {
@@ -76,7 +81,8 @@ object TransferNotification {
             items.all { it.bucket } -> Action.PAUSE_SYNC
             else -> Action.CANCEL
         }
-        if (items.size == 1 && items[0].saving) return Note(w.saving.format(items[0].name), 0f, true, action)
+        // A file being put in place cannot be stopped half way: no button, the notice of the finished file follows.
+        if (items.size == 1 && items[0].saving) return Note(w.saving.format(items[0].name), 0f, true, Action.NONE)
         val verb = when {
             items.all { it.sending } -> w.sending
             items.none { it.sending } -> w.receiving
@@ -117,6 +123,10 @@ object TransferNotification {
         var finishedInSet = 0
         var finishedBytes = 0L
         var showing = false
+        /** Changes whenever a new set starts: the Cancel of a notification shown for an earlier set does nothing. */
+        var setId = 0
+        /** Jobs that ended or were cancelled: a late progress call for one does not bring it back. */
+        val ended = LinkedHashSet<Long>()
         val throttle = ActivityItems.Throttle(UPDATE_EVERY_MS)
         var trailing: Runnable? = null
     }
@@ -124,14 +134,31 @@ object TransferNotification {
     private val desks = HashMap<String, Desk>()
     private val handler by lazy { Handler(Looper.getMainLooper()) }
     private fun desk(id: String) = synchronized(desks) { desks.getOrPut(id) { Desk() } }
-    private fun deskOfJob(jobId: Long) = synchronized(desks) { desks.entries.firstOrNull { jobId in it.value.jobs }?.toPair() }
+
+    /** The computer a job belongs to; each desk's jobs are read under its own lock. */
+    private fun deskOfJob(jobId: Long): Pair<String, Desk>? {
+        val all = synchronized(desks) { desks.entries.map { it.key to it.value } }
+        return all.firstOrNull { (_, d) -> synchronized(d) { jobId in d.jobs } }
+    }
+
+    private fun tombstone(d: Desk, jobId: Long) {
+        d.ended.add(jobId)
+        while (d.ended.size > 64) d.ended.remove(d.ended.first())
+    }
 
     /** A transfer moved (sent or received): [percent] of [totalBytes], by [TransferProgress]. */
     fun progress(deviceId: String, jobId: Long, upload: Boolean, title: String, percent: Int?, totalBytes: Long) {
         val now = SystemClock.elapsedRealtime()
         val d = desk(deviceId)
         synchronized(d) {
-            val job = d.jobs.getOrPut(jobId) { Job(upload, title, totalBytes, now) }
+            if (jobId in d.ended) return
+            val existing = d.jobs[jobId]
+            if (existing == null) {
+                // A send that resumes after a lost link runs under a new id: the paused one it replaces goes.
+                d.jobs.entries.removeAll { (_, j) -> j.waiting && j.upload == upload && j.name == title }
+                if (d.jobs.isEmpty()) d.setId++
+            }
+            val job = existing ?: Job(upload, title, totalBytes, now).also { d.jobs[jobId] = it }
             if (title.isNotEmpty()) job.name = title
             if (totalBytes > 0) job.total = totalBytes
             job.done = if (percent == null) 0 else job.total * percent.coerceIn(0, 100) / 100
@@ -145,6 +172,8 @@ object TransferNotification {
     fun saving(deviceId: String, jobId: Long, title: String, totalBytes: Long) {
         val d = desk(deviceId)
         synchronized(d) {
+            if (jobId in d.ended) return
+            if (d.jobs.isEmpty()) d.setId++
             val job = d.jobs.getOrPut(jobId) { Job(false, title, totalBytes, SystemClock.elapsedRealtime()) }
             job.saving = true; job.done = job.total
         }
@@ -162,6 +191,7 @@ object TransferNotification {
         val (id, d) = deskOfJob(jobId) ?: return
         synchronized(d) {
             val job = d.jobs.remove(jobId) ?: return
+            tombstone(d, jobId)
             if (!failed) { d.finishedInSet++; d.finishedBytes += job.total }
         }
         refresh(id)
@@ -169,9 +199,39 @@ object TransferNotification {
 
     fun cancelled(jobId: Long) {
         val (id, d) = deskOfJob(jobId) ?: return
-        synchronized(d) { d.jobs.remove(jobId) }
+        synchronized(d) { d.jobs.remove(jobId); tombstone(d, jobId) }
         refresh(id)
     }
+
+    /** Sends paused by a lost link of [deviceId] will never resume (discarded, unpaired): their "Waiting" goes. */
+    fun dropWaiting(deviceId: String) {
+        val d = desk(deviceId)
+        synchronized(d) { d.jobs.entries.removeAll { (_, j) -> j.waiting } }
+        refresh(deviceId)
+    }
+
+    /** The computer is unpaired: nothing of it stays on the shade. */
+    fun forget(context: Context, deviceId: String) {
+        val d = synchronized(desks) { desks.remove(deviceId) } ?: return
+        clear(context, deviceId, d)
+    }
+
+    /**
+     * At start nothing is moving: a transfer notification still on the shade belongs to a process that died (or to the Bucket's
+     * earlier "bucket-sync" tag) and its buttons would do nothing. They go.
+     */
+    fun sweep(context: Context) {
+        val manager = NotificationManagerCompat.from(context)
+        val leftovers = runCatching {
+            context.getSystemService(android.app.NotificationManager::class.java).activeNotifications.filter {
+                it.id == ID && (it.tag?.startsWith("transfer:") == true || it.tag?.startsWith("bucket-sync:") == true)
+            }
+        }.getOrDefault(emptyList())
+        leftovers.forEach { runCatching { manager.cancel(it.tag, ID) } }
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun resetForTest() { synchronized(desks) { desks.values.forEach { it.trailing?.let(handler::removeCallbacks) }; desks.clear() } }
 
     /** The jobs of [deviceId] now moving (for Cancel). */
     fun jobIds(deviceId: String): List<Long> = desk(deviceId).let { d -> synchronized(d) { d.jobs.keys.toList() } }
@@ -200,69 +260,82 @@ object TransferNotification {
 
     private fun tag(deviceId: String) = "transfer:$deviceId"
 
-    /** Posts the current state, at most once a second (one trailing post catches the last change). */
+    /** Posts the current state, at most once a second: the first change at once, one trailing post for the rest. */
     private fun refresh(deviceId: String) {
         val context = runCatching { DeskLinkApplication.getInstance() as Context }.getOrNull() ?: return
         val d = desk(deviceId)
         val moving = synchronized(d) { d.jobs.isNotEmpty() || d.bucket.isNotEmpty() }
         if (!moving) { clear(context, deviceId, d); return }
-        val now = SystemClock.elapsedRealtime()
-        val wait = synchronized(d) { d.throttle.onChange(now) } ?: return
-        if (wait == 0L) post(context, deviceId, d)
-        else handler.postDelayed(Runnable { synchronized(d) { d.throttle.onFired(SystemClock.elapsedRealtime()) }; refresh(deviceId) }.also { synchronized(d) { d.trailing = it } }, wait)
+        val wait = synchronized(d) { d.throttle.onChange(SystemClock.elapsedRealtime()) } ?: return
+        if (wait == 0L) { post(context, deviceId, d); return }
+        val trailing = Runnable {
+            synchronized(d) { d.throttle.onFired(SystemClock.elapsedRealtime()); d.trailing = null }
+            // Posted now, not asked again: asking would only schedule another wait for the same second.
+            if (synchronized(d) { d.jobs.isNotEmpty() || d.bucket.isNotEmpty() }) post(context, deviceId, d) else clear(context, deviceId, d)
+        }
+        synchronized(d) { d.trailing = trailing }
+        handler.postDelayed(trailing, wait)
     }
 
     private fun clear(context: Context, deviceId: String, d: Desk) {
-        val wasShowing = synchronized(d) {
+        synchronized(d) {
             d.trailing?.let(handler::removeCallbacks); d.trailing = null
             d.throttle.onFired(Long.MIN_VALUE / 4)
             d.finishedInSet = 0; d.finishedBytes = 0
-            d.showing.also { d.showing = false }
+            // Under the same lock as post: a post in flight cannot land after this cancel.
+            if (d.showing) runCatching { NotificationManagerCompat.from(context).cancel(tag(deviceId), ID) }
+            d.showing = false
         }
-        if (wasShowing) runCatching { NotificationManagerCompat.from(context).cancel(tag(deviceId), ID) }
     }
 
+    /** Ongoing only while bytes move: waiting or paused can be swiped, and goes by itself after ten minutes. */
+    const val IDLE_TIMEOUT_MS = 10 * 60_000L
+
     @SuppressLint("MissingPermission")
-    private fun post(context: Context, deviceId: String, d: Desk) {
+    private fun post(context: Context, deviceId: String, d: Desk) = synchronized(d) {
         val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return
+        if (!manager.areNotificationsEnabled()) return@synchronized
         val desk = DeskNames.of(deviceId)
         val now = SystemClock.elapsedRealtime()
-        val (items, set) = synchronized(d) {
-            val running = d.jobs.values.map { j ->
-                val remaining = (j.total - j.done).coerceAtLeast(0)
-                Item(j.name, j.upload, j.done, j.total, j.meter.etaSeconds(remaining, now), j.meter.bytesPerSecond(now), j.waiting, j.saving)
-            } + d.bucket.map { it.copy(waiting = it.waiting || !d.bucketLinkUp || d.bucketPaused) }
-            running to listOf(d.finishedInSet.toLong(), d.finishedBytes, if (d.bucketPaused) 1L else 0L, if (d.storageFull) 1L else 0L)
-        }
+        val items = d.jobs.values.map { j ->
+            val remaining = (j.total - j.done).coerceAtLeast(0)
+            Item(j.name, j.upload, j.done, j.total, j.meter.etaSeconds(remaining, now), j.meter.bytesPerSecond(now), j.waiting, j.saving)
+        } + d.bucket.map { it.copy(waiting = it.waiting || !d.bucketLinkUp || d.bucketPaused) }
         val w = words(context)
-        val note = note(desk, items, set[0].toInt(), set[1], set[2] == 1L, set[3] == 1L, { Sizes.iec(it) }, w) ?: return
+        val note = note(desk, items, d.finishedInSet, d.finishedBytes, d.bucketPaused, d.storageFull, { Sizes.iec(it) }, w) ?: return@synchronized
+        val standing = items.all { it.waiting } || note.text == w.paused || note.text == w.storageFull
         val builder = base(context, deviceId)
             .setContentTitle(context.getString(R.string.transfer_note_title))
             .setContentText(note.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(note.text))
             .setSubText(desk)
             .setProgress(1000, (note.fraction * 1000).toInt(), note.indeterminate)
-            .setOngoing(true)
+            .setOngoing(!standing)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setPublicVersion(
                 NotificationCompat.Builder(context, NotificationHelper.Channels.FILETRANSFER_DOWNLOAD)
                     .setSmallIcon(R.drawable.ic_notification).setContentTitle(context.getString(R.string.transfer_note_title))
                     .setContentText(w.publicText).setProgress(1000, (note.fraction * 1000).toInt(), note.indeterminate).build(),
             )
-        val (label, action) = when (note.action) {
-            Action.CANCEL -> context.getString(R.string.cancel) to ACTION_CANCEL
-            Action.PAUSE_SYNC -> context.getString(R.string.bucket_pause) to ACTION_PAUSE
-            Action.RESUME_SYNC -> context.getString(R.string.bucket_resume) to ACTION_RESUME
+        if (standing) builder.setTimeoutAfter(IDLE_TIMEOUT_MS)
+        val set = d.setId
+        when (note.action) {
+            Action.NONE -> Unit
+            Action.CANCEL -> builder.addAction(R.drawable.ic_reject_pairing_24dp, context.getString(R.string.cancel), action(context, deviceId, ACTION_CANCEL, set))
+            Action.PAUSE_SYNC -> builder.addAction(R.drawable.ic_reject_pairing_24dp, context.getString(R.string.bucket_pause), action(context, deviceId, ACTION_PAUSE, set))
+            Action.RESUME_SYNC -> builder.addAction(R.drawable.ic_reject_pairing_24dp, context.getString(R.string.bucket_resume), action(context, deviceId, ACTION_RESUME, set))
         }
-        val intent = Intent(context, Receiver::class.java).setAction(action).putExtra(EXTRA_DEVICE, deviceId)
         runCatching {
-            manager.notify(
-                tag(deviceId), ID,
-                builder.addAction(R.drawable.ic_reject_pairing_24dp, label, PendingIntent.getBroadcast(context, deviceId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)).build(),
-            )
-            synchronized(d) { d.showing = true }
+            manager.notify(tag(deviceId), ID, builder.build())
+            d.showing = true
         }
+    }
+
+    /** Each computer and action has its own PendingIntent: the data differs, so no two are the same to Android. */
+    private fun action(context: Context, deviceId: String, action: String, set: Int): PendingIntent {
+        val intent = Intent(context, Receiver::class.java).setAction(action).setData(android.net.Uri.parse("desklink://transfer/$deviceId/$action"))
+            .putExtra(EXTRA_DEVICE, deviceId).putExtra(EXTRA_SET, set)
+        return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
     private fun base(context: Context, deviceId: String) = NotificationCompat.Builder(context, NotificationHelper.Channels.FILETRANSFER_DOWNLOAD)
@@ -273,8 +346,9 @@ object TransferNotification {
         .setContentIntent(openFiles(context, deviceId))
 
     private fun openFiles(context: Context, deviceId: String) = PendingIntent.getActivity(
-        context, ID + (deviceId.hashCode() and 0xFF),
+        context, 0,
         Intent(context, org.desklink.mobile.ui.MainActivity::class.java)
+            .setData(android.net.Uri.parse("desklink://transfer/$deviceId/open"))
             .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_DEVICE_ID, deviceId)
             .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_OPEN_FILES, true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
@@ -296,18 +370,25 @@ object TransferNotification {
         override fun onReceive(context: Context, intent: Intent) {
             val deviceId = intent.getStringExtra(EXTRA_DEVICE) ?: return
             when (intent.action) {
-                ACTION_CANCEL -> cancelAll(context, deviceId)
+                ACTION_CANCEL -> cancelAll(context, deviceId, intent.getIntExtra(EXTRA_SET, -1))
                 ACTION_PAUSE -> BucketEngine.setPaused(deviceId, true)
                 ACTION_RESUME -> BucketEngine.setPaused(deviceId, false)
             }
         }
     }
 
-    /** Everything of this computer that is moving, except the Bucket's own sync: sends by their jobs, receives and cut sends by the transfer layer. */
-    fun cancelAll(context: Context, deviceId: String) {
+    /**
+     * Ends the set the notification was shown for (and only that set): its sends by their jobs, its receives and resumed sends by the
+     * transfer layer. The Bucket's own sync and anything not in the notification are left alone. Its entries go at once, whether or
+     * not their owners report.
+     */
+    fun cancelAll(context: Context, deviceId: String, set: Int) {
+        val d = desk(deviceId)
+        val ids = synchronized(d) { if (set != d.setId) return; d.jobs.keys.toList() }
         val app = DeskLinkApplication.getInstance()
         val share = app.getDevicePlugin(deviceId, SharePlugin::class.java)
-        jobIds(deviceId).forEach { runCatching { share?.cancelJob(it) } }
-        runCatching { app.webRtcCoordinator(deviceId)?.cancelFileTransfers() }
+        ids.forEach { runCatching { share?.cancelJob(it) } }
+        runCatching { app.webRtcCoordinator(deviceId)?.cancelFileTransfers(ids.toSet()) }
+        ids.forEach(::cancelled)
     }
 }

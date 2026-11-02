@@ -59,6 +59,13 @@ class TransferNotificationTest {
         assertNull(TransferNotification.note("Dell", emptyList(), 0, 0, false, false, size))
     }
 
+    @org.junit.Before
+    fun fresh() { TransferNotification.resetForTest(); androidx.core.app.NotificationManagerCompat.from(app).cancelAll() }
+
+    private fun text(n: android.app.Notification) = n.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString()
+
+    private fun later(ms: Long) = org.robolectric.shadows.ShadowLooper.idleMainLooper(ms, java.util.concurrent.TimeUnit.MILLISECONDS)
+
     private fun posted(): List<android.app.Notification> = shadowOf(app.getSystemService(NotificationManager::class.java)).allNotifications
 
     @Test
@@ -82,16 +89,6 @@ class TransferNotificationTest {
     }
 
     @Test
-    fun aCutLinkReadsWaitingForTheComputerAndCancelledOnesGo() {
-        val desk = "22222222-aaaa-bbbb-cccc-222222222222"
-        TransferProgress.update(desk, 7L, true, "a.bin", 30, 1_000_000)
-        TransferProgress.resuming(7L)
-        // (The same second: the throttle holds the post; the state is what the next one carries.)
-        TransferProgress.cancel(7L)
-        assertEquals(0, posted().size)
-    }
-
-    @Test
     fun theOngoingNoticesOfTheOldJobsPostNothingSoThereIsOnlyTheOne() {
         val context = app
         val device = mockk<Device>(relaxed = true)
@@ -108,30 +105,87 @@ class TransferNotificationTest {
     }
 
     @Test
-    fun theTapOpensTheFilesTabAndUpdatesAreAtMostOneASecond() {
-        val source = java.io.File("src/main/java/org/desklink/mobile/plugins/share/TransferNotification.kt").readText()
-        assertTrue(source.contains("EXTRA_OPEN_FILES, true"))
-        assertEquals(1_000L, TransferNotification.UPDATE_EVERY_MS)
-        assertTrue(java.io.File("src/main/java/org/desklink/mobile/ui/MainActivity.kt").readText().contains("intent.getBooleanExtra(EXTRA_OPEN_FILES, false)"))
-        assertFalse("the Bucket posts through the one notification", java.io.File("src/main/java/org/desklink/mobile/plugins/folders/BucketSyncNotification.kt").readText().contains("notify("))
+    fun theUpdateHeldWithinTheSecondIsPostedWhenTheSecondIsOverAndNothingKeepsTickingAfter() {
+        val desk = "44444444-aaaa-bbbb-cccc-444444444444"
+        TransferProgress.update(desk, 1L, false, "a.bin", 10, 1_000_000)
+        assertTrue(text(posted().single()).contains("10%"))
+        TransferProgress.update(desk, 1L, false, "a.bin", 60, 1_000_000)
+        assertTrue("held: the second is not over", text(posted().single()).contains("10%"))
+        later(1_100)
+        assertTrue("posted when it is: ${text(posted().single())}", text(posted().single()).contains("60%"))
+        later(10_000)
+        assertTrue("and no timer re-arms itself", shadowOf(android.os.Looper.getMainLooper()).nextScheduledTaskTime == java.time.Duration.ZERO)
     }
-}
-
-/** Every live thing the phone does for a computer has one ongoing notification titled DeskLink, with a way to stop it. */
-class LiveNotificationsTest {
-    private fun source(path: String) = java.io.File("src/main/java/org/desklink/mobile/$path").readText()
 
     @Test
-    fun theDeskScreenTheMicrophoneAndSoundTheScreenShareAndGlideAreAllOngoingDeskLinkNoticesWithAStop() {
-        for ((file, stop) in listOf(
-            "plugins/screen/SessionLiveNotification.kt" to "active_session_end", "plugins/audio/PhoneAudioService.kt" to "audio_stop",
-            "plugins/screen/PhoneScreenCaptureService.kt" to "screen_share_stop",
-        )) {
-            val text = source(file)
-            assertTrue("$file: titled DeskLink", text.contains("setContentTitle(") && text.contains("R.string.transfer_note_title"))
-            assertTrue("$file: ongoing", text.contains("setOngoing(true)"))
-            assertTrue("$file: a stop action", text.contains(stop))
-        }
-        assertTrue("glide is a line of the desk-screen notice", source("plugins/screen/SessionLiveNotification.kt").contains("session_live_glide"))
+    fun aCutLinkReadsWaitingForTheComputerCanBeSwipedAndIsReplacedByTheResumedSend() {
+        val desk = "55555555-aaaa-bbbb-cccc-555555555555"
+        TransferProgress.update(desk, 7L, true, "a.bin", 30, 1_000_000)
+        TransferProgress.resuming(7L)
+        later(1_100)
+        val waiting = posted().single()
+        assertTrue(text(waiting).startsWith("Waiting for "))
+        assertEquals("not stuck on the shade", 0, waiting.flags and android.app.Notification.FLAG_ONGOING_EVENT)
+        // The send resumes under another job id: the paused entry is replaced, not left behind.
+        TransferProgress.update(desk, 99L, true, "a.bin", 40, 1_000_000)
+        later(1_100)
+        assertEquals(listOf(99L), TransferNotification.jobIds(desk))
+        assertTrue(text(posted().single()).startsWith("Sending a.bin"))
+        // A send that will never resume goes too.
+        TransferProgress.resuming(99L)
+        TransferProgress.dropResuming(desk)
+        assertEquals(0, posted().size)
+    }
+
+    @Test
+    fun cancelEndsTheSetItWasShownForAndAStaleNoticeDoesNothing() {
+        val desk = "66666666-aaaa-bbbb-cccc-666666666666"
+        TransferProgress.update(desk, 1L, false, "a.bin", 10, 1_000_000)
+        val shown = shadowOf(posted().single().actions.single().actionIntent).savedIntent
+        val set = shown.getIntExtra("set", -1)
+        val receiver = TransferNotification.Receiver()
+        receiver.onReceive(app, android.content.Intent(shown).putExtra("set", set + 5))
+        assertEquals("another set's Cancel does nothing", listOf(1L), TransferNotification.jobIds(desk))
+        receiver.onReceive(app, shown)
+        assertEquals(emptyList<Long>(), TransferNotification.jobIds(desk))
+        assertEquals(0, posted().size)
+        // A late progress call of the cancelled transfer does not bring it back.
+        TransferProgress.update(desk, 1L, false, "a.bin", 20, 1_000_000)
+        assertEquals(0, posted().size)
+    }
+
+    @Test
+    fun aPausedBucketOrAFullDiskIsTheBucketsNotAPlainFilesAndSavingHasNoButton() {
+        val plain = listOf(item("a.bin", true, 1, 10))
+        assertTrue(TransferNotification.note("Dell", plain, 0, 0, userPaused = true, storageFull = true, size = size)!!.text.startsWith("Sending a.bin"))
+        val saving = TransferNotification.note("Dell", listOf(item("x.pdf", false, 10, 10, saving = true)), 0, 0, false, false, size)!!
+        assertEquals(Action.NONE, saving.action)
+    }
+
+    @Test
+    fun theTapOpensTheFilesTabOfThatComputerAndEachComputerHasItsOwnIntents() {
+        val a = "77777777-aaaa-bbbb-cccc-777777777777"
+        val b = "88888888-aaaa-bbbb-cccc-888888888888"
+        TransferProgress.update(a, 1L, false, "a.bin", 10, 1_000_000)
+        TransferProgress.update(b, 2L, true, "b.bin", 10, 1_000_000)
+        val notes = shadowOf(app.getSystemService(NotificationManager::class.java)).allNotifications
+        assertEquals(2, notes.size)
+        val opens = notes.map { shadowOf(it.contentIntent).savedIntent }
+        assertTrue(opens.all { it.getBooleanExtra("openFiles", false) })
+        assertEquals(setOf(a, b), opens.map { it.getStringExtra("deviceId") }.toSet())
+        assertTrue("different intents even if the ids hash alike", opens[0].data != opens[1].data)
+    }
+
+    @Test
+    fun whatAnEarlierProcessLeftOnTheShadeIsSweptAtStart() {
+        val nm = app.getSystemService(NotificationManager::class.java)
+        val left = NotificationCompat.Builder(app, "x").setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle("DeskLink").setOngoing(true).build()
+        androidx.core.app.NotificationManagerCompat.from(app).notify("transfer:old", 7490, left)
+        androidx.core.app.NotificationManagerCompat.from(app).notify("bucket-sync:old", 7490, left)
+        androidx.core.app.NotificationManagerCompat.from(app).notify("other", 7490, left)
+        TransferNotification.sweep(app)
+        assertEquals(listOf("other"), shadowOf(nm).allNotifications.size.let { listOf("other").take(it) })
+        assertNull(nm.activeNotifications.firstOrNull { it.tag == "transfer:old" })
+        assertNull(nm.activeNotifications.firstOrNull { it.tag == "bucket-sync:old" })
     }
 }

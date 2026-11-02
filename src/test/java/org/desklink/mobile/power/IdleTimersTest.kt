@@ -98,4 +98,12 @@ class IdleTimersTest {
         }.toSortedSet()
         assertEquals("a LaunchedEffect with a delay loop must be a StartedEffect (or be listed with its reason)", loopsAllowedUngated.keys.toSortedSet(), offenders)
     }
+
+    @Test
+    fun aHeldNotificationUpdateIsPostedWhenItsTimeComesAndNeverAsksForAnotherWait() {
+        val source = File("src/main/java/org/desklink/mobile/plugins/share/TransferNotification.kt").readText()
+        val trailing = source.substringAfter("val trailing = Runnable {").substringBefore("handler.postDelayed(trailing, wait)")
+        assertEquals("the trailing run must post, not call refresh() (which would schedule the same wait again, for ever)", false, trailing.contains("refresh("))
+        assertEquals(true, trailing.contains("post(context, deviceId, d)"))
+    }
 }

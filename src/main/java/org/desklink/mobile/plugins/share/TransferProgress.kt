@@ -87,6 +87,7 @@ object TransferProgress {
     @JvmStatic
     fun dropResuming(deviceId: String) {
         if (current?.let { it.deviceId == deviceId && it.resuming } == true) current = null
+        notify { TransferNotification.dropWaiting(deviceId) }
     }
 
     @JvmStatic
