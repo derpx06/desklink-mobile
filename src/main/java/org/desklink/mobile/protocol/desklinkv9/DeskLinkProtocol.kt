@@ -33,7 +33,6 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_HEARTBEAT = "desklink.heartbeat"
     const val PACKET_TYPE_PING = "desklink.ping"
     const val PACKET_TYPE_MOUSEPAD_REQUEST = "desklink.mousepad.request"
-    const val PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = "desklink.mousepad.keyboardstate"
     const val PACKET_TYPE_SHARE_REQUEST = "desklink.share.request"
     const val PACKET_TYPE_CLIPBOARD = "desklink.clipboard"
     const val PACKET_TYPE_CLIPBOARD_CONNECT = "desklink.clipboard.connect"

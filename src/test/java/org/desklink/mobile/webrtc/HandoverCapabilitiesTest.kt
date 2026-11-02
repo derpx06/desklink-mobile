@@ -55,7 +55,6 @@ class HandoverCapabilitiesTest {
         "desklink.findmyphone.request",
         "desklink.folders",
         "desklink.lock.request",
-        "desklink.mousepad.keyboardstate",
         "desklink.mousepad.request",
         "desklink.mpris",
         "desklink.mpris.request",

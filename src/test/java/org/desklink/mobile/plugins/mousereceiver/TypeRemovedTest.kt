@@ -32,4 +32,11 @@ class TypeRemovedTest {
         val gate = source("webrtc/WebRtcSessionCoordinator.kt").substringAfter("internal fun deliverFeaturePacket").substringBefore("verifyInboundInput")
         assertTrue(gate.contains("glide.isGliding(device.deviceId) && glide.allowed(context, device.deviceId)"))
     }
+
+    @Test
+    fun theKeyboardStateReportIsNoLongerAPacketTypeOfTheActiveProtocol() {
+        assertFalse(source("protocol/desklinkv9/DeskLinkProtocol.kt").contains("keyboardstate"))
+        assertFalse(org.desklink.mobile.webrtc.WebRtcFeatureProfile.allows("desklink.mousepad.keyboardstate"))
+        assertTrue("and the glide packet stays", org.desklink.mobile.webrtc.WebRtcFeatureProfile.allows("desklink.mousepad.request"))
+    }
 }

@@ -150,11 +150,10 @@ class MousePadPlugin : Plugin() {
         if (Looper.myLooper() == Looper.getMainLooper()) post.run() else Handler(Looper.getMainLooper()).post(post)
     }
 
-    override val supportedPacketTypes = arrayOf(PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE)
+    override val supportedPacketTypes = emptyArray<String>()
     override val outgoingPacketTypes = arrayOf(PACKET_TYPE_MOUSEPAD_REQUEST)
 
     companion object {
         const val PACKET_TYPE_MOUSEPAD_REQUEST: String = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST
-        private const val PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_KEYBOARDSTATE
     }
 }
