@@ -22,4 +22,13 @@ class BackgroundViewTest {
         assertEquals(BackgroundAction.NONE, action(rotating = true))
         assertEquals(BackgroundAction.NONE, action(finishing = true))
     }
+
+    private val source = java.io.File("src/main/java/org/desklink/mobile/plugins/mousepad/MousePadActivity.kt").readText()
+
+    @Test
+    fun backIsNotInterceptedAndAFinishingScreenEndsTheRemoteSession() {
+        assertEquals("Back is the system's: it finishes the screen", false, Regex("""BackHandler|onBackPressed|OnBackPressedCallback""").containsMatchIn(source))
+        val destroy = source.substringAfter("override fun onDestroy()").substringBefore("override fun onSharedPreferenceChanged")
+        assertEquals(true, Regex("""isFinishing && !isChangingConfigurations\)\s*\{\s*sendStopScreen\(\)""").containsMatchIn(destroy))
+    }
 }
