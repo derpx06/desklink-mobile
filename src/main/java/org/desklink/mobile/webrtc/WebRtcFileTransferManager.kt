@@ -809,6 +809,20 @@ class WebRtcFileTransferManager(
         }
     }
 
+    /** The gallery switch went off: gallery pictures in flight are cancelled and the ones waiting to resume are forgotten. */
+    fun cancelGallery() {
+        runner.post {
+            sends.values.filter { it.sender.metaForRestart()["gallery"] != null }.forEach { it.sender.cancel(FileCodes.USER, "Turned off.") }
+            store.list().filter { it.direction == "send" && it.deviceId == device.deviceId && it.meta["gallery"] != null && !sends.containsKey(it.transferId) }
+                .forEach { forgetStored(it.transferId) }
+        }
+    }
+
+    private fun forgetStored(id: String) {
+        store.remove(id)
+        TransferHistory.forgetResumable(appContext, id)
+    }
+
     /** A new connection: sends that were paused by a lost link offer themselves again from their checkpoints. */
     fun resumeSends(wire: WebRtcWireBinding) {
         runner.post {
@@ -825,6 +839,11 @@ class WebRtcFileTransferManager(
         store.list().filter { it.direction == "send" && it.deviceId == wire.peerDeviceId }.sortedBy { it.transferId }.forEach { stored ->
             val id = stored.transferId
             if (sends.containsKey(id)) return@forEach
+            // A gallery picture is sent only while the switch is on and the computer accepts: otherwise forgotten, quietly (no "send again").
+            if (stored.meta["gallery"] != null && !org.desklink.mobile.plugins.gallery.GalleryWatcher.mayResume(appContext, wire.peerDeviceId)) {
+                forgetStored(id)
+                return@forEach
+            }
             val source = sourceOf(stored)
             val stat = source?.stat()
             if (source == null || stat == null || stat.size != stored.totalSize || stat.mtime != stored.mtime) {

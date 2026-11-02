@@ -638,7 +638,7 @@ private fun GalleryRows(desk: DeskSettings, changed: () -> Unit) {
             else -> stringResource(R.string.settings_gallery_send_summary)
         },
         checked = on,
-        enabled = accepted,
+        enabled = accepted || on, // turning it off is always possible
         onClick = { org.desklink.mobile.plugins.gallery.GalleryWatcher.setOn(context, desk.id, !on); changed() },
     )
     if (on) {

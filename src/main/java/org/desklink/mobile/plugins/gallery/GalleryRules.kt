@@ -14,19 +14,31 @@ object GalleryRules {
     const val HOUR_MS = 3600_000L
     const val LEDGER_SIZE = 2000
 
+    /** A file younger than this may still be being written by the camera. */
+    const val SETTLE_MS = 5_000L
+
+    /** A scan looks at the newest this many files of a folder (a Camera folder can hold thousands). */
+    const val SCAN_LIMIT = 200
+
+    /** A file that fails this many times for no known reason is let go. */
+    const val MAX_TRIES = 3
+
     /** A file found in a picked folder. [uri] is its document URI. */
-    data class Found(val uri: String, val name: String, val mime: String, val size: Long, val mtime: Long)
+    data class Found(val uri: String, val name: String, val mime: String, val size: Long, val mtime: Long, val folder: String = "")
 
     /**
      * The files to send now, oldest first: an image of an allowed type and size, not older than 24 hours, not there before the
      * switch was turned on ([enabledAt]), and not already sent.
      */
-    fun toSend(found: List<Found>, ledger: Ledger, enabledAt: Long, now: Long): List<Found> = found
-        .filter { it.mime in TYPES && it.size in 1..MAX_BYTES && it.mtime >= enabledAt && now - it.mtime <= MAX_AGE_MS && !ledger.has(it.uri, it.mtime) }
+    fun toSend(found: List<Found>, ledger: Ledger, enabledAt: (Found) -> Long, now: Long): List<Found> = found
+        .filter { it.mime in TYPES && it.size in 1..MAX_BYTES && it.mtime >= enabledAt(it) && now - it.mtime in SETTLE_MS..MAX_AGE_MS && !ledger.has(it.uri, it.mtime) }
         .sortedBy { it.mtime }
 
+    /** The newest [SCAN_LIMIT] of one folder's files. */
+    fun newest(found: List<Found>): List<Found> = found.sortedByDescending { it.mtime }.take(SCAN_LIMIT)
+
     /** At most [MAX_FILES_PER_HOUR] files and [MAX_BYTES_PER_HOUR] bytes in any rolling hour (the computer counts too). */
-    class Budget(private val now: () -> Long = System::currentTimeMillis) {
+    class Budget(private val now: () -> Long = android.os.SystemClock::elapsedRealtime) {
         private val sent = ArrayDeque<Pair<Long, Long>>()
 
         @Synchronized

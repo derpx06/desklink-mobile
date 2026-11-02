@@ -614,6 +614,18 @@ class FileTransferManagerTest {
     }
 
     @Test
+    fun turningTheGalleryOffForgetsItsStoredSendsAndOnlyThose() {
+        val store = FileTransferStore(phone.root)
+        val gallery = UUID.randomUUID().toString()
+        val other = UUID.randomUUID().toString()
+        assertTrue(store.save(FileCheckpoint(gallery, "send", "g".repeat(32), phoneWire.peerDeviceId, "shot.png", 100, 77, 0, sourceUri = "file:///s", meta = mapOf("gallery" to "true", "mimeType" to "image/png"))))
+        assertTrue(store.save(FileCheckpoint(other, "send", "h".repeat(32), phoneWire.peerDeviceId, "doc.pdf", 100, 77, 0, sourceUri = "file:///d")))
+        phone.manager.cancelGallery()
+        pump()
+        assertEquals(listOf(other), store.list().filter { it.direction == "send" }.map { it.transferId })
+    }
+
+    @Test
     fun aFileThatIsReadInPlaceIsNeverCopiedFirst() {
         val bytes = data(FileV2.BLOCK_BYTES + 5)
         val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {

@@ -117,7 +117,7 @@ class PeerStateTest {
         prefs.edit {
             listOf(desk, other).forEach { id ->
                 putBoolean(org.desklink.mobile.plugins.gallery.GalleryWatcher.onKey(id), true)
-                putLong(org.desklink.mobile.plugins.gallery.GalleryWatcher.sinceKey(id), 5L)
+                putLong(org.desklink.mobile.plugins.gallery.GalleryWatcher.sinceKey(id, true), 5L)
                 putString(org.desklink.mobile.plugins.gallery.GalleryWatcher.shotsKey(id), "content://tree/shots")
             }
         }
