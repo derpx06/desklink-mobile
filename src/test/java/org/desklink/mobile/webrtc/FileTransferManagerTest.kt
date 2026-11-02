@@ -13,6 +13,7 @@ import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -61,7 +62,7 @@ class FileTransferManagerTest {
     private val phoneWire = WebRtcWireBinding("phone", "desk", 42, 7)
     private val deskWire = WebRtcWireBinding("desk", "phone", 42, 7)
 
-    private inner class Side(val context: Context, val wire: WebRtcWireBinding, val peerWire: WebRtcWireBinding) {
+    private inner class Side(val context: Context, val wire: WebRtcWireBinding, val peerWire: WebRtcWireBinding, val lanes: FileLanes? = null) {
         val runner = ManualRunner()
         /** What this side's destination was handed: a verified file, copied out before the part is deleted. */
         val delivered = CopyOnWriteArrayList<Received>()
@@ -81,6 +82,7 @@ class FileTransferManagerTest {
         val outControl = ArrayDeque<WebRtcFileControl>()
         val outFrames = ArrayDeque<ByteArray>()
         var linkDown = false
+        var frameCount = 0
         var bufferedAmount = 0L
         val sent = CopyOnWriteArrayList<WebRtcFileControl>()
         val link = object : FileLink {
@@ -90,13 +92,15 @@ class FileTransferManagerTest {
                 outControl.add(control)
             }
             override fun sendFrame(message: ByteArray) {
+                frameCount++
                 if (linkDown) throw org.desklink.mobile.transport.TransportError(org.desklink.mobile.transport.TransportErrorCode.CLOSED, "closed")
                 outFrames.add(message)
             }
             override fun bufferedAmount() = bufferedAmount
         }
         var now = 0L
-        val manager = WebRtcFileTransferManager(context, device, link, runner, { now }, { Long.MAX_VALUE }, destination, java.util.concurrent.Executor { it.run() })
+        fun tick() { runner.tickStep?.invoke() }
+        val manager = WebRtcFileTransferManager(context, device, link, runner, { now }, { Long.MAX_VALUE }, destination, java.util.concurrent.Executor { it.run() }, lanes)
         val root: File get() = File(context.filesDir, "webrtc-transfers")
         fun control(action: WebRtcFileAction, id: String, token: String = "t".repeat(32), block: WebRtcFileControl.() -> WebRtcFileControl = { this }) = WebRtcFileControl(
             action = action, transferId = id, deviceId = peerWire.senderDeviceId, sessionId = peerWire.sessionId,
@@ -106,18 +110,59 @@ class FileTransferManagerTest {
 
     private lateinit var phone: Side
     private lateinit var desk: Side
+    private lateinit var phoneLanes: FakeLanes
+    private lateinit var deskLanes: FakeLanes
+
+    /** Lane A in memory: frames written to it go straight to the other manager's lane intake. */
+    private class FakeLanes : FileLanes {
+        var offer = false
+        var issues = false
+        var dialOk = true
+        var failAfterFrames = Int.MAX_VALUE
+        /** Only the first lane breaks; a later one (promotion) is whole. */
+        var failFirstOnly = false
+        /** The lane swallows frames (they never arrive), as a lane does that is closing. */
+        var swallow = false
+        var dialed = 0
+        var peer: () -> WebRtcFileTransferManager = { error("no peer") }
+        var out: FakeOut? = null
+
+        inner class FakeOut(private val target: WebRtcFileTransferManager) : LaneOut {
+            var frames = 0
+            @Volatile var closed = false
+            override var onFailure: ((Throwable) -> Unit)? = null
+            override fun write(frame: ByteArray) {
+                if (closed) throw java.io.IOException("closed")
+                if (++frames > failAfterFrames) { closed = true; throw java.io.IOException("lane broke") }
+                if (!swallow) target.handleLaneFrame(frame)
+            }
+            override fun buffered() = 0L
+            override fun close() { closed = true }
+        }
+
+        override fun canOffer(totalSize: Long) = offer
+        override fun issue(transferId: String) = if (issues) FileLaneSpec(v = 1, port = 1717, token = "00112233445566778899aabbccddeeff", ttlMs = 60_000) else null
+        override fun dial(transferId: String, spec: FileLaneSpec, pass: Int, startBlock: Int, result: (LaneOut?) -> Unit) {
+            dialed++
+            if (dialOk) peer().onLaneAccepted(transferId) // as the real listener does once the token is good
+            result(if (dialOk) FakeOut(peer()).also { out = it; if (failFirstOnly && dialed > 1) failAfterFrames = Int.MAX_VALUE } else null)
+        }
+    }
 
     @Before
     fun setUp() {
         phoneContext = ApplicationProvider.getApplicationContext()
         File(phoneContext.filesDir, "webrtc-transfers").deleteRecursively()
         File(phoneContext.filesDir, "webrtc-delivered.json").delete()
-        phone = Side(phoneContext, phoneWire, deskWire)
+        phoneLanes = FakeLanes()
+        deskLanes = FakeLanes()
+        phone = Side(phoneContext, phoneWire, deskWire, phoneLanes)
         val deskDir = tmp.newFolder()
         val deskContext = mockk<Context>()
         every { deskContext.applicationContext } returns deskContext
         every { deskContext.filesDir } returns deskDir
-        desk = Side(deskContext, deskWire, phoneWire)
+        desk = Side(deskContext, deskWire, phoneWire, deskLanes)
+        phoneLanes.peer = { desk.manager }
     }
 
     @After
@@ -669,6 +714,118 @@ class FileTransferManagerTest {
         assertFalse(runUntilDone(future))
         assertEquals(FileCodes.USER, phone.sent.last { it.action == WebRtcFileAction.CANCEL }.code)
         assertEquals(1, recorder.failures.size)
+    }
+
+    @Test
+    fun aBigFileGoesOverTheFastLaneWhenBothSidesHaveItAndNoFrameUsesTheDataChannel() {
+        phoneLanes.offer = true; deskLanes.issues = true
+        val bytes = data(3 * FileV2.BLOCK_BYTES + 17)
+        assertTrue(runUntilDone(startSend(share(bytes, "big.bin"), Recorder())))
+        val offer = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        assertEquals(1, offer.lane?.v)
+        assertNotNull("the accept carried the lane", desk.sent.first { it.action == WebRtcFileAction.ACCEPT }.lane?.token)
+        assertEquals(1, phoneLanes.dialed)
+        assertEquals("every frame went over the lane", 0, phone.frameCount)
+        assertTrue(phoneLanes.out!!.frames > 0)
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
+        assertTrue("no failover: the only lane action announces the tcp lane", phone.sent.filter { it.action == WebRtcFileAction.LANE }.all { it.lane?.kind == FileLaneSpec.TCP })
+        val announce = phone.sent.single { it.action == WebRtcFileAction.LANE }
+        assertNull("a lane action carries no version", announce.lane?.v)
+        assertEquals(0, announce.lane?.startBlock)
+    }
+
+    @Test
+    fun aFailedLaneIsAskedForAgainByAReOfferAfterTenSecondsAndTheFileStillArrivesWhole() {
+        phoneLanes.offer = true; deskLanes.issues = true
+        phoneLanes.failFirstOnly = true
+        phoneLanes.failAfterFrames = 20
+        val bytes = data(24 * FileV2.BLOCK_BYTES + 7)
+        val recorder = Recorder()
+        val future = startSend(share(bytes, "big.bin"), recorder)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (phone.sent.none { it.action == WebRtcFileAction.LANE && it.lane?.kind == FileLaneSpec.WEBRTC } && System.nanoTime() < deadline) { if (pump(maxMessages = 1) == 0) Thread.sleep(2) }
+        assertEquals("nothing re-offered yet", 1, phone.sent.count { it.action == WebRtcFileAction.OFFER })
+        phone.tick() // too early: the first wait is ten seconds
+        assertEquals(1, phone.sent.count { it.action == WebRtcFileAction.OFFER })
+        phone.now += FileLaneProtocol.RETRY_MS + 1
+        phone.tick()
+        assertEquals("a re-offer asked for a lane again", 2, phone.sent.count { it.action == WebRtcFileAction.OFFER })
+        val ok = runUntilDone(future)
+        assertTrue("failed: ${recorder.failures} ${phone.sent.map { it.action.wireName + ":" + (it.message ?: "") }.takeLast(12)} desk=${desk.sent.map { it.action.wireName + ":" + (it.message ?: "") }.takeLast(8)}", ok)
+        assertEquals("the second lane was dialled and carried the rest", 2, phoneLanes.dialed)
+        assertEquals("the tcp lane was announced twice", 2, phone.sent.count { it.action == WebRtcFileAction.LANE && it.lane?.kind == FileLaneSpec.TCP })
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
+    }
+
+    @Test
+    fun aLaneActionPastTheVerifiedPrefixIsIgnoredNotFatal() {
+        phoneLanes.offer = true; deskLanes.issues = true
+        val bytes = data(3 * FileV2.BLOCK_BYTES + 1)
+        val future = startSend(share(bytes, "big.bin"), Recorder())
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (phone.sent.none { it.action == WebRtcFileAction.OFFER } && System.nanoTime() < deadline) pump(maxMessages = 1)
+        val offered = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        pump(maxMessages = 3)
+        desk.manager.handleControl(deskWire, desk.control(WebRtcFileAction.LANE, offered.transferId, offered.transferToken) { copy(lane = FileLaneSpec(kind = FileLaneSpec.WEBRTC, startBlock = 50, pass = 3)) })
+        assertTrue(runUntilDone(future))
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
+        assertTrue(desk.sent.none { it.action == WebRtcFileAction.ERROR })
+    }
+
+    @Test
+    fun withoutALaneInTheAcceptOrOnAFailedDialTheDataChannelCarriesTheFile() {
+        phoneLanes.offer = true; deskLanes.issues = false
+        val a = data(2 * FileV2.BLOCK_BYTES + 5)
+        assertTrue(runUntilDone(startSend(share(a, "a.bin"), Recorder())))
+        assertEquals(0, phoneLanes.dialed)
+        assertTrue(phone.frameCount > 0)
+        assertArrayEquals(a, desk.delivered.single().bytes)
+        // Accepted but the dial fails (blocked, firewalled): silently the data channel.
+        deskLanes.issues = true; phoneLanes.dialOk = false
+        val before = phone.frameCount
+        val b = data(2 * FileV2.BLOCK_BYTES + 9)
+        assertTrue(runUntilDone(startSend(share(b, "b.bin"), Recorder())))
+        assertEquals(1, phoneLanes.dialed)
+        assertTrue(phone.frameCount > before)
+        assertArrayEquals(b, desk.delivered.last().bytes)
+        assertTrue("a failed dial changes no lane", phone.sent.none { it.action == WebRtcFileAction.LANE })
+    }
+
+    @Test
+    fun aLaneThatBreaksMidFileFailsOverToTheDataChannelFromTheFirstUnacknowledgedBlockAndTheFileIsWhole() {
+        phoneLanes.offer = true; deskLanes.issues = true
+        phoneLanes.failAfterFrames = 20 // about a block and a quarter
+        val bytes = data(5 * FileV2.BLOCK_BYTES + 321)
+        val recorder = Recorder()
+        assertTrue(runUntilDone(startSend(share(bytes, "big.bin"), recorder)))
+        val lane = phone.sent.single { it.action == WebRtcFileAction.LANE && it.lane?.kind == FileLaneSpec.WEBRTC }
+        assertEquals(FileLaneSpec.WEBRTC, lane.lane?.kind)
+        assertEquals("the next pass", 1, lane.lane?.pass)
+        assertTrue("never from 0 once blocks were verified: ${lane.lane?.startBlock}", (lane.lane?.startBlock ?: -1) >= 0)
+        assertTrue(phone.frameCount > 0)
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
+        assertEquals(1, recorder.successes.get())
+    }
+
+    @Test
+    fun theReceiverSeeingTheLaneCloseAsksForTheRestAndTheSenderCarriesOnOverWebRtcWithoutCountingARewind() {
+        phoneLanes.offer = true; deskLanes.issues = true
+        phoneLanes.swallow = true // frames written to the lane never arrive
+        val bytes = data(4 * FileV2.BLOCK_BYTES)
+        val future = startSend(share(bytes, "big.bin"), Recorder())
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while ((phoneLanes.out?.frames ?: 0) < 10 && System.nanoTime() < deadline) { if (pump(maxMessages = 5) == 0) Thread.sleep(2) }
+        val offered = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        val id = offered.transferId
+        assertEquals("nothing went over the data channel yet", 0, phone.frameCount)
+        // The nack the receiver sends when its lane closes under it.
+        phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.BLOCK_NACK, id, offered.transferToken) { copy(blockIndex = 0, pass = 0, reason = FileLaneProtocol.NACK_REASON) })
+        assertTrue(runUntilDone(future))
+        val lane = phone.sent.single { it.action == WebRtcFileAction.LANE && it.lane?.kind == FileLaneSpec.WEBRTC }
+        assertEquals(FileLaneSpec.WEBRTC, lane.lane?.kind)
+        assertTrue(phoneLanes.out!!.closed)
+        assertTrue(phone.frameCount > 0)
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
     }
 
     @Test

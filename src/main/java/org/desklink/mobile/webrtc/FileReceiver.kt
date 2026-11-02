@@ -31,6 +31,8 @@ class FileReceiver(
     val offer: WebRtcFileControl,
     /** Runs a task on the thread this receiver lives on (the file thread); inline when a test does not care. */
     private val post: (() -> Unit) -> Unit = { it() },
+    /** W18: the bulk lanes, or null. */
+    private val lanes: FileLanes? = null,
 ) {
     interface Listener {
         /** Bytes of this file in place so far (verified blocks plus the current one). */
@@ -172,13 +174,60 @@ class FileReceiver(
         sendAccept()
     }
 
-    private fun sendAccept() = send(
+    private fun sendAccept() = run { laneUp = false }.also { sendAcceptNow() }
+
+    private fun sendAcceptNow() = send(
         control(WebRtcFileAction.ACCEPT).copy(
             resumeBlock = hashes.size,
             prefixSha256 = FileHashes.prefixHash(hashes, hashes.size),
             maxFrameBytes = frameMax,
+            // The sender asked for the lane and ours can carry it: a port and a one-time token (else the data channel carries the file).
+            lane = if (offer.lane?.v == FileLaneProtocol.V && hashes.size < blocksTotal) lanes?.issue(id) else null,
         ),
     )
+
+    // ---------------------------------------------------------------- lanes (W18)
+
+    /** Where the stream must start for a lane to be taken: the first block not verified. */
+    fun nextBlockForLane(): Int? = if (ended || publishing || file == null) null else hashes.size
+
+    /** The pass a lane must start at; null while any pass is taken (right after an accept). */
+    fun passForLane(): Int? = if (adoptAny) null else expectedPass
+
+    /** The sender switched lane: "from now on from block n at this pass". The partial block is dropped and that is what is expected. */
+    fun onLane(spec: FileLaneSpec) {
+        if (ended || publishing || file == null) return
+        val start = requireNotNull(spec.startBlock)
+        if (start > hashes.size) return // past what is verified: ignored (the sender asks again from where it must)
+        if (spec.kind == FileLaneSpec.TCP && laneUp) return // the lane's own connection already put the transfer on it; frames may be in flight
+        laneUp = spec.kind == FileLaneSpec.TCP
+        // The data channel's frames can overtake this message: the stream is already in place under that pass, so nothing is dropped.
+        if (spec.pass == expectedPass && !adoptAny) return
+        // The partial block is dropped; a sender whose acknowledgements lag restarts below our verified end: those blocks arrive as
+        // duplicates and are skipped, never un-verified.
+        truncateTo(hashes.size)
+        expectedPass = requireNotNull(spec.pass)
+        adoptAny = false
+        awaitingStart = false
+        lastActivityAt = clock()
+    }
+
+    /** A lane connection passed its token check: frames come over it, whatever the data channel last said. */
+    fun onLaneUp() {
+        if (!ended && !publishing && file != null) laneUp = true
+    }
+
+    private var laneUp = false
+
+    /** Set by a re-offer of a live transfer until the restarted stream's first frame: older frames still in the pipe are skipped, not fatal. */
+    private var staleInFlight = false
+
+    /** The lane closed under us: the sender is asked to carry on from the first block not verified (not a damaged block). */
+    fun onLaneClosed() {
+        laneUp = false
+        if (ended || publishing || file == null || hashes.size >= blocksTotal) return
+        send(control(WebRtcFileAction.BLOCK_NACK).copy(blockIndex = hashes.size, pass = expectedPass, reason = FileLaneProtocol.NACK_REASON))
+    }
 
     /** The same transfer offered again while it is live (the sender lost our accept): answered from where we are. */
     fun onReoffer() {
@@ -187,6 +236,7 @@ class FileReceiver(
         truncateTo(hashes.size)
         awaitingStart = true
         adoptAny = true
+        staleInFlight = true
         lastActivityAt = clock()
         sendAccept()
     }
@@ -205,16 +255,20 @@ class FileReceiver(
             truncateTo(frame.blockIndex)
             expectedPass = frame.pass
             awaitingStart = false
+            staleInFlight = false
         }
         if (frame.pass == expectedPass && frame.offset >= nextOffset) adoptAny = false
         if (awaitingStart) {
             // The first frame after an accept, a nack or a resume: a block boundary the receiver has verified up to.
             // A frame of the right pass that starts anywhere else is a sender we cannot follow.
             if (frame.offset % FileV2.BLOCK_BYTES != 0L || frame.blockIndex > hashes.size) {
+                // Right after a re-offer of a live transfer (a lane promotion), frames sent before the sender heard our accept can still arrive.
+                if (staleInFlight) return
                 return fail(FileCodes.BAD_FRAME, "The computer sent the file out of order.")
             }
             truncateTo(frame.blockIndex)
             awaitingStart = false
+            staleInFlight = false
         }
         if (frame.offset < nextOffset) return // a duplicate
         if (frame.offset > nextOffset) return fail(FileCodes.BAD_FRAME, "The computer sent the file out of order.")

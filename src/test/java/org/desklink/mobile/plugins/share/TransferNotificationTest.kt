@@ -37,6 +37,18 @@ class TransferNotificationTest {
     }
 
     @Test
+    fun theLaneIsNamedOnlyWhenEveryMovingFileIsOnTheSameOne() {
+        val fast = item("a.bin", true, 10, 100, bps = 1_000_000).copy(lane = TransferNotification.LANE_FAST)
+        val web = item("b.bin", true, 10, 100, bps = 1_000_000).copy(lane = TransferNotification.LANE_WEBRTC)
+        assertTrue(TransferNotification.note("Dell", listOf(fast), 0, 0, false, false, size)!!.text.endsWith("fast lane"))
+        assertTrue(TransferNotification.note("Dell", listOf(web), 0, 0, false, false, size)!!.text.endsWith("over WebRTC"))
+        assertTrue(TransferNotification.note("Dell", listOf(item("c.bin", true, 10, 100).copy(lane = TransferNotification.LANE_RELAY)), 0, 0, false, false, size)!!.text.endsWith("through a relay"))
+        val mixed = TransferNotification.note("Dell", listOf(fast, web), 0, 0, false, false, size)!!.text
+        assertFalse(mixed, mixed.contains("lane") || mixed.contains("WebRTC"))
+        assertFalse(TransferNotification.note("Dell", listOf(item("d.bin", true, 10, 100)), 0, 0, false, false, size)!!.text.contains("lane"))
+    }
+
+    @Test
     fun aSetSaysHowManyHowManyAreDoneAndTheWholeProgress() {
         val note = TransferNotification.note("Dell", listOf(item("c.bin", true, 20, 100)), finishedInSet = 2, finishedBytes = 200, userPaused = false, storageFull = false, size = size)!!
         assertEquals("Sending 3 files · 2 of 3 · 73%", note.text)

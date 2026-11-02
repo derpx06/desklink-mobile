@@ -44,7 +44,21 @@ object TransferNotification {
         val name: String, val sending: Boolean, val done: Long, val total: Long, val etaSeconds: Long?, val bytesPerSecond: Long,
         /** The link is gone (it resumes by itself), or the sync is paused. */
         val waiting: Boolean, val saving: Boolean = false, val bucket: Boolean = false,
+        /** How it moves: [LANE_FAST], [LANE_WEBRTC], [LANE_RELAY] or null (not known). */
+        val lane: String? = null,
     )
+
+    const val LANE_FAST = "fast"
+    const val LANE_WEBRTC = "webrtc"
+    const val LANE_RELAY = "relay"
+
+    private val laneKinds = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** Which way a file is moving ([LANE_FAST], [LANE_WEBRTC] or [LANE_RELAY]), for the detail line. */
+    fun lane(deviceId: String, name: String, upload: Boolean, kind: String?) {
+        val key = "$deviceId|$upload|$name"
+        if (kind == null) laneKinds.remove(key) else laneKinds[key] = kind
+    }
 
     enum class Action { CANCEL, PAUSE_SYNC, RESUME_SYNC, NONE }
 
@@ -57,6 +71,7 @@ object TransferNotification {
         val percent: String = "%d%%", val about: String = "about %s", val perSecond: String = "%s/s", val join: String = " · ",
         val waitingFor: String = "Waiting for %s", val paused: String = "Paused", val storageFull: String = "Storage is full",
         val publicText: String = "DeskLink · transferring files",
+        val laneFast: String = "fast lane", val laneWebRtc: String = "over WebRTC", val laneRelay: String = "through a relay",
         val eta: BucketProgress.Words = BucketProgress.Words(),
     )
 
@@ -100,6 +115,8 @@ object TransferNotification {
                 w.percent.format((fraction * 100).toInt()),
                 sum.bytesPerSecond.takeIf { it > 0 }?.let { w.perSecond.format(size(it)) },
                 sum.etaSeconds?.let { w.about.format(BucketProgress.eta(it, w.eta)) },
+                // The lane, when every file in the set moves the same way.
+                items.map { it.lane }.distinct().singleOrNull()?.let { when (it) { LANE_FAST -> w.laneFast; LANE_RELAY -> w.laneRelay; LANE_WEBRTC -> w.laneWebRtc; else -> null } },
             ).joinToString(w.join)
         }
         return Note(text, fraction, indeterminate = false, action = action)
@@ -299,7 +316,7 @@ object TransferNotification {
         val now = SystemClock.elapsedRealtime()
         val items = d.jobs.values.map { j ->
             val remaining = (j.total - j.done).coerceAtLeast(0)
-            Item(j.name, j.upload, j.done, j.total, j.meter.etaSeconds(remaining, now), j.meter.bytesPerSecond(now), j.waiting, j.saving)
+            Item(j.name, j.upload, j.done, j.total, j.meter.etaSeconds(remaining, now), j.meter.bytesPerSecond(now), j.waiting, j.saving, lane = laneKinds["$deviceId|${j.upload}|${j.name}"])
         } + d.bucket.map { it.copy(waiting = it.waiting || !d.bucketLinkUp || d.bucketPaused) }
         val w = words(context)
         val note = note(desk, items, d.finishedInSet, d.finishedBytes, d.bucketPaused, d.storageFull, { Sizes.iec(it) }, w) ?: return@synchronized

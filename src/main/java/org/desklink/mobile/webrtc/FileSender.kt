@@ -28,6 +28,10 @@ class FileSender(
     val mtime: Long,
     private val meta: Map<String, String>,
     private val spooled: Boolean,
+    /** W18: the bulk lanes, or null (everything over the data channel). */
+    private val lanes: FileLanes? = null,
+    /** Runs a task on the file thread (a lane's callbacks come from other threads). */
+    private val post: (() -> Unit) -> Unit = { it() },
 ) {
     interface Listener {
         /** Bytes acknowledged plus the current block's, at most four times a second. */
@@ -63,6 +67,19 @@ class FileSender(
     private var unsavedBlocks = 0
     private var lastReportAt = 0L
     private var ended = false
+
+    /** W18: the open TCP lane, or null (frames go over the data channel); [laneDialling] while it is being opened. */
+    private var laneOut: LaneOut? = null
+    private var laneDialling = false
+
+    /** A lane was offered on this transfer, when the last one failed (or 0), and how many failed in a row (a delivered block clears it). */
+    private var laneOffered = false
+    private var laneFailedAt = 0L
+    private var laneRetryPending = false
+    private var laneFailures = 0
+
+    /** "fast lane" while frames go over TCP; for the transfer's detail line. */
+    val onFastLane: Boolean get() = laneOut != null
 
     // Where the time of this send went, in nanoseconds (see [summary]).
     private val startedAt = System.nanoTime()
@@ -126,6 +143,7 @@ class FileSender(
                 maxFrameBytes = FileV2.FRAME_BYTES_PROVEN,
                 clipboard = meta["clipboard"]?.let { true },
                 gallery = meta["gallery"]?.let { true },
+                lane = if (lanes?.canOffer(totalSize) == true) FileLaneSpec(v = FileLaneProtocol.V).also { laneOffered = true } else null,
                 mimeType = meta["mimeType"], captureId = meta["captureId"],
                 folder = meta["folder"], relpath = meta["relpath"], contentSha256 = meta["contentSha256"],
             ),
@@ -143,10 +161,13 @@ class FileSender(
                 if (!restartAt(requireNotNull(message.resumeBlock), requireNotNull(message.prefixSha256), pass)) return
                 state = State.STREAMING
                 touch()
+                openLane(message.lane)
                 pump()
             }
             WebRtcFileAction.BLOCK_ACK -> onAck(requireNotNull(message.blockIndex), requireNotNull(message.sha256))
-            WebRtcFileAction.BLOCK_NACK -> onNack(requireNotNull(message.blockIndex), requireNotNull(message.pass))
+            WebRtcFileAction.BLOCK_NACK ->
+                if (message.reason == FileLaneProtocol.NACK_REASON) onLaneNack(requireNotNull(message.blockIndex))
+                else onNack(requireNotNull(message.blockIndex), requireNotNull(message.pass))
             // "no-progress" is informational: it never stops the sender.
             WebRtcFileAction.PAUSE -> if (message.reason != FileCodes.NO_PROGRESS) peerPaused = FileCodes.pauseReason(message.reason)
             WebRtcFileAction.RESUME -> {
@@ -233,8 +254,85 @@ class FileSender(
         if (ackedBlocks > index) ackedBlocks = index
     }
 
+    // ---------------------------------------------------------------- lanes (W18)
+
+    /** The accept carried a lane: it is dialled (at most 3 s) while nothing is sent; failing, the data channel carries the stream. */
+    private fun openLane(spec: FileLaneSpec?) {
+        val token = spec?.token ?: return
+        val dialler = lanes ?: return
+        if (spec.port == null || laneOut != null || laneDialling || !FileLaneProtocol.validToken(token)) return
+        laneDialling = true
+        dialler.dial(transferId, spec, pass, ackedBlocks) { out ->
+            post {
+                laneDialling = false
+                if (ended || out == null) {
+                    out?.close()
+                    if (!ended) noteLaneFailure() // connect refused or past 3 s: the data channel carries it, a re-offer asks again later
+                } else {
+                    laneOut = out
+                    out.onFailure = { post { laneFailed() } }
+                    touch()
+                    // From the settled block on, over the lane (the receiver already put the lane in place when it accepted the token).
+                    send(control(WebRtcFileAction.LANE).copy(lane = FileLaneSpec(kind = FileLaneSpec.TCP, startBlock = ackedBlocks, pass = pass)))
+                }
+                pump()
+            }
+        }
+    }
+
+    /**
+     * The lane failed (a write error, the receiver closed it, no block acknowledged for [FileLaneProtocol.STALL_MS]): the data channel
+     * carries on from the first unacknowledged block under the next pass, and the receiver is told. Never from 0, never a verified block twice.
+     */
+    private fun laneFailed() {
+        val lane = laneOut ?: return
+        runCatching { lane.close() }
+        laneOut = null
+        if (ended) return
+        noteLaneFailure()
+        switchToWebRtc(ackedBlocks)
+    }
+
+    /** The receiver saw the lane close under it: it names the first block it has not verified. */
+    private fun onLaneNack(blockIndex: Int) {
+        val lane = laneOut
+        if (lane != null) { runCatching { lane.close() }; laneOut = null; noteLaneFailure() }
+        if (state == State.OFFERED) return
+        switchToWebRtc(minOf(blockIndex, hashes.size, blocksTotal))
+    }
+
+    private fun noteLaneFailure() {
+        laneFailures++
+        laneFailedAt = clock()
+        laneRetryPending = true
+    }
+
+    /**
+     * Promotion: a failed lane is asked for again by a re-offer (the receiver answers with where it is and a fresh token) after
+     * 10 s, doubling with each failure in a row, while the LAN path still holds.
+     */
+    private fun maybePromote(now: Long) {
+        if (!laneRetryPending || !laneOffered || laneOut != null || laneDialling || state != State.STREAMING || peerPaused != null) return
+        val wait = FileLaneProtocol.RETRY_MS shl (laneFailures - 1).coerceIn(0, 5)
+        if (now - laneFailedAt < wait || lanes?.canOffer(totalSize) != true) return
+        laneRetryPending = false
+        pass = (pass + 1) and 0xff // the receiver tells the restarted stream from frames still in the pipe by its pass
+        state = State.OFFERED
+        start()
+    }
+
+    private fun switchToWebRtc(from: Int) {
+        rewindTo(from)
+        pass = (pass + 1) and 0xff
+        if (state == State.AWAITING_COMPLETE) state = State.STREAMING
+        send(control(WebRtcFileAction.LANE).copy(lane = FileLaneSpec(kind = FileLaneSpec.WEBRTC, startBlock = from, pass = pass)))
+        touch()
+        pump()
+    }
+
     private fun onAck(index: Int, sha: String) {
         if (state == State.OFFERED || index !in 0 until hashes.size || index + 1 <= ackedBlocks) return
+        if (laneOut != null) laneFailures = 0 // a block delivered over the lane
         if (!sha.equals(hashes[index].toHex(), ignoreCase = true)) {
             // The receiver verified a block that is not the one we read: read and send it again under the next pass.
             if (++rewinds > FileV2.MAX_REWINDS) {
@@ -270,10 +368,10 @@ class FileSender(
 
     /** Sends frames while the window allows; call after any event that may have opened it. */
     fun pump() {
-        if (ended || state != State.STREAMING || peerPaused != null) return
+        if (ended || state != State.STREAMING || peerPaused != null || laneDialling) return
         try {
             while (true) {
-                if (link.bufferedAmount() >= FileV2.IN_FLIGHT_TARGET) return blocked(onAcks = false)
+                if ((laneOut?.buffered() ?: link.bufferedAmount()) >= FileV2.IN_FLIGHT_TARGET) return blocked(onAcks = false)
                 if (sentBytes() - ackedBytes() >= FileV2.UNACKED_MAX) return blocked(onAcks = true)
                 unblocked()
                 if (cursor >= blocksTotal) {
@@ -337,9 +435,19 @@ class FileSender(
         val count = minOf(FileV2.payloadCapacity(frameBytes), blockLength - emitted)
         val last = emitted + count == blockLength
         val sendStart = System.nanoTime()
-        link.sendFrame(
-            FileFrame.encode(uuid, pass, cursor, cursor.toLong() * FileV2.BLOCK_BYTES + emitted, data, emitted, count, if (last) blockHash else null),
-        )
+        val frame = FileFrame.encode(uuid, pass, cursor, cursor.toLong() * FileV2.BLOCK_BYTES + emitted, data, emitted, count, if (last) blockHash else null)
+        val lane = laneOut
+        if (lane != null) {
+            try {
+                lane.write(frame)
+            } catch (error: IOException) {
+                // Not sent: the stream goes on from the first unacknowledged block on the data channel (on this thread, now).
+                laneFailed()
+                return
+            }
+        } else {
+            link.sendFrame(frame)
+        }
         sendNs += System.nanoTime() - sendStart
         framesSent++
         emitted += count
@@ -381,10 +489,12 @@ class FileSender(
     fun tick(now: Long) {
         if (ended) return
         saveCheckpoint(force = false)
+        if (laneOut != null && sentBytes() > ackedBytes() && now - lastProgressAt >= FileLaneProtocol.STALL_MS) laneFailed()
         if (peerPaused == null && !noProgress && now - lastProgressAt >= FileV2.NO_PROGRESS_MS) {
             noProgress = true
             send(control(WebRtcFileAction.PAUSE).copy(reason = FileCodes.NO_PROGRESS))
         }
+        maybePromote(now)
         pump() // a wake-up for a window that opened without an event
     }
 
@@ -452,6 +562,8 @@ class FileSender(
     }
 
     private fun close() {
+        runCatching { laneOut?.close() }
+        laneOut = null
         runCatching { stream?.close() }
         stream = null
         block = null

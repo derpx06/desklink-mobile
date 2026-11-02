@@ -93,9 +93,36 @@ class WebRtcFileTransferManager(
      * up no other transfer (and the sender waits for `complete` while it runs).
      */
     private val publisher: java.util.concurrent.Executor = ThreadPublisher.shared,
+    /** The bulk lanes (W18); the real ones unless a test brings its own. */
+    lanes: FileLanes? = null,
 ) {
     private val appContext = context.applicationContext
     private val store = FileTransferStore(File(appContext.filesDir, "webrtc-transfers"))
+
+    /** What the lane layer asks of this manager: where the receive stands, and where frames go. Called from lane threads. */
+    private val laneHost = object : RealFileLanes.Host {
+        override fun onLan() = device.connectionPath == WebRtcConnectionPath.LAN
+        override fun peerLanAddress() = device.lanAddress() // the selected ICE pair's address, never a peer-supplied one
+        override fun peerHasLane(): Boolean {
+            val peer = WebRtcFeatureProfile.peer(device.deviceId) ?: return false
+            return DeskLinkProtocol.PACKET_TYPE_FILELANE_V1.let { it in peer.incoming && it in peer.outgoing }
+        }
+        override fun nextBlock(transferId: String) = onFileThread { receives[transferId]?.nextBlockForLane() }
+        override fun expectedPass(transferId: String) = onFileThread { receives[transferId]?.passForLane() }
+        override fun onFrame(frame: ByteArray) = handleLaneFrame(frame)
+        override fun laneAccepted(transferId: String) { runner.post { receives[transferId]?.onLaneUp() } } // queued ahead of the lane's first frame
+        override fun laneClosed(transferId: String) { runner.post { receives[transferId]?.onLaneClosed() } }
+    }
+
+    private val lanes: FileLanes? = lanes ?: RealFileLanes(context.applicationContext, device.deviceId, laneHost)
+        .also { RealFileLanes.register(context.applicationContext, device.deviceId, laneHost) }
+
+    /** Runs [block] on the file thread and waits (briefly) for its answer: the lane layer's questions come from its own thread. */
+    private fun <T> onFileThread(block: () -> T?): T? {
+        val done = java.util.concurrent.CompletableFuture<T?>()
+        runner.post { done.complete(runCatching(block).getOrNull()) }
+        return runCatching { done.get(1, java.util.concurrent.TimeUnit.SECONDS) }.getOrNull()
+    }
 
     /** Transfers already in place: a re-offer of one is answered, never received twice. */
     private val delivered = DeliveredTransfers(File(appContext.filesDir, "webrtc-delivered.json"))
@@ -296,7 +323,7 @@ class WebRtcFileTransferManager(
     private fun newSender(
         wire: WebRtcWireBinding, id: String, token: String, source: FileSource, filename: String, size: Long,
         mtime: Long, meta: Map<String, String>, spooled: Boolean, resumedHashes: List<ByteArray>,
-    ) = FileSender(wire, store, link, clock, senderListener, id, token, source, filename, size, mtime, meta, spooled).also {
+    ) = FileSender(wire, store, link, clock, senderListener, id, token, source, filename, size, mtime, meta, spooled, lanes, { task -> runner.post(Runnable(task)) }).also {
         if (!spooled) liveSources[id] = source
         it.restore(resumedHashes)
         currentWire = wire
@@ -316,6 +343,7 @@ class WebRtcFileTransferManager(
     private val senderListener: FileSender.Listener = object : FileSender.Listener {
         override fun progress(sender: FileSender, bytesDone: Long) {
             val entry = sends[sender.transferId] ?: return
+            org.desklink.mobile.plugins.share.TransferNotification.lane(device.deviceId, sender.filename, true, laneKind(sender.onFastLane))
             val percent = if (sender.totalSize == 0L) 100 else (bytesDone * 100 / sender.totalSize).toInt().coerceIn(0, 100)
             entry.callback.onPayloadProgressChanged(percent)
         }
@@ -441,6 +469,7 @@ class WebRtcFileTransferManager(
             WebRtcFileAction.ACCEPT, WebRtcFileAction.BLOCK_ACK, WebRtcFileAction.BLOCK_NACK, WebRtcFileAction.COMPLETE -> {
                 sendEntry(wire, message)?.sender?.onControl(message)
             }
+            WebRtcFileAction.LANE -> receiveEntry(wire, message)?.onLane(requireNotNull(message.lane))
             WebRtcFileAction.DONE -> {
                 val receiver = receiveEntry(wire, message)
                 if (receiver != null) receiver.onDone(message) else answerDeliveredDone(wire, message)
@@ -524,7 +553,7 @@ class WebRtcFileTransferManager(
             if (ref != null) BucketEngine.receiveEnded(wire.peerDeviceId, ref.relpath)
             return
         }
-        val receiver = FileReceiver(wire, store, link, clock, freeSpace, receiverListener, message) { task -> runner.post(Runnable(task)) }
+        val receiver = FileReceiver(wire, store, link, clock, freeSpace, receiverListener, message, { task -> runner.post(Runnable(task)) }, lanes)
         if (ref != null) { folderOffers[id] = ref; BucketEngine.receiveStarted(wire.peerDeviceId, ref.relpath) }
         if (message.clipboard == true && message.mimeType == org.desklink.mobile.plugins.clipboard.ClipboardImages.MIME &&
             totalSize <= org.desklink.mobile.plugins.clipboard.ClipboardImages.MAX_BYTES
@@ -705,7 +734,15 @@ class WebRtcFileTransferManager(
      * paused (`backlog`) instead of anything being dropped silently; they restart from their last
      * verified block when the queue has drained.
      */
-    fun handleFrame(message: ByteArray) {
+    fun handleFrame(message: ByteArray) = handleFrame(message, viaLane = false)
+
+    private fun laneKind(fast: Boolean) = when {
+        fast -> org.desklink.mobile.plugins.share.TransferNotification.LANE_FAST
+        device.connectionPath == WebRtcConnectionPath.TURN -> org.desklink.mobile.plugins.share.TransferNotification.LANE_RELAY
+        else -> org.desklink.mobile.plugins.share.TransferNotification.LANE_WEBRTC
+    }
+
+    private fun handleFrame(message: ByteArray, viaLane: Boolean) {
         val frame = try {
             FileFrame.decode(message, FileV2.FRAME_BYTES_PROVEN)
         } catch (error: IllegalArgumentException) {
@@ -725,9 +762,25 @@ class WebRtcFileTransferManager(
         }
         runner.post {
             queuedBytes.addAndGet(-message.size.toLong())
-            receives[frame.transferId.toString()]?.onFrame(frame)
+            receives[frame.transferId.toString()]?.let {
+                org.desklink.mobile.plugins.share.TransferNotification.lane(device.deviceId, it.filename, false, laneKind(viaLane))
+                it.onFrame(frame)
+            }
             resumeIfDrained()
         }
+    }
+
+    /**
+     * A frame from a TCP lane (its reader thread). TCP's own back-pressure is the queue: while the file thread is behind, the reader
+     * waits here instead of overflowing the queue (which would pause the receive).
+     */
+    /** A lane connection passed its token check for [transferId] (the real lanes call it through the host). */
+    internal fun onLaneAccepted(transferId: String) = laneHost.laneAccepted(transferId)
+
+    fun handleLaneFrame(message: ByteArray) {
+        var waited = 0
+        while (queuedBytes.get() > FileV2.FILE_QUEUE_MAX_BYTES / 2 && waited++ < 600) Thread.sleep(10)
+        handleFrame(message, viaLane = true)
     }
 
     private fun resumeIfDrained() {
