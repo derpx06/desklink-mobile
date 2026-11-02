@@ -24,8 +24,10 @@ internal class MprisReceiverCallback : MediaController.Callback {
         val artAndUri: Pair<Bitmap, String>? = getArtAndUri(player.metadata)
         if (artAndUri != null) {
             val bitmap = artAndUri.first
-            val hash = hashBitmap(bitmap)
+            val pixels = pixelsOf(bitmap)
+            val hash = pixels.contentHashCode().toLong()
             artHash = hash
+            artCheck = check(pixels, bitmap.width)
             artUrl = makeArtUrl(hash, artAndUri.second)
             displayArt = bitmap
             album = player.album
@@ -34,6 +36,8 @@ internal class MprisReceiverCallback : MediaController.Callback {
     }
 
     private var artHash: Long? = null
+    /** A second, independent digest of the same pixels, which stands in for a full pixel comparison on the main thread. */
+    private var artCheck: Long = 0
     private var displayArt: Bitmap? = null
     var artUrl: String? = null
         private set
@@ -84,11 +88,12 @@ internal class MprisReceiverCallback : MediaController.Callback {
         return Pair(art, uri)
     }
 
-    private fun hashBitmap(bitmap: Bitmap): Long {
+    private fun pixelsOf(bitmap: Bitmap): IntArray {
         val buffer = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(buffer, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        return buffer.contentHashCode().toLong()
+        return buffer
     }
+
 
     private fun makeArtUrl(artHash: Long, artUrl: String): String {
         // we include the hash in the URL to handle the case when the player changes the bitmap
@@ -114,7 +119,7 @@ internal class MprisReceiverCallback : MediaController.Callback {
             album = null
         } else {
             // We could check hasRequestedAlbumArt to avoid hashing art for clients that don't support it
-            //  But upon running the profiler, looks like hashBitmap is a minuscule (<1%) part so no
+            //  But upon running the profiler, looks like hashing is a minuscule (<1%) part so no
             //  need to optimize prematurely.
             val artAndUri: Pair<Bitmap, String>? = getArtAndUri(metadata)
             val newAlbum = metadata.getString(MediaMetadata.METADATA_KEY_ALBUM)
@@ -130,10 +135,13 @@ internal class MprisReceiverCallback : MediaController.Callback {
                     artist = null
                 }
             } else {
-                val newHash: Long = hashBitmap(artAndUri.first)
-                // In case the hashes are equal, we do a full comparison to protect against collisions
-                if ((newHash != artHash || !artAndUri.first.sameAs(displayArt))) {
+                val pixels = pixelsOf(artAndUri.first)
+                val newHash: Long = pixels.contentHashCode().toLong()
+                val newCheck = check(pixels, artAndUri.first.width)
+                // Equal hashes are confirmed by a second digest and the width (not by Bitmap.sameAs, a slow call on the main thread).
+                if (newHash != artHash || newCheck != artCheck || displayArt == null) {
                     artHash = newHash
+                    artCheck = newCheck
                     displayArt = artAndUri.first
                     artUrl = makeArtUrl(artHash!!, artAndUri.second)
                     artist = newArtist
@@ -159,6 +167,13 @@ internal class MprisReceiverCallback : MediaController.Callback {
         get() = displayArt?.let(::cappedJpeg)
 
     companion object {
+        /** FNV-1a (64 bit) over the pixels and the width: independent of [IntArray.contentHashCode]. */
+        fun check(pixels: IntArray, width: Int): Long {
+            var h = -0x340d631b7bdddcdbL xor width.toLong()
+            for (p in pixels) { h = (h xor (p.toLong() and 0xffffffffL)) * 0x100000001b3L }
+            return h
+        }
+
         /** Wire size fix: the phone's cover, like the desk's, is a JPEG of at most this, inline in one packet. */
         const val MAX_ART_BYTES = 24 * 1024
         /** Its long side. */
