@@ -109,9 +109,11 @@ class WebRtcFileTransferManager(
         }
         override fun nextBlock(transferId: String) = onFileThread { receives[transferId]?.nextBlockForLane() }
         override fun expectedPass(transferId: String) = onFileThread { receives[transferId]?.passForLane() }
-        override fun onFrame(frame: ByteArray) = handleLaneFrame(frame)
-        override fun laneAccepted(transferId: String) { runner.post { receives[transferId]?.onLaneUp() } } // queued ahead of the lane's first frame
-        override fun laneClosed(transferId: String) { runner.post { receives[transferId]?.onLaneClosed() } }
+        override fun onFrame(frame: ByteArray, connection: Long) = handleLaneFrame(frame, connection)
+        override fun laneAccepted(transferId: String, pass: Int, startBlock: Int, connection: Long) {
+            runner.post { receives[transferId]?.onLaneUp(connection, pass, startBlock) } // queued ahead of the lane's first frame
+        }
+        override fun laneClosed(transferId: String, connection: Long) { runner.post { receives[transferId]?.onLaneClosed(connection) } }
     }
 
     private val lanes: FileLanes? = lanes ?: RealFileLanes(context.applicationContext, device.deviceId, laneHost)
@@ -266,6 +268,11 @@ class WebRtcFileTransferManager(
                 return completion.get(250, TimeUnit.MILLISECONDS)
             } catch (_: java.util.concurrent.TimeoutException) {
                 // Check cancellation again. There is deliberately no deadline.
+            } catch (interrupted: InterruptedException) {
+                // The job was cancelled (Cancel on the notification interrupts its thread before the packet is marked): the file
+                // must not go on to the computer with nobody waiting for it.
+                runner.post { sends.values.firstOrNull { it.packet === packet }?.sender?.cancel(FileCodes.USER, "Cancelled.") }
+                throw interrupted
             }
         }
     }
@@ -354,6 +361,7 @@ class WebRtcFileTransferManager(
             val entry = sends[id] ?: return
             if (entry.sender !== sender) return
             sends.remove(id)
+            org.desklink.mobile.plugins.share.TransferNotification.lane(sender.wire.peerDeviceId, sender.filename, true, null)
             if (outcome != FileSender.Outcome.SUSPENDED && outcome != FileSender.Outcome.BUSY) {
                 // A slot is free: the next stored send, if any, starts (after this one's own bookkeeping below).
                 runner.post { currentWire?.let(::startStoredSends) }
@@ -655,12 +663,14 @@ class WebRtcFileTransferManager(
                         TransferProgress.finish(job, receiver.filename, false)
                         if (org.desklink.mobile.BuildConfig.DEBUG) Log.i(TAG, receiver.summary() + " backlogPauses=$backlogPauses")
                     }
-                    // Cancelled or suspended: nothing to show.
+                    // Cut by a lost link: the same id returns when it resumes, so it is not tombstoned like a cancel.
+                    FileReceiver.Outcome.SUSPENDED -> TransferProgress.suspended(job)
                     else -> TransferProgress.cancel(job)
                 }
             }
+            org.desklink.mobile.plugins.share.TransferNotification.lane(receiver.wire.peerDeviceId, receiver.filename, false, null)
             if (outcome == FileReceiver.Outcome.CANCELLED) synchronized(savingNotes) { savingNotes.remove(receiver.id) }?.let { runCatching { it.cancel() } }
-            if (receives[receiver.id] === receiver) receives.remove(receiver.id)
+            if (receives[receiver.id] === receiver) { receives.remove(receiver.id); lanes?.forget(receiver.id) } // a token for it is void
             // A Bucket file that did not arrive (the delivered one was taken out of the map when it was handed over).
             folderOffers.remove(receiver.id)?.let { ref ->
                 if (outcome != FileReceiver.Outcome.DELIVERED && outcome != FileReceiver.Outcome.SUSPENDED) {
@@ -734,7 +744,7 @@ class WebRtcFileTransferManager(
      * paused (`backlog`) instead of anything being dropped silently; they restart from their last
      * verified block when the queue has drained.
      */
-    fun handleFrame(message: ByteArray) = handleFrame(message, viaLane = false)
+    fun handleFrame(message: ByteArray) = handleFrame(message, viaLane = false, connection = 0L)
 
     private fun laneKind(fast: Boolean) = when {
         fast -> org.desklink.mobile.plugins.share.TransferNotification.LANE_FAST
@@ -742,7 +752,7 @@ class WebRtcFileTransferManager(
         else -> org.desklink.mobile.plugins.share.TransferNotification.LANE_WEBRTC
     }
 
-    private fun handleFrame(message: ByteArray, viaLane: Boolean) {
+    private fun handleFrame(message: ByteArray, viaLane: Boolean, connection: Long) {
         val frame = try {
             FileFrame.decode(message, FileV2.FRAME_BYTES_PROVEN)
         } catch (error: IllegalArgumentException) {
@@ -762,7 +772,8 @@ class WebRtcFileTransferManager(
         }
         runner.post {
             queuedBytes.addAndGet(-message.size.toLong())
-            receives[frame.transferId.toString()]?.let {
+            receives[frame.transferId.toString()]?.takeIf { !viaLane || it.laneCurrent(connection) }?.let {
+                // A frame from a lane the receiver has left (or never took) is dropped: the data channel carries the stream now.
                 org.desklink.mobile.plugins.share.TransferNotification.lane(device.deviceId, it.filename, false, laneKind(viaLane))
                 it.onFrame(frame)
             }
@@ -775,12 +786,15 @@ class WebRtcFileTransferManager(
      * waits here instead of overflowing the queue (which would pause the receive).
      */
     /** A lane connection passed its token check for [transferId] (the real lanes call it through the host). */
-    internal fun onLaneAccepted(transferId: String) = laneHost.laneAccepted(transferId)
+    internal fun onLaneAccepted(transferId: String, pass: Int, startBlock: Int, connection: Long) = laneHost.laneAccepted(transferId, pass, startBlock, connection)
 
-    fun handleLaneFrame(message: ByteArray) {
+    /** A test's lane ended (the real ones call the host from their reader). */
+    internal fun onLaneEnded(transferId: String, connection: Long) = laneHost.laneClosed(transferId, connection)
+
+    fun handleLaneFrame(message: ByteArray, connection: Long) {
         var waited = 0
         while (queuedBytes.get() > FileV2.FILE_QUEUE_MAX_BYTES / 2 && waited++ < 600) Thread.sleep(10)
-        handleFrame(message, viaLane = true)
+        handleFrame(message, viaLane = true, connection = connection)
     }
 
     private fun resumeIfDrained() {
@@ -873,7 +887,7 @@ class WebRtcFileTransferManager(
         runner.post {
             receives.entries.filter { receiveJob(it.key) in ids && !folderOffers.containsKey(it.key) && !clipboardOffers.contains(it.key) }
                 .forEach { it.value.cancel(FileCodes.USER, "Cancelled.") }
-            sends.entries.filter { resumedJob(it.key) in ids }.forEach { it.value.sender.cancel(FileCodes.USER, "Cancelled.") }
+            sends.entries.filter { resumedJob(it.key) in ids || it.value.packet?.isCanceled == true }.forEach { it.value.sender.cancel(FileCodes.USER, "Cancelled.") }
             store.list().filter { it.direction == "send" && it.deviceId == device.deviceId && resumedJob(it.transferId) in ids && !sends.containsKey(it.transferId) }
                 .forEach { forgetStored(it.transferId) }
         }

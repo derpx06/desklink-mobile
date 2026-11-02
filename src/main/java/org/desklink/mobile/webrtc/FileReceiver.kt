@@ -200,7 +200,14 @@ class FileReceiver(
         val start = requireNotNull(spec.startBlock)
         if (start > hashes.size) return // past what is verified: ignored (the sender asks again from where it must)
         if (spec.kind == FileLaneSpec.TCP && laneUp) return // the lane's own connection already put the transfer on it; frames may be in flight
-        laneUp = spec.kind == FileLaneSpec.TCP
+        if (spec.kind == FileLaneSpec.WEBRTC) {
+            laneUp = false
+            // Where this side stands, always: a sender that waits for it need not, and one that does not simply ignores it. It restarts
+            // at its own acknowledged block; what is verified here arrives again as duplicates and is skipped.
+            send(control(WebRtcFileAction.BLOCK_NACK).copy(blockIndex = hashes.size, pass = requireNotNull(spec.pass), reason = FileLaneProtocol.NACK_REASON))
+        } else {
+            laneUp = true
+        }
         // The data channel's frames can overtake this message: the stream is already in place under that pass, so nothing is dropped.
         if (spec.pass == expectedPass && !adoptAny) return
         // The partial block is dropped; a sender whose acknowledgements lag restarts below our verified end: those blocks arrive as
@@ -212,18 +219,41 @@ class FileReceiver(
         lastActivityAt = clock()
     }
 
-    /** A lane connection passed its token check: frames come over it, whatever the data channel last said. */
-    fun onLaneUp() {
-        if (!ended && !publishing && file != null) laneUp = true
+    /**
+     * A lane connection passed its token check: frames come over it, at [pass] from [startBlock] (at or below the verified prefix: the
+     * blocks we have arrive as duplicates), whatever the data channel last said. [connection] names this lane.
+     */
+    fun onLaneUp(connection: Long, pass: Int, startBlock: Int) {
+        if (ended || publishing || file == null) return
+        laneUp = true
+        laneConnection = connection
+        laneCorrupt = 0
+        truncateTo(hashes.size) // the partial block goes; the lane restarts at a block boundary
+        expectedPass = pass
+        adoptAny = false
+        awaitingStart = false
+        staleInFlight = false
+        lastActivityAt = clock()
     }
 
     private var laneUp = false
 
+    /** Whether [connection] is the lane this transfer is on; frames of any other lane are dropped. */
+    fun laneCurrent(connection: Long) = laneUp && connection == laneConnection
+    private var laneConnection = 0L
+
+    /** Hash failures of one block in a row on the lane: the second makes the sender leave the lane (it is no rewind). */
+    private var laneCorrupt = 0
+
     /** Set by a re-offer of a live transfer until the restarted stream's first frame: older frames still in the pipe are skipped, not fatal. */
     private var staleInFlight = false
 
-    /** The lane closed under us: the sender is asked to carry on from the first block not verified (not a damaged block). */
-    fun onLaneClosed() {
+    /**
+     * The lane [connection] closed under us: the sender is asked to carry on from the first block not verified (not a damaged block).
+     * The end of an older lane (its 30 s of silence) is not the end of the current one.
+     */
+    fun onLaneClosed(connection: Long) {
+        if (!laneUp || connection != laneConnection) return
         laneUp = false
         if (ended || publishing || file == null || hashes.size >= blocksTotal) return
         send(control(WebRtcFileAction.BLOCK_NACK).copy(blockIndex = hashes.size, pass = expectedPass, reason = FileLaneProtocol.NACK_REASON))
@@ -299,6 +329,7 @@ class FileReceiver(
         digest = MessageDigest.getInstance("SHA-256")
         if (computed.contentEquals(frame.trailer())) {
             hashes.add(computed)
+            laneCorrupt = 0
             unsavedBlocks++
             val t3 = System.nanoTime()
             send(control(WebRtcFileAction.BLOCK_ACK).copy(blockIndex = frame.blockIndex, sha256 = computed.toHex()))
@@ -314,6 +345,13 @@ class FileReceiver(
 
     /** The block failed its hash: drop it and ask for it again under a new pass. */
     private fun rewind(blockIndex: Int) {
+        if (laneUp && ++laneCorrupt >= 2) {
+            // The second damaged block in a row on the lane: the sender leaves it (not a rewind, nothing counted against the file).
+            laneUp = false
+            laneCorrupt = 0
+            truncateTo(blockIndex)
+            return send(control(WebRtcFileAction.BLOCK_NACK).copy(blockIndex = blockIndex, pass = expectedPass, reason = FileLaneProtocol.NACK_REASON))
+        }
         if (++rewinds > FileV2.MAX_REWINDS) return fail(FileCodes.HASH_MISMATCH, "The file got damaged on the way and could not be fixed.")
         truncateTo(blockIndex)
         expectedPass = (expectedPass + 1) and 0xff

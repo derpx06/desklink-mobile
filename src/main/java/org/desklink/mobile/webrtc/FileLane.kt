@@ -41,6 +41,12 @@ object FileLaneProtocol {
     /** First wait before a failed lane is asked for again; doubled with each failure in a row. */
     const val RETRY_MS = 10_000L
 
+    /** Lane failures one transfer gets; after the third it stays on the data channel. */
+    const val MAX_FAILURES = 3
+
+    /** The longest back-off between a peer's lane attempts. */
+    const val COOL_MAX_MS = 300_000L
+
     /** A lane that carries no byte for this long is dead (the receiver closes it and asks for the rest over WebRTC). */
     const val SILENT_MS = 30_000
 
@@ -167,10 +173,22 @@ interface FileLanes {
 
     /** Sender: dial per the accept; [result] gets the open lane, or null (any thread). */
     fun dial(transferId: String, spec: FileLaneSpec, pass: Int, startBlock: Int, result: (LaneOut?) -> Unit)
+
+    /** The transfer ended: any token issued for it is void. */
+    fun forget(transferId: String) {}
+
+    /** This peer's lanes failed lately: no lane is offered or promoted until the back-off (10 s doubling to 5 min) has passed. */
+    fun cooling(nowMs: Long): Boolean = false
+
+    /** A lane of this peer failed at [nowMs]. */
+    fun failed(nowMs: Long) {}
+
+    /** A transfer a lane carried to the end without a failure: the back-off is cleared. */
+    fun clean() {}
 }
 
 /** A lane connection's writer: its own thread, so a slow socket never stops the file thread. */
-class TcpLaneOut(private val socket: Socket, private val out: OutputStream) : LaneOut {
+class TcpLaneOut(private val socket: Socket, private val out: OutputStream, private val raw: Socket = socket) : LaneOut {
     private val queue = LinkedBlockingQueue<ByteArray>()
     private val queued = AtomicLong()
     @Volatile private var closed = false
@@ -200,6 +218,9 @@ class TcpLaneOut(private val socket: Socket, private val out: OutputStream) : La
 
     override fun close() {
         closed = true
+        // The raw socket first: a writer blocked in the TLS stream is released at once, and closing the TLS layer afterwards has no
+        // close_notify to wait on (the file thread calls this).
+        runCatching { raw.close() }
         runCatching { socket.close() }
     }
 }
@@ -221,11 +242,14 @@ class RealFileLanes(
         fun peerHasLane(): Boolean
         fun nextBlock(transferId: String): Int?
         fun expectedPass(transferId: String): Int?
-        fun onFrame(frame: ByteArray)
-        fun laneClosed(transferId: String)
+        fun onFrame(frame: ByteArray, connection: Long)
+        fun laneClosed(transferId: String, connection: Long)
 
-        /** The lane's token was good and the lane is about to carry frames: the transfer is on it from now (before the sender says so). */
-        fun laneAccepted(transferId: String)
+        /**
+         * The lane's token was good and the lane is about to carry frames: the transfer is on it from now (before the sender says so),
+         * at [pass] from [startBlock]. [connection] names this lane, so the end of an older one is never taken for the end of this one.
+         */
+        fun laneAccepted(transferId: String, pass: Int, startBlock: Int, connection: Long)
     }
 
     override fun canOffer(totalSize: Long) =
@@ -235,7 +259,13 @@ class RealFileLanes(
         val port = listenPort
         if (port <= 0 || !host.peerHasLane() || !host.onLan() || open(peerDeviceId) >= FileLaneProtocol.LANES_PER_PEER) return null
         val token = FileLaneProtocol.newToken()
-        tokens[token] = Issued(transferId, peerDeviceId, System.currentTimeMillis() + FileLaneProtocol.TOKEN_TTL_MS)
+        val now = System.currentTimeMillis()
+        synchronized(tokens) {
+            tokens.entries.removeAll { it.value.expiresAt < now }
+            // One live token per transfer: the newest accept's.
+            byTransfer.put(transferId, token)?.let { tokens.remove(it) }
+            tokens[token] = Issued(transferId, peerDeviceId, now + FileLaneProtocol.TOKEN_TTL_MS)
+        }
         return FileLaneSpec(v = FileLaneProtocol.V, port = port, token = token, ttlMs = FileLaneProtocol.TOKEN_TTL_MS)
     }
 
@@ -253,6 +283,8 @@ class RealFileLanes(
     private fun connect(address: InetAddress, port: Int, token: String, transferId: String, pass: Int, startBlock: Int): LaneOut? {
         val deadline = System.currentTimeMillis() + FileLaneProtocol.CONNECT_MS
         val raw = Socket()
+        // A real wall clock for the whole dial (connect, TLS, token, ready): every socket read has its own timeout, but they add up.
+        val guard = closeAfter(raw, FileLaneProtocol.CONNECT_MS.toLong())
         try {
             raw.connect(InetSocketAddress(address, port), FileLaneProtocol.CONNECT_MS)
             raw.tcpNoDelay = true
@@ -268,12 +300,30 @@ class RealFileLanes(
             val ready = FileLaneProtocol.parseReady(readLineBounded(tls.inputStream, FileLaneProtocol.FIRST_LINE_BYTES)) ?: throw IOException("No ready line")
             if (!ready.first) throw IOException("The lane was refused: ${ready.second}")
             tls.soTimeout = 0
-            return TcpLaneOut(tls, tls.outputStream)
+            guard.cancel(false)
+            return TcpLaneOut(tls, tls.outputStream, raw)
         } catch (error: Throwable) {
+            guard.cancel(false)
             runCatching { raw.close() }
             throw error
         }
     }
+
+    // ---- the lane's token, one per transfer ----
+
+    override fun forget(transferId: String) = forgetTransfer(transferId)
+
+    private var failuresInRow = 0
+    private var coolUntil = 0L
+
+    @Synchronized override fun cooling(nowMs: Long) = nowMs < coolUntil
+
+    @Synchronized override fun failed(nowMs: Long) {
+        failuresInRow++
+        coolUntil = nowMs + minOf(FileLaneProtocol.RETRY_MS shl (failuresInRow - 1).coerceIn(0, 5), FileLaneProtocol.COOL_MAX_MS)
+    }
+
+    @Synchronized override fun clean() { failuresInRow = 0; coolUntil = 0 }
 
     companion object {
         private const val TAG = "DeskLink/FileLane"
@@ -284,9 +334,40 @@ class RealFileLanes(
         private class Issued(val transferId: String, val deviceId: String, val expiresAt: Long)
 
         private val tokens = ConcurrentHashMap<String, Issued>()
+        private val byTransfer = ConcurrentHashMap<String, String>()
         private val openByPeer = ConcurrentHashMap<String, Int>()
+        private val connections = java.util.concurrent.atomic.AtomicLong()
+
+        /** Pre-authentication limits of the lane listener. */
+        internal val admission = LaneAdmission()
+
+        private val watchdog = java.util.concurrent.ScheduledThreadPoolExecutor(1) { Thread(it, "DeskLink-lane-watchdog").apply { isDaemon = true } }
+            .apply { removeOnCancelPolicy = true }
+
+        /** Closes [socket] after [ms] unless cancelled: the hard deadline of a handshake. */
+        internal fun closeAfter(socket: Socket, ms: Long): java.util.concurrent.ScheduledFuture<*> =
+            watchdog.schedule({ runCatching { socket.close() } }, ms, TimeUnit.MILLISECONDS)
 
         private fun open(peer: String) = openByPeer[peer] ?: 0
+
+        /** Takes a lane slot of [peer] in one step with the count; false when both are taken. */
+        private fun tryOpen(peer: String): Boolean = synchronized(openByPeer) {
+            val n = open(peer)
+            if (n >= FileLaneProtocol.LANES_PER_PEER) false else { openByPeer[peer] = n + 1; true }
+        }
+
+        private fun release(peer: String) { synchronized(openByPeer) { openByPeer[peer] = maxOf(0, open(peer) - 1) } }
+
+        /** Open lane sockets by transfer, so a transfer that ends takes its lanes with it. */
+        private val liveSockets = ConcurrentHashMap<String, MutableSet<Socket>>()
+
+        internal fun forgetTransfer(transferId: String) {
+            synchronized(tokens) { byTransfer.remove(transferId)?.let { tokens.remove(it) } }
+            liveSockets.remove(transferId)?.forEach { runCatching { it.close() } }
+        }
+
+        /** Tokens waiting to be redeemed (tests). */
+        internal fun pendingTokens() = tokens.size
 
         /** The peer's certificate is the one stored at pairing, and names the device it claims to be. */
         fun pinned(context: Context, socket: SSLSocket, deviceId: String): Boolean = runCatching {
@@ -302,22 +383,33 @@ class RealFileLanes(
         fun register(context: Context, deviceId: String, host: Host) { appContext = context.applicationContext; hosts[deviceId] = host }
         fun unregister(deviceId: String, host: Host) { hosts.remove(deviceId, host) }
 
-        /** A lane connection reached the LAN listener: [first] is its plaintext first line. Blocking; runs on its own thread. */
+        /** A lane connection reached the LAN listener: [firstLine] is its plaintext first line. Blocking; runs on its own thread. */
         fun accept(context: Context, raw: Socket, firstLine: String) {
             appContext = context.applicationContext
-            val deadline = System.currentTimeMillis() + FileLaneProtocol.CONNECT_MS
-            var counted: String? = null
+            var slot: String? = null
+            var halfOpen: String? = null
+            var guard: java.util.concurrent.ScheduledFuture<*>? = null
+            var registered: Pair<String, Socket>? = null
             try {
+                // At most 4 KiB, and cheap to refuse before anything costs: a paired id, a host, then the caps and the 3 s clock.
+                if (firstLine.length > FileLaneProtocol.FIRST_LINE_BYTES) return raw.closeQuietly()
                 val first = FileLaneProtocol.parseFirst(firstLine) ?: return raw.closeQuietly()
                 if (first.targetDeviceId != DeviceHelper.getDeviceId(context)) return raw.closeQuietly()
                 // Paired devices only: no QR admission, no unpaired lane.
                 if (!TrustedDevices.isTrustedDevice(context, first.deviceId) || !TrustedDevices.isCertificateStored(context, first.deviceId)) return raw.closeQuietly()
                 val host = hosts[first.deviceId] ?: return raw.closeQuietly()
+                val ip = raw.inetAddress?.hostAddress ?: return raw.closeQuietly()
+                if (!admission.admit(ip)) return raw.closeQuietly()
+                halfOpen = ip
+                guard = closeAfter(raw, FileLaneProtocol.CONNECT_MS.toLong())
+                val deadline = System.currentTimeMillis() + FileLaneProtocol.CONNECT_MS
                 raw.tcpNoDelay = true
-                raw.soTimeout = (deadline - System.currentTimeMillis()).toInt().coerceAtLeast(200)
                 val tls = SslHelper.convertToSslSocket(context, raw, first.deviceId, true, true)
+                // convertToSslSocket sets 10 s; the whole handshake has 3 (and the watchdog closes the socket at 3 whatever the reads do).
+                tls.soTimeout = (deadline - System.currentTimeMillis()).toInt().coerceAtLeast(200)
                 tls.startHandshake()
                 if (!pinned(context, tls, first.deviceId)) return raw.closeQuietly()
+                tls.soTimeout = (deadline - System.currentTimeMillis()).toInt().coerceAtLeast(200)
                 val line = readLineBounded(tls.inputStream, FileLaneProtocol.FIRST_LINE_BYTES)
                 val token = FileLaneProtocol.parseToken(line)
                 val verdict = if (token == null) FileLaneProtocol.REASON_TOKEN else judge(token, first.deviceId, host)
@@ -325,37 +417,48 @@ class RealFileLanes(
                     tls.outputStream.apply { write((FileLaneProtocol.readyLine(false, verdict) + "\n").toByteArray()); flush() }
                     return tls.closeQuietly()
                 }
-                if (open(first.deviceId) >= FileLaneProtocol.LANES_PER_PEER) {
+                if (!tryOpen(first.deviceId)) {
                     tls.outputStream.apply { write((FileLaneProtocol.readyLine(false, FileLaneProtocol.REASON_BUSY) + "\n").toByteArray()); flush() }
                     return tls.closeQuietly()
                 }
-                counted = first.deviceId
-                openByPeer.merge(first.deviceId, 1, Int::plus)
+                slot = first.deviceId
+                val connection = connections.incrementAndGet()
+                val sockets = liveSockets.getOrPut(token!!.transferId) { ConcurrentHashMap.newKeySet() }
+                sockets.add(raw)
+                registered = token.transferId to raw
+                host.laneAccepted(token.transferId, token.pass, token.startBlock, connection)
                 tls.outputStream.apply { write((FileLaneProtocol.readyLine(true) + "\n").toByteArray()); flush() }
-                host.laneAccepted(token!!.transferId)
+                guard.cancel(false)
+                admission.release(ip); halfOpen = null
                 tls.soTimeout = FileLaneProtocol.SILENT_MS
-                read(tls.inputStream, host, token.transferId)
+                read(tls.inputStream, host, token.transferId, connection)
             } catch (error: Throwable) {
                 Log.i(TAG, "A lane ended (${error.javaClass.simpleName})")
             } finally {
-                counted?.let { openByPeer.merge(it, -1, Int::plus) }
+                guard?.cancel(false)
+                halfOpen?.let { admission.release(it) }
+                slot?.let { release(it) }
+                registered?.let { (id, socket) -> liveSockets[id]?.remove(socket) }
                 raw.closeQuietly()
             }
         }
 
         /** Null when the token is good (and spent); else the refusal's reason. */
         internal fun judge(token: FileLaneProtocol.Token, deviceId: String, host: Host, now: Long = System.currentTimeMillis()): String? {
-            val issued = tokens.remove(token.token) ?: return FileLaneProtocol.REASON_TOKEN // single use: gone either way
+            val issued = synchronized(tokens) { tokens.remove(token.token)?.also { byTransfer.remove(it.transferId, token.token) } }
+                ?: return FileLaneProtocol.REASON_TOKEN // single use: gone either way
             if (issued.expiresAt < now || issued.deviceId != deviceId || issued.transferId != token.transferId) return FileLaneProtocol.REASON_TOKEN
+            if (!host.onLan()) return FileLaneProtocol.REASON_PATH // the path is not the LAN any more
             val next = host.nextBlock(token.transferId) ?: return FileLaneProtocol.REASON_TRANSFER
-            if (token.startBlock != next) return FileLaneProtocol.REASON_RANGE
-            // Null = the receiver takes any pass (just accepted): the stream's pass becomes its own.
-            host.expectedPass(token.transferId)?.let { if (it != token.pass) return FileLaneProtocol.REASON_RANGE }
+            // At or below the verified prefix: the stream restarts there and the blocks we have arrive as duplicates.
+            if (token.startBlock > next) return FileLaneProtocol.REASON_RANGE
+            // Null = the receiver takes any pass (just accepted). Else the transfer's pass or the next.
+            host.expectedPass(token.transferId)?.let { if (token.pass != it && token.pass != ((it + 1) and 0xff)) return FileLaneProtocol.REASON_RANGE }
             return null
         }
 
         /** Frames, back to back, until the lane ends; each goes to the file thread through the host. */
-        private fun read(input: InputStream, host: Host, transferId: String) {
+        private fun read(input: InputStream, host: Host, transferId: String, connection: Long) {
             val header = ByteArray(FileV2.FRAME_HEADER_BYTES)
             try {
                 while (true) {
@@ -365,10 +468,10 @@ class RealFileLanes(
                     readFully(input, frame, total - FileV2.FRAME_HEADER_BYTES, FileV2.FRAME_HEADER_BYTES)
                     // The frame must belong to this transfer: anything else ends the lane (the transfer carries on over WebRTC).
                     if (frameTransfer(frame) != transferId) throw IOException("A frame of another transfer")
-                    host.onFrame(frame)
+                    host.onFrame(frame, connection)
                 }
             } finally {
-                host.laneClosed(transferId)
+                host.laneClosed(transferId, connection)
             }
         }
 
@@ -387,5 +490,38 @@ class RealFileLanes(
         }
 
         private fun Socket.closeQuietly() { runCatching { close() } }
+    }
+}
+
+/**
+ * The lane listener's limits before a connection has proved anything: at most [perIpOpen] handshakes in progress per address, [globalOpen]
+ * in all, and [perIpPerMinute] attempts per address per minute. A handshake leaves the count when it is answered or dropped.
+ */
+internal class LaneAdmission(
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val perIpOpen: Int = 4,
+    private val globalOpen: Int = 16,
+    private val perIpPerMinute: Int = 20,
+) {
+    private val open = HashMap<String, Int>()
+    private val recent = HashMap<String, ArrayDeque<Long>>()
+    private var total = 0
+
+    @Synchronized fun admit(ip: String): Boolean {
+        val now = clock()
+        if (recent.size > 256) recent.entries.removeAll { (_, t) -> t.isEmpty() || now - t.last() > 60_000 }
+        val times = recent.getOrPut(ip) { ArrayDeque() }
+        while (times.isNotEmpty() && now - times.first() > 60_000) times.removeFirst()
+        if (times.size >= perIpPerMinute || (open[ip] ?: 0) >= perIpOpen || total >= globalOpen) return false
+        times.addLast(now)
+        open[ip] = (open[ip] ?: 0) + 1
+        total++
+        return true
+    }
+
+    @Synchronized fun release(ip: String) {
+        val n = open[ip] ?: return
+        if (n <= 1) open.remove(ip) else open[ip] = n - 1
+        total = maxOf(0, total - 1)
     }
 }

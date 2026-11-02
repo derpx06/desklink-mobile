@@ -211,6 +211,13 @@ public class LanLinkProvider extends BaseLinkProvider {
         // timeout a silent connection pinned this thread and socket forever.
         socket.setSoTimeout(5000);
 
+        // Before anything is read, as it always was: a flood of connections from one address is dropped, not read.
+        if (rateLimit(lastTcpConnectionTimeByIp, address)) {
+            Log.i("LanLinkProvider", "Discarding second TCP packet from the same ip " + address + " received too quickly");
+            closeQuietly(socket);
+            return;
+        }
+
         String message;
         try {
             // We don't use a BufferedInputStream on purpose, since BufferedReader reads ahead and would require
@@ -225,15 +232,9 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
 
         // W18: a bulk-transfer lane from a paired computer takes this connection over; it never becomes a link and never reaches the
-        // dispatcher. It has its own limits (paired only, a one-time token, two per peer), so the identity rate limit below does not apply.
+        // dispatcher. It has its own limits (paired only, a one-time token, two per peer, handshake caps, a 3 s clock, a first line of 4 KiB).
         if (org.desklink.mobile.webrtc.FileLaneProtocol.INSTANCE.parseFirst(message) != null) {
             org.desklink.mobile.webrtc.RealFileLanes.Companion.accept(context, socket, message);
-            return;
-        }
-
-        if (rateLimit(lastTcpConnectionTimeByIp, address)) {
-            Log.i("LanLinkProvider", "Discarding second TCP packet from the same ip " + address + " received too quickly");
-            closeQuietly(socket);
             return;
         }
 
