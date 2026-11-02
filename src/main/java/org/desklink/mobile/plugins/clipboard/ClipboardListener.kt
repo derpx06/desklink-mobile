@@ -84,7 +84,8 @@ class ClipboardListener private constructor(ctx: Context) {
     private var logcat: Process? = null
 
     init {
-        main.post { cm.addPrimaryClipChangedListener { onPrimaryClipChanged() } }
+        // A binder call: off the main thread (the change callback still arrives on it).
+        execute { cm.addPrimaryClipChangedListener { onPrimaryClipChanged() } }
         // Deliberately no automatic-sync start here: running logcat is what makes Android 13+ ask "Allow
         // DeskLink to access all device logs?", and that question belongs to the person turning the
         // setting on, never to a cold start.
@@ -117,22 +118,24 @@ class ClipboardListener private constructor(ctx: Context) {
         val inFront = runCatching {
             androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
         }.getOrDefault(false)
-        // Android 10+ does not deliver this callback to an app that is behind (the system denies it, which is what automatic sync's
-        // logcat watch reads), so a line here is the proof that it arrived at all.
-        org.desklink.mobile.helpers.AppLog.event("clipboard", "copy seen, ${if (inFront) "app in front" else "app behind"}")
+        val own = remoteSetAt != 0L && SystemClock.elapsedRealtime() - remoteSetAt < 2_000
         if (inFront) {
+            execute { org.desklink.mobile.helpers.AppLog.event("clipboard", "copy seen, app in front") }
             ClipboardOffer.cancel(context)
             sync(force = false)
             return
         }
-        val description = try { cm.primaryClipDescription } catch (_: Exception) { null }
-        val own = remoteSetAt != 0L && SystemClock.elapsedRealtime() - remoteSetAt < 2_000
-        val names = offerTargets()
-        val reason = ClipboardOffer.skipReason(false, own, description != null && isSensitive(description), names.size, watching)
-        if (reason == null) {
-            ClipboardOffer.show(context, ClipboardOffer.target(names, context.getString(org.desklink.mobile.R.string.clipboard_many_computers)))
-        } else {
-            org.desklink.mobile.helpers.AppLog.event("clipboard", "no offer: $reason")
+        // Behind: the clip's description (a binder call), the preferences and the log are the disk's and Android's business, not the main thread's.
+        execute {
+            org.desklink.mobile.helpers.AppLog.event("clipboard", "copy seen, app behind")
+            val description = try { cm.primaryClipDescription } catch (_: Exception) { null }
+            val names = offerTargets()
+            val reason = ClipboardOffer.skipReason(false, own, description != null && isSensitive(description), names.size, watching)
+            if (reason == null) {
+                ClipboardOffer.show(context, ClipboardOffer.target(names, context.getString(org.desklink.mobile.R.string.clipboard_many_computers)))
+            } else {
+                org.desklink.mobile.helpers.AppLog.event("clipboard", "no offer: $reason")
+            }
         }
     }
 

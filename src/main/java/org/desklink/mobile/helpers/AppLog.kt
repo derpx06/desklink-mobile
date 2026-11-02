@@ -31,6 +31,19 @@ object AppLog {
     fun event(tag: String, message: String) {
         val where = dir ?: return
         val line = "${stamp.get()!!.format(Date())} ${tag.take(24)} ${LogExport.redact(message).replace('\n', ' ').take(300)}\n"
+        // The file is the disk's business: the main thread only hands the line over (in order, on one thread).
+        if (onMainThread()) { runCatching { writer.execute { append(where, line) } }; return }
+        append(where, line)
+    }
+
+    private val writer = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "DeskLink-applog").apply { isDaemon = true } }
+
+    private fun onMainThread() = runCatching { android.os.Looper.myLooper() === android.os.Looper.getMainLooper() }.getOrDefault(false)
+
+    /** Waits for the lines the main thread handed over (readers and tests). */
+    private fun flush() { runCatching { writer.submit {}.get(2, java.util.concurrent.TimeUnit.SECONDS) } }
+
+    private fun append(where: File, line: String) {
         runCatching {
             synchronized(lock) {
                 val current = File(where, FILE)
@@ -47,6 +60,7 @@ object AppLog {
     /** The kept lines, oldest first. */
     fun lines(): Sequence<String> {
         val where = dir ?: return emptySequence()
+        flush()
         val text = synchronized(lock) {
             listOf(OLD, FILE).joinToString("") { name -> runCatching { File(where, name).readText() }.getOrDefault("") }
         }
@@ -55,6 +69,7 @@ object AppLog {
 
     fun clear() {
         val where = dir ?: return
+        flush()
         synchronized(lock) { File(where, FILE).delete(); File(where, OLD).delete() }
     }
 
