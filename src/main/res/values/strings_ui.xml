@@ -815,6 +815,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     </plurals>
     <string name="settings_turn_on_at">Turn on at %1$s</string>
     <string name="bucket_skip_fetch">Couldn\'t fetch</string>
+    <string name="settings_send_selected_direct">Send selected text without asking</string>
+    <string name="settings_send_selected_direct_summary">"Send to computer" in the text-selection menu sends at once when one computer shares its clipboard. Otherwise it asks first</string>
     <string name="send_selected_label">Send to computer</string>
     <string name="send_selected_pick">Send to which computer?</string>
     <string name="send_selected_sent">Sent to %1$s</string>

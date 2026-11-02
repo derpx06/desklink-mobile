@@ -35,6 +35,22 @@ class SendSelectedTest {
     }
 
     @Test
+    fun theSheetIsSkippedOnlyWithTheSwitchOnAndExactlyOneComputer() {
+        assertEquals(SendSelected.Plan.DIRECT, SendSelected.plan("a", 1, withoutAsking = true))
+        assertEquals("two computers still ask which", SendSelected.Plan.CHOOSE, SendSelected.plan("a", 2, withoutAsking = true))
+        assertEquals(SendSelected.Plan.NO_COMPUTER, SendSelected.plan("a", 0, withoutAsking = true))
+        assertEquals(SendSelected.Plan.NO_TEXT, SendSelected.plan(null, 1, withoutAsking = true))
+    }
+
+    @Test
+    fun theSwitchIsOffUntilThePersonTurnsItOn() {
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(app).edit().remove(SendSelected.KEY_DIRECT).commit()
+        assertEquals(false, SendSelected.sendsWithoutAsking(app))
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(app).edit().putBoolean(SendSelected.KEY_DIRECT, true).commit()
+        assertEquals(true, SendSelected.sendsWithoutAsking(app))
+    }
+
+    @Test
     fun theTextSelectionMenuReachesTheActivityAndNothingElseOfOursTakesProcessText() {
         val found = app.packageManager.queryIntentActivities(Intent(Intent.ACTION_PROCESS_TEXT).setType("text/plain"), 0)
             .filter { it.activityInfo.packageName == app.packageName }

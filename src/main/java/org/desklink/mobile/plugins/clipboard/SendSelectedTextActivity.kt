@@ -17,8 +17,9 @@ import org.desklink.mobile.plugins.share.ShareEntry
  * a tap in DeskLink and without READ_LOGS: the selected text arrives in the intent, so no clipboard read is needed.
  *
  * It is exported (the system menu of other apps must reach it), so an app can also start it with any text. Therefore nothing is sent
- * until the person taps a computer or Send on a sheet that shows what and to whom (as the share target does); the text is only ever
- * read from the intent and nothing is returned to the calling app.
+ * until the person taps a computer or Send on a sheet that shows what and to whom (as the share target does), unless the person
+ * turned on "Send selected text without asking" and exactly one computer takes it; the text is only ever read from the intent and
+ * nothing is returned to the calling app.
  */
 class SendSelectedTextActivity : AppCompatActivity() {
     private var dialog: AlertDialog? = null
@@ -27,9 +28,10 @@ class SendSelectedTextActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         val text = SendSelected.textOf(intent)
         val targets = SendSelected.targets()
-        when (SendSelected.plan(text, targets.size)) {
+        when (SendSelected.plan(text, targets.size, SendSelected.sendsWithoutAsking(this))) {
             SendSelected.Plan.NO_TEXT -> end(R.string.send_selected_nothing)
             SendSelected.Plan.NO_COMPUTER -> end(R.string.send_selected_no_computer)
+            SendSelected.Plan.DIRECT -> send(text!!, targets[0])
             SendSelected.Plan.ONE -> dialog = AlertDialog.Builder(this)
                 .setTitle(getString(R.string.share_confirm_title, targets[0].name))
                 .setMessage(text!!.take(ShareEntry.MAX_SHOWN))
@@ -65,7 +67,13 @@ class SendSelectedTextActivity : AppCompatActivity() {
 
 /** What "Send to computer" does with the selection and the computers that can take it (pure parts are tested). */
 object SendSelected {
-    enum class Plan { NO_TEXT, NO_COMPUTER, ONE, CHOOSE }
+    enum class Plan { NO_TEXT, NO_COMPUTER, DIRECT, ONE, CHOOSE }
+
+    /** Settings > Clipboard > "Send selected text without asking" (off unless the person turned it on). */
+    const val KEY_DIRECT = "send_selected_direct"
+
+    fun sendsWithoutAsking(context: android.content.Context): Boolean =
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_DIRECT, false)
 
     /** The selected text of a PROCESS_TEXT intent; null for any other action or a blank selection. Read only. */
     fun textOf(intent: Intent): String? {
@@ -73,10 +81,11 @@ object SendSelected {
         return runCatching { intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString() }.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
-    fun plan(text: String?, computers: Int): Plan = when {
+    /** [withoutAsking]: the person's switch; it only ever skips the sheet when exactly one computer can take the text. */
+    fun plan(text: String?, computers: Int, withoutAsking: Boolean = false): Plan = when {
         text == null -> Plan.NO_TEXT
         computers <= 0 -> Plan.NO_COMPUTER
-        computers == 1 -> Plan.ONE
+        computers == 1 -> if (withoutAsking) Plan.DIRECT else Plan.ONE
         else -> Plan.CHOOSE
     }
 

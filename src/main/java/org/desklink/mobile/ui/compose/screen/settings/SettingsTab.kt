@@ -423,6 +423,14 @@ private fun ClipboardGroup(desk: DeskSettings?, actions: SettingsActions, prefs:
         DeskSwitch(desk, actions, DeskSettingsPlugin.CLIPBOARD, stringResource(R.string.settings_desk_clipboard, desk.name), R.drawable.sym_content_paste, stringResource(R.string.settings_desk_clipboard_summary, desk.name), desk.remote?.clipboard == true)
         if (desk.clipboardOn) {
             GroupRow(stringResource(R.string.home_send_clipboard, desk.name), icon = R.drawable.sym_upload, onClick = actions.onSendClipboard) { Chevron() }
+            var direct by remember { mutableStateOf(prefs.getBoolean(org.desklink.mobile.plugins.clipboard.SendSelected.KEY_DIRECT, false)) }
+            GroupRow(
+                stringResource(R.string.settings_send_selected_direct),
+                icon = R.drawable.sym_content_paste,
+                subtitle = stringResource(R.string.settings_send_selected_direct_summary),
+                checked = direct,
+                onClick = { direct = !direct; prefs.edit { putBoolean(org.desklink.mobile.plugins.clipboard.SendSelected.KEY_DIRECT, direct) } },
+            )
         }
     }
 }
