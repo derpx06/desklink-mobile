@@ -86,4 +86,13 @@ class MainThreadWorkTest {
         assertTrue("the active notifications are asked for in the background", current.indexOf("ThreadHelper.execute") in 0 until current.indexOf("getActiveNotifications"))
         assertTrue("and a label is looked up at the post, not at the send", notifications.contains("ThreadHelper.execute { appNameLookup(context, pkg) }"))
     }
+
+    @Test
+    fun theRingtoneNameIsWorkedOutInTheBackgroundWhenSettingsOpen() {
+        val tab = source("ui/compose/screen/settings/SettingsTab.kt")
+        val group = tab.substringAfter("private fun NotificationsGroup(").substringBefore("SectionLabel(stringResource(R.string.sg_notifications_phone")
+        val at = group.indexOf("getRingtone(")
+        assertTrue(at > 0)
+        assertTrue("inside a produceState on Dispatchers.IO", group.lastIndexOf("withContext(kotlinx.coroutines.Dispatchers.IO)", at) > group.lastIndexOf("produceState", at))
+    }
 }

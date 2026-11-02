@@ -311,7 +311,12 @@ private fun NotificationsGroup(desk: DeskSettings?, actions: SettingsActions, pr
         }
     }
     val ringtone = prefs.getString(ringKey, null)?.let(Uri::parse) ?: Settings.System.DEFAULT_RINGTONE_URI
-    val ringtoneTitle = runCatching { RingtoneManager.getRingtone(context, ringtone)?.getTitle(context) }.getOrNull().orEmpty()
+    // The ringtone's name is the media provider's to give (a disk and binder read): worked out in the background, shown when it is.
+    val ringtoneTitle by androidx.compose.runtime.produceState("", ringtone) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { RingtoneManager.getRingtone(context, ringtone)?.getTitle(context) }.getOrNull().orEmpty()
+        }
+    }
     SectionLabel(stringResource(R.string.sg_notifications_phone, desk.name))
     RowGroup {
         GroupRow(
