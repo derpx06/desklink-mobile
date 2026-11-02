@@ -90,4 +90,24 @@ class PeerStateTest {
         PeerState.forgetLate(app, desk, 5, 5, paired = true)
         assertTrue(prefs.getBoolean("glide_allowed_$desk", false))
     }
+
+    private fun bucketRecords(loaded: Boolean) {
+        val state = File(app.filesDir, "bucket/state.json").apply { parentFile!!.mkdirs() }
+        fun record(id: String) = org.json.JSONObject().put("deviceId", id).put("treeUri", "content://tree/$id").put("computer", id).put("entries", org.json.JSONArray())
+        state.writeText(org.json.JSONObject().put("version", 1).put("buckets", org.json.JSONArray().put(record(desk)).put(record(other))).toString())
+        File(app.filesDir, "bucket-files").apply { mkdirs() }.let { File(it, "kept.txt").writeText("the person's file") }
+        org.desklink.mobile.plugins.folders.BucketEngine.resetForTest(app, loaded)
+        PeerState.forget(app, desk)
+        val ids = { org.json.JSONObject(state.readText()).getJSONArray("buckets").let { a -> (0 until a.length()).map { a.getJSONObject(it).getString("deviceId") } } }
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+        while (desk in ids() && System.nanoTime() < deadline) Thread.sleep(20)
+        assertEquals(listOf(other), ids())
+        assertTrue("the files stay", File(File(app.filesDir, "bucket-files"), "kept.txt").exists())
+    }
+
+    @Test
+    fun anUnpairRemovesThatComputersBucketRecordAndKeepsTheOthersAndTheFiles() = bucketRecords(loaded = true)
+
+    @Test
+    fun anUnpairBeforeTheBucketStateWasReadStillRemovesOnlyThatRecord() = bucketRecords(loaded = false)
 }

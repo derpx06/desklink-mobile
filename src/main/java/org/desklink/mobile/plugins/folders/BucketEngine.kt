@@ -184,6 +184,8 @@ object BucketEngine {
     fun moving(deviceId: String): Boolean = lastMoved[deviceId]?.let { SystemClock.elapsedRealtime() - it < 30_000L } == true
 
     private val buckets = LinkedHashMap<String, Live>()
+    /** Whether the saved state has been read into [buckets] (on the worker). */
+    @Volatile private var started = false
     private val ready = HashSet<String>()
     /** The phone asked the desk to turn the Bucket on: device → (tree, at). */
     private val asked = HashMap<String, Pair<String, Long>>()
@@ -204,6 +206,7 @@ object BucketEngine {
         app = context.applicationContext
         worker.execute {
             load()
+            started = true
             publish()
             buckets.values.forEach { live -> runCatching { tree(live)?.cleanTemps() } }
             File(app.cacheDir, "bucket-stash").listFiles()?.forEach { it.delete() }
@@ -289,7 +292,7 @@ object BucketEngine {
      * files in the folder are the person's and stay.
      */
     fun forgetPeer(context: Context, deviceId: String) {
-        if (!::app.isInitialized) app = context.applicationContext
+        app = context.applicationContext
         worker.execute {
             val live = buckets.remove(deviceId)
             val tree = live?.treeUri ?: asked.remove(deviceId)?.first
@@ -298,7 +301,8 @@ object BucketEngine {
             synchronized(wanted) { wanted.keys.removeAll { it.first == deviceId } }
             live?.let(::unwatch)
             tree?.let(::release)
-            save()
+            // Not loaded yet (an unpair before start): saving the empty list would wipe the other computers' records, so the file is edited.
+            if (live != null || started) save() else dropRecord(deviceId)
             publish()
         }
     }
@@ -1280,6 +1284,33 @@ object BucketEngine {
             o.optJSONArray("conflicts")?.let { c -> (0 until minOf(c.length(), 200)).forEach { live.conflicts += c.optString(it) } }
             buckets[deviceId] = live
             watch(live)
+        }
+    }
+
+    /** A test's way to make the engine look freshly started (state read) or not started yet, on the worker, before what the test does next. */
+    @androidx.annotation.VisibleForTesting
+    internal fun resetForTest(context: Context, loaded: Boolean) {
+        app = context.applicationContext
+        worker.execute {
+            buckets.clear()
+            started = false
+            if (loaded) load()
+            started = loaded
+        }
+    }
+
+    /** Removes [deviceId]'s record from the saved state without loading it (the files in its folder are not touched). */
+    private fun dropRecord(deviceId: String) {
+        val file = AtomicFile(File(app.filesDir, STATE_FILE))
+        if (!file.baseFile.exists()) return
+        val json = runCatching { JSONObject(String(file.readFully(), Charsets.UTF_8)) }.getOrNull() ?: return
+        val kept = JSONArray()
+        val all = json.optJSONArray("buckets") ?: return
+        (0 until all.length()).forEach { i -> all.optJSONObject(i)?.takeIf { it.optString("deviceId") != deviceId }?.let(kept::put) }
+        json.put("buckets", kept)
+        runCatching {
+            val out = file.startWrite()
+            try { out.write(json.toString().toByteArray(Charsets.UTF_8)); file.finishWrite(out) } catch (e: Exception) { file.failWrite(out); throw e }
         }
     }
 
