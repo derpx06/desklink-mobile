@@ -195,5 +195,8 @@ class BucketActivity : AppCompatActivity() {
 
         /** Documents on the phone's storage: where the folder picker starts ("Choose or create DeskLink Bucket"). */
         fun documentsUri(): Uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Documents")
+
+        /** Where "Fix" starts the picker: Documents/DeskLink Bucket (the computer's own folder is made inside the one picked). */
+        fun fixUri(): Uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Documents/DeskLink Bucket")
     }
 }

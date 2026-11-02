@@ -301,6 +301,31 @@ object BucketEngine {
         }
     }
 
+    /**
+     * "Fix" on a held Bucket: the person picked the folder again. The grant is taken again, the folder is watched and scanned, and
+     * the sync resumes. Nothing is deleted on either side (see [BucketFix.startsFresh] for what a missing folder starts from).
+     */
+    fun fix(context: Context, deviceId: String, tree: Uri): Boolean {
+        if (!keepGrant(context, tree)) return false
+        worker.execute {
+            val old = buckets[deviceId] ?: return@execute
+            val live = if (BucketFix.startsFresh(old.phase)) Live(deviceId, tree.toString(), old.computer) else old
+            val oldTree = old.treeUri
+            unwatch(old)
+            live.treeUri = tree.toString()
+            live.phase = Phase.WAITING
+            live.dirtyAt = 0
+            live.scannedAt = null
+            buckets[deviceId] = live
+            synchronized(wanted) { wanted.keys.removeAll { it.first == deviceId } }
+            watch(live)
+            if (oldTree != live.treeUri) release(oldTree)
+            save()
+            publish()
+        }
+        return true
+    }
+
     fun decline(deviceId: String) = worker.execute {
         offers.remove(deviceId) ?: return@execute
         send(deviceId, packet("decline").apply { this["id"] = FolderSync.BUCKET_ID })

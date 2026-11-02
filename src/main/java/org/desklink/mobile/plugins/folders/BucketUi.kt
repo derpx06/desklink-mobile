@@ -173,6 +173,10 @@ class BucketUi(
             tree ?: return@rememberLauncherForActivityResult
             if (!BucketEngine.turnOn(host, deviceId, tree)) toast(getString(R.string.bucket_folder_failed))
         }
+        val pickFix = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+            tree ?: return@rememberLauncherForActivityResult
+            if (!BucketEngine.fix(host, deviceId, tree)) toast(getString(R.string.bucket_folder_failed))
+        }
         val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             if (uris.isNotEmpty()) BucketEngine.add(deviceId, uris.take(MAX_SHARED), path, ::report)
         }
@@ -315,7 +319,7 @@ class BucketUi(
                         onDecline = { BucketEngine.decline(deviceId) },
                         below = below,
                     )
-                    else -> Content(view!!, desk, deviceId, path, selected, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p }, below = below)
+                    else -> Content(view!!, desk, deviceId, path, selected, onFix = { pickFix.launch(BucketActivity.fixUri()) }, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p }, below = below)
                 }
                 if (on && !selecting) {
                     Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) {
@@ -536,7 +540,7 @@ class BucketUi(
     }
 
     @Composable
-    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onOpen: (String) -> Unit, onSelect: (String) -> Unit, below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null) {
+    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onFix: () -> Unit, onOpen: (String) -> Unit, onSelect: (String) -> Unit, below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null) {
         val t = tokens
         var menuFor by remember { mutableStateOf<BucketItem?>(null) }
         var renaming by remember { mutableStateOf<BucketItem?>(null) }
@@ -556,11 +560,11 @@ class BucketUi(
             }
             if (view.phase == Phase.HELD_EMPTY) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    Banner(stringResource(R.string.bucket_held_empty, desk), action = stringResource(R.string.bucket_held_confirm), warn = true) { BucketEngine.confirmEmpty(deviceId) }
+                    Banner(stringResource(R.string.bucket_held_empty, desk), action = stringResource(R.string.bucket_held_confirm), warn = true, action2 = stringResource(R.string.bucket_fix), onAction2 = onFix) { BucketEngine.confirmEmpty(deviceId) }
                 }
             }
             if (view.phase == Phase.NO_ACCESS) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_no_access), warn = true) }
+                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_no_access, desk), action = stringResource(R.string.bucket_fix), warn = true, onAction = onFix) }
             }
             if (view.phase == Phase.LISTING_FAILED) {
                 item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_listing_failed), warn = true) }
@@ -667,7 +671,7 @@ class BucketUi(
     }
 
     @Composable
-    private fun Banner(text: String, action: String? = null, warn: Boolean = false, progress: Float? = null, onAction: () -> Unit = {}) {
+    private fun Banner(text: String, action: String? = null, warn: Boolean = false, progress: Float? = null, action2: String? = null, onAction2: () -> Unit = {}, onAction: () -> Unit = {}) {
         val t = tokens
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(if (warn) t.coralContainer else t.surface)
@@ -676,6 +680,7 @@ class BucketUi(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(text, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.weight(1f).padding(vertical = 6.dp))
                 action?.let { TextButton(onClick = onAction, modifier = Modifier.heightIn(min = 48.dp)) { Text(it) } }
+                action2?.let { TextButton(onClick = onAction2, modifier = Modifier.heightIn(min = 48.dp)) { Text(it) } }
             }
             progress?.let { LinearProgressIndicator({ it }, Modifier.fillMaxWidth().padding(end = 8.dp, bottom = 4.dp).height(4.dp), color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp) }
         }

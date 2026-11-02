@@ -18,3 +18,18 @@ class BucketHandshakeTest {
         assertFalse(BucketHandshake.resendOffer(asked = false, bucketExists = true))
     }
 }
+
+class BucketFixTest {
+    @Test
+    fun fixIsOfferedOnlyForAFolderThatIsGoneOrAGrantThatWasRevoked() {
+        for (phase in Phase.values()) {
+            assertTrue(phase.name, BucketFix.offered(phase) == (phase == Phase.HELD_EMPTY || phase == Phase.NO_ACCESS))
+        }
+    }
+
+    @Test
+    fun aMissingFolderStartsWithoutRecordsSoNothingReadsAsDeletedButARevokedGrantKeepsThem() {
+        assertTrue(BucketFix.startsFresh(Phase.HELD_EMPTY))
+        assertFalse(BucketFix.startsFresh(Phase.NO_ACCESS))
+    }
+}

@@ -609,7 +609,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_adding">Adding %1$d of %2$d…</string>
     <string name="bucket_held_empty">The Bucket folder looks empty here. Nothing was deleted on %1$s. If you emptied it on purpose, confirm.</string>
     <string name="bucket_held_confirm">It\'s empty on purpose</string>
-    <string name="bucket_no_access">DeskLink can no longer open the Bucket folder. Turn the Bucket off and on again to choose it.</string>
+    <string name="bucket_no_access">DeskLink can no longer open the Bucket folder. Nothing was deleted on %1$s. Choose the folder again to carry on.</string>
+    <string name="bucket_fix">Fix</string>
     <string name="bucket_not_on_desk">The Bucket is not set up on %1$s: paused</string>
     <string name="bucket_storage_full">Phone storage is full: files from the computer wait until there is room</string>
     <string name="bucket_too_many">The Bucket holds 10,000 items at most</string>
