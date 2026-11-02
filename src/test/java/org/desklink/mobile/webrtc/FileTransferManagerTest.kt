@@ -626,6 +626,18 @@ class FileTransferManagerTest {
     }
 
     @Test
+    fun cancelOnTheTransferNotificationEndsEverythingButTheBucketsOwnFiles() {
+        val store = FileTransferStore(phone.root)
+        val plain = UUID.randomUUID().toString()
+        val bucket = UUID.randomUUID().toString()
+        assertTrue(store.save(FileCheckpoint(plain, "send", "p".repeat(32), phoneWire.peerDeviceId, "a.bin", 100, 77, 0, sourceUri = "file:///a")))
+        assertTrue(store.save(FileCheckpoint(bucket, "send", "q".repeat(32), phoneWire.peerDeviceId, "b.bin", 100, 77, 0, sourceUri = "file:///b", meta = bucketMeta("A/b.bin", "cd".repeat(32)))))
+        phone.manager.cancelAllTransfers()
+        pump()
+        assertEquals(listOf(bucket), store.list().filter { it.direction == "send" }.map { it.transferId })
+    }
+
+    @Test
     fun aFileThatIsReadInPlaceIsNeverCopiedFirst() {
         val bytes = data(FileV2.BLOCK_BYTES + 5)
         val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {

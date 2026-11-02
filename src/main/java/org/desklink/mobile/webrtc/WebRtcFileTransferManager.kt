@@ -809,6 +809,15 @@ class WebRtcFileTransferManager(
         }
     }
 
+    /** Cancel on the transfer notification: everything of this computer moving, except the Bucket's own sync, ends. */
+    fun cancelAllTransfers() {
+        runner.post {
+            sends.values.filter { it.sender.metaForRestart()["folder"] == null }.forEach { it.sender.cancel(FileCodes.USER, "Cancelled.") }
+            receives.entries.filter { !folderOffers.containsKey(it.key) && !clipboardOffers.contains(it.key) }.forEach { it.value.cancel(FileCodes.USER, "Cancelled.") }
+            store.list().filter { it.direction == "send" && it.deviceId == device.deviceId && it.meta["folder"] == null && !sends.containsKey(it.transferId) }.forEach { forgetStored(it.transferId) }
+        }
+    }
+
     /** The gallery switch went off: gallery pictures in flight are cancelled and the ones waiting to resume are forgotten. */
     fun cancelGallery() {
         runner.post {

@@ -522,6 +522,17 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_note_both" formatted="false">Sending to and receiving from %s</string>
     <string name="bucket_done_one" formatted="false">Bucket up to date · 1 file synced</string>
     <string name="bucket_done_many" formatted="false">Bucket up to date · %d files synced</string>
+    <string name="transfer_note_title" translatable="false">DeskLink</string>
+    <string name="transfer_note_sending">Sending</string>
+    <string name="transfer_note_receiving">Receiving</string>
+    <string name="transfer_note_transferring">Transferring</string>
+    <string name="transfer_note_saving" formatted="false">Saving %s</string>
+    <string name="transfer_note_files" formatted="false">%1$s %2$d files</string>
+    <string name="transfer_note_of" formatted="false">%1$d of %2$d</string>
+    <string name="transfer_note_waiting" formatted="false">Waiting for %s</string>
+    <string name="transfer_note_paused">Paused</string>
+    <string name="transfer_note_storage_full">Storage is full</string>
+    <string name="transfer_note_public">DeskLink · transferring files</string>
     <string name="bucket_open_action" formatted="false">Open Bucket</string>
     <string name="bucket_pause" formatted="false">Pause sync</string>
     <string name="bucket_resume" formatted="false">Resume</string>

@@ -1413,7 +1413,14 @@ object BucketEngine {
         // The notification: every second at most while files move, then "up to date" once.
         for ((deviceId, view) in _views.value) {
             val live = buckets[deviceId] ?: continue
-            if (BucketSyncNotification.update(app, view, deviceId in ready, live.burst.size)) live.burst.clear()
+            val flights = view.items.mapNotNull { item ->
+                item.progress?.let {
+                    org.desklink.mobile.plugins.share.TransferNotification.Item(
+                        item.name, item.state == BucketItem.State.SENDING, it.done, it.total, it.etaSeconds, it.bytesPerSecond, it.paused, bucket = true,
+                    )
+                }
+            }
+            if (org.desklink.mobile.plugins.share.TransferNotification.bucket(app, deviceId, flights, deviceId in ready, view.userPaused, view.storageFull, live.burst.size)) live.burst.clear()
         }
     }
 

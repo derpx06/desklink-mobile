@@ -64,6 +64,7 @@ class UploadNotification {
     }
 
     public void setFinished(String message) {
+        over = true;
         TransferProgress.finish(jobId, message, false);
         builder = new NotificationCompat.Builder(device.getContext(), NotificationHelper.Channels.FILETRANSFER_UPLOAD);
         builder.setContentTitle(message)
@@ -90,6 +91,7 @@ class UploadNotification {
 
     /** Paused by a lost link: an ongoing-looking notice, not an error. */
     public void setResuming(String message) {
+        // "Waiting for <computer>" is said by the one transfer notification; nothing is posted here.
         builder.setContentText(message)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
                 .setProgress(0, 0, false)
@@ -102,7 +104,11 @@ class UploadNotification {
         notificationManager.cancel(notificationId);
     }
 
+    /** Whether the transfer is over (finished, failed): only then does this notice post; what is moving is the one notification of [TransferNotification]. */
+    private boolean over = false;
+
     void show() {
+        if (!over) return;
         notificationManager.notify(notificationId, builder.build());
     }
 }

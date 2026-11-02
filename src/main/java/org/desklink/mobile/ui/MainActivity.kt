@@ -275,7 +275,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 } else if (DeskLinkApplication.getInstance().getDevice(id)?.isPaired == true) {
                     select(id)
                     resetTo(HOME)
-                    nav.select(AppTab.HOME)
+                    // The transfer notification opens the Files tab; any other way in lands on Home.
+                    nav.select(if (intent.getBooleanExtra(EXTRA_OPEN_FILES, false)) AppTab.FILES else AppTab.HOME)
                 }
             }
         }
@@ -1273,6 +1274,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         const val ACTION_NEW_NOTE = "org.desklink.mobile.action.NEW_NOTE"
         const val ACTION_ADD_TO_BUCKET = "org.desklink.mobile.action.ADD_TO_BUCKET"
         const val EXTRA_DEVICE_ID = "deviceId"
+        const val EXTRA_OPEN_FILES = "openFiles"
         const val PAIR_REQUEST_STATUS = "pair_req_status"
         const val PAIRING_PENDING = "pending"
         const val RESULT_NEEDS_RELOAD = RESULT_FIRST_USER

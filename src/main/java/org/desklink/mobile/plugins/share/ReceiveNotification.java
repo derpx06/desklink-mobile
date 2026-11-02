@@ -55,7 +55,11 @@ public class ReceiveNotification {
         addCancelAction();
     }
 
+    /** Whether the receive is over: only then does this notice post; what is moving is the one notification of [TransferNotification]. */
+    private boolean over = false;
+
     public void show() {
+        if (!over) return;
         notificationManager.notify(notificationId, builder.build());
     }
 
@@ -89,6 +93,7 @@ public class ReceiveNotification {
 
 
     public void setFinished(String message) {
+        over = true;
         TransferProgress.finish(jobId, message, false);
         builder = new NotificationCompat.Builder(device.getContext(), NotificationHelper.Channels.FILETRANSFER_COMPLETE);
         builder.setContentTitle(message)
