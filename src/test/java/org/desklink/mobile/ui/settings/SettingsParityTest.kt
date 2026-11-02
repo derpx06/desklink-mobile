@@ -84,7 +84,7 @@ class SettingsParityTest {
             rows("SoundGroup"),
         )
         assertEquals(
-            listOf("Let <computer> control this phone", "Let <computer> type on this phone", "Pointer speed", "Reverse scroll direction"),
+            listOf("Let <computer> control this phone", "Pointer speed", "Reverse scroll direction"),
             rows("ControlGroup"),
         )
         assertEquals(

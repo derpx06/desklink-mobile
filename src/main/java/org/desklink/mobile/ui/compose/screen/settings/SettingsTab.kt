@@ -565,24 +565,7 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
                 if (!desk.glideOn && !desk.accessibilityOn) AccessibilitySetupActivity.open(context)
             },
         )
-        GroupRow(
-            stringResource(R.string.settings_type_on_phone, desk.name),
-            icon = R.drawable.sym_keyboard,
-            subtitle = stringResource(
-                when {
-                    !desk.typeOnPhoneOn -> R.string.settings_type_on_phone_off
-                    !desk.accessibilityOn -> R.string.settings_type_on_phone_service
-                    else -> R.string.settings_type_on_phone_on
-                },
-                desk.name,
-            ),
-            checked = desk.typeOnPhoneOn,
-            onClick = {
-                actions.onTypeOnPhone(!desk.typeOnPhoneOn)
-                if (!desk.typeOnPhoneOn && !desk.accessibilityOn) AccessibilitySetupActivity.open(context)
-            },
-        )
-        if ((desk.glideOn || desk.typeOnPhoneOn) && !desk.accessibilityOn) {
+        if (desk.glideOn && !desk.accessibilityOn) {
             AllowRow(stringResource(R.string.settings_perm_accessibility), stringResource(R.string.settings_perm_accessibility_summary, desk.name)) { AccessibilitySetupActivity.open(context) }
         }
     }

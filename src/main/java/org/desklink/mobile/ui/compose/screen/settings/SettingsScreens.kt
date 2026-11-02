@@ -145,8 +145,6 @@ data class DeskSettings(
     val showCaller: Boolean = false,
     /** The desk's notifications shown on this phone (phone-owned, off by default). */
     val deskNotificationsOn: Boolean = false,
-    /** "Let <desk> type on this phone" (phone-owned, off by default), and whether the service is on. */
-    val typeOnPhoneOn: Boolean = false,
     /** F4: "Let <desk> control this phone" (glide), off by default. */
     val glideOn: Boolean = false,
     val accessibilityOn: Boolean = false,
@@ -175,7 +173,6 @@ class SettingsActions(
     val onCalls: (Boolean) -> Unit = {},
     val onShowCaller: (Boolean) -> Unit = {},
     val onDeskNotifications: (Boolean) -> Unit = {},
-    val onTypeOnPhone: (Boolean) -> Unit = {},
     val onGlide: (Boolean) -> Unit = {},
     val onDeskSound: (Boolean) -> Unit = {},
     val onDeskSoundVolume: (Int) -> Unit = {},
@@ -323,10 +320,7 @@ internal data class PermissionNeeds(val accessibility: Boolean = true, val notif
             fun any(check: (org.desklink.mobile.Device) -> Boolean) = devices.any { runCatching { check(it) }.getOrDefault(false) }
             fun plugin(cls: Class<out org.desklink.mobile.plugins.Plugin>) = org.desklink.mobile.plugins.Plugin.getPluginKey(cls)
             return PermissionNeeds(
-                accessibility = any {
-                    org.desklink.mobile.plugins.inputdevicesreceiver.Glide.allowed(context, it.deviceId) ||
-                        org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.allowed(context, it.deviceId)
-                },
+                accessibility = any { org.desklink.mobile.plugins.inputdevicesreceiver.Glide.allowed(context, it.deviceId) },
                 notificationAccess = any {
                     it.isPluginEnabled(plugin(org.desklink.mobile.plugins.notifications.NotificationsPlugin::class.java)) ||
                         it.isPluginEnabled(plugin(org.desklink.mobile.plugins.mprisreceiver.MprisReceiverPlugin::class.java))

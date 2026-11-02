@@ -2662,31 +2662,20 @@ class WebRtcSessionCoordinator(
     private val inboundDrops = DropLog(TAG)
 
     /**
-     * What an authenticated feature packet gets: the input rules (glide, focused-field typing, the screen lease), then its
+     * What an authenticated feature packet gets: the input rules (glide, the screen lease), then its
      * plugin. A packet that is merely not allowed now is dropped (one rate-limited log line, a count) and never ends the link;
      * only a protocol violation does ([publish] "Failed"). Internal so a test drives the real path without a peer.
      */
     internal fun deliverFeaturePacket(packet: NetworkPacket, wire: WebRtcWireBinding) {
         runCatching {
-            val focusedField = packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST &&
-                org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.targetsFocusedField(packet)
             val glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide
             if (
-                packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST && !focusedField &&
+                packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST &&
                 glide.isGliding(device.deviceId) && glide.allowed(context, device.deviceId)
             ) {
                 // F4 glide (G5): the person's per-desk "Let <desk> control this phone" is the
                 // consent while the desk's pointer is here; no screen lease.
                 if (!glide.accepts(device.deviceId, packet.getStringOrNull("key"))) return@runCatching
-            } else if (focusedField) {
-                // "Type on <phone>" (C2): no screen session, so no lease; the person's
-                // per-desk switch is the consent, and only keys may come this way.
-                val typing = org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping
-                if (!typing.keyboardOnly(packet)) throw InboundNotAllowed("focused-field input with more than keys")
-                if (!typing.allowed(context, device.deviceId)) {
-                    typing.askToAllow(context, device)
-                    return@runCatching
-                }
             } else if (packet.type == DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST) {
                 remoteSession.verifyInboundInput(packet, wire)
             }

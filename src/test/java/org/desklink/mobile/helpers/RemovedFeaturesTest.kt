@@ -58,4 +58,11 @@ class RemovedFeaturesTest {
         val kept = listOf("mousepad_scroll_direction", "mousepad_sensitivity_key", "findmyphone_ringtone", "share_destination_custom", "share_destination_folder_uri")
         assertEquals(emptyList<String>(), RemovedFeatures.staleKeys(kept))
     }
+
+    @Test
+    fun theRemovedTypeSwitchesGoAndNothingElseDoes() {
+        val all = listOf("type_on_phone_abc", "type_on_phone_def", "glide_allowed_abc", "mic_consent_abc", "dynamic_colors", "certificate")
+        assertEquals(listOf("type_on_phone_abc", "type_on_phone_def"), RemovedFeatures.typeKeys(all))
+        assertEquals(emptyList<String>(), RemovedFeatures.typeKeys(listOf("glide_allowed_type_on_phone_x")))
+    }
 }

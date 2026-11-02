@@ -1020,7 +1020,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 pending = it.getPlugin(DeskSettingsPlugin::class.java)?.pending.orEmpty(),
                 callsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)),
                 showCaller = org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(this, it.deviceId),
-                typeOnPhoneOn = org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.allowed(this, it.deviceId),
                 glideOn = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.allowed(this, it.deviceId),
                 deskSoundOn = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this, it.deviceId),
                 deskSoundVolume = org.desklink.mobile.plugins.audio.PhoneAudio.volume(this, it.deviceId),
@@ -1115,14 +1114,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                         // Turned off mid-glide: the desk gets its pointer back now.
                         if (!on) d.getPlugin(org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin::class.java)
                             ?.takeIf { org.desklink.mobile.plugins.inputdevicesreceiver.Glide.activeDesk == d.deviceId }?.stop(release = true)
-                    }
-                    tick++
-                },
-                onTypeOnPhone = { on ->
-                    device?.let { org.desklink.mobile.plugins.mousereceiver.FocusedFieldTyping.setAllowed(this, it.deviceId, on) }
-                    // The accessibility service is asked for only now, when the person turns this on.
-                    if (on && org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance == null) {
-                        org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.open(this)
                     }
                     tick++
                 },

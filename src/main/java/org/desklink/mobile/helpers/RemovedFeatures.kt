@@ -38,6 +38,14 @@ object RemovedFeatures {
         "clipboard_auto_sync",
     )
 
+    /** The removed "Type" feature: "Let <desk> type on this phone" was stored per computer under this prefix. */
+    internal const val TYPE_PREFIX = "type_on_phone_"
+    internal const val MARKER_KEY_TYPE = "type_removed_1_4"
+    private const val TYPE_ASK_NOTIFICATION_ID = 0x7e1e
+
+    /** The preference keys among [all] that the removed Type feature wrote. */
+    fun typeKeys(all: Collection<String>): List<String> = all.filter { it.startsWith(TYPE_PREFIX) }
+
     /** 2.0 made one marker of its own: the settings that became fixed defaults. */
     internal const val MARKER_KEY_SETTINGS = "simplified_2_0"
 
@@ -97,6 +105,7 @@ object RemovedFeatures {
         val app = context.applicationContext
         val marker = app.getSharedPreferences(MARKER_PREFS, Context.MODE_PRIVATE)
         runCatching { runSimplification(app, marker) }
+        runCatching { runTypeRemoval(app, marker) }
         if (marker.getBoolean(MARKER_KEY, false)) return
         // The marker is set only when every step worked, so a step that failed is tried again at the next start.
         val steps = listOf(
@@ -115,6 +124,16 @@ object RemovedFeatures {
             },
         )
         if (steps.all { it.isSuccess }) marker.edit { putBoolean(MARKER_KEY, true) }
+    }
+
+    /** Type was removed: its per-computer switches go, and so does a leftover "wants to type" notification. Nothing else is touched. */
+    private fun runTypeRemoval(app: Context, marker: SharedPreferences) {
+        if (marker.getBoolean(MARKER_KEY_TYPE, false)) return
+        val prefs = PreferenceManager.getDefaultSharedPreferences(app)
+        val stale = typeKeys(prefs.all.keys)
+        if (stale.isNotEmpty()) prefs.edit(commit = true) { stale.forEach(::remove) }
+        runCatching { androidx.core.app.NotificationManagerCompat.from(app).cancel(TYPE_ASK_NOTIFICATION_ID) }
+        marker.edit(commit = true) { putBoolean(MARKER_KEY_TYPE, true) }
     }
 
     private fun runSimplification(app: Context, marker: SharedPreferences) {

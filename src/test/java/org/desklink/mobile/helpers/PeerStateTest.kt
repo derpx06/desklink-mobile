@@ -29,7 +29,7 @@ class PeerStateTest {
 
     /** Every per-computer preference key the app writes: `<what>_<deviceId>`. */
     private val prefixes = listOf(
-        "glide_allowed_", "type_on_phone_", "mic_consent_", "desk_sound_", "desk_sound_push_", "desk_sound_volume_", "screen_display_",
+        "glide_allowed_", "mic_consent_", "desk_sound_", "desk_sound_push_", "desk_sound_volume_", "screen_display_",
         "private_notifications_", "key_unreachable_url_list",
     )
 
