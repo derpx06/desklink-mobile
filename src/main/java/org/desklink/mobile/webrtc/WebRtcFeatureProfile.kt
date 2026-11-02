@@ -23,6 +23,8 @@ object WebRtcFeatureProfile {
     private val enabled = setOf(
         // Folder sync (F8): both ways.
         DeskLinkProtocol.PACKET_TYPE_FOLDERS,
+        // Live activities (W13): the phone's ongoing items, phone to desk.
+        DeskLinkProtocol.PACKET_TYPE_ACTIVITY,
         DeskLinkProtocol.PACKET_TYPE_BATTERY,
         DeskLinkProtocol.PACKET_TYPE_CLIPBOARD,
         DeskLinkProtocol.PACKET_TYPE_CLIPBOARD_CONNECT,

@@ -58,6 +58,9 @@ object DeskLinkProtocol {
     const val PACKET_TYPE_SHARE_INPUT_DEVICES = "desklink.shareinputdevices"
     const val PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST = "desklink.shareinputdevices.request"
 
+    /** Phone → desk (W13): a snapshot of up to 5 ongoing items (timers, progress, navigation, calls), `{rev, at, items}`. */
+    const val PACKET_TYPE_ACTIVITY = "desklink.activity"
+
     /** Desk → phone: the desk's own settings, on feature-ready and on every change. */
     const val PACKET_TYPE_SETTINGS = "desklink.settings"
 
