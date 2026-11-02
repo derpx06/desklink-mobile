@@ -75,7 +75,7 @@ class SettingsParityTest {
             rows("NotificationsGroup"),
         )
         assertEquals(
-            listOf("Share this phone's clipboard", "Offer to send copied text to <computer>", "Receive <computer>'s clipboard", "Send clipboard to <computer>", "Send selected text without asking"),
+            listOf("Share this phone's clipboard", "Offer to send copied text to <computer>", "Receive <computer>'s clipboard", "Send clipboard to <computer>"),
             rows("ClipboardGroup").filter { !it.startsWith("Last sent") && !it.startsWith("Nothing sent") && !it.startsWith("Not ") },
         )
         assertEquals(listOf("Calls on <computer>", "Show caller on <computer>"), rows("CallsGroup"))

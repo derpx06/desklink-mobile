@@ -16,9 +16,9 @@ import org.desklink.mobile.plugins.Plugin
  * a tap in DeskLink and without READ_LOGS: the selected text arrives in the intent, so no clipboard read is needed.
  *
  * It is exported (the system menu of other apps must reach it), so an app can also start it with any text. Therefore nothing is sent
- * until the person taps a computer or Send on a sheet that shows what and to whom (as the share target does), unless the person
- * turned on "Send selected text without asking" and exactly one computer takes it; the text is only ever read from the intent and
- * nothing is returned to the calling app.
+ * until the person taps a computer or Send on a sheet that shows what and to whom (as the share target does); there is no way to
+ * skip the sheet, because nothing tells a selection menu's start from any other app's. The text is only ever read from the intent
+ * and nothing is returned to the calling app.
  */
 class SendSelectedTextActivity : AppCompatActivity() {
     private var dialog: AlertDialog? = null
@@ -27,11 +27,10 @@ class SendSelectedTextActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         val text = SendSelected.textOf(intent)
         val targets = SendSelected.targets()
-        when (SendSelected.plan(text, targets.size, SendSelected.sendsWithoutAsking(this))) {
+        when (SendSelected.plan(text, targets.size)) {
             SendSelected.Plan.NO_TEXT -> end(R.string.send_selected_nothing)
             SendSelected.Plan.TOO_LONG -> end(R.string.send_selected_too_long)
             SendSelected.Plan.NO_COMPUTER -> end(R.string.send_selected_no_computer)
-            SendSelected.Plan.DIRECT -> send(text!!, targets[0])
             // The whole text is on the sheet (it is capped), with its length: what is shown is what is sent.
             SendSelected.Plan.ONE -> show(
                 AlertDialog.Builder(this)
@@ -41,11 +40,13 @@ class SendSelectedTextActivity : AppCompatActivity() {
             )
             SendSelected.Plan.CHOOSE -> {
                 val column = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.VERTICAL; setPadding(48, 16, 48, 0) }
+                // The whole text, scrollable from its first line: blank lines at the top must not hide what follows.
                 column.addView(
-                    android.widget.TextView(this).apply {
-                        this.text = text + "\n" + resources.getQuantityString(R.plurals.send_selected_length, text!!.length, text.length)
-                        maxLines = 12
-                        movementMethod = android.text.method.ScrollingMovementMethod()
+                    android.widget.ScrollView(this).apply {
+                        addView(android.widget.TextView(this@SendSelectedTextActivity).apply {
+                            this.text = text + "\n" + resources.getQuantityString(R.plurals.send_selected_length, text!!.length, text.length)
+                        })
+                        layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, (240 * resources.displayMetrics.density).toInt())
                     },
                 )
                 targets.forEach { device ->
@@ -93,7 +94,7 @@ class SendSelectedTextActivity : AppCompatActivity() {
 
 /** What "Send to computer" does with the selection and the computers that can take it (pure parts are tested). */
 object SendSelected {
-    enum class Plan { NO_TEXT, TOO_LONG, NO_COMPUTER, DIRECT, ONE, CHOOSE }
+    enum class Plan { NO_TEXT, TOO_LONG, NO_COMPUTER, ONE, CHOOSE }
 
     /** The longest text this action takes: all of it fits on the sheet, so everything that is sent has been shown. */
     const val MAX_CHARS = 2000
@@ -101,11 +102,7 @@ object SendSelected {
     /** The sheet ignores taps this long after it appears. */
     const val TAP_DELAY_MS = 400L
 
-    /** Settings > Clipboard > "Send selected text without asking" (off unless the person turned it on). */
-    const val KEY_DIRECT = "send_selected_direct"
 
-    fun sendsWithoutAsking(context: android.content.Context): Boolean =
-        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context).getBoolean(KEY_DIRECT, false)
 
     /** The selected text of a PROCESS_TEXT intent; null for any other action or a blank selection. Read only. */
     fun textOf(intent: Intent): String? {
@@ -113,12 +110,11 @@ object SendSelected {
         return runCatching { intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString() }.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
-    /** [withoutAsking]: the person's switch; it only ever skips the sheet when exactly one computer can take the text. */
-    fun plan(text: String?, computers: Int, withoutAsking: Boolean = false): Plan = when {
+    fun plan(text: String?, computers: Int): Plan = when {
         text == null -> Plan.NO_TEXT
         text.length > MAX_CHARS -> Plan.TOO_LONG
         computers <= 0 -> Plan.NO_COMPUTER
-        computers == 1 -> if (withoutAsking) Plan.DIRECT else Plan.ONE
+        computers == 1 -> Plan.ONE
         else -> Plan.CHOOSE
     }
 
