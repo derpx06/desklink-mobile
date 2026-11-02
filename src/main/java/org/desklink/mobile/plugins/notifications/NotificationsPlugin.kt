@@ -121,6 +121,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     }
 
     override fun onDestroy() {
+        snapshotGeneration++
         gate.stop()
         synchronized(notificationDeliveryLock) {
             currentNotifications.clear()
@@ -174,7 +175,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     }
 
     /** Turned off: the desk drops every notification it shows from this phone. */
-    override fun onTurnedOff() = sendSnapshot(emptyList())
+    override fun onTurnedOff() { snapshotGeneration++; sendSnapshot(emptyList()) }
 
     /** [resync]: a new link, where the desk may already hold exactly this set. */
     private fun sendSnapshot(ids: List<String>, resync: Boolean = false) {
@@ -192,6 +193,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         }
 
         val id = getNotificationKeyCompat(statusBarNotification)
+        snapshotGeneration++
 
         synchronized(postedNotificationsLock) {
             postedNotifications.remove(id)
@@ -560,10 +562,14 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
      * The active notifications are asked of Android (a binder call) and their app labels looked up off the main thread; the sending
      * itself comes back to it, so it stays in order with the posts and removals the listener delivers there.
      */
+    /** Bumped by every removal and when the plugin ends: a set read before it is out of date. */
+    @Volatile private var snapshotGeneration = 0
+
     private fun sendCurrentNotifications(service: NotificationReceiver, resync: Boolean = false) {
         if (!NotificationReceiver.hasReadNotificationsPermission(context)) {
             return
         }
+        val generation = snapshotGeneration
         org.desklink.mobile.helpers.ThreadHelper.execute {
             val notifications = try {
                 service.getActiveNotifications()
@@ -572,7 +578,15 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
             if (notifications == null) return@execute // Can happen only on API 23 and lower
             notifications.map { it.packageName }.toSet().forEach { appNameLookup(context, it) }
-            mainHandler.post { sendCurrentNotifications(notifications, resync) }
+            mainHandler.post {
+                when {
+                    // Turned off or destroyed meanwhile: nothing is sent after the empty snapshot.
+                    !device.isPluginEnabled(getPluginKey(NotificationsPlugin::class.java)) -> Unit
+                    // A removal came in between: the set read is stale, so it is read again (it would bring the removed one back).
+                    generation != snapshotGeneration -> sendCurrentNotifications(service, resync)
+                    else -> sendCurrentNotifications(notifications, resync)
+                }
+            }
         }
     }
 

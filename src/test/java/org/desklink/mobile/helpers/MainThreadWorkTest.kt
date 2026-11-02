@@ -95,4 +95,24 @@ class MainThreadWorkTest {
         assertTrue(at > 0)
         assertTrue("inside a produceState on Dispatchers.IO", group.lastIndexOf("withContext(kotlinx.coroutines.Dispatchers.IO)", at) > group.lastIndexOf("produceState", at))
     }
+
+    @Test
+    fun aPackageThatCannotBeResolvedIsNotAskedForEveryPost() {
+        AppsHelper.clearCache()
+        val manager = mockk<PackageManager>()
+        every { manager.getApplicationInfo("org.gone", 0) } throws PackageManager.NameNotFoundException()
+        val context = mockk<Context>()
+        every { context.packageManager } returns manager
+        repeat(5) { assertEquals(null, AppsHelper.appNameLookup(context, "org.gone")) }
+        verify(exactly = 1) { manager.getApplicationInfo("org.gone", 0) }
+    }
+
+    @Test
+    fun aSetOfActiveNotificationsReadBeforeARemovalIsReadAgainAndNothingIsSentAfterTheSwitchIsOff() {
+        val plugin = source("plugins/notifications/NotificationsPlugin.kt")
+        val posted = plugin.substringAfter("mainHandler.post {\n                when {").substringBefore("sendCurrentNotifications(notifications, resync)")
+        assertTrue(posted.contains("generation != snapshotGeneration -> sendCurrentNotifications(service, resync)"))
+        assertTrue(posted.contains("!device.isPluginEnabled("))
+        assertTrue("every removal bumps it", plugin.substringAfter("override fun onNotificationRemoved").take(400).contains("snapshotGeneration++"))
+    }
 }
