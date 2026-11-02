@@ -1625,6 +1625,7 @@ class WebRtcSessionCoordinator(
             }
             WebRtcRemoteSessionControlKind.AUDIO_STOP,
             WebRtcRemoteSessionControlKind.AUDIO_DENIED -> {
+                audio.withdrawn(context, device.deviceId, message.remoteSessionId)
                 val ended = audioSessions.end(message.remoteSessionId) ?: return
                 if (ended.direction == WebRtcRemoteSessionControlMessage.DESK_TO_PHONE) {
                     transport?.setAudioPlayout(false)
@@ -1716,6 +1717,7 @@ class WebRtcSessionCoordinator(
     private fun stopSendingLocked(session: org.desklink.mobile.plugins.audio.AudioSessions.Session, reason: String, notifyPeer: Boolean) {
         audioOnScreenProjection = false
         audioSessions.end(session.remoteSessionId)
+        org.desklink.mobile.plugins.audio.PhoneAudio.withdrawn(context, device.deviceId, session.remoteSessionId)
         transport?.setAudioRecording(false)
         // The audio module is the process's one: only the computer it is feeding may put it down.
         val feeding = org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo
@@ -2560,6 +2562,9 @@ class WebRtcSessionCoordinator(
                 screen.onRemoteSessionEnded(context.getString(R.string.remote_screen_interrupted))
             }
         }
+        // A question the computer asked over the link that just went is dropped.
+        org.desklink.mobile.plugins.audio.PhoneAudio.withdrawn(context, device.deviceId)
+        org.desklink.mobile.plugins.capture.PhoneCapture.withdrawn(context, device.deviceId)
         val previousTransport = transport
         activeWireBinding?.let { closing -> terminalLinkEvent { terminal.onLinkLost(closing) } }
         transport = null

@@ -41,9 +41,10 @@ class PhoneAudioActivity : AppCompatActivity() {
         PhoneAudio.clearAsk(this, deviceId)
         request = PhoneAudio.pending?.takeIf { it.deviceId == deviceId } ?: return finish()
         PhoneAudio.opened = true
+        PhoneAudio.screen = { runOnUiThread { finish() } }
         // Rotated or recreated after the person answered: that answer is already being acted on.
         if (savedInstanceState?.getBoolean(STATE_ANSWERED) == true) return
-        if (PhoneAudio.consented(this, deviceId)) return allowed()
+        if (PhoneAudio.consented(this, deviceId)) { PhoneAudio.answered = true; return allowed() }
         val desk = DeskNames.of(deviceId)
         val mic = request.source == "mic"
         AlertDialog.Builder(this)
@@ -51,6 +52,7 @@ class PhoneAudioActivity : AppCompatActivity() {
             .setMessage(getString(if (mic) R.string.audio_consent_mic_text else R.string.audio_consent_sound_text, desk))
             .setPositiveButton(R.string.audio_allow) { _, _ ->
                 answered = true
+                PhoneAudio.answered = true
                 PhoneAudio.rememberConsent(this, deviceId)
                 allowed()
             }
@@ -60,6 +62,11 @@ class PhoneAudioActivity : AppCompatActivity() {
     }
 
     private var answered = false
+
+    override fun onDestroy() {
+        PhoneAudio.screen = null
+        super.onDestroy()
+    }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)

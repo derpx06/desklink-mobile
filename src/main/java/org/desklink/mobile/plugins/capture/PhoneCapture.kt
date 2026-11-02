@@ -113,9 +113,22 @@ object PhoneCapture {
         return previous
     }
 
-    /** DeskLink came to the front while a request was still waiting (the heads-up was missed): its screen opens now. */
+    /** A request this young is still the computer's: older ones are not opened by merely opening DeskLink. */
+    const val OPEN_WITHIN_MS = 30_000L
+
+    fun openable(ageMs: Long) = ageMs in 0..OPEN_WITHIN_MS
+
+    /** The link to [deviceId] is gone: what it asked for is dropped, not shown later. */
+    fun withdrawn(context: Context, deviceId: String) {
+        if (current?.deviceId != deviceId) return
+        NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
+        current = null
+    }
+
+    /** DeskLink came to the front while a fresh request was still waiting (the heads-up was missed): its screen opens now. */
     fun openIfWaiting(context: Context) {
-        if (current == null || opened) return
+        val waiting = current ?: return
+        if (opened || !openable(System.currentTimeMillis() - waiting.at)) return
         runCatching { context.startActivity(Intent(context, CaptureActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)) }
     }
 

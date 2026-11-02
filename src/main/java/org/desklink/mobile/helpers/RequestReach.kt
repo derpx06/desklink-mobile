@@ -20,7 +20,7 @@ object RequestReach {
     /** Pure: the app in front can open its screen itself; otherwise the notification must be allowed and loud enough to pop up. */
     fun verdict(inFront: Boolean, notificationsEnabled: Boolean, channelImportance: Int?): Verdict = when {
         inFront -> Verdict.OK
-        !notificationsEnabled -> Verdict.NOTIFICATIONS_OFF
+        !notificationsEnabled || channelImportance == NotificationManagerCompat.IMPORTANCE_NONE -> Verdict.NOTIFICATIONS_OFF
         channelImportance != null && channelImportance < NotificationManagerCompat.IMPORTANCE_HIGH -> Verdict.QUIET
         else -> Verdict.OK
     }
@@ -29,7 +29,9 @@ object RequestReach {
         val manager = NotificationManagerCompat.from(context)
         val permitted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        val importance = runCatching { manager.getNotificationChannelCompat(channelId)?.importance }.getOrNull()
+        val channel = runCatching { manager.getNotificationChannelCompat(channelId) }.getOrNull()
+        val groupBlocked = runCatching { channel?.group?.let { manager.getNotificationChannelGroupCompat(it)?.isBlocked } }.getOrNull() == true
+        val importance = if (groupBlocked) NotificationManagerCompat.IMPORTANCE_NONE else channel?.importance
         return verdict(LifecycleHelper.isInForeground, permitted && manager.areNotificationsEnabled(), importance)
     }
 }

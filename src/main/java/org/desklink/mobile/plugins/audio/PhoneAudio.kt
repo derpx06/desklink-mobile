@@ -68,7 +68,7 @@ object PhoneAudio {
     private const val NOTIFICATION_ASK = 1735
 
     /** The desk whose request is waiting for the person, and what it wants. */
-    data class Pending(val deviceId: String, val remoteSessionId: String, val source: String)
+    data class Pending(val deviceId: String, val remoteSessionId: String, val source: String, val at: Long = android.os.SystemClock.elapsedRealtime())
 
     @Volatile var pending: Pending? = null
 
@@ -145,10 +145,11 @@ object PhoneAudio {
         }
         // The heads-up always goes up (a background start may be silently refused); in front the
         // screen opens at once too, and takes the heads-up down.
-        if (LifecycleHelper.isInForeground) runCatching { context.startActivity(open) }
         opened = false
+        answered = false
+        if (LifecycleHelper.isInForeground) runCatching { context.startActivity(open) }
         val app = context.applicationContext
-        // Nobody saw the question (notifications off) or answered it: the computer is told, in words, instead of waiting for ever.
+        // Nobody saw the question (notifications off or the channel blocked) or answered it: the computer is told, in words.
         when (RequestReach.check(context, NotificationHelper.Channels.REQUESTS)) {
             RequestReach.Verdict.NOTIFICATIONS_OFF -> {
                 AppLog.event("audio", "request not shown: notifications are off")
@@ -158,7 +159,23 @@ object PhoneAudio {
             RequestReach.Verdict.QUIET -> AppLog.event("audio", "request channel is quiet: the heads-up may not pop up")
             RequestReach.Verdict.OK -> Unit
         }
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (pending === request && !opened) end(app, request, "timeout") }, ASK_TIMEOUT_MS)
+        // Shown or not, an unanswered question ends after a minute and the computer is told.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (pending === request && !answered) end(app, request, "timeout") }, ASK_TIMEOUT_MS)
+    }
+
+    /** The person tapped Allow (or had allowed it before): the question is answered and its timeout no longer applies. */
+    @Volatile var answered = false
+
+    /** The screen showing the question, so a timeout can close it. */
+    @Volatile var screen: (() -> Unit)? = null
+
+    /** The computer withdrew the request, the session was replaced or the link went: the question is dropped, not shown later. */
+    fun withdrawn(context: Context, deviceId: String, remoteSessionId: String? = null) {
+        val waiting = pending ?: return
+        if (waiting.deviceId != deviceId || (remoteSessionId != null && waiting.remoteSessionId != remoteSessionId)) return
+        pending = null
+        clearAsk(context, deviceId)
+        screen?.invoke()
     }
 
     /** What to tell the person on the phone when a request ends for a reason that is not their own "no" (null for that). */
@@ -181,19 +198,31 @@ object PhoneAudio {
         if (pending !== request) return
         pending = null
         clearAsk(context, request.deviceId)
+        screen?.invoke()
         org.desklink.mobile.DeskLinkApplication.getInstance().webRtcCoordinator(request.deviceId)?.denyAudio(reason)
     }
 
-    /** DeskLink came to the front while a question was waiting (the heads-up was missed): its screen opens now. */
+    /** A question this young is still the computer's: older ones are not opened by merely opening DeskLink. */
+    const val OPEN_WITHIN_MS = 30_000L
+
+    /**
+     * DeskLink came to the front while a fresh question was waiting (the heads-up was missed): its screen opens now, but only for a
+     * request the computer still has (its session is live) and that is under [OPEN_WITHIN_MS] old.
+     */
     fun openIfWaiting(context: Context) {
         val waiting = pending ?: return
-        if (opened) return
+        if (opened || !openable(android.os.SystemClock.elapsedRealtime() - waiting.at)) return
+        val live = org.desklink.mobile.DeskLinkApplication.getInstance().webRtcCoordinator(waiting.deviceId)?.sendingSessionId() == waiting.remoteSessionId
+        if (!live) return withdrawn(context, waiting.deviceId, waiting.remoteSessionId)
+        opened = true
         runCatching {
             context.startActivity(
                 Intent(context, PhoneAudioActivity::class.java).putExtra(PhoneAudioActivity.EXTRA_DEVICE, waiting.deviceId).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
-        }
+        }.onFailure { opened = false }
     }
+
+    fun openable(ageMs: Long) = ageMs in 0..OPEN_WITHIN_MS
 
     fun clearAsk(context: Context, deviceId: String) =
         NotificationManagerCompat.from(context).cancel("audio:$deviceId", NOTIFICATION_ASK)
