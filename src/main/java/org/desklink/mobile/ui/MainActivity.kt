@@ -290,6 +290,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         super.onStart()
         org.desklink.mobile.helpers.CrashLoop.clear(this)
         BackgroundService.Start(applicationContext)
+        // A question from the computer whose heads-up was missed opens now that the person is here.
+        org.desklink.mobile.plugins.capture.PhoneCapture.openIfWaiting(this)
+        org.desklink.mobile.plugins.audio.PhoneAudio.openIfWaiting(this)
     }
 
     override fun onDestroy() {

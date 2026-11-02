@@ -47,6 +47,7 @@ class PhoneAudioService : Service() {
         // Microphone service without RECORD_AUDIO (revoked meanwhile), or a start Android no longer allows.
         if (runCatching { startForegroundCompat(notification(DeskNames.of(id), sound), sound) }.onFailure { Log.w(TAG, "foreground start refused", it) }.isFailure) {
             app.webRtcCoordinator(id)?.denyAudio("unavailable")
+            tell(R.string.audio_unavailable)
             return stop()
         }
         if (sound) {
@@ -77,7 +78,13 @@ class PhoneAudioService : Service() {
     /** Whatever stopped this start, the computer that asked is told, not left waiting. */
     private fun refuse(id: String): Int {
         DeskLinkApplication.getInstance().webRtcCoordinator(id)?.denyAudio("unavailable")
+        tell(R.string.audio_unavailable)
         return stop()
+    }
+
+    /** A line on the phone for a start Android refused: the computer is told too, so neither side is left guessing. */
+    private fun tell(message: Int) {
+        Handler(Looper.getMainLooper()).post { runCatching { android.widget.Toast.makeText(applicationContext, message, android.widget.Toast.LENGTH_LONG).show() } }
     }
 
     private fun stop(): Int {

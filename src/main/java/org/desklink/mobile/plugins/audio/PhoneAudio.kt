@@ -16,8 +16,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import org.desklink.mobile.R
+import org.desklink.mobile.helpers.AppLog
 import org.desklink.mobile.helpers.LifecycleHelper
 import org.desklink.mobile.helpers.NotificationHelper
+import org.desklink.mobile.helpers.RequestReach
 import org.desklink.mobile.webrtc.WebRtcRemoteSessionControlMessage.Companion.DESK_TO_PHONE
 
 /**
@@ -144,6 +146,53 @@ object PhoneAudio {
         // The heads-up always goes up (a background start may be silently refused); in front the
         // screen opens at once too, and takes the heads-up down.
         if (LifecycleHelper.isInForeground) runCatching { context.startActivity(open) }
+        opened = false
+        val app = context.applicationContext
+        // Nobody saw the question (notifications off) or answered it: the computer is told, in words, instead of waiting for ever.
+        when (RequestReach.check(context, NotificationHelper.Channels.REQUESTS)) {
+            RequestReach.Verdict.NOTIFICATIONS_OFF -> {
+                AppLog.event("audio", "request not shown: notifications are off")
+                end(app, request, "notifications")
+                return
+            }
+            RequestReach.Verdict.QUIET -> AppLog.event("audio", "request channel is quiet: the heads-up may not pop up")
+            RequestReach.Verdict.OK -> Unit
+        }
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ if (pending === request && !opened) end(app, request, "timeout") }, ASK_TIMEOUT_MS)
+    }
+
+    /** What to tell the person on the phone when a request ends for a reason that is not their own "no" (null for that). */
+    fun reasonTextRes(reason: String): Int? = when (reason) {
+        "permission" -> R.string.audio_mic_denied
+        "unavailable" -> R.string.audio_unavailable
+        "unsupported" -> R.string.audio_unsupported
+        "busy" -> R.string.audio_busy
+        else -> null // "declined": the person said no themselves
+    }
+
+    fun reasonText(context: Context, reason: String): String? = reasonTextRes(reason)?.let(context::getString)
+
+    /** True once [PhoneAudioActivity] has the question on screen: the timeout no longer applies. */
+    @Volatile var opened = false
+
+    const val ASK_TIMEOUT_MS = 60_000L
+
+    private fun end(context: Context, request: Pending, reason: String) {
+        if (pending !== request) return
+        pending = null
+        clearAsk(context, request.deviceId)
+        org.desklink.mobile.DeskLinkApplication.getInstance().webRtcCoordinator(request.deviceId)?.denyAudio(reason)
+    }
+
+    /** DeskLink came to the front while a question was waiting (the heads-up was missed): its screen opens now. */
+    fun openIfWaiting(context: Context) {
+        val waiting = pending ?: return
+        if (opened) return
+        runCatching {
+            context.startActivity(
+                Intent(context, PhoneAudioActivity::class.java).putExtra(PhoneAudioActivity.EXTRA_DEVICE, waiting.deviceId).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
     }
 
     fun clearAsk(context: Context, deviceId: String) =

@@ -21,7 +21,9 @@ import org.desklink.mobile.Device
 import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.R
 import org.desklink.mobile.helpers.LifecycleHelper
+import org.desklink.mobile.helpers.AppLog
 import org.desklink.mobile.helpers.NotificationHelper
+import org.desklink.mobile.helpers.RequestReach
 import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import java.io.File
 import java.io.FileInputStream
@@ -99,7 +101,22 @@ object PhoneCapture {
         // The heads-up always goes up (a background start may be silently refused); in front the
         // screen opens at once too, and takes the heads-up down.
         if (LifecycleHelper.isInForeground) runCatching { context.startActivity(open) }
+        // Notifications off: nobody will see it, so the computer is told now, not after two minutes.
+        when (RequestReach.check(context, NotificationHelper.Channels.REQUESTS)) {
+            RequestReach.Verdict.NOTIFICATIONS_OFF -> {
+                AppLog.event("capture", "request not shown: notifications are off")
+                finish(context, "notifications")
+            }
+            RequestReach.Verdict.QUIET -> AppLog.event("capture", "request channel is quiet: the heads-up may not pop up")
+            RequestReach.Verdict.OK -> Unit
+        }
         return previous
+    }
+
+    /** DeskLink came to the front while a request was still waiting (the heads-up was missed): its screen opens now. */
+    fun openIfWaiting(context: Context) {
+        if (current == null || opened) return
+        runCatching { context.startActivity(Intent(context, CaptureActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)) }
     }
 
     fun titleFor(kind: String) = when (kind) {

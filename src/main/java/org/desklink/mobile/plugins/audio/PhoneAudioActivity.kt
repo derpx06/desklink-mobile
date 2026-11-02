@@ -40,6 +40,7 @@ class PhoneAudioActivity : AppCompatActivity() {
         deviceId = intent.getStringExtra(EXTRA_DEVICE) ?: return finish()
         PhoneAudio.clearAsk(this, deviceId)
         request = PhoneAudio.pending?.takeIf { it.deviceId == deviceId } ?: return finish()
+        PhoneAudio.opened = true
         // Rotated or recreated after the person answered: that answer is already being acted on.
         if (savedInstanceState?.getBoolean(STATE_ANSWERED) == true) return
         if (PhoneAudio.consented(this, deviceId)) return allowed()
@@ -88,6 +89,8 @@ class PhoneAudioActivity : AppCompatActivity() {
     }
 
     private fun deny(reason: String) {
+        // Plain words here too: the person who just saw a screen close should know why nothing is playing.
+        PhoneAudio.reasonText(this, reason)?.let { android.widget.Toast.makeText(this, it, android.widget.Toast.LENGTH_LONG).show() }
         PhoneAudio.pending = null
         DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.denyAudio(reason)
         finish()
