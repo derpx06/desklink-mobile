@@ -78,6 +78,9 @@ object HomeModel {
         )
     }
 
+    /** The time of the last position report; 0 when there is none (a value built from the clock would tick Home every second). */
+    internal fun positionStamp(lastPositionTime: Long?): Long = lastPositionTime ?: 0L
+
     /**
      * The desk's current player ([MprisPlugin.currentPlayerName]); null (no card) only when the
      * desk has no player at all.
@@ -107,8 +110,9 @@ object HomeModel {
             canSeek = !stale && player != null && player.seekAllowed && player.length > 0,
             lengthMs = player?.length ?: -1,
             positionMs = player?.lastPosition ?: 0,
-            // MprisPlayer stamps positions with the wall clock.
-            positionAt = player?.lastPositionTime ?: System.currentTimeMillis(),
+            // MprisPlayer stamps positions with the wall clock. Unknown is 0, never "now": a state built every second must not differ
+            // from the last one, or the whole of Home recomposes (and the seek bar restarts) once a second.
+            positionAt = positionStamp(player?.lastPositionTime),
             reportedPlaying = reported,
             volume = player?.volume?.takeIf { it in 0..100 },
             art = art?.image,
