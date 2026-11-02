@@ -88,7 +88,7 @@ class SettingsParityTest {
             rows("FilesGroup"),
         )
         assertEquals(
-            listOf("Fingerprint before terminals", "Unlock with this phone", "Session password", "Encryption", "Privacy policy", "Unpair <computer>…"),
+            listOf("Ask before terminal and screen access", "Fingerprint before terminals", "Unlock with this phone", "Encryption", "Privacy policy", "Unpair <computer>…"),
             rows("PrivacyGroup"),
         )
         assertEquals(listOf("Style", "Use wallpaper colours"), rows("AppearanceGroup"))

@@ -647,6 +647,17 @@ private fun PrivacyGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
     val remote = desk?.remote
     val live = desk != null && desk.ready && remote != null
     RowGroup {
+        // First, as on the computer (read-only here: the password is set there).
+        if (desk != null) {
+            remote?.sessionPasswordSet?.let { set ->
+                GroupRow(
+                    stringResource(R.string.settings_session_password),
+                    icon = R.drawable.sym_fingerprint,
+                    subtitle = if (!live) waiting else stringResource(if (set) R.string.settings_session_password_set else R.string.settings_session_password_unset, desk.name),
+                    enabled = live,
+                )
+            }
+        }
         // Phone-only: a fingerprint or screen-lock check before Terminals and the desk screen.
         val canCheck = org.desklink.mobile.ui.Biometrics.available(context, org.desklink.mobile.ui.Biometrics.STRONG_OR_CREDENTIAL)
         GroupRow(
@@ -672,14 +683,6 @@ private fun PrivacyGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
                 },
                 enabled = live,
             )
-            remote?.sessionPasswordSet?.let { set ->
-                GroupRow(
-                    stringResource(R.string.settings_session_password),
-                    icon = R.drawable.sym_fingerprint,
-                    subtitle = if (!live) waiting else stringResource(if (set) R.string.settings_session_password_set else R.string.settings_session_password_unset, desk.name),
-                    enabled = live,
-                )
-            }
             GroupRow(
                 stringResource(R.string.device_encryption),
                 icon = R.drawable.sym_lock,
