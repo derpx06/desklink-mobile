@@ -221,6 +221,10 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             postedNotifications.add(key)
         }
 
+        // The label is looked up (a disk read) now, off the main thread; the send half a second later finds it in the cache.
+        val pkg = statusBarNotification.packageName
+        org.desklink.mobile.helpers.ThreadHelper.execute { appNameLookup(context, pkg) }
+
         val sendOnlyIfLocked = sharedPreferences.getBoolean(PREF_NOTIFICATION_SCREEN_OFF, false)
         val isLocked = keyguardManager.isKeyguardLocked
         if (!sendOnlyIfLocked || isLocked) {
@@ -552,18 +556,27 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         return ticker
     }
 
+    /**
+     * The active notifications are asked of Android (a binder call) and their app labels looked up off the main thread; the sending
+     * itself comes back to it, so it stays in order with the posts and removals the listener delivers there.
+     */
     private fun sendCurrentNotifications(service: NotificationReceiver, resync: Boolean = false) {
         if (!NotificationReceiver.hasReadNotificationsPermission(context)) {
             return
         }
-        val notifications= try {
-            service.getActiveNotifications()
-        } catch (_: SecurityException) {
-            return
+        org.desklink.mobile.helpers.ThreadHelper.execute {
+            val notifications = try {
+                service.getActiveNotifications()
+            } catch (_: SecurityException) {
+                return@execute
+            }
+            if (notifications == null) return@execute // Can happen only on API 23 and lower
+            notifications.map { it.packageName }.toSet().forEach { appNameLookup(context, it) }
+            mainHandler.post { sendCurrentNotifications(notifications, resync) }
         }
-        if (notifications == null) {
-            return // Can happen only on API 23 and lower
-        }
+    }
+
+    private fun sendCurrentNotifications(notifications: Array<StatusBarNotification>, resync: Boolean) {
         val mirrored = notifications.filter { runCatching { isMirrored(it) }.getOrDefault(false) }
         // The ids first: the desk drops every other notification it holds from this phone.
         val ids = mirrored.map(::getNotificationKeyCompat)

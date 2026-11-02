@@ -402,13 +402,17 @@ class MprisMediaSession : OnSharedPreferenceChangeListener, NotificationReceiver
     }
 
     override fun onListenerConnected(service: NotificationReceiver) {
-        try {
-            service.activeNotifications.find { n -> n.isSpotify() }?.let {
-                spotifyRunning = true
-                updateMediaNotification()
+        // Asking Android for the active notifications is a binder call: off the main thread, the answer comes back to it.
+        org.desklink.mobile.helpers.ThreadHelper.execute {
+            try {
+                val spotify = service.activeNotifications.find { n -> n.isSpotify() }
+                if (spotify != null) android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    spotifyRunning = true
+                    updateMediaNotification()
+                }
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Failed to get active notifications", e)
             }
-        } catch (e: SecurityException) {
-            Log.w(TAG, "Failed to get active notifications", e)
         }
     }
 
