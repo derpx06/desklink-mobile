@@ -24,46 +24,111 @@ object DndSync {
         context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
     }.getOrDefault(false)
 
-    /** Turns the phone's Do Not Disturb on (priority only) or off. False when Android refuses. */
-    fun apply(context: Context, dnd: Boolean): Boolean = runCatching {
+    /**
+     * Turns the phone's Do Not Disturb on (priority only) or off. The filter the phone had before the first change is remembered, and
+     * "off" puts it back (see [Restore]). False when Android refuses.
+     */
+    fun apply(context: Context, deviceId: String, dnd: Boolean): Boolean = runCatching {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (!manager.isNotificationPolicyAccessGranted) return false
-        manager.setInterruptionFilter(if (dnd) NotificationManager.INTERRUPTION_FILTER_PRIORITY else NotificationManager.INTERRUPTION_FILTER_ALL)
+        if (!dnd && Restore.has(deviceId)) return Restore.restoreNow(context, deviceId)
+        val target = if (dnd) NotificationManager.INTERRUPTION_FILTER_PRIORITY else NotificationManager.INTERRUPTION_FILTER_ALL
+        Restore.remember(deviceId, manager.currentInterruptionFilter, target)
+        manager.setInterruptionFilter(target)
         true
     }.getOrDefault(false)
 
     /**
-     * The two loop guards. Each side remembers the last value it received from the peer, never reports a change that equals it, and
-     * ignores a local change that equals what it just applied.
+     * What the phone's filter was before DeskLink changed it, so it can be put back when the switch turns off, the computer is
+     * unpaired, or the link stays gone for [GONE_MS]. Only when the filter still is what DeskLink set: a change the person made
+     * since is theirs.
+     */
+    object Restore {
+        const val GONE_MS = 60_000L
+
+        private class Saved(val before: Int, val setTo: Int)
+
+        private val saved = java.util.concurrent.ConcurrentHashMap<String, Saved>()
+        private val pending = HashMap<String, Runnable>()
+        private val handler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
+
+        fun has(deviceId: String) = saved.containsKey(deviceId)
+
+        fun remember(deviceId: String, before: Int, setTo: Int) {
+            saved[deviceId] = Saved(saved[deviceId]?.before ?: before, setTo)
+        }
+
+        /** Pure: the person's own change since is left alone. */
+        fun shouldRestore(current: Int, setTo: Int) = current == setTo
+
+        fun restoreNow(context: Context, deviceId: String): Boolean {
+            cancel(deviceId)
+            val s = saved.remove(deviceId) ?: return true
+            return runCatching {
+                val manager = context.getSystemService(NotificationManager::class.java)
+                if (manager.isNotificationPolicyAccessGranted && shouldRestore(manager.currentInterruptionFilter, s.setTo)) manager.setInterruptionFilter(s.before)
+                true
+            }.getOrDefault(false)
+        }
+
+        /** The link is gone: after [GONE_MS] without it coming back (see [cancel]) the filter is put back. */
+        fun restoreLater(context: Context, deviceId: String) {
+            if (!has(deviceId)) return
+            val app = context.applicationContext
+            val task = Runnable { restoreNow(app, deviceId) }
+            synchronized(pending) { pending.remove(deviceId)?.let(handler::removeCallbacks); pending[deviceId] = task }
+            handler.postDelayed(task, GONE_MS)
+        }
+
+        fun cancel(deviceId: String) = synchronized(pending) { pending.remove(deviceId)?.let(handler::removeCallbacks) }
+    }
+
+    /**
+     * The two loop guards. Each side remembers the last value it knows the peer holds (received from it, or reported to it), never
+     * reports a change that equals it, and ignores a local change that equals what it just applied.
      */
     class Loop(private val now: () -> Long = System::currentTimeMillis) {
         private var received: Boolean? = null
+        private var latest: Boolean? = null
         private var applied: Boolean? = null
         private var appliedAt = 0L
 
-        /** The computer's value: what to set on the phone, or null when the phone already has it (or the value is absent). */
+        /**
+         * The computer's value: what to set on the phone, or null when nothing is to be done (no change, the phone already has it,
+         * no access). The first value after a connection is never an "off": a Do Not Disturb the person set here meanwhile stays.
+         */
         @Synchronized
         fun fromDesk(deskDnd: Boolean?, phoneDnd: Boolean, canSet: Boolean): Boolean? {
             if (deskDnd == null) return null
+            val first = received == null
             val changed = deskDnd != received
             received = deskDnd
-            if (!changed || !canSet || deskDnd == phoneDnd) return null
-            applied = deskDnd
-            appliedAt = now()
-            return deskDnd
+            latest = deskDnd
+            if (!changed || !canSet || deskDnd == phoneDnd || (first && !deskDnd)) return null
+            return mark(deskDnd)
         }
 
-        /** A change of the phone's own filter: whether the computer should be told. */
+        /** Access was granted after the computer's value arrived: its latest value is applied now. */
+        @Synchronized
+        fun reapply(phoneDnd: Boolean, canSet: Boolean): Boolean? {
+            val value = latest ?: return null
+            return if (canSet && value != phoneDnd) mark(value) else null
+        }
+
+        private fun mark(value: Boolean): Boolean { applied = value; appliedAt = now(); return value }
+
+        /** A change of the phone's own filter: whether the computer should be told (and from then on it is known to hold it). */
         @Synchronized
         fun localChange(phoneDnd: Boolean): Boolean {
             if (applied == phoneDnd && now() - appliedAt < APPLIED_ECHO_MS) return false // our own write coming back
             if (received == phoneDnd) return false // the computer already has it
+            received = phoneDnd
             return true
         }
 
         /** The link or the switch went away: nothing received counts any more. */
         @Synchronized
-        fun reset() { received = null; applied = null }
+        fun reset() { received = null; latest = null; applied = null }
     }
 
     const val APPLIED_ECHO_MS = 3_000L

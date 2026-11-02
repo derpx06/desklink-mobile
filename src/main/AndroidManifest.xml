@@ -82,6 +82,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <!-- F1: the phone's microphone for the desk, started only from a visible DeskLink window. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- A marker, no prompt: it lists DeskLink under Do Not Disturb access. Used only when the person turns on Share Do Not Disturb. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Calls: mute the microphone on the desk's request (setMicrophoneMute needs it). -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />

@@ -41,11 +41,12 @@ class BatteryPlugin : Plugin() {
         dndSyncOn = syncOn
         if (!syncOn) {
             dndLoop.reset()
+            DndSync.Restore.restoreNow(context, device.deviceId) // what DeskLink changed is put back
             if (was) device.sendPacket(outgoing()) // the keys go away: the computer stops following this phone
             return
         }
         val toSet = dndLoop.fromDesk(deskDnd, DndSync.phoneDnd(context), DndSync.canSet(context))
-        if (toSet != null) DndSync.apply(context, toSet)
+        if (toSet != null) DndSync.apply(context, device.deviceId, toSet)
         if (!was) device.sendPacket(outgoing()) // the first report after the switch turned on
     }
 
@@ -53,6 +54,8 @@ class BatteryPlugin : Plugin() {
         override fun onReceive(context: Context, intent: Intent) {
             if (!dndSyncOn) return
             val granted = intent.action == NotificationManager.ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED
+            // Access given after the computer's value arrived: that value is applied now.
+            if (granted) dndLoop.reapply(DndSync.phoneDnd(context), DndSync.canSet(context))?.let { DndSync.apply(context, device.deviceId, it) }
             if (granted || dndLoop.localChange(DndSync.phoneDnd(context))) device.sendPacket(outgoing())
         }
     }
@@ -133,6 +136,7 @@ class BatteryPlugin : Plugin() {
         }
         val currentState = context.registerReceiver(receiver, intentFilter)
         receiver.onReceive(context, currentState)
+        DndSync.Restore.cancel(device.deviceId) // the link is back within the minute: nothing is put back
         dndSyncOn = device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.dndSync == true
         context.registerReceiver(dndReceiver, IntentFilter().apply {
             addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
@@ -156,6 +160,7 @@ class BatteryPlugin : Plugin() {
         // It's okay to call this only once, even though we registered it for two filters
         context.unregisterReceiver(receiver)
         runCatching { context.unregisterReceiver(dndReceiver) }
+        DndSync.Restore.restoreLater(context, device.deviceId) // gone for a minute: the phone's own setting comes back
     }
 
     override fun onPacketReceived(np: NetworkPacket): Boolean {

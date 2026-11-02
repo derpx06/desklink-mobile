@@ -30,4 +30,9 @@ class ManifestPermissionsTest {
         assertTrue("android.permission.READ_EXTERNAL_STORAGE\" android:maxSdkVersion=\"29\"" in main)
         assertFalse("BLUETOOTH" in main)
     }
+
+    @Test
+    fun doNotDisturbAccessCanBeGrantedBecauseTheMarkerPermissionIsDeclared() {
+        assertTrue("android.permission.ACCESS_NOTIFICATION_POLICY" in manifest("src/main/AndroidManifest.xml"))
+    }
 }

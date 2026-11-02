@@ -49,6 +49,8 @@ class DndSyncTest {
         var now = 0L
         val loop = DndSync.Loop { now }
         assertNull("not allowed: nothing changes", loop.fromDesk(true, phoneDnd = false, canSet = false))
+        assertEquals("access given later: the latest value is applied", true, loop.reapply(phoneDnd = false, canSet = true))
+        assertNull("and not again", loop.reapply(phoneDnd = true, canSet = true))
         assertNull("the same value again is not a change", loop.fromDesk(true, phoneDnd = false, canSet = true))
         assertEquals("a new value that differs", false, loop.fromDesk(false, phoneDnd = true, canSet = true))
         assertNull("the phone already has it", loop.fromDesk(true, phoneDnd = true, canSet = true))
@@ -76,5 +78,30 @@ class DndSyncTest {
         assertNull(DeskSettingsPlugin.parse(settings())!!.galleryAccepted)
         assertEquals(true, DeskSettingsPlugin.parse(settings("galleryAccepted" to true))!!.galleryAccepted)
         assertEquals(false, DeskSettingsPlugin.parse(settings("galleryAccepted" to false))!!.galleryAccepted)
+    }
+
+    @Test
+    fun aSecondLocalChangeIsReportedToo() {
+        val loop = DndSync.Loop { 0L }
+        loop.fromDesk(false, phoneDnd = false, canSet = true) // the computer holds off
+        assertTrue("on", loop.localChange(true))
+        assertTrue("and off again, which the computer would otherwise never hear", loop.localChange(false))
+        assertFalse("not twice", loop.localChange(false))
+    }
+
+    @Test
+    fun theFirstValueAfterAConnectionNeverSwitchesAPhoneDndOff() {
+        val loop = DndSync.Loop { 0L }
+        assertNull("the computer says off, the person turned it on here meanwhile", loop.fromDesk(false, phoneDnd = true, canSet = true))
+        assertEquals("a later change of the computer's own is followed", true, loop.fromDesk(true, phoneDnd = false, canSet = true))
+        val fresh = DndSync.Loop { 0L }
+        assertEquals("a first 'on' is followed", true, fresh.fromDesk(true, phoneDnd = false, canSet = true))
+    }
+
+    @Test
+    fun thePhonesOwnFilterIsPutBackOnlyWhileItStillIsWhatDeskLinkSet() {
+        assertTrue(DndSync.Restore.shouldRestore(NotificationManager.INTERRUPTION_FILTER_PRIORITY, NotificationManager.INTERRUPTION_FILTER_PRIORITY))
+        assertFalse("the person changed it since", DndSync.Restore.shouldRestore(NotificationManager.INTERRUPTION_FILTER_NONE, NotificationManager.INTERRUPTION_FILTER_PRIORITY))
+        assertEquals(60_000L, DndSync.Restore.GONE_MS)
     }
 }

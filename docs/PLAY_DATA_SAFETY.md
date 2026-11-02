@@ -123,3 +123,7 @@ Access Framework. `MANAGE_EXTERNAL_STORAGE` is not in the manifest.
   user-generated content shared with others.
 - App access: the reviewer needs the DeskLink desktop app; provide instructions or
   a demo video of pairing.
+
+## Do Not Disturb access (ACCESS_NOTIFICATION_POLICY)
+
+Declared as a marker so DeskLink appears in Android's Do Not Disturb access list. It is used only after the person turns on "Share Do Not Disturb" at their computer and then allows access in Android's settings; DeskLink then reports whether Do Not Disturb is on and, when the computer's value changes, sets it. The filter the phone had before is put back when the switch turns off, the computer is unpaired, or the link stays gone for a minute. Nothing about it leaves the paired computer.
