@@ -208,6 +208,20 @@ object UnpublishedFiles {
 
     private val inFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
+    /** Whether a kept file is waiting for room: read by the 5 s tick, so an idle phone lists nothing. Set by [keep] and [prune]. */
+    @Volatile
+    var waitingForRoom = false
+        private set
+
+    /** Saves again, with no tap, each file that was kept for lack of room and now fits ([retry] checks the room itself). */
+    fun retryWhereRoom(context: Context, destination: ReceiveDestination): List<Published> {
+        val kept = list(context).filter { it.storageFull }
+        waitingForRoom = kept.isNotEmpty()
+        val done = kept.filter { destination.freeBytes() >= it.size + RESERVE_BYTES }.mapNotNull { (retry(context, it.id, destination) as? Retry.Done)?.published }
+        if (done.isNotEmpty()) waitingForRoom = list(context).any { it.storageFull }
+        return done
+    }
+
     fun isRetrying(id: String) = id in inFlight
 
     private fun dir(context: Context) = File(context.applicationContext.filesDir, "webrtc-unpublished").apply { mkdirs() }
@@ -229,6 +243,7 @@ object UnpublishedFiles {
                 meta.delete()
                 return null
             }
+            if (storageFull) waitingForRoom = true
             Item(id, name, target.length(), mime, lastModified, deviceId, target, reason, storageFull)
         } catch (e: Exception) {
             meta.delete()
@@ -286,6 +301,7 @@ object UnpublishedFiles {
      */
     fun prune(context: Context, now: Long = System.currentTimeMillis()) {
         val folder = dir(context)
+        waitingForRoom = list(context).any { it.storageFull }
         folder.listFiles { f -> f.name.endsWith(".json") }.orEmpty()
             .filter { now - it.lastModified() > KEEP_MS }
             .forEach { discard(context, it.name.removeSuffix(".json")) }

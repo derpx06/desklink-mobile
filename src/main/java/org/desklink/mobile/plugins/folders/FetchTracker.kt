@@ -49,3 +49,28 @@ class FetchTracker {
             outstanding.filter { now - maxOf(requestedAt[it] ?: 0L, lastProgress[it] ?: 0L) > SILENT_MS }
     }
 }
+
+/**
+ * Bucket files this phone refused for lack of room, with what to ask for again. They are not failures: they never count toward
+ * [FetchTracker]'s give-up and nothing times out. [risen] hands back the ones that fit once the free space allows.
+ */
+class RoomHold {
+    private val held = LinkedHashMap<String, Entry>()
+
+    val isEmpty get() = held.isEmpty()
+
+    fun hold(path: String, entry: Entry) { held[path] = entry }
+
+    fun holds(path: String) = path in held
+
+    fun forget(path: String) { held.remove(path) }
+
+    fun clear() = held.clear()
+
+    /** The held files that fit in [free] (taken out of the hold), smallest first. */
+    fun risen(free: Long): List<Pair<String, Entry>> {
+        val fits = held.entries.filter { FolderSync.enoughSpace(free, it.value.size) }.sortedBy { it.value.size }.map { it.key to it.value }
+        fits.forEach { held.remove(it.first) }
+        return fits
+    }
+}

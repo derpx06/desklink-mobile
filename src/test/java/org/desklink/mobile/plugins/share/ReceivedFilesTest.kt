@@ -94,4 +94,28 @@ class ReceivedFilesTest {
         assertEquals("fresh.txt", DeviceStorageDestination.uniqueIn(dir, "fresh.txt"))
         assertEquals("bad_name_file", DeviceStorageDestination.uniqueIn(dir, "..."))
     }
+
+    @Test
+    fun aFileKeptForLackOfRoomIsSavedAgainByItselfOnceThereIsRoom() {
+        val kept = UnpublishedFiles.keep(app, tmp.newFile("full").apply { writeBytes(ByteArray(1000)) }, "big.bin", null, null, "desk", storageFull = true)!!
+        val other = UnpublishedFiles.keep(app, tmp.newFile("other").apply { writeBytes(ByteArray(10)) }, "other.bin", null, null, "desk", reason = "the folder is gone")!!
+        assertTrue(UnpublishedFiles.waitingForRoom)
+        var free = 1000L
+        val saved = mutableListOf<String>()
+        val destination = object : ReceiveDestination {
+            override fun freeBytes() = free
+            override fun publish(source: File, name: String, lastModified: Long?, mime: String?): Published {
+                saved += name
+                return Published(android.net.Uri.parse("file:///x/$name"), name, mime, source.length())
+            }
+        }
+        assertEquals("no room yet: nothing is tried", emptyList<Published>(), UnpublishedFiles.retryWhereRoom(app, destination))
+        assertEquals(emptyList<String>(), saved)
+        free = 1000L + UnpublishedFiles.RESERVE_BYTES
+        assertEquals(listOf("big.bin"), UnpublishedFiles.retryWhereRoom(app, destination).map { it.name })
+        assertEquals("a file kept for another reason waits for the person", listOf(other.id), UnpublishedFiles.list(app).map { it.id })
+        assertFalse("and nothing is waiting for room any more", UnpublishedFiles.waitingForRoom)
+        UnpublishedFiles.discard(app, other.id)
+        assertEquals(kept.name, "big.bin")
+    }
 }

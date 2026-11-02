@@ -161,6 +161,8 @@ object BucketEngine {
         val gaveUpEntries = HashMap<String, Entry>()
         /** Paths whose receive is live in the transfer layer right now: never judged silent. */
         val receiving = HashSet<String>()
+        /** Files refused for lack of room: asked for again when the free space rises (see [RoomHold]). */
+        val roomHold = RoomHold()
         var userPaused = false
         /** Folders the desk holds. */
         var remoteDirs = emptySet<String>()
@@ -240,7 +242,7 @@ object BucketEngine {
             it.phase = Phase.WAITING
             // Shown "Paused": each resumes from its checkpoint on the next connection.
             it.tracks.values.forEach { track -> track.paused = true }
-            it.incoming.clear(); it.toRequest.clear(); it.outstanding.clear(); it.sending.clear(); it.sendQueue.clear(); it.sendActive.clear()
+            it.incoming.clear(); it.toRequest.clear(); it.outstanding.clear(); it.sending.clear(); it.sendQueue.clear(); it.sendActive.clear(); it.roomHold.clear()
         }
         synchronized(wanted) { wanted.keys.removeAll { it.first == deviceId } }
     }
@@ -840,7 +842,9 @@ object BucketEngine {
         live.receiving.remove(path)
         live.tracks.remove(path)
         val entry = synchronized(wanted) { wanted.remove(live.deviceId to path) }
-        when (val decision = live.fetches.failed(path)) {
+        // Refused for lack of room: not a failure. It waits (no tries counted, no deadline) until the free space rises.
+        when (val decision = if (live.roomHold.holds(path)) null else live.fetches.failed(path)) {
+            null -> Unit
             FetchTracker.Decision.GiveUp -> {
                 live.notSynced = live.notSynced.filter { it.first != path } + (path to Skip.COULDNT_FETCH)
                 if (entry != null) { live.gaveUp[path] = entry.sha256; live.gaveUpEntries[path] = entry }
@@ -983,14 +987,19 @@ object BucketEngine {
     /** The transfer manager asks before accepting a synced file (P4): asked for, same content, and room for it. */
     fun accepts(deviceId: String, ref: FolderRef, sha256: String, size: Long): Boolean {
         if (ref.folder != FolderSync.BUCKET_ID) return false
-        val asked = synchronized(wanted) { wanted[deviceId to ref.relpath] }?.let { it.sha256.equals(sha256, true) && it.size == size } == true
-        if (!asked) return false
-        val free = runCatching { minOf(StatFs(app.cacheDir.path).availableBytes, StatFs(android.os.Environment.getExternalStorageDirectory().path).availableBytes) }.getOrDefault(Long.MAX_VALUE)
-        if (!FolderSync.enoughSpace(free, size)) {
-            worker.execute { buckets[deviceId]?.storageFull = true; publish() }
+        val entry = synchronized(wanted) { wanted[deviceId to ref.relpath] }?.takeIf { it.sha256.equals(sha256, true) && it.size == size }
+        if (entry == null) return false
+        if (!FolderSync.enoughSpace(freeSpace(), size)) {
+            worker.execute { buckets[deviceId]?.let { it.storageFull = true; it.roomHold.hold(ref.relpath, entry) }; publish() }
             return false
         }
         return true
+    }
+
+    /** The room on the phone's storage; a test replaces it. */
+    @Volatile
+    internal var freeSpace: () -> Long = {
+        runCatching { minOf(StatFs(app.cacheDir.path).availableBytes, StatFs(android.os.Environment.getExternalStorageDirectory().path).availableBytes) }.getOrDefault(Long.MAX_VALUE)
     }
 
     /** A requested file arrived at [partial]; it is moved aside now and placed on the worker. */
@@ -1026,7 +1035,8 @@ object BucketEngine {
         live.gaveUp.remove(ref.relpath); live.gaveUpEntries.remove(ref.relpath)
         live.fetches.succeeded(ref.relpath)
         finished(live, ref.relpath)
-        live.storageFull = false
+        live.roomHold.forget(ref.relpath)
+        live.storageFull = !live.roomHold.isEmpty
         val tree = tree(live)
         val existing = tree?.find(ref.relpath)
         val placed = if (tree != null && unchanged(existing, live.manifest[ref.relpath])) tree.place(ref.relpath, stash, existing) else null
@@ -1052,6 +1062,10 @@ object BucketEngine {
     // ---- scanning ---------------------------------------------------------------------------------------------
 
     private fun tick() {
+        // Verified files kept because the phone was full are saved again once there is room (no tap), even with no Bucket.
+        if (org.desklink.mobile.plugins.share.UnpublishedFiles.waitingForRoom) {
+            org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { org.desklink.mobile.plugins.share.UnpublishedFiles.retryWhereRoom(app, org.desklink.mobile.plugins.share.DeviceStorageDestination(app)) } }
+        }
         // Nothing to look after (no Bucket, no link, no offer waiting): the 5 s tick costs nothing and publishes nothing.
         if (buckets.isEmpty() && ready.isEmpty() && offers.isEmpty() && asked.isEmpty()) return
         // A link that dropped: sync stops until the next feature-ready.
@@ -1071,6 +1085,16 @@ object BucketEngine {
             val quiet = if (live.userPaused) emptyList() else FetchTracker.silent(live.outstanding - live.receiving - live.tracks.keys, live.requestedAt, live.tracks.mapValues { it.value.at }, now)
             if (quiet.isNotEmpty()) { quiet.forEach { retryFetch(live, it) }; changed = true }
             if (live.tracks.isNotEmpty() || live.outstanding.isNotEmpty() || live.sendActive.isNotEmpty()) changed = true
+            if (!live.roomHold.isEmpty && !live.userPaused) {
+                val again = live.roomHold.risen(freeSpace())
+                if (again.isNotEmpty()) {
+                    synchronized(wanted) { again.forEach { (path, entry) -> wanted[live.deviceId to path] = entry } }
+                    again.forEach { (path, _) -> if (path !in live.toRequest && path !in live.outstanding) live.toRequest.add(path) }
+                    if (live.roomHold.isEmpty) live.storageFull = false
+                    requestMore(live)
+                    changed = true
+                }
+            }
         }
         // Only when something moved or was scanned: an idle Bucket builds no views every five seconds.
         if (changed) publish()

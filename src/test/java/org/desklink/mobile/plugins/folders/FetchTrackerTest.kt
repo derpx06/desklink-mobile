@@ -2,6 +2,7 @@
 package org.desklink.mobile.plugins.folders
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FetchTrackerTest {
@@ -59,5 +60,21 @@ class FetchTrackerTest {
         val other = mutableMapOf("c.txt" to "h3")
         assertEquals(emptySet<String>(), FetchTracker.keepGivenUp(emptyMap(), other))
         assertEquals(emptyMap<String, String>(), other)
+    }
+
+    @Test
+    fun aFileRefusedForLackOfRoomIsAskedForAgainOnlyWhenItFitsAndNeverCountsAsAFailure() {
+        val hold = RoomHold()
+        val small = Entry(10L shl 20, 1, "a".repeat(64))
+        val big = Entry(600L shl 20, 1, "b".repeat(64))
+        hold.hold("small.bin", small); hold.hold("big.bin", big)
+        assertEquals("under the 500 MB reserve nothing fits", emptyList<String>(), hold.risen(FolderSync.MIN_FREE_BYTES).map { it.first })
+        assertEquals("room for the small one only", listOf("small.bin"), hold.risen(FolderSync.MIN_FREE_BYTES + (10L shl 20)).map { it.first })
+        assertTrue(hold.holds("big.bin") && !hold.holds("small.bin"))
+        assertEquals(listOf("big.bin"), hold.risen(Long.MAX_VALUE / 2).map { it.first })
+        assertTrue(hold.isEmpty)
+        // A hold is not a try: the tracker still gives its full three.
+        val tracker = FetchTracker()
+        assertTrue(tracker.failed("big.bin") is FetchTracker.Decision.Retry)
     }
 }
