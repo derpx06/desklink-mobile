@@ -213,12 +213,30 @@ object UnpublishedFiles {
     var waitingForRoom = false
         private set
 
-    /** Saves again, with no tap, each file that was kept for lack of room and now fits ([retry] checks the room itself). */
-    fun retryWhereRoom(context: Context, destination: ReceiveDestination): List<Published> {
+    /** Per kept file: when it may be tried again and the wait after the next failure (5 s doubling to 5 min). */
+    private val backoff = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Long>>()
+    const val RETRY_FIRST_MS = 5_000L
+    const val RETRY_MAX_MS = 5 * 60_000L
+
+    /**
+     * Saves again, with no tap, each file that was kept for lack of room and now fits ([retry] checks the room itself). A file that
+     * fails again waits longer each time, so a destination that cannot report its free space is not copied into every few seconds.
+     */
+    fun retryWhereRoom(context: Context, destination: ReceiveDestination, now: Long = android.os.SystemClock.elapsedRealtime()): List<Published> {
         val kept = list(context).filter { it.storageFull }
-        waitingForRoom = kept.isNotEmpty()
-        val done = kept.filter { destination.freeBytes() >= it.size + RESERVE_BYTES }.mapNotNull { (retry(context, it.id, destination) as? Retry.Done)?.published }
-        if (done.isNotEmpty()) waitingForRoom = list(context).any { it.storageFull }
+        backoff.keys.retainAll(kept.map { it.id }.toSet())
+        val done = kept.filter { destination.freeBytes() >= it.size + RESERVE_BYTES && now >= (backoff[it.id]?.first ?: 0L) }.mapNotNull { item ->
+            when (val result = retry(context, item.id, destination)) {
+                is Retry.Done -> { backoff.remove(item.id); result.published }
+                is Retry.Failed -> {
+                    val wait = (backoff[item.id]?.second?.times(2) ?: RETRY_FIRST_MS).coerceAtMost(RETRY_MAX_MS)
+                    backoff[item.id] = (now + wait) to wait
+                    null
+                }
+                else -> null
+            }
+        }
+        waitingForRoom = list(context).any { it.storageFull }
         return done
     }
 

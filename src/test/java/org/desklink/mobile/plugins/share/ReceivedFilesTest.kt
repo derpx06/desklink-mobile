@@ -118,4 +118,18 @@ class ReceivedFilesTest {
         UnpublishedFiles.discard(app, other.id)
         assertEquals(kept.name, "big.bin")
     }
+
+    @Test
+    fun aKeptFileThatFailsAgainIsTriedLessAndLessOften() {
+        UnpublishedFiles.keep(app, tmp.newFile("failing").apply { writeBytes(ByteArray(100)) }, "f.bin", null, null, "desk", storageFull = true)!!
+        var publishes = 0
+        // A destination that cannot tell its free space and fails when written to (a full card).
+        val destination = object : ReceiveDestination {
+            override fun publish(source: File, name: String, lastModified: Long?, mime: String?): Published { publishes++; throw IOException("No space left on device") }
+        }
+        var t = 1_000_000L
+        repeat(60) { UnpublishedFiles.retryWhereRoom(app, destination, now = t); t += 5_000 } // five minutes of 5 s ticks
+        assertTrue("backed off 5 s, 10 s, 20 s … instead of every tick: $publishes", publishes in 5..8)
+        assertTrue("and it is still kept, waiting", UnpublishedFiles.waitingForRoom)
+    }
 }
