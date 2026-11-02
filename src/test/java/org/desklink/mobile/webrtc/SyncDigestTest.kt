@@ -168,4 +168,41 @@ class SyncDigestTest {
     fun theWaitIsOneSecond() {
         assertEquals(1000L, SyncDigest.SYNC_WAIT_MS)
     }
+
+    private fun applied(type: String, rev: String) = NetworkPacket(type).apply { this["rev"] = rev }
+
+    private fun held(feature: String): Boolean = digest.havePacket("desk-1").getJSONObject("have")!!.has(feature)
+
+    @Test
+    fun aReloadedPluginNoLongerHoldsTheRevItsPredecessorApplied() {
+        digest.record("desk-1", applied(DeskLinkProtocol.PACKET_TYPE_SETTINGS, "s1"))
+        digest.record("desk-1", applied(DeskLinkProtocol.PACKET_TYPE_MPRIS, "m1"))
+        assertTrue(held(SyncDigest.SETTINGS) && held(SyncDigest.MEDIA))
+        // The settings plugin is removed (link lost, preference changed): only what it held is dropped.
+        digest.forgetHeldBy(arrayOf(DeskLinkProtocol.PACKET_TYPE_SETTINGS))
+        assertFalse("the new plugin instance has no settings", held(SyncDigest.SETTINGS))
+        assertTrue("the media plugin is still there", held(SyncDigest.MEDIA))
+        digest.forgetHeldBy(arrayOf(DeskLinkProtocol.PACKET_TYPE_NOTES, "desklink.nothing"))
+        assertTrue("types that report nothing change nothing", held(SyncDigest.MEDIA))
+    }
+
+    @Test
+    fun afterAReloadTheNextFeatureReadyAsksForTheSnapshotAgainButAPlainRebuildDoesNot() {
+        digest.record("desk-1", applied(DeskLinkProtocol.PACKET_TYPE_SETTINGS, "s1"))
+        // The desk is told what the phone holds on each feature-ready, and skips a snapshot only when the rev matches.
+        fun deskSkips(): Boolean {
+            val body = digest.havePacket("desk-1").getJSONObject("have")!!
+            return body.optString(SyncDigest.SETTINGS) == "s1"
+        }
+        // A plain link rebuild, plugins kept: delta resync still skips the resend.
+        digest.endLink()
+        assertTrue(deskSkips())
+        // The plugin was removed and created again: nothing is reported, so the desk resends.
+        digest.forgetHeldBy(arrayOf(DeskLinkProtocol.PACKET_TYPE_SETTINGS))
+        digest.endLink()
+        assertFalse(deskSkips())
+        // Once the new instance applies a snapshot, it is reported again.
+        digest.record("desk-1", applied(DeskLinkProtocol.PACKET_TYPE_SETTINGS, "s2"))
+        assertEquals("s2", digest.havePacket("desk-1").getJSONObject("have")!!.getString(SyncDigest.SETTINGS))
+    }
 }

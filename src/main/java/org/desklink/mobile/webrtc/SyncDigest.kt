@@ -45,6 +45,16 @@ class SyncDigest(private val myInstance: () -> String) {
     }
 
     /**
+     * A plugin that held a reported feature's data is gone (removed on a lost link, turned off, reloaded): its state went with it, so
+     * its rev must not be offered in `have`, or the peer skips the snapshot and the new plugin instance stays empty.
+     */
+    @Synchronized
+    fun forgetHeldBy(packetTypes: Array<String>) {
+        val features = packetTypes.mapNotNull { REPORTED_TYPES[it] }
+        if (features.isNotEmpty()) received.values.forEach { it.keys.removeAll(features.toSet()) }
+    }
+
+    /**
      * Runs [action] once: at once if the peer's `have` is already here, else when it arrives, else
      * after [timeoutMs] (scheduled through [schedule]) with everything to be sent. Never blocks.
      */
@@ -120,6 +130,9 @@ class SyncDigest(private val myInstance: () -> String) {
 
         /** The desk's features this phone reports in its `have`. */
         val REPORTED = setOf("settings", "media")
+
+        /** The incoming packet types whose data a plugin keeps in memory, with the feature each one reports. */
+        private val REPORTED_TYPES = mapOf(DeskLinkProtocol.PACKET_TYPE_SETTINGS to "settings", DeskLinkProtocol.PACKET_TYPE_MPRIS to "media")
 
         const val NOTIFICATIONS = "notifications"
         const val CONTACTS = "contacts"
