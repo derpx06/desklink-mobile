@@ -111,4 +111,14 @@ class ClipboardOfferTest {
             listener.removeObserver(observer)
         }
     }
+
+    @Test
+    fun everyRefusalNamesItsReasonAndAnOfferHasNone() {
+        assertEquals(null, ClipboardOffer.skipReason(false, false, false, 1, false))
+        assertEquals("app in front", ClipboardOffer.skipReason(true, false, false, 1, false))
+        assertEquals("the computer's own copy", ClipboardOffer.skipReason(false, true, false, 1, false))
+        assertEquals("marked sensitive", ClipboardOffer.skipReason(false, false, true, 1, false))
+        assertEquals("no computer eligible", ClipboardOffer.skipReason(false, false, false, 0, false))
+        assertEquals("automatic sync is running", ClipboardOffer.skipReason(false, false, false, 1, true))
+    }
 }

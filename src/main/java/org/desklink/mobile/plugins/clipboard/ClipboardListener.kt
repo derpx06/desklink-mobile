@@ -113,6 +113,9 @@ class ClipboardListener private constructor(ctx: Context) {
         val inFront = runCatching {
             androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
         }.getOrDefault(false)
+        // Android 10+ does not deliver this callback to an app that is behind (the system denies it, which is what automatic sync's
+        // logcat watch reads), so a line here is the proof that it arrived at all.
+        org.desklink.mobile.helpers.AppLog.event("clipboard", "copy seen, ${if (inFront) "app in front" else "app behind"}")
         if (inFront) {
             ClipboardOffer.cancel(context)
             sync(force = false)
@@ -121,8 +124,11 @@ class ClipboardListener private constructor(ctx: Context) {
         val description = try { cm.primaryClipDescription } catch (_: Exception) { null }
         val own = remoteSetAt != 0L && SystemClock.elapsedRealtime() - remoteSetAt < 2_000
         val names = offerTargets()
-        if (ClipboardOffer.shouldOffer(false, own, description != null && isSensitive(description), names.size, watching)) {
+        val reason = ClipboardOffer.skipReason(false, own, description != null && isSensitive(description), names.size, watching)
+        if (reason == null) {
             ClipboardOffer.show(context, ClipboardOffer.target(names, context.getString(org.desklink.mobile.R.string.clipboard_many_computers)))
+        } else {
+            org.desklink.mobile.helpers.AppLog.event("clipboard", "no offer: $reason")
         }
     }
 

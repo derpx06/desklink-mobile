@@ -36,7 +36,17 @@ object ClipboardOffer {
      * is not the computer's own copy arriving, not marked sensitive (a password manager's), and a computer wants it.
      */
     fun shouldOffer(appInFront: Boolean, ownCopy: Boolean, sensitive: Boolean, computers: Int, automaticWatchRunning: Boolean): Boolean =
-        !appInFront && !ownCopy && !sensitive && computers > 0 && !automaticWatchRunning
+        skipReason(appInFront, ownCopy, sensitive, computers, automaticWatchRunning) == null
+
+    /** Why a copy gets no offer (a word for the log, never the content), or null when it does. */
+    fun skipReason(appInFront: Boolean, ownCopy: Boolean, sensitive: Boolean, computers: Int, automaticWatchRunning: Boolean): String? = when {
+        appInFront -> "app in front"
+        ownCopy -> "the computer's own copy"
+        sensitive -> "marked sensitive"
+        computers <= 0 -> "no computer eligible"
+        automaticWatchRunning -> "automatic sync is running"
+        else -> null
+    }
 
     /** A computer the offer is for: paired, sharing the clipboard, connected and feature-ready, and the person wants the offer. */
     fun eligible(paired: Boolean, sharing: Boolean, ready: Boolean, offerOn: Boolean) = paired && sharing && ready && offerOn
@@ -73,8 +83,11 @@ object ClipboardOffer {
                 android.content.pm.PackageManager.PERMISSION_GRANTED || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU
             ) {
                 NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+                org.desklink.mobile.helpers.AppLog.event("clipboard", "offer posted")
+            } else {
+                org.desklink.mobile.helpers.AppLog.event("clipboard", "offer skipped: notifications not allowed")
             }
-        }
+        }.onFailure { org.desklink.mobile.helpers.AppLog.event("clipboard", "offer failed: ${it.javaClass.simpleName}") }
     }
 
     fun cancel(context: Context) {
