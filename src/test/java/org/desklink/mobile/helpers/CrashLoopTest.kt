@@ -44,4 +44,36 @@ class CrashLoopTest {
         controller.destroy()
         CrashLoop.clear(app)
     }
+
+    @Test
+    fun onceLoadedTheBreakerAnswersFromMemoryAndNeverTouchesThePreferencesOnTheCallingThread() {
+        val t = System.currentTimeMillis()
+        app.getSharedPreferences("crash_loop", android.content.Context.MODE_PRIVATE).edit()
+            .putString("times", listOf(t - 30_000, t - 20_000, t - 10_000).joinToString(",")).commit()
+        CrashLoop.resetForTest()
+        CrashLoop.preload(app)
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+        // A context that fails on any preferences access: the answer must come from memory.
+        val bare = io.mockk.mockk<android.content.Context>()
+        io.mockk.every { bare.getSharedPreferences(any(), any()) } throws IllegalStateException("main thread must not read")
+        while (!CrashLoop.safeMode(app, t) && System.nanoTime() < deadline) Thread.sleep(10)
+        assertTrue("three crashes in the last minute from the stored file", CrashLoop.safeMode(bare, t))
+        assertFalse("and two minutes on it is over", CrashLoop.safeMode(bare, t + 3 * 60_000))
+        CrashLoop.clear(app)
+        assertFalse(CrashLoop.safeMode(bare, t))
+    }
+
+    @Test
+    fun aClearNeverWipesACrashRecordedAfterIt() {
+        CrashLoop.clear(app)
+        val t = System.currentTimeMillis()
+        repeat(3) { CrashLoop.recordCrash(app, t + it) }
+        Thread.sleep(200) // the background half of the clear has run
+        CrashLoop.resetForTest()
+        CrashLoop.preload(app)
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+        while (!CrashLoop.safeMode(app, t + 10) && System.nanoTime() < deadline) Thread.sleep(10)
+        assertTrue("what the file holds after a restart still counts", CrashLoop.safeMode(app, t + 10))
+        CrashLoop.clear(app)
+    }
 }

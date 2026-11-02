@@ -117,6 +117,8 @@ class DeskLinkApplication : Application() {
         super.onCreate()
         _instance = this
         CrashReporter.install(this)
+        // The crash-loop times are read here, off the main thread, so the service's safe-mode check answers from memory.
+        org.desklink.mobile.helpers.CrashLoop.preload(this)
         org.desklink.mobile.helpers.AppLog.init(this)
         org.desklink.mobile.helpers.AppLog.event("app", "started ${BuildConfig.VERSION_NAME}")
         // "Stopped, tap to restart": a feature that threw is reloaded from its settings.
