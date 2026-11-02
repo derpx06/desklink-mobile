@@ -67,8 +67,8 @@ class ExportedComponentsTest {
     }
 
     private companion object {
-        /** What another app must reach: the launcher, and the share sheet targets (each asks the person before it acts). */
-        val EXPECTED_ACTIVITIES = sortedSetOf("MainActivity", "SaveToNotesActivity", "ShareActivity", "ShareToBucketActivity")
+        /** What another app must reach: the launcher, the share sheet targets and the text-selection menu entry (each asks the person before it acts). */
+        val EXPECTED_ACTIVITIES = sortedSetOf("MainActivity", "SaveToNotesActivity", "SendSelectedTextActivity", "ShareActivity", "ShareToBucketActivity")
 
         /** Debug builds only (src/debug and the Compose test manifest); a release build has none of them. */
         val DEBUG_ONLY_ACTIVITIES = sortedSetOf("AudioSelfTestActivity", "CaptureDemoActivity", "ComponentActivity", "MediaCardPreviewActivity", "PreviewActivity", "QuitActivity")

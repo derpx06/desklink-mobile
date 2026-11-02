@@ -100,6 +100,10 @@ class ClipboardListener private constructor(ctx: Context) {
         return CopyTime.of(stamp, copiedAt, now, lastCopiedAtSent).also { lastCopiedAtSent = it }
     }
 
+    /** The copy time of text that was not on the clipboard (a selection sent from the text menu): now, never behind one already sent. */
+    @Synchronized
+    fun nextCopyTime(): Long = CopyTime.of(0L, 0L, System.currentTimeMillis(), lastCopiedAtSent).also { lastCopiedAtSent = it }
+
     /** The newest copiedAt this process has sent: copy times never go backwards, even if the system clock is set back. */
     @Volatile
     var lastCopiedAtSent: Long = 0L

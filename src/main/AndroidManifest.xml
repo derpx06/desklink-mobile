@@ -236,6 +236,21 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
         <!-- Plugin-related activities and services -->
 
+        <!-- "Send to computer" in the text-selection menu: exported for the system menu; it asks before it sends. -->
+        <activity
+            android:name="org.desklink.mobile.plugins.clipboard.SendSelectedTextActivity"
+            android:label="@string/send_selected_label"
+            android:theme="@style/Theme.Transparent"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name="org.desklink.mobile.plugins.clipboard.ClipboardFloatingActivity"
             android:theme="@style/Theme.Transparent"

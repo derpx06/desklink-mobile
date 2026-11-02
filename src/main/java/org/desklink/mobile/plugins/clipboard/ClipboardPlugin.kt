@@ -88,6 +88,13 @@ class ClipboardPlugin : Plugin() {
         })
     }
 
+    /** Text selected in another app ("Send to computer"): sent as a clipboard packet, stamped like a manual send. False when too large. */
+    fun sendSelected(text: String): Boolean {
+        if (!fitsWire(text)) return false
+        propagateClipboard(text, ClipboardListener.instance(context).nextCopyTime())
+        return true
+    }
+
     /** Home's "Send clipboard to <desk>": whatever is on the clipboard, text or image, sent now. */
     fun sendNow(): Boolean = ClipboardListener.instance(context).sync(force = true)
 
