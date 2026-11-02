@@ -23,6 +23,8 @@ object PeerState {
     fun forget(context: Context, deviceId: String) {
         // Best effort, step by step: tidying up must never make an unpair look as if it failed.
         val app = runCatching { context.applicationContext }.getOrNull() ?: return
+        // Before the preferences go: the folders it used are read from them to release their grants.
+        runCatching { org.desklink.mobile.plugins.gallery.GalleryWatcher.forgetDevice(app, deviceId) }
         runCatching {
             val prefs = PreferenceManager.getDefaultSharedPreferences(app)
             val keys = preferenceKeys(prefs.all.keys, deviceId)

@@ -110,4 +110,22 @@ class PeerStateTest {
 
     @Test
     fun anUnpairBeforeTheBucketStateWasReadStillRemovesOnlyThatRecord() = bucketRecords(loaded = false)
+
+    @Test
+    fun anUnpairForgetsTheGalleryChoicesAndWhatWasSentToThatComputerOnly() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(app)
+        prefs.edit {
+            listOf(desk, other).forEach { id ->
+                putBoolean(org.desklink.mobile.plugins.gallery.GalleryWatcher.onKey(id), true)
+                putLong(org.desklink.mobile.plugins.gallery.GalleryWatcher.sinceKey(id), 5L)
+                putString(org.desklink.mobile.plugins.gallery.GalleryWatcher.shotsKey(id), "content://tree/shots")
+            }
+        }
+        listOf(desk, other).forEach { id -> org.desklink.mobile.plugins.gallery.GalleryRules.Ledger(File(app.filesDir, "gallery/$id.json")).add("u", 1) }
+        PeerState.forget(app, desk)
+        assertEquals(emptyList<String>(), prefs.all.keys.filter { desk in it })
+        assertTrue(prefs.getBoolean(org.desklink.mobile.plugins.gallery.GalleryWatcher.onKey(other), false))
+        assertEquals(false, File(app.filesDir, "gallery/$desk.json").exists())
+        assertTrue("another computer's record stays", File(app.filesDir, "gallery/$other.json").exists())
+    }
 }

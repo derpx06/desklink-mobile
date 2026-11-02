@@ -819,6 +819,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_send_selected_direct_summary">"Send to computer" in the text-selection menu sends at once when one computer shares its clipboard. Otherwise it asks first</string>
     <string name="settings_activity_on">Show ongoing items on %1$s</string>
     <string name="settings_activity_on_summary">Timers, progress, navigation and calls running here. Follows the notification filter and privacy choices</string>
+    <string name="settings_gallery_send">Send new screenshots and photos to %1$s</string>
+    <string name="settings_gallery_send_summary">Only pictures taken or saved from now on, one at a time, at most 20 an hour. Pick the folders below</string>
+    <string name="settings_gallery_screenshots">Screenshots folder</string>
+    <string name="settings_gallery_camera">Camera folder</string>
+    <string name="settings_gallery_folder_none">Not chosen</string>
     <string name="settings_dnd_share">Share Do Not Disturb with %1$s</string>
     <string name="settings_dnd_share_on">Do Not Disturb follows %1$s, both ways</string>
     <string name="settings_dnd_access">Do Not Disturb access</string>

@@ -125,6 +125,7 @@ class FileSender(
                 filename = filename, totalSize = totalSize, mtime = meta["mtime"]?.toLongOrNull() ?: mtime, blockSize = FileV2.BLOCK_BYTES,
                 maxFrameBytes = FileV2.FRAME_BYTES_PROVEN,
                 clipboard = meta["clipboard"]?.let { true },
+                gallery = meta["gallery"]?.let { true },
                 mimeType = meta["mimeType"], captureId = meta["captureId"],
                 folder = meta["folder"], relpath = meta["relpath"], contentSha256 = meta["contentSha256"],
             ),

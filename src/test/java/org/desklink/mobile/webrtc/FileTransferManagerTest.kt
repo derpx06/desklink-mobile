@@ -574,6 +574,34 @@ class FileTransferManagerTest {
     }
 
     @Test
+    fun aGalleryImageIsOfferedWithTheGalleryFlagAndItsTypeAndNothingFromABucketOrTheClipboard() {
+        val bytes = data(1000)
+        val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
+            this["filename"] = "Screenshot_1.png"
+            this["gallery"] = true
+            this["mimeType"] = "image/png"
+            this["mtime"] = 1_730_000_000_000L
+            payload = NetworkPacket.Payload(bytes.size.toLong()).also {
+                it.source = object : FileSource {
+                    override fun stat() = FileSource.Stat(bytes.size.toLong(), 1_730_000_000_000L)
+                    override fun open(offset: Long): InputStream = java.io.ByteArrayInputStream(bytes, offset.toInt(), bytes.size - offset.toInt())
+                }
+            }
+        }
+        startSend(packet, Recorder())
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (phone.sent.none { it.action == WebRtcFileAction.OFFER } && System.nanoTime() < deadline) { phone.runner.runPending(); Thread.sleep(2) }
+        val offer = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        assertEquals(true, offer.gallery)
+        assertEquals("image/png", offer.mimeType)
+        assertEquals(1_730_000_000_000L, offer.mtime)
+        assertEquals("Screenshot_1.png", offer.filename)
+        assertNull(offer.folder); assertNull(offer.clipboard); assertNull(offer.captureId); assertNull(offer.relpath)
+        // On the wire as an additive boolean, and read back.
+        assertEquals(true, WebRtcFileControl.fromJson(offer.toJson()).gallery)
+    }
+
+    @Test
     fun aFileThatIsReadInPlaceIsNeverCopiedFirst() {
         val bytes = data(FileV2.BLOCK_BYTES + 5)
         val packet = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {

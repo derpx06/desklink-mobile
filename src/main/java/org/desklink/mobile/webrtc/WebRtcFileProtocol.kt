@@ -107,6 +107,8 @@ data class WebRtcFileControl(
     val message: String? = null,
     /** Share fields on an offer (contract C3, F3): a clipboard image, or the file answering a capture. */
     val clipboard: Boolean? = null,
+    /** W12: a new screenshot or photo the phone sends on its own (additive; carries no folder, clipboard or capture id). */
+    val gallery: Boolean? = null,
     val mimeType: String? = null,
     val captureId: String? = null,
     /** A Bucket file on an offer: the pair id, its path, and the manifest's whole-file SHA-256. */
@@ -186,6 +188,7 @@ data class WebRtcFileControl(
             code?.let { value.put("code", it) }
             message?.let { value.put("message", it) }
             clipboard?.let { value.put("clipboard", it) }
+            gallery?.let { value.put("gallery", it) }
             mimeType?.let { value.put("mimeType", it) }
             captureId?.let { value.put("captureId", it) }
             folder?.let { value.put("folder", it) }
@@ -228,6 +231,7 @@ data class WebRtcFileControl(
                 code = str("code"),
                 message = str("message"),
                 clipboard = if (value.has("clipboard")) value.getBoolean("clipboard") else null,
+                gallery = if (value.has("gallery")) value.getBoolean("gallery") else null,
                 mimeType = str("mimeType")?.take(128),
                 captureId = str("captureId")?.take(64),
                 folder = str("folder"),

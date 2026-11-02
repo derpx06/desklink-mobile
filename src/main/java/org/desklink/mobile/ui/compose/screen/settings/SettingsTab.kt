@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.RingtoneManager
 import android.net.Uri
+import android.widget.Toast
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -617,6 +618,49 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
     }
 }
 
+/** W12: "Send new screenshots and photos to <computer>", disabled until the computer accepts them, and the two folders it watches. */
+@Composable
+private fun GalleryRows(desk: DeskSettings, changed: () -> Unit) {
+    val context = LocalContext.current
+    val accepted = desk.ready && desk.remote?.galleryAccepted == true
+    val on = org.desklink.mobile.plugins.gallery.GalleryWatcher.isOn(context, desk.id)
+    val shots = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null && !org.desklink.mobile.plugins.gallery.GalleryWatcher.setFolder(context, desk.id, true, uri)) Toast.makeText(context, R.string.bucket_folder_failed, Toast.LENGTH_SHORT).show()
+        changed()
+    }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null && !org.desklink.mobile.plugins.gallery.GalleryWatcher.setFolder(context, desk.id, false, uri)) Toast.makeText(context, R.string.bucket_folder_failed, Toast.LENGTH_SHORT).show()
+        changed()
+    }
+    GroupRow(
+        stringResource(R.string.settings_gallery_send, desk.name),
+        icon = R.drawable.sym_photo_library,
+        subtitle = when {
+            !desk.ready || desk.remote == null -> stringResource(R.string.settings_waiting_for, desk.name)
+            !accepted -> stringResource(R.string.settings_turn_on_at, desk.name)
+            else -> stringResource(R.string.settings_gallery_send_summary)
+        },
+        checked = on,
+        enabled = accepted,
+        onClick = { org.desklink.mobile.plugins.gallery.GalleryWatcher.setOn(context, desk.id, !on); changed() },
+    )
+    if (on) {
+        val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+        val none = stringResource(R.string.settings_gallery_folder_none)
+        fun shown(key: String) = prefs.getString(key, null)?.let { Uri.parse(it).lastPathSegment?.substringAfterLast(':') } ?: none
+        GroupRow(
+            stringResource(R.string.settings_gallery_screenshots), icon = R.drawable.sym_folder_zip,
+            subtitle = shown(org.desklink.mobile.plugins.gallery.GalleryWatcher.shotsKey(desk.id)),
+            onClick = { runCatching { shots.launch(org.desklink.mobile.plugins.gallery.GalleryWatcher.pickerStart("Pictures/Screenshots")) } },
+        ) { Chevron() }
+        GroupRow(
+            stringResource(R.string.settings_gallery_camera), icon = R.drawable.sym_folder_zip,
+            subtitle = shown(org.desklink.mobile.plugins.gallery.GalleryWatcher.cameraKey(desk.id)),
+            onClick = { runCatching { camera.launch(org.desklink.mobile.plugins.gallery.GalleryWatcher.pickerStart("DCIM/Camera")) } },
+        ) { Chevron() }
+    }
+}
+
 @Composable
 private fun FilesGroup(desk: DeskSettings?, actions: SettingsActions, prefs: android.content.SharedPreferences, changed: () -> Unit) {
     val context = LocalContext.current
@@ -645,6 +689,7 @@ private fun FilesGroup(desk: DeskSettings?, actions: SettingsActions, prefs: and
                 changed()
             })
         }
+        if (desk != null) GalleryRows(desk, changed)
         if (desk != null) {
             GroupRow(
                 stringResource(R.string.settings_contacts_share, desk.name),

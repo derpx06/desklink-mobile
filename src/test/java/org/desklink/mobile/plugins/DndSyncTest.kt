@@ -70,4 +70,11 @@ class DndSyncTest {
         loop.reset()
         assertTrue("after the switch goes off nothing received counts", loop.localChange(true))
     }
+
+    @Test
+    fun theGalleryFlagIsReadFromTheSettingsReport() {
+        assertNull(DeskSettingsPlugin.parse(settings())!!.galleryAccepted)
+        assertEquals(true, DeskSettingsPlugin.parse(settings("galleryAccepted" to true))!!.galleryAccepted)
+        assertEquals(false, DeskSettingsPlugin.parse(settings("galleryAccepted" to false))!!.galleryAccepted)
+    }
 }

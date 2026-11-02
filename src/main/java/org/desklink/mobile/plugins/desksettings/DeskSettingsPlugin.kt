@@ -35,6 +35,8 @@ data class DeskSettingsState(
     val dndSync: Boolean? = null,
     /** W14: the computer's Do Not Disturb, sent only while [dndSync] is true. */
     val dnd: Boolean? = null,
+    /** W12: the computer's "Accept photos and screenshots from <phone>" switch; null from a desk that does not say. */
+    val galleryAccepted: Boolean? = null,
 )
 
 /**
@@ -73,6 +75,7 @@ class DeskSettingsPlugin : Plugin() {
             settings = it
             pending = emptyMap()
             device.getPlugin(org.desklink.mobile.plugins.battery.BatteryPlugin::class.java)?.deskDndChanged(it.dndSync == true, it.dnd)
+            org.desklink.mobile.plugins.gallery.GalleryWatcher.kick(context)
             org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
         }
         return true
@@ -118,6 +121,7 @@ class DeskSettingsPlugin : Plugin() {
                 unlockNearby = np.getBoolean("unlockNearby"),
                 sessionPasswordSet = if (np.has("sessionPasswordSet")) np.getBoolean("sessionPasswordSet") else null,
                 keepAwakeAllowed = if (np.has("keepAwakeAllowed")) np.getBoolean("keepAwakeAllowed") else null,
+                galleryAccepted = if (np.has("galleryAccepted")) np.getBoolean("galleryAccepted") else null,
                 dndSync = if (np.has("dndSync")) np.getBoolean("dndSync") else null,
                 dnd = if (np.has("dndSync") && np.getBoolean("dndSync") && np.has("dnd")) np.getBoolean("dnd") else null,
             )

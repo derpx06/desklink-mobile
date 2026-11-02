@@ -43,11 +43,13 @@ class SettingsParityTest {
     private fun rows(function: String): List<String> {
         val start = source.indexOf("fun $function(")
         val body = source.substring(start, source.indexOf("\nprivate fun ", start + 1).takeIf { it > 0 } ?: source.length)
-        return Regex("""\b(GroupRow|DeskSwitch|UnpairRow)\(""").findAll(body).mapNotNull { call ->
-            if (call.groupValues[1] == "UnpairRow") return@mapNotNull english("settings_unpair_row")
+        return Regex("""\b(GroupRow|DeskSwitch|UnpairRow|GalleryRows)\(""").findAll(body).flatMap { call ->
+            if (call.groupValues[1] == "UnpairRow") return@flatMap listOf(english("settings_unpair_row"))
+            // GalleryRows is its own function: the switch, then the two folders it watches.
+            if (call.groupValues[1] == "GalleryRows") return@flatMap listOf("settings_gallery_send", "settings_gallery_screenshots", "settings_gallery_camera").map(::english)
             val args = arguments(body, call.range.last)
-            val title = args.getOrNull(if (call.groupValues[1] == "DeskSwitch") 3 else 0) ?: return@mapNotNull null
-            Regex("""R\.string\.(\w+)""").find(title)?.let { english(it.groupValues[1]) }
+            val title = args.getOrNull(if (call.groupValues[1] == "DeskSwitch") 3 else 0) ?: return@flatMap emptyList()
+            listOfNotNull(Regex("""R\.string\.(\w+)""").find(title)?.let { english(it.groupValues[1]) })
         }.toList()
     }
 
@@ -84,7 +86,7 @@ class SettingsParityTest {
             rows("ControlGroup"),
         )
         assertEquals(
-            listOf("Bucket with <computer>", "Downloads folder", "Use the Downloads folder again", "Share contacts with <computer>"),
+            listOf("Bucket with <computer>", "Downloads folder", "Use the Downloads folder again", "Send new screenshots and photos to <computer>", "Screenshots folder", "Camera folder", "Share contacts with <computer>"),
             rows("FilesGroup"),
         )
         assertEquals(

@@ -175,6 +175,8 @@ class DeskLinkApplication : Application() {
         org.desklink.mobile.helpers.ThreadHelper.execute {
             org.desklink.mobile.plugins.folders.BucketEngine.start(this)
         }
+        // Gallery: the folder watchers of the computers that accept images, registered once per process.
+        org.desklink.mobile.plugins.gallery.GalleryWatcher.kick(this)
         // 1.3 removed several features: what they stored is deleted once, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute {
             org.desklink.mobile.helpers.RemovedFeatures.runOnce(this)

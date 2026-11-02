@@ -193,6 +193,10 @@ class WebRtcFileTransferManager(
                 put("clipboard", "true")
                 packet.getStringOrNull("mimeType")?.let { put("mimeType", it) }
             }
+            if (packet.getBoolean("gallery", false)) {
+                put("gallery", "true")
+                packet.getStringOrNull("mimeType")?.let { put("mimeType", it) }
+            }
             packet.getStringOrNull("captureId")?.let {
                 put("captureId", it)
                 packet.getStringOrNull("mimeType")?.let { m -> put("mimeType", m) }
