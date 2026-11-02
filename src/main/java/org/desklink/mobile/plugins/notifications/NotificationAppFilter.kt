@@ -15,4 +15,11 @@ class NotificationAppFilter(context: Context) {
     fun isEnabled(packageName: String) = database.isEnabled(packageName)
 
     fun blocksContents(packageName: String) = database.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS)
+
+    companion object {
+        /** [listener] runs when the per-app choices change. */
+        fun addChangeListener(listener: Runnable) = AppDatabase.addChangeListener(listener)
+
+        fun removeChangeListener(listener: Runnable) = AppDatabase.removeChangeListener(listener)
+    }
 }

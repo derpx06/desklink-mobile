@@ -52,6 +52,37 @@ object ActivityItems {
         else -> null
     }
 
+    /** The percent of [progress] in [max] without overflowing (byte counts of a download are in the hundreds of millions); -1 for none. */
+    fun percent(progress: Int, max: Int): Int =
+        if (max <= 0) -1 else (progress.toLong().coerceAtLeast(0) * 100 / max).toInt().coerceIn(0, 100)
+
+    /** The same reading of "a call" as `desklink.notification`: the call categories and the default dialer's own notifications. */
+    fun isCall(category: String?, packageName: String, dialerPackage: String?): Boolean =
+        category == "call" || category == "missed_call" || (dialerPackage != null && dialerPackage == packageName)
+
+    /** A stable id that does not carry the notification's tag (often a contact or conversation key). */
+    fun id(notificationId: Int, packageName: String, tag: String?): String =
+        "$notificationId|$packageName|" + (tag?.let { Integer.toHexString(it.hashCode()) } ?: "")
+
+    /** At most one snapshot a second: the first change goes at once, the rest wait for one trailing send, which is never pushed back. */
+    class Throttle(private val intervalMs: Long = 1_000L) {
+        private var last = Long.MIN_VALUE / 2
+        private var pending = false
+
+        /** null: a trailing send already waits; 0: send now; more: send after that many ms. */
+        @Synchronized
+        fun onChange(now: Long): Long? {
+            if (pending) return null
+            val wait = (last + intervalMs - now).coerceAtLeast(0)
+            if (wait == 0L) { last = now; return 0L }
+            pending = true
+            return wait
+        }
+
+        @Synchronized
+        fun onFired(now: Long) { pending = false; last = now }
+    }
+
     private val IMPORTANCE = listOf("call", "navigation", "timer", "progress", "other")
 
     /** Calls first, then navigation, timers and progress; the newest first inside a kind. */

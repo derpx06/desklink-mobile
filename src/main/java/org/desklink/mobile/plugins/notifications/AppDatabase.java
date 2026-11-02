@@ -128,6 +128,15 @@ class AppDatabase {
 
     }
 
+    /** Told whenever the per-app choices change (Choose apps, hide contents): other features that follow the same rules look again. */
+    private static final java.util.concurrent.CopyOnWriteArrayList<Runnable> changeListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    static void addChangeListener(Runnable listener) { changeListeners.add(listener); }
+
+    static void removeChangeListener(Runnable listener) { changeListeners.remove(listener); }
+
+    private static void changed() { for (Runnable listener : changeListeners) listener.run(); }
+
     void setEnabled(String packageName, boolean isEnabled) {
         if (!cacheLoaded) loadCache(); // a write may be the first thing that happens
         enabledCache.put(packageName, isEnabled);
@@ -144,6 +153,7 @@ class AppDatabase {
                 Log.i("AppDatabase", "SetEnabled retval = " + retVal);
             }
         }
+        changed();
     }
 
     boolean getAllEnabled() {
@@ -156,6 +166,7 @@ class AppDatabase {
         SQLiteDatabase ourDatabase = ourHelper.getWritableDatabase();
         ourDatabase.execSQL("UPDATE " + TABLE_ENABLED + " SET " + KEY_IS_ENABLED + "=" + (enabled? "1" : "0"));
         for (String key : enabledCache.keySet()) enabledCache.put(key, enabled);
+        changed();
     }
 
     boolean isEnabled(String packageName) {
@@ -207,6 +218,7 @@ class AppDatabase {
                 Log.i("AppDatabase", "SetPrivacyOptions retval = " + retVal);
             }
         }
+        changed();
     }
 
     /**

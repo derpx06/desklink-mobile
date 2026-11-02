@@ -5,6 +5,7 @@ import android.app.KeyguardManager
 import android.app.Notification
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.service.notification.StatusBarNotification
 import org.desklink.mobile.R
 import org.desklink.mobile.helpers.AppsHelper.appNameLookup
@@ -24,14 +25,21 @@ import org.json.JSONArray
  */
 @LoadablePlugin
 class ActivityPlugin : Plugin(), NotificationReceiver.NotificationListener {
-    private lateinit var appDatabase: NotificationAppFilter
+    private lateinit var appFilter: NotificationAppFilter
     private lateinit var mainHandler: Handler
     private val keyguard: KeyguardManager by lazy { context.getSystemService(KeyguardManager::class.java) }
-    private var service: NotificationReceiver? = null
+    @Volatile private var service: NotificationReceiver? = null
     private var lastSentRev: String? = null
-    private val send = Runnable { sendChange() }
+    private val throttle = ActivityItems.Throttle()
+
     /** The notification switch may have been turned off or on: what is shown is worked out again. */
     private val pluginsChanged = org.desklink.mobile.Device.PluginsChangedListener { schedule() }
+
+    /** The per-app choices (Choose apps, hide contents) and the private-contents switch changed: the same. */
+    private val filterChanged = Runnable { schedule() }
+    private val prefsChanged = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == NotificationPrivacy.key(device.deviceId)) schedule()
+    }
 
     override val displayName: String get() = context.getString(R.string.pref_plugin_activity)
     override val description: String get() = context.getString(R.string.pref_plugin_activity_desc)
@@ -42,10 +50,12 @@ class ActivityPlugin : Plugin(), NotificationReceiver.NotificationListener {
     override fun checkRequiredPermissions(): Boolean = NotificationReceiver.hasReadNotificationsPermission(context)
 
     override fun onCreate(): Boolean {
-        appDatabase = NotificationAppFilter(context)
+        appFilter = NotificationAppFilter(context)
         mainHandler = Handler(Looper.getMainLooper())
         device.addPluginsChangedListener(pluginsChanged)
-        org.desklink.mobile.helpers.ThreadHelper.execute { appDatabase.preload(); mainHandler.post(::schedule) }
+        NotificationAppFilter.addChangeListener(filterChanged)
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context).registerOnSharedPreferenceChangeListener(prefsChanged)
+        org.desklink.mobile.helpers.ThreadHelper.execute { appFilter.preload(); schedule() }
         NotificationReceiver.WithService(context) { s ->
             s.addListener(this)
             service = s
@@ -55,7 +65,9 @@ class ActivityPlugin : Plugin(), NotificationReceiver.NotificationListener {
 
     override fun onDestroy() {
         device.removePluginsChangedListener(pluginsChanged)
-        if (::mainHandler.isInitialized) mainHandler.removeCallbacks(send)
+        if (::appFilter.isInitialized) NotificationAppFilter.removeChangeListener(filterChanged)
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(context).unregisterOnSharedPreferenceChangeListener(prefsChanged)
+        if (::mainHandler.isInitialized) mainHandler.removeCallbacksAndMessages(null)
         NotificationReceiver.WithService(context) { s -> s.removeListener(this) }
     }
 
@@ -70,39 +82,48 @@ class ActivityPlugin : Plugin(), NotificationReceiver.NotificationListener {
 
     /** Feature-ready: the snapshot, unless the computer says it already holds exactly this one. */
     override fun onFeatureReady() {
-        val items = snapshot()
-        val rev = ActivityItems.rev(items)
-        lastSentRev = rev
-        device.sendSnapshot(SyncDigest.ACTIVITY, rev, listOf(ActivityItems.packet(items, System.currentTimeMillis())))
+        org.desklink.mobile.helpers.ThreadHelper.execute {
+            val items = snapshot() ?: JSONArray()
+            val rev = ActivityItems.rev(items)
+            synchronized(this) { lastSentRev = rev }
+            device.sendSnapshot(SyncDigest.ACTIVITY, rev, listOf(ActivityItems.packet(items, System.currentTimeMillis())))
+        }
     }
 
     /** Turned off: the computer drops what it shows from this phone. */
     override fun onTurnedOff() {
-        lastSentRev = ActivityItems.rev(JSONArray())
-        device.sendPacket(ActivityItems.packet(JSONArray(), System.currentTimeMillis()).also { it["rev"] = lastSentRev!! })
+        val empty = ActivityItems.rev(JSONArray())
+        synchronized(this) { lastSentRev = empty }
+        device.sendPacket(ActivityItems.packet(JSONArray(), System.currentTimeMillis()).also { it["rev"] = empty })
     }
 
-    /** At most one snapshot a second, and only when what is shown changed. */
+    /** At most one snapshot a second: the first change goes at once, then one trailing send; a busy phone does not starve it. */
     private fun schedule() {
         if (!::mainHandler.isInitialized) return
-        mainHandler.removeCallbacks(send)
-        mainHandler.postDelayed(send, DEBOUNCE_MS)
+        mainHandler.post {
+            val wait = throttle.onChange(SystemClock.elapsedRealtime()) ?: return@post
+            if (wait == 0L) sendChange() else mainHandler.postDelayed({ throttle.onFired(SystemClock.elapsedRealtime()); sendChange() }, wait)
+        }
     }
 
+    /** Android is asked and the rules applied off the main thread; only a changed snapshot is sent. */
     private fun sendChange() {
-        val items = snapshot()
-        val rev = ActivityItems.rev(items)
-        if (rev == lastSentRev) return
-        lastSentRev = rev
-        device.sendPacket(ActivityItems.packet(items, System.currentTimeMillis()).also { it["rev"] = rev })
+        org.desklink.mobile.helpers.ThreadHelper.execute {
+            val items = snapshot() ?: return@execute
+            val rev = ActivityItems.rev(items)
+            synchronized(this) { if (rev == lastSentRev) return@execute; lastSentRev = rev }
+            device.sendPacket(ActivityItems.packet(items, System.currentTimeMillis()).also { it["rev"] = rev })
+        }
     }
 
     private fun notificationsOn() = device.isPluginEnabled(getPluginKey(NotificationsPlugin::class.java))
 
-    private fun snapshot(): JSONArray {
-        val active = service?.takeIf { it.isConnected }?.activeNotifications
-        if (!notificationsOn() || active == null || !appDatabase.isReady()) return JSONArray()
-        val items = active.mapNotNull { candidate(it) }
+    /** Null when Android cannot be asked (access lost, listener gone): nothing is sent on a guess. */
+    private fun snapshot(): JSONArray? {
+        if (!notificationsOn()) return JSONArray()
+        val active = runCatching { service?.takeIf { it.isConnected }?.activeNotifications }.getOrNull() ?: return null
+        if (!appFilter.isReady()) return null
+        val items = active.mapNotNull { runCatching { candidate(it) }.getOrNull() }
             .sortedWith(compareBy({ ActivityItems.importance(it.first.kind) }, { -it.second }))
             .map { ActivityItems.json(it.first, it.third) }
         return ActivityItems.sanitize(JSONArray(items))
@@ -113,37 +134,33 @@ class ActivityPlugin : Plugin(), NotificationReceiver.NotificationListener {
         val n = sbn.notification
         val extras = n.extras
         val pkg = sbn.packageName
-        val isCall = n.category == Notification.CATEGORY_CALL
+        val dialer = runCatching { context.getSystemService(android.telecom.TelecomManager::class.java)?.defaultDialerPackage }.getOrNull()
+        val isCall = ActivityItems.isCall(n.category, pkg, dialer)
         val show = ActivityItems.decide(
-            ongoing = n.flags and Notification.FLAG_ONGOING_EVENT != 0,
+            ongoing = n.flags and Notification.FLAG_ONGOING_EVENT != 0 && n.flags and Notification.FLAG_LOCAL_ONLY == 0,
             groupSummary = n.flags and Notification.FLAG_GROUP_SUMMARY != 0,
             media = n.category == Notification.CATEGORY_TRANSPORT || extras.containsKey(Notification.EXTRA_MEDIA_SESSION),
             ownApp = pkg.startsWith("org.desklink.mobile"),
-            appEnabled = appDatabase.isEnabled(pkg),
+            appEnabled = appFilter.isEnabled(pkg),
             privacy = NotificationPrivacy.decide(
                 n.visibility, keyguard.isKeyguardSecure, NotificationPrivacy.showPrivate(context, device.deviceId),
                 NotificationPrivacy.systemAllowsPrivate(context), NotificationReceiver.channelLockscreenVisibility(sbn),
             ),
             hiddenCall = isCall && !org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(context, device.deviceId),
-            blockContents = appDatabase.blocksContents(pkg),
+            blockContents = appFilter.blocksContents(pkg),
         )
         if (show == ActivityItems.Show.SKIP) return null
         val chronometer = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
         val max = extras.getInt(Notification.EXTRA_PROGRESS_MAX)
         val kind = ActivityItems.kindOf(isCall, n.category == Notification.CATEGORY_NAVIGATION, chronometer, max > 0) ?: return null
         val label = appNameLookup(context, pkg) ?: pkg
-        val progress = if (max > 0) extras.getInt(Notification.EXTRA_PROGRESS) * 100 / max else -1
         val candidate = ActivityItems.Candidate(
-            id = "${sbn.id}|$pkg|${sbn.tag.orEmpty()}", appLabel = label,
+            id = ActivityItems.id(sbn.id, pkg, sbn.tag), appLabel = label,
             title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(),
             text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty(),
-            progress = progress, chronometerBase = if (chronometer) n.`when` else -1L,
+            progress = ActivityItems.percent(extras.getInt(Notification.EXTRA_PROGRESS), max), chronometerBase = if (chronometer) n.`when` else -1L,
             countdown = chronometer && extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN), kind = kind,
         )
         return Triple(candidate, sbn.postTime, show == ActivityItems.Show.HIDDEN)
-    }
-
-    private companion object {
-        const val DEBOUNCE_MS = 1_000L
     }
 }
