@@ -77,7 +77,7 @@ class FileTransferManagerTest {
                 return org.desklink.mobile.plugins.share.Published(android.net.Uri.parse("content://fake/$name"), name, mime, source.length())
             }
         }
-        val device: Device = mockk<Device>(relaxed = true)
+        val device: Device = mockk<Device>(relaxed = true).also { every { it.deviceId } returns wire.peerDeviceId }
         val outControl = ArrayDeque<WebRtcFileControl>()
         val outFrames = ArrayDeque<ByteArray>()
         var linkDown = false
@@ -599,6 +599,18 @@ class FileTransferManagerTest {
         assertNull(offer.folder); assertNull(offer.clipboard); assertNull(offer.captureId); assertNull(offer.relpath)
         // On the wire as an additive boolean, and read back.
         assertEquals(true, WebRtcFileControl.fromJson(offer.toJson()).gallery)
+    }
+
+    @Test
+    fun removingABucketFileWhileItsSendIsPausedByALostLinkForgetsTheStoredSend() {
+        val oldId = UUID.randomUUID().toString()
+        val store = FileTransferStore(phone.root)
+        assertTrue(store.save(FileCheckpoint(oldId, "send", "o".repeat(32), phoneWire.peerDeviceId, "big.bin", 100, 77, 0, sourceUri = "file:///x", meta = bucketMeta("A/big.bin", "cd".repeat(32)))))
+        val other = UUID.randomUUID().toString()
+        assertTrue(store.save(FileCheckpoint(other, "send", "p".repeat(32), phoneWire.peerDeviceId, "keep.bin", 100, 77, 0, sourceUri = "file:///y", meta = bucketMeta("A/keep.bin", "ef".repeat(32)))))
+        phone.manager.cancelFolderSend("A/big.bin")
+        pump()
+        assertEquals(listOf(other), store.list().filter { it.direction == "send" }.map { it.transferId })
     }
 
     @Test

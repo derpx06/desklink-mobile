@@ -801,6 +801,11 @@ class WebRtcFileTransferManager(
         runner.post {
             sends.values.firstOrNull { it.sender.metaForRestart()["folder"] != null && it.sender.metaForRestart()["relpath"] == relpath }
                 ?.sender?.cancel(FileCodes.REMOVED, "The file was removed.")
+            // One paused by a lost link lives only in the store: forgotten, so it is not offered again when the link returns.
+            store.list().filter { it.direction == "send" && it.deviceId == device.deviceId && it.meta["folder"] != null && it.meta["relpath"] == relpath && !sends.containsKey(it.transferId) }.forEach { stored ->
+                store.remove(stored.transferId)
+                TransferHistory.forgetResumable(appContext, stored.transferId)
+            }
         }
     }
 
