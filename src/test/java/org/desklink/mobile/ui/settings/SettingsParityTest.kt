@@ -53,12 +53,14 @@ class SettingsParityTest {
         }.toList()
     }
 
+    private fun groupTitles(): List<String> =
+        Regex("""\w+\("(\w+)", R\.string\.(\w+),""").findAll(source.substringAfter("enum class SettingsPage")).map { english(it.groupValues[2]) }.toList()
+
     @Test
     fun theGroupTitlesAreTheDesksTenInOrder() {
-        val pages = Regex("""\w+\("(\w+)", R\.string\.(\w+),""").findAll(source.substringAfter("enum class SettingsPage")).toList()
         assertEquals(
             listOf("Connection", "Notifications", "Clipboard", "Calls", "Sound", "Control", "Files", "Privacy & security", "Appearance", "Advanced"),
-            pages.map { english(it.groupValues[2]) },
+            groupTitles(),
         )
     }
 
@@ -106,5 +108,30 @@ class SettingsParityTest {
     @Test
     fun unpairIsTheLastRowOfPrivacyAndSecurity() {
         assertEquals("Unpair <computer>…", rows("PrivacyGroup").last())
+    }
+
+    // The desk's own list (workspace protocol/testdata/desklink_v9/settings_rows.json, copied here).
+    private val desk = org.json.JSONObject(javaClass.getResourceAsStream("/shared/settings_rows.json")!!.bufferedReader().readText()).getJSONArray("groups")
+    private val phoneGroups = listOf("ConnectionGroup", "NotificationsGroup", "ClipboardGroup", "CallsGroup", "SoundGroup", "ControlGroup", "FilesGroup", "PrivacyGroup", "AppearanceGroup", "AdvancedGroup")
+
+    @Test
+    fun theDesksGroupsAreThePhonesGroupsInTheSameOrder() {
+        assertEquals((0 until desk.length()).map { desk.getJSONObject(it).getString("title") }, groupTitles())
+    }
+
+    @Test
+    fun theRowsTheContractCallsTheSameAreTheSameWordsOnBothAndUnpairIsLastOnBoth() {
+        val same = mapOf(
+            "Notifications" to listOf("Command alerts"), "Files" to listOf("Bucket with {phone}", "Downloads folder"),
+            "Privacy & security" to listOf("Ask before terminal and screen access", "Unpair {phone}…"), "Appearance" to listOf("Style"),
+        )
+        for (i in 0 until desk.length()) {
+            val group = desk.getJSONObject(i)
+            val title = group.getString("title")
+            val phoneRows = rows(phoneGroups[i])
+            same[title]?.forEach { row -> assertEquals("$title: $row", true, row.replace("{phone}", "<computer>") in phoneRows) }
+        }
+        val deskPrivacy = desk.getJSONObject(7).getJSONArray("rows")
+        assertEquals(deskPrivacy.getString(deskPrivacy.length() - 1).replace("{phone}", "<computer>"), rows("PrivacyGroup").last())
     }
 }
