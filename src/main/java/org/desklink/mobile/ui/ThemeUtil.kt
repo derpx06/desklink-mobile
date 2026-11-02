@@ -52,6 +52,15 @@ object ThemeUtil {
         }
     }
 
+    /** "Use wallpaper colours", kept in memory: read from the preferences once and whenever it changes, never at an activity's creation. */
+    @Volatile
+    private var dynamicColors = false
+    private val dynamicColorsWatcher = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+        if (key == KEY_DYNAMIC_COLORS) dynamicColors = prefs.getBoolean(KEY_DYNAMIC_COLORS, false)
+    }
+
+    internal fun dynamicColorsOn() = dynamicColors
+
     private fun <T> readAllowingDisk(read: () -> T): T {
         val before = android.os.StrictMode.allowThreadDiskReads()
         try {
@@ -68,15 +77,16 @@ object ThemeUtil {
         // The one read the first screen cannot wait without: the theme must be set before any activity is made, or the
         // screen is drawn and then recreated. A small file, read once, so the disk-read check is told it is meant.
         val appTheme = readAllowingDisk {
-            PreferenceManager.getDefaultSharedPreferences(application).getString("theme_pref", DEFAULT_MODE)!!
+            val prefs = PreferenceManager.getDefaultSharedPreferences(application)
+            dynamicColors = prefs.getBoolean(KEY_DYNAMIC_COLORS, false)
+            prefs.registerOnSharedPreferenceChangeListener(dynamicColorsWatcher)
+            prefs.getString("theme_pref", DEFAULT_MODE)!!
         }
-        // Read at each activity's creation, so turning it off applies to the next screen opened.
+        // Asked at each activity's creation, so turning it off applies to the next screen opened; answered from memory.
         DynamicColors.applyToActivitiesIfAvailable(
             application,
             DynamicColorsOptions.Builder()
-                .setPrecondition { activity, _ ->
-                    PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(KEY_DYNAMIC_COLORS, false)
-                }
+                .setPrecondition { _, _ -> dynamicColors }
                 .build(),
         )
         applyTheme(appTheme)
