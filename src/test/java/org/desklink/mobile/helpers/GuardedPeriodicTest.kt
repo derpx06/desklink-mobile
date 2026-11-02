@@ -108,4 +108,12 @@ class GuardedPeriodicTest {
         assertTrue(seen.single() is OutOfMemoryError)
         file.delete()
     }
+
+    @Test
+    fun theHeartbeatAndLivenessTasksRunOnTheGuardedExecutorWhoseOwnerRebuildsThePeer() {
+        val source = File("src/main/java/org/desklink/mobile/webrtc/WebRtcSessionCoordinator.kt").readText()
+        assertTrue("the owner of the periodic tasks restarts the peer", source.contains("recoveryExecutor.owner = ::restartAfterFailures"))
+        val periodic = Regex("""(\w+)\.(scheduleWithFixedDelay|scheduleAtFixedRate)\(""").findAll(source).map { it.groupValues[1] }.toSet()
+        assertEquals("every periodic task of the coordinator is on the guarded executor", setOf("recoveryExecutor"), periodic)
+    }
 }
