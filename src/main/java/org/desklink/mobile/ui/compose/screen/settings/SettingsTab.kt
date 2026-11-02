@@ -687,12 +687,12 @@ private fun PrivacyGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
                 onClick = actions.onEncryptionInfo,
             ) { Chevron() }
         }
-        // Unpair lives here, as on the computer (Privacy & security).
-        UnpairRow(desk, actions)
         val privacyUrl = stringResource(R.string.privacy_policy_url)
         GroupRow(stringResource(R.string.privacy_policy), icon = R.drawable.sym_open_in_new, subtitle = stringResource(R.string.privacy_policy_summary), onClick = {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, privacyUrl.toUri())) }
         })
+        // Unpair is the last row of Privacy & security, as on the computer.
+        UnpairRow(desk, actions)
     }
 }
 
