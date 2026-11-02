@@ -505,6 +505,74 @@ class FileTransferManagerTest {
         assertEquals(1, store.list().count { it.direction == "send" })
     }
 
+    private fun bucketPacket(bytes: ByteArray, path: String, sha: String) = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST).apply {
+        this["filename"] = path.substringAfterLast('/')
+        this["folder"] = "bucket"
+        this["relpath"] = path
+        this["mtime"] = 77L
+        this["contentSha256"] = sha
+        payload = NetworkPacket.Payload(bytes.size.toLong()).also {
+            it.source = object : FileSource {
+                override fun stat() = FileSource.Stat(bytes.size.toLong(), 77)
+                override fun open(offset: Long): InputStream = java.io.ByteArrayInputStream(bytes, offset.toInt(), bytes.size - offset.toInt())
+            }
+        }
+    }
+
+    /** The computer's side of a Bucket send: the phone asked for [path] (the engine's wanted list), and has room for it. */
+    private fun asBucketFileWanted(path: String, size: Long, sha: String, body: () -> Unit) {
+        val engine = org.desklink.mobile.plugins.folders.BucketEngine
+        @Suppress("UNCHECKED_CAST")
+        val wanted = engine::class.java.getDeclaredField("wanted").apply { isAccessible = true }.get(null) as HashMap<Pair<String, String>, org.desklink.mobile.plugins.folders.Entry>
+        synchronized(wanted) { wanted["phone" to path] = org.desklink.mobile.plugins.folders.Entry(size, 77, sha) }
+        val saved = engine.freeSpace
+        engine.freeSpace = { Long.MAX_VALUE / 2 }
+        try {
+            body()
+        } finally {
+            engine.freeSpace = saved
+            synchronized(wanted) { wanted.remove("phone" to path) }
+        }
+    }
+
+    private fun startBucketSend(bytes: ByteArray, sha: String, recorder: Recorder): Future<Boolean> {
+        val future = executor.submit<Boolean> { phone.manager.sendPayload(phoneWire, bucketPacket(bytes, "A/big.bin", sha), recorder) }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (desk.sent.count { it.action == WebRtcFileAction.BLOCK_ACK } < 1 && System.nanoTime() < deadline) { if (pump(maxMessages = 5) == 0) Thread.sleep(2) }
+        assertTrue("the transfer is live", desk.sent.any { it.action == WebRtcFileAction.ACCEPT })
+        return future
+    }
+
+    @Test
+    fun removingABucketFileWhileThePhoneSendsItEndsTheSendAndTellsTheComputer() {
+        val bytes = data(6 * FileV2.BLOCK_BYTES)
+        val sha = "cd".repeat(32)
+        asBucketFileWanted("A/big.bin", bytes.size.toLong(), sha) {
+            val recorder = Recorder()
+            val future = startBucketSend(bytes, sha, recorder)
+            phone.manager.cancelFolderSend("A/big.bin")
+            assertFalse(runUntilDone(future))
+            assertEquals(FileCodes.REMOVED, phone.sent.last { it.action == WebRtcFileAction.CANCEL }.code)
+            assertEquals(1, recorder.failures.size)
+            assertEquals(0, recorder.successes.get())
+            assertTrue("nothing is left of it on the sender", FileTransferStore(phone.root).list().none { it.direction == "send" })
+        }
+    }
+
+    @Test
+    fun removingABucketFileWhileItArrivesEndsTheReceiveAndTellsTheComputer() {
+        val bytes = data(6 * FileV2.BLOCK_BYTES)
+        val sha = "ef".repeat(32)
+        asBucketFileWanted("A/big.bin", bytes.size.toLong(), sha) {
+            val recorder = Recorder()
+            val future = startBucketSend(bytes, sha, recorder)
+            desk.manager.cancelFolderReceive("A/big.bin")
+            assertFalse(runUntilDone(future))
+            assertEquals(FileCodes.REMOVED, desk.sent.last { it.action == WebRtcFileAction.CANCEL }.code)
+            assertEquals(1, recorder.failures.size)
+        }
+    }
+
     @Test
     fun aFileThatIsReadInPlaceIsNeverCopiedFirst() {
         val bytes = data(FileV2.BLOCK_BYTES + 5)

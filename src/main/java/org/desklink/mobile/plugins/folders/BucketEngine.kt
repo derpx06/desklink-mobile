@@ -499,6 +499,10 @@ object BucketEngine {
             synchronized(wanted) { wanted.remove(live.deviceId to p) }
             DeskLinkApplication.getInstance().webRtcCoordinator(live.deviceId)?.cancelBucketReceive(p)
         }
+        // Being sent from here: ended in the transfer layer too (the computer then deletes it), not left to run to the end.
+        (live.sendActive.filter(::hit) + live.sending.keys.filter(::hit)).toSet().forEach { p ->
+            DeskLinkApplication.getInstance().webRtcCoordinator(live.deviceId)?.cancelBucketSend(p)
+        }
         live.tracks.keys.removeAll(::hit)
         live.sending.keys.removeAll(::hit)
         live.sendActive.removeAll(::hit)

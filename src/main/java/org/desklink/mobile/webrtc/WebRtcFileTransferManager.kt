@@ -792,6 +792,14 @@ class WebRtcFileTransferManager(
         }
     }
 
+    /** A Bucket item removed while it is being sent: its transfer ends on both sides. */
+    fun cancelFolderSend(relpath: String) {
+        runner.post {
+            sends.values.firstOrNull { it.sender.metaForRestart()["folder"] != null && it.sender.metaForRestart()["relpath"] == relpath }
+                ?.sender?.cancel(FileCodes.REMOVED, "The file was removed.")
+        }
+    }
+
     /** A new connection: sends that were paused by a lost link offer themselves again from their checkpoints. */
     fun resumeSends(wire: WebRtcWireBinding) {
         runner.post {
