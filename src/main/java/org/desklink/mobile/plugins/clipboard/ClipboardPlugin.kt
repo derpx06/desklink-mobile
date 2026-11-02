@@ -90,7 +90,7 @@ class ClipboardPlugin : Plugin() {
 
     /** Text selected in another app ("Send to computer"): sent as a clipboard packet, stamped like a manual send. False when too large. */
     fun sendSelected(text: String): Boolean {
-        if (!fitsWire(text)) return false
+        if (text.length > SendSelected.MAX_CHARS || !fitsWire(text)) return false
         propagateClipboard(text, ClipboardListener.instance(context).nextCopyTime())
         return true
     }

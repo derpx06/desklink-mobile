@@ -831,6 +831,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="send_selected_label">Send to computer</string>
     <string name="send_selected_pick">Send to which computer?</string>
     <string name="send_selected_sent">Sent to %1$s</string>
+    <string name="send_selected_too_long">That text is too long for this action. Select less than 2,000 characters</string>
+    <plurals name="send_selected_length">
+        <item quantity="one">%d character</item>
+        <item quantity="other">%d characters</item>
+    </plurals>
     <string name="send_selected_nothing">There is no text to send</string>
     <string name="send_selected_no_computer">No connected computer is sharing its clipboard</string>
     <string name="send_selected_too_large">That text is too large to send</string>
