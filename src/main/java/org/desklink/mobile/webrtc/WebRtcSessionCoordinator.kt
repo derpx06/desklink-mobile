@@ -1683,7 +1683,7 @@ class WebRtcSessionCoordinator(
     /** W0: a Bucket item removed mid-transfer: the incoming file is cancelled on both sides. */
     fun cancelBucketReceive(relpath: String) = runCatching { fileTransfers.cancelFolderReceive(relpath) }
     /** Cancel on the transfer notification. */
-    fun cancelFileTransfers() = runCatching { fileTransfers.cancelAllTransfers() }
+    fun cancelFileTransfers(jobIds: Set<Long>) = runCatching { fileTransfers.cancelJobs(jobIds) }
 
     /** The gallery switch was turned off: pictures being sent, or waiting to resume, stop. */
     fun cancelGallerySends() = runCatching { fileTransfers.cancelGallery() }

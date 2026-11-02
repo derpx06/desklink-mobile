@@ -625,16 +625,50 @@ class FileTransferManagerTest {
         assertEquals(listOf(other), store.list().filter { it.direction == "send" }.map { it.transferId })
     }
 
+    private fun resumedJob(id: String) = (1L shl 40) + (id.hashCode().toLong() and 0xffffffffL)
+    private fun receiveJob(id: String) = (1L shl 41) + (id.hashCode().toLong() and 0xffffffffL)
+
     @Test
-    fun cancelOnTheTransferNotificationEndsEverythingButTheBucketsOwnFiles() {
+    fun cancelOnTheTransferNotificationEndsTheShownResumedSendsAndNotTheBucketsOwnOrOtherFiles() {
         val store = FileTransferStore(phone.root)
-        val plain = UUID.randomUUID().toString()
+        val shown = UUID.randomUUID().toString()
+        val unlisted = UUID.randomUUID().toString()
         val bucket = UUID.randomUUID().toString()
-        assertTrue(store.save(FileCheckpoint(plain, "send", "p".repeat(32), phoneWire.peerDeviceId, "a.bin", 100, 77, 0, sourceUri = "file:///a")))
+        assertTrue(store.save(FileCheckpoint(shown, "send", "p".repeat(32), phoneWire.peerDeviceId, "a.bin", 100, 77, 0, sourceUri = "file:///a")))
+        assertTrue(store.save(FileCheckpoint(unlisted, "send", "r".repeat(32), phoneWire.peerDeviceId, "c.bin", 100, 77, 0, sourceUri = "file:///c")))
         assertTrue(store.save(FileCheckpoint(bucket, "send", "q".repeat(32), phoneWire.peerDeviceId, "b.bin", 100, 77, 0, sourceUri = "file:///b", meta = bucketMeta("A/b.bin", "cd".repeat(32)))))
-        phone.manager.cancelAllTransfers()
+        phone.manager.cancelJobs(setOf(resumedJob(shown)))
         pump()
-        assertEquals(listOf(bucket), store.list().filter { it.direction == "send" }.map { it.transferId })
+        assertEquals(setOf(unlisted, bucket), store.list().filter { it.direction == "send" }.map { it.transferId }.toSet())
+    }
+
+    @Test
+    fun cancelOnTheNotificationEndsALiveReceiveAndTellsTheComputer() {
+        val bytes = data(6 * FileV2.BLOCK_BYTES)
+        val recorder = Recorder()
+        val future = startSend(share(bytes), recorder)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (desk.sent.count { it.action == WebRtcFileAction.BLOCK_ACK } < 1 && System.nanoTime() < deadline) { if (pump(maxMessages = 5) == 0) Thread.sleep(2) }
+        val id = phone.sent.first { it.action == WebRtcFileAction.OFFER }.transferId
+        desk.manager.cancelJobs(setOf(receiveJob(id)))
+        assertFalse(runUntilDone(future))
+        assertEquals(FileCodes.USER, desk.sent.last { it.action == WebRtcFileAction.CANCEL }.code)
+        assertEquals(1, recorder.failures.size)
+        assertTrue("the partial is gone", desk.root.listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun cancelOnTheNotificationEndsALiveSend() {
+        val bytes = data(6 * FileV2.BLOCK_BYTES)
+        val recorder = Recorder()
+        val future = startSend(share(bytes), recorder)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (desk.sent.count { it.action == WebRtcFileAction.BLOCK_ACK } < 1 && System.nanoTime() < deadline) { if (pump(maxMessages = 5) == 0) Thread.sleep(2) }
+        val id = phone.sent.first { it.action == WebRtcFileAction.OFFER }.transferId
+        phone.manager.cancelJobs(setOf(resumedJob(id)))
+        assertFalse(runUntilDone(future))
+        assertEquals(FileCodes.USER, phone.sent.last { it.action == WebRtcFileAction.CANCEL }.code)
+        assertEquals(1, recorder.failures.size)
     }
 
     @Test

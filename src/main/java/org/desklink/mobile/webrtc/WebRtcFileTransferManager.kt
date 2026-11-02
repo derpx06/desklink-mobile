@@ -399,7 +399,10 @@ class WebRtcFileTransferManager(
         if (!keepSource) runCatching { sender.sourceForRestart().close() }
         store.remove(id).also { if (keepSource && sender.isSpooled()) Unit }
         TransferHistory.forgetResumable(appContext, id)
-        if (store.list().none { it.direction == "send" && it.deviceId == device.deviceId }) TransferProgress.dropResuming(device.deviceId)
+        if (store.list().none { it.direction == "send" && it.deviceId == device.deviceId }) {
+            TransferProgress.dropResuming(device.deviceId)
+            org.desklink.mobile.plugins.share.TransferNotification.dropWaiting(device.deviceId)
+        }
     }
 
     private fun cleanupSource(sender: FileSender) {
@@ -809,12 +812,17 @@ class WebRtcFileTransferManager(
         }
     }
 
-    /** Cancel on the transfer notification: everything of this computer moving, except the Bucket's own sync, ends. */
-    fun cancelAllTransfers() {
+    /**
+     * Cancel on the transfer notification: the receives and resumed sends whose job ids the notification showed end (the Bucket's
+     * files, clipboard pictures and gallery pictures are not among them). Their waiting entries go with them.
+     */
+    fun cancelJobs(ids: Set<Long>) {
         runner.post {
-            sends.values.filter { it.sender.metaForRestart()["folder"] == null }.forEach { it.sender.cancel(FileCodes.USER, "Cancelled.") }
-            receives.entries.filter { !folderOffers.containsKey(it.key) && !clipboardOffers.contains(it.key) }.forEach { it.value.cancel(FileCodes.USER, "Cancelled.") }
-            store.list().filter { it.direction == "send" && it.deviceId == device.deviceId && it.meta["folder"] == null && !sends.containsKey(it.transferId) }.forEach { forgetStored(it.transferId) }
+            receives.entries.filter { receiveJob(it.key) in ids && !folderOffers.containsKey(it.key) && !clipboardOffers.contains(it.key) }
+                .forEach { it.value.cancel(FileCodes.USER, "Cancelled.") }
+            sends.entries.filter { resumedJob(it.key) in ids }.forEach { it.value.sender.cancel(FileCodes.USER, "Cancelled.") }
+            store.list().filter { it.direction == "send" && it.deviceId == device.deviceId && resumedJob(it.transferId) in ids && !sends.containsKey(it.transferId) }
+                .forEach { forgetStored(it.transferId) }
         }
     }
 
@@ -830,6 +838,11 @@ class WebRtcFileTransferManager(
     private fun forgetStored(id: String) {
         store.remove(id)
         TransferHistory.forgetResumable(appContext, id)
+        // Nothing left to resume for this computer: no "Waiting for <computer>" either.
+        if (store.list().none { it.direction == "send" && it.deviceId == device.deviceId }) {
+            TransferProgress.dropResuming(device.deviceId)
+            org.desklink.mobile.plugins.share.TransferNotification.dropWaiting(device.deviceId)
+        }
     }
 
     /** A new connection: sends that were paused by a lost link offer themselves again from their checkpoints. */
@@ -919,6 +932,8 @@ class WebRtcFileTransferManager(
     )
 
     private fun receiveJob(transferId: String) = RECEIVE_JOB_BASE + (transferId.hashCode().toLong() and 0xffffffffL)
+
+    private fun resumedJob(transferId: String) = RESUMED_JOB_BASE + (transferId.hashCode().toLong() and 0xffffffffL)
 
     private fun randomToken(): String = UUID.randomUUID().toString().replace("-", "")
 
