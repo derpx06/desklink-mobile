@@ -761,9 +761,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             .filter { it.isReachable && !it.isPaired }
             .sortedBy { it.name.lowercase() }
             .map { NearbyComputer(it.deviceId, it.name) }
-        // Leaving the scan screen ends any pairing it started and the next visit scans afresh.
+        // Leaving the scan screen ends any pairing it started and the next visit scans afresh. A rotation is not leaving: the
+        // flow lives in a ViewModel and the new composition picks the pairing up where it was.
         androidx.compose.runtime.DisposableEffect(Unit) {
-            onDispose { qrFlow.leave { id -> DeskLinkApplication.getInstance().getDevice(id)?.isPaired == true } }
+            onDispose { if (!isChangingConfigurations) qrFlow.leave { id -> DeskLinkApplication.getInstance().getDevice(id)?.isPaired == true } }
         }
         val flowState = qrFlow.state
         ScanScreen(
@@ -797,7 +798,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         }
     }
 
-    private val qrFlow = QrScanFlow()
+    // Held by a ViewModel: a rotation recreates the activity, but the pairing in progress must carry on.
+    private val qrFlow by lazy { androidx.lifecycle.ViewModelProvider(this)[QrScanHolder::class.java].flow }
 
     /** A scanned code that would replace an existing pairing, waiting for the person's answer. */
     private var qrConflict by mutableStateOf<Pair<QrPairing.Code, String>?>(null)

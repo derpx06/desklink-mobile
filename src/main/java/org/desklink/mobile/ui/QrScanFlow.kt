@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
 import org.desklink.mobile.QrPairing
 
 /**
@@ -131,4 +132,12 @@ class QrScanFlow {
         /** From the first scan to a pairing: longer than the 10 s link wait plus the desk's answer. */
         const val TIMEOUT_MS = 20_000L
     }
+}
+
+/**
+ * Keeps the [QrScanFlow] (and with it the running attempt) across a configuration change: a rotation recreates the activity, and the
+ * new composition must show the same pairing progress instead of cancelling it. Cleared only when the activity is really gone.
+ */
+class QrScanHolder : ViewModel() {
+    val flow = QrScanFlow()
 }

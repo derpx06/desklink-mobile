@@ -192,4 +192,21 @@ class QrScanFlowTest {
         flow.leave { false }
         assertEquals(0, undone[0])
     }
+
+    @Test
+    fun aRotationKeepsThePairingBecauseTheHolderKeepsTheFlowAndItsAttempt() {
+        val holder = QrScanHolder()
+        val undone = intArrayOf(0)
+        holder.flow.start("desk")
+        holder.flow.attach(token(holder.flow), attempt(undone))
+        holder.flow.progress(token(holder.flow), QrPairing.Stage.VERIFYING)
+        // The activity is recreated: the dispose handler skips leave() and the new activity reads the same flow.
+        val afterRotation = holder.flow
+        assertEquals(State.Pairing("desk", QrPairing.Stage.VERIFYING, token(afterRotation)), afterRotation.state)
+        assertEquals("nothing was cancelled", 0, undone[0])
+        // Really leaving still takes the attempt back.
+        afterRotation.leave { false }
+        assertEquals(1, undone[0])
+        assertEquals(State.Scanning, afterRotation.state)
+    }
 }
