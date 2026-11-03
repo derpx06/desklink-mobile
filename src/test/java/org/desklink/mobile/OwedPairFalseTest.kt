@@ -96,6 +96,23 @@ class OwedPairFalseTest {
     }
 
     @Test
+    fun aQrScanInProgressForThatComputerIsNotMetByThePairFalse() {
+        OwedPairFalse.owe(app, "desk9", OwedPairFalse.fingerprint(deskCert))
+        val d = device("desk9", link = true)
+        QrPairing.pendingDesktopId = "desk9"
+        try {
+            handler(d, PairingHandler.PairState.NotPaired).sendOwedPairFalse()
+        } finally {
+            QrPairing.pendingDesktopId = null
+        }
+        verify(exactly = 0) { d.sendPacket(any(), any()) }
+        assertTrue("still owed for after a failed scan", OwedPairFalse.owes(app, "desk9"))
+        handler(d, PairingHandler.PairState.NotPaired).sendOwedPairFalse()
+        verify(exactly = 1) { d.sendPacket(any(), any()) }
+        OwedPairFalse.clear(app, "desk9")
+    }
+
+    @Test
     fun aFailedSendKeepsTheDebtForTheNextLink() {
         OwedPairFalse.owe(app, "desk4", OwedPairFalse.fingerprint(deskCert))
         val d = device("desk4", link = true)

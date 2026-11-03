@@ -127,6 +127,9 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         val context = device.context
         val id = device.deviceId
         if (!org.desklink.mobile.helpers.OwedPairFalse.owes(context, id)) return
+        // A QR scan for this very computer is in progress: its proof goes out next on this link, and a pair:false ahead of it would
+        // end the session the scan is opening. The debt stays (a failed scan leaves it to the next link; a pairing clears it).
+        if (QrPairing.pendingDesktopId == id) return
         // Only the computer that was unpaired is told: the link must show that certificate, not just claim the id.
         val linkFingerprint = runCatching { org.desklink.mobile.helpers.OwedPairFalse.fingerprint(device.certificate) }.getOrNull()
         if (!org.desklink.mobile.helpers.OwedPairFalse.mayTell(context, id, linkFingerprint)) return

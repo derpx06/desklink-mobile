@@ -43,7 +43,7 @@ object QrPairing {
     @Volatile
     @JvmStatic
     var pendingDesktopId: String? = null
-        private set
+        internal set
 
     /** Parses `desklink://pair?v=1&id=..&fp=..&s=..[&h=ip:port]`, or null if it isn't one. */
     @JvmStatic
