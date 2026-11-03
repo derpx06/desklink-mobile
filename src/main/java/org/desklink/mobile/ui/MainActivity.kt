@@ -28,6 +28,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -366,7 +373,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         BackHandler(enabled = stack.size > 1 || (onTabs && nav.canGoBack)) {
             if (stack.size > 1) onBack(stack.last()) else nav.back()
         }
-        Box(Modifier.fillMaxSize().background(tokens.bg)) {
+        // Edge to edge: sideways, the navigation bar (3-button) and a camera cutout sit at the left or right edge.
+        Box(Modifier.fillMaxSize().background(tokens.bg).windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal))) {
             AnimatedContent(
                 targetState = stack.last(),
                 transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
@@ -484,7 +492,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onDismissRequest = { finish(apply = false) },
             title = { Text(stringResource(R.string.first_share_title, device.name)) },
             text = {
-                androidx.compose.foundation.layout.Column {
+                androidx.compose.foundation.layout.Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                     Text(stringResource(R.string.first_share_body, device.name))
                     androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
                     androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().toggleable(value = clipboard, role = androidx.compose.ui.semantics.Role.Checkbox, onValueChange = { clipboard = it }).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {

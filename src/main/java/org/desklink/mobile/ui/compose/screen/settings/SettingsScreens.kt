@@ -494,7 +494,7 @@ fun NetworkScreen(onBack: () -> Unit) {
                 monoSubtitle = true,
                 onClick = { editing = RelaySettings.KEY_URL },
             )
-            GroupRow(stringResource(R.string.setting_relay_use_turn), checked = prefs.getBoolean(RelaySettings.KEY_USE_TURN, true), onClick = {
+            GroupRow(stringResource(R.string.settings_use_relay_fallback), subtitle = stringResource(R.string.settings_use_relay_fallback_summary), checked = prefs.getBoolean(RelaySettings.KEY_USE_TURN, true), onClick = {
                 prefs.edit { putBoolean(RelaySettings.KEY_USE_TURN, !prefs.getBoolean(RelaySettings.KEY_USE_TURN, true)) }
                 revision++
             })
@@ -574,7 +574,11 @@ internal fun TextDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { OutlinedTextField(value = text, onValueChange = { text = filter(it) }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(value = text, onValueChange = { text = filter(it) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            }
+        },
         confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }) { Text(confirm) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
@@ -586,7 +590,8 @@ internal fun ChoiceDialog(title: String, options: List<String>, selected: Int, o
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(Modifier.selectableGroup()) {
+            // Scrolls: four options at a large font size are taller than a phone held sideways.
+            Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
                 options.forEachIndexed { index, option ->
                     ListItem(
                         headlineContent = { Text(option) },

@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +34,8 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -62,10 +66,12 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.desklink.mobile.R
+import org.desklink.mobile.ui.compose.components.CappedFontScale
 import org.desklink.mobile.ui.compose.components.rememberReducedMotion
 import org.desklink.mobile.ui.compose.model.device.DeviceConnection
 import org.desklink.mobile.ui.compose.tokens
@@ -105,8 +111,8 @@ fun TabsShell(
     LaunchedEffect(pager) {
         snapshotFlow { pager.settledPage }.collect { nav.select(tabs[it]) }
     }
-    val bar: @Composable () -> Unit = {
-        TabItems(nav.selected, badges, vertical = wide, onSelect = nav::select, onQuickAction = onQuickAction)
+    val bar: @Composable (Modifier) -> Unit = { itemModifier ->
+        TabItems(nav.selected, badges, vertical = wide, itemModifier, onSelect = nav::select, onQuickAction = onQuickAction)
     }
     val pages: @Composable (Modifier) -> Unit = { mod ->
         HorizontalPager(
@@ -123,10 +129,11 @@ fun TabsShell(
     if (wide) {
         Row(modifier.fillMaxSize().background(tokens.bg)) {
             Column(
-                Modifier.width(88.dp).fillMaxHeight().background(tokens.surface).statusBarsPadding().navigationBarsPadding(),
+                // Scrolls: a phone turned sideways is wide enough for the rail but not tall enough for five tabs.
+                Modifier.width(88.dp).fillMaxHeight().background(tokens.surface).statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
-            ) { bar() }
+            ) { CappedFontScale(1.2f) { bar(Modifier) } }
             pages(Modifier.weight(1f).fillMaxHeight())
         }
     } else {
@@ -135,11 +142,13 @@ fun TabsShell(
             pages(Modifier.weight(1f).fillMaxWidth().consumeWindowInsets(WindowInsets.navigationBars))
             Box(Modifier.fillMaxWidth().background(tokens.surface)) {
                 Box(Modifier.fillMaxWidth().height(1.dp).background(tokens.hairline))
-                Row(
-                    Modifier.fillMaxWidth().navigationBarsPadding().height(TabBarHeight).selectableGroup(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) { bar() }
+                // Five equal slots: a tab is never pushed off the edge by a long label or a large font size.
+                BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().height(TabBarHeight)) {
+                    val slot = maxWidth / tabs.size
+                    Row(Modifier.fillMaxSize().selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
+                        CappedFontScale(if (slot < 72.dp) 1f else 1.2f) { bar(Modifier.width(slot)) }
+                    }
+                }
             }
         }
     }
@@ -150,11 +159,12 @@ private fun TabItems(
     selected: AppTab,
     badges: TabBadges,
     vertical: Boolean,
+    itemModifier: Modifier,
     onSelect: (AppTab) -> Unit,
     onQuickAction: (QuickAction) -> Unit,
 ) {
     AppTab.entries.forEach { tab ->
-        val modifier = if (vertical) Modifier.fillMaxWidth().height(72.dp) else Modifier
+        val modifier = if (vertical) Modifier.fillMaxWidth().heightIn(min = 72.dp) else itemModifier.fillMaxHeight()
         TabItem(tab, tab == selected, badges, modifier, onClick = { onSelect(tab) }, onLongClick = tab.quickAction()?.let { action -> { onQuickAction(action) } })
     }
 }
@@ -204,6 +214,7 @@ private fun TabItem(
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (selected) t.text else t.textDim,
                 maxLines = 1,
+                textAlign = TextAlign.Center,
             )
         }
     }

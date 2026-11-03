@@ -197,7 +197,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
     val cardArt = remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-            Row(Modifier.fillMaxWidth().height(60.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 DeviceChip(state.name, state.connection) { sheet = true }
             }
             Column(
@@ -253,7 +253,7 @@ private fun DeviceChip(name: String, connection: DeviceConnection, onClick: () -
     ) {
         Row(
             Modifier
-                .height(40.dp)
+                .heightIn(min = 40.dp)
                 .background(t.surface, RoundedCornerShape(20.dp))
                 .border(1.dp, t.hairline, RoundedCornerShape(20.dp))
                 .padding(start = 6.dp, end = 10.dp),
@@ -263,7 +263,8 @@ private fun DeviceChip(name: String, connection: DeviceConnection, onClick: () -
             Box(Modifier.size(28.dp).background(t.fill, CircleShape), contentAlignment = Alignment.Center) {
                 LaptopGlyph(t.text, Modifier.padding(bottom = 1.dp).size(width = 21.dp, height = 14.dp))
             }
-            Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(IntrinsicSize.Max).padding(end = 0.dp))
+            // The computer's name is what this chip says: two lines before anything is cut.
+            Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).padding(vertical = 4.dp))
             Icon(painterResource(R.drawable.sym_expand_more), contentDescription = null, tint = t.textDim, modifier = Modifier.size(20.dp))
         }
     }
@@ -312,13 +313,24 @@ private fun StatusCard(state: HomeState, actions: HomeActions) {
             .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(
-            Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            LaptopIllustration(t.text)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        // At a large font size the picture would leave the words a sliver: it goes above them instead.
+        val stacked = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
+        val statusModifier = Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
+        val statusLayout: @Composable (@Composable (Modifier) -> Unit) -> Unit = { words ->
+            if (stacked) {
+                Column(statusModifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LaptopIllustration(t.text)
+                    words(Modifier)
+                }
+            } else {
+                Row(statusModifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                    LaptopIllustration(t.text)
+                    words(Modifier.weight(1f))
+                }
+            }
+        }
+        statusLayout { wordsModifier ->
+            Column(wordsModifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LinkGlyph(glyph, Modifier.align(Alignment.Top).padding(top = 6.dp))
                     Text(connectionLabel(state.connection, state.path), fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
@@ -414,9 +426,18 @@ private fun PrimaryActions(state: HomeState, gate: (() -> Unit) -> Unit, actions
         Triple(R.drawable.sym_vibration, R.string.home_ring_desk, actions.onRing),
         Triple(R.drawable.sym_lock, R.string.home_lock_desk, actions.onLock),
     )
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        tiles.forEachIndexed { index, (icon, label, onClick) ->
-            ActionTile(icon, stringResource(label), index == 0, state.ready, Modifier.weight(1f).fillMaxHeight()) { gate(onClick) }
+    // Four across, or two by two when the words would not fit (a narrow screen, a large font).
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val width = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val rows = if (width / density.fontScale < 300f) tiles.chunked(2) else listOf(tiles)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        var index = 0
+        rows.forEach { row ->
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (icon, label, onClick) ->
+                    ActionTile(icon, stringResource(label), index++ == 0, state.ready, Modifier.weight(1f).fillMaxHeight()) { gate(onClick) }
+                }
+            }
         }
     }
 }
@@ -424,6 +445,7 @@ private fun PrimaryActions(state: HomeState, gate: (() -> Unit) -> Unit, actions
 @Composable
 private fun ActionTile(@DrawableRes icon: Int, label: String, primary: Boolean, ready: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val t = tokens
+    val unavailable = stringResource(R.string.home_action_unavailable)
     val shape = RoundedCornerShape(20.dp)
     val bg = if (primary) t.accentContainer else t.surface
     Column(
@@ -433,7 +455,8 @@ private fun ActionTile(@DrawableRes icon: Int, label: String, primary: Boolean, 
             .background(bg)
             .then(if (primary) Modifier else Modifier.border(1.dp, t.hairline, shape))
             .clickable(role = Role.Button, onClick = onClick)
-            .semantics(mergeDescendants = true) { if (!ready) stateDescription = "unavailable" }
+            .alpha(if (ready) 1f else 0.6f)
+            .semantics(mergeDescendants = true) { if (!ready) stateDescription = unavailable }
             .padding(horizontal = 6.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
@@ -446,7 +469,6 @@ private fun ActionTile(@DrawableRes icon: Int, label: String, primary: Boolean, 
             fontWeight = FontWeight.Medium,
             color = if (primary) t.onAccentContainer else t.text,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            maxLines = 2,
         )
     }
 }
@@ -474,8 +496,8 @@ private fun FilesCard(state: HomeState, actions: HomeActions) {
                 IconCircle(if (transfer.upload) R.drawable.sym_upload else R.drawable.sym_download, 36.dp, 20.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(transfer.name, fontFamily = MonoFamily, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Text(transfer.label, fontSize = 11.sp, color = t.textDim, maxLines = 1)
+                        Text(transfer.name, fontFamily = MonoFamily, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f))
+                        Text(transfer.label, fontSize = 12.sp, color = t.textDim)
                     }
                     if (transfer.progress == null) {
                         LinearProgressIndicator(Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, gapSize = 0.dp)
@@ -523,7 +545,7 @@ private fun MoreActionsSheet(state: HomeState, gate: (() -> Unit) -> Unit, actio
         containerColor = t.surface2,
         dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(width = 32.dp, height = 4.dp, color = t.hairlineStrong) },
     ) {
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.home_more_actions), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = t.textDim, modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
             val rows = buildList {
                 add(Triple(R.drawable.sym_link, stringResource(R.string.home_send_link), { gate(onSendLink) }))
@@ -570,7 +592,7 @@ private fun ComputersSheet(state: HomeState, onDismiss: () -> Unit, actions: Hom
         // The stock handle: TalkBack names it and it expands or collapses the sheet.
             dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(width = 32.dp, height = 4.dp, color = t.hairlineStrong) },
     ) {
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 stringResource(R.string.home_your_computers),
                 fontSize = 14.sp,
@@ -597,7 +619,7 @@ private fun ComputersSheet(state: HomeState, onDismiss: () -> Unit, actions: Hom
                         contentAlignment = Alignment.Center,
                     ) { LaptopGlyph(if (selected) fg else t.textDim) }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(computer.name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(computer.name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Text(connectionShort(computer.connection), fontSize = 12.sp, color = if (selected) fg else t.textDim)
                     }
                     if (selected) Icon(painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
@@ -630,6 +652,8 @@ private fun SendLinkDialog(onDismiss: () -> Unit, onSend: (String) -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.home_send_link_title)) },
         text = {
+            // At a large font size, or sideways with the keyboard up, the field must stay reachable.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it.take(2048) },
@@ -639,6 +663,7 @@ private fun SendLinkDialog(onDismiss: () -> Unit, onSend: (String) -> Unit) {
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.fillMaxWidth(),
             )
+            }
         },
         confirmButton = { TextButton(onClick = { url?.let(onSend) }, enabled = url != null) { Text(stringResource(R.string.home_send)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },

@@ -31,7 +31,7 @@ fun KdeCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(4.dp)
-            .clickable(onClick = onClick),
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick),
         colors = CardDefaults.cardColors(),
         elevation = CardDefaults.cardElevation(),
         content = content

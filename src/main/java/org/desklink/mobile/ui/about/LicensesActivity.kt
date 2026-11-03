@@ -82,7 +82,7 @@ private fun LicensesTopBar(
             IconButton(onClick = onNavigateBack) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_arrow_back_black_24dp),
-                    contentDescription = "Back"
+                    contentDescription = stringResource(R.string.navigate_up)
                 )
             }
         },
@@ -90,13 +90,13 @@ private fun LicensesTopBar(
             IconButton(onClick = onScrollToTop) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_arrow_upward_black_24dp),
-                    contentDescription = "Scroll to top"
+                    contentDescription = stringResource(R.string.licenses_scroll_top)
                 )
             }
             IconButton(onClick = onScrollToBottom) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_arrow_downward_black_24dp),
-                    contentDescription = "Scroll to bottom"
+                    contentDescription = stringResource(R.string.licenses_scroll_bottom)
                 )
             }
         }

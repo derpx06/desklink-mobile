@@ -580,6 +580,7 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
         GroupRow(
             stringResource(R.string.mousepad_scroll_direction_title),
             icon = R.drawable.sym_swap_vert,
+            subtitle = stringResource(R.string.settings_scroll_reverse_summary),
             checked = prefs.getBoolean(scrollKey, false),
             onClick = { prefs.edit { putBoolean(scrollKey, !prefs.getBoolean(scrollKey, false)) }; changed() },
         )

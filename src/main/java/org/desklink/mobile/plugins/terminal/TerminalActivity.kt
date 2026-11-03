@@ -556,7 +556,7 @@ class TerminalActivity : AppCompatActivity() {
         Row(
             modifier
                 .shadow(8.dp, RoundedCornerShape(18.dp))
-                .height(56.dp)
+                .heightIn(min = 56.dp)
                 .clip(RoundedCornerShape(18.dp))
                 .background(t.accentContainer)
                 .clickable(role = Role.Button, onClick = onClick)
@@ -906,7 +906,7 @@ class TerminalActivity : AppCompatActivity() {
 
         Box(Modifier.fillMaxSize().background(TermBg).safeDrawingPadding()) {
             Column(Modifier.fillMaxSize()) {
-                Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { leaveTerminal(client, id) }, modifier = Modifier.size(48.dp)) {
                         Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.terminal_back_to_sessions), tint = TermText)
                     }
