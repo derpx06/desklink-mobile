@@ -161,6 +161,9 @@ class ContactsPlugin : Plugin() {
 
         fun readFailed(deviceId: String): Boolean = deviceId in failed
 
+        /** The computer was unpaired: its failed-read mark goes with it. */
+        fun forgetDevice(deviceId: String) { failed.remove(deviceId) }
+
         @androidx.annotation.VisibleForTesting
         internal fun markFailedForTest(deviceId: String, on: Boolean) { if (on) failed.add(deviceId) else failed.remove(deviceId) }
 

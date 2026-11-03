@@ -568,8 +568,12 @@ class NotesSyncScenariosTest {
         val id = newNote(desk, "n", "x")
         syncWith(desk, phone, "p")
         assertTrue(id in desk.held || id in desk.sent)
-        desk.forgetPeer("p")
+        assertTrue("it says it changed something, so the store saves", desk.forgetPeer("p"))
         assertTrue(desk.held.isEmpty() && desk.sent.isEmpty())
+        // What is saved no longer carries the marks (a file that did would bring them back after a restart).
+        val reloaded = Shelf.fromStored(desk.toStored())
+        assertTrue(reloaded.held.isEmpty() && reloaded.sent.isEmpty())
+        assertTrue("nothing left to forget: nothing to save", !desk.forgetPeer("p"))
     }
 
     // ---- an editor over a note that changed underneath it --------------------------------------------

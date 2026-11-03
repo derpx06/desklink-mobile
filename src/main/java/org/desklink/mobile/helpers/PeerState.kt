@@ -44,6 +44,9 @@ object PeerState {
         runCatching { org.desklink.mobile.plugins.folders.BucketEngine.forgetPeer(app, deviceId) }
         runCatching { org.desklink.mobile.webrtc.DeliveredTransfers.forgetDevice(app, deviceId) }
         runCatching { org.desklink.mobile.webrtc.FileTransferStore.forgetDevice(app, deviceId) }
+        // The notes stay (they are the person's); what they remembered of that desk goes.
+        runCatching { org.desklink.mobile.plugins.notes.NotesStore.forgetPeer(app, deviceId) }
+        runCatching { org.desklink.mobile.plugins.contacts.ContactsPlugin.forgetDevice(deviceId) }
     }
 
     /**

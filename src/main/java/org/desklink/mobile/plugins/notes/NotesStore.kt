@@ -171,7 +171,7 @@ object NotesStore {
 
     /** A desk was unpaired: what the notes remembered of it goes (the notes stay). */
     fun forgetPeer(context: Context, deviceId: String) {
-        worker.execute { with(context) { s -> s.forgetPeer(deviceId) to false } }
+        worker.execute { with(context) { s -> s.forgetPeer(deviceId).let { Unit to it } } } // saved: the dropped marks must not come back from the file
     }
 
     /** "Remove duplicate copies": (copies that would go, copies that stay because their text exists nowhere else). */

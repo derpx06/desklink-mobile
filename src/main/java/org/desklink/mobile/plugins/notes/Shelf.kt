@@ -123,11 +123,13 @@ class Shelf {
     }
 
     /** A peer was unpaired: what was remembered of it goes (the notes stay). */
-    fun forgetPeer(peer: String) {
+    fun forgetPeer(peer: String): Boolean {
+        var changed = false
         for (marks in listOf(held, sent)) {
-            marks.values.forEach { it.remove(peer) }
+            marks.values.forEach { if (it.remove(peer) != null) changed = true }
             marks.values.removeAll { it.isEmpty() }
         }
+        return changed
     }
 
     /** S2: the newer wins (equal: ours). Whether [incoming] was taken. */

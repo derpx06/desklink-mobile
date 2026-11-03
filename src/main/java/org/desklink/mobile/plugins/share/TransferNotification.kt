@@ -245,6 +245,7 @@ object TransferNotification {
 
     /** The computer is unpaired: nothing of it stays on the shade. */
     fun forget(context: Context, deviceId: String) {
+        laneKinds.keys.removeAll { it.startsWith("$deviceId|") }
         val d = synchronized(desks) { desks.remove(deviceId) } ?: return
         clear(context, deviceId, d)
     }

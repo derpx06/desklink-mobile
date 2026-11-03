@@ -13,6 +13,8 @@ import org.desklink.mobile.webrtc.FileCheckpoint
 import org.desklink.mobile.webrtc.FileTransferStore
 import org.desklink.mobile.webrtc.SyncDigest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,6 +34,18 @@ class PeerStateTest {
         "glide_allowed_", "mic_consent_", "desk_sound_", "desk_sound_push_", "desk_sound_volume_", "screen_display_",
         "private_notifications_", "key_unreachable_url_list",
     )
+
+    @Test
+    fun forgettingAComputerAlsoDropsItsLaneLabelsAndFailedContactsMark() {
+        org.desklink.mobile.plugins.share.TransferNotification.lane(desk, "t1", "a.bin", true, org.desklink.mobile.plugins.share.TransferNotification.LANE_FAST)
+        org.desklink.mobile.plugins.share.TransferNotification.lane(other, "t2", "b.bin", true, org.desklink.mobile.plugins.share.TransferNotification.LANE_FAST)
+        org.desklink.mobile.plugins.contacts.ContactsPlugin.markFailedForTest(desk, true)
+        PeerState.forget(app, desk)
+        assertNull(org.desklink.mobile.plugins.share.TransferNotification.laneWord(app, desk, true, "a.bin"))
+        assertNotNull("another computer's label stays", org.desklink.mobile.plugins.share.TransferNotification.laneWord(app, other, true, "b.bin"))
+        assertEquals(false, org.desklink.mobile.plugins.contacts.ContactsPlugin.readFailed(desk))
+        org.desklink.mobile.plugins.share.TransferNotification.lane(other, "t2", "b.bin", true, null)
+    }
 
     @Test
     fun everyPerDevicePreferenceIsCleared() {
