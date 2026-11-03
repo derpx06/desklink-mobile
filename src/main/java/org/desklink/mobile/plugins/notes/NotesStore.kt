@@ -302,6 +302,15 @@ object NotesStore {
         return modified
     }
 
+    /**
+     * The editor's Delete. [loaded]: the version it was showing; a newer one that landed meanwhile (the desk's edit) is not
+     * deleted without a word, it stays. True when the note is gone, false when the newer version was kept.
+     */
+    fun deleteNote(context: Context, id: String, loaded: Long?): Boolean {
+        editNote(context, id, loaded) { it.copy(deleted = true) }
+        return note(context, id) == null
+    }
+
     /** Now, but strictly after [previous] even within one millisecond. */
     private fun later(previous: Long?) = maxOf(System.currentTimeMillis(), (previous ?: 0) + 1)
 

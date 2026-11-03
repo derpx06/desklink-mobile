@@ -336,10 +336,11 @@ class NotesUi(
                 }
                 IconButton(
                     onClick = {
-                        id?.let { NotesStore.editNote(context, it) { note -> note.copy(deleted = true) } }
+                        val gone = id?.let { NotesStore.deleteNote(context, it, loaded = shown) } ?: true
                         NoteDrafts.clear(NoteDrafts.key(id))
                         dirty = false
-                        Toast.makeText(context, R.string.notes_deleted, Toast.LENGTH_SHORT).show()
+                        // A newer version from the desk beats the delete: say so instead of "Note deleted".
+                        Toast.makeText(context, if (gone) R.string.notes_deleted else R.string.notes_delete_kept, Toast.LENGTH_SHORT).show()
                         onDone()
                     },
                     modifier = Modifier.size(48.dp),

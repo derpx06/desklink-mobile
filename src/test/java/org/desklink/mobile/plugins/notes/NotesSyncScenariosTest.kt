@@ -598,6 +598,22 @@ class NotesSyncScenariosTest {
     }
 
     @Test
+    fun aDeleteFromAnEditorShowingAnOlderVersionLosesToTheNewerOneAndIsReported() {
+        val shelf = Shelf()
+        val id = newNote(shelf, "n", "mine")
+        val loaded = shelf.notes.getValue(id).modified
+        val landed = shelf.notes.getValue(id).copy(body = "desk", parent = loaded, modified = loaded + 10, ancestors = listOf(loaded))
+        assertEquals(Merged.TAKEN, shelf.mergeNote(landed))
+        shelf.applyEdit(id, loaded, nextTick()) { it.copy(deleted = true) }
+        val note = shelf.notes.getValue(id)
+        assertTrue("the desk's newer text survives the delete (the editor says so)", !note.deleted && note.body == "desk")
+        assertEquals("and no copy is made of a tombstone", 1, shelf.notes.size)
+        // With the version it is showing, the delete goes through.
+        shelf.applyEdit(id, note.modified, nextTick()) { it.copy(deleted = true) }
+        assertTrue(shelf.notes.getValue(id).deleted)
+    }
+
+    @Test
     fun savingAnUnchangedEditorOverANewerVersionChangesNothing() {
         val shelf = Shelf()
         val id = newNote(shelf, "n", "same")
