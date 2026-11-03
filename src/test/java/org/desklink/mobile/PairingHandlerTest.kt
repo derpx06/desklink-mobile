@@ -79,6 +79,7 @@ class PairingHandlerClockTest {
         io.mockk.every { device.context } returns app
         io.mockk.every { device.deviceId } returns otherId
         io.mockk.every { device.protocolVersion } returns 9
+        io.mockk.every { device.isReachable } returns true
         return PairingHandler(device, recorder, state)
     }
 
@@ -94,22 +95,49 @@ class PairingHandlerClockTest {
         }
         val recorder = Recorder()
         val handler = handler(PairingHandler.PairState.NotPaired, recorder, "0")
-        handler.packetReceived(request(-600))
+        handler.packetReceived(request(-120))
         Assert.assertEquals(PairingHandler.PairState.RequestedByPeer, handler.state)
         Assert.assertEquals(1, recorder.prompts)
     }
 
-    /** The follower of two crossing requests adopts the leader's only if its stamp is plausible, as the desktop does. */
+    private fun timerJob(handler: PairingHandler): kotlinx.coroutines.Job? {
+        val field = PairingHandler::class.java.getDeclaredField("pairingJob").apply { isAccessible = true }
+        return (field.get(handler) as kotlinx.coroutines.Job).children.firstOrNull()
+    }
+
+    /**
+     * The follower of two crossing requests adopts the leader's only if its stamp is plausible, as the desktop does, and an
+     * implausible one leaves the timer of its own request exactly as it was (the same job, not re-armed).
+     */
     @Test
-    fun aCrossingRequestWithAnImplausibleStampIsNotAdopted() {
+    fun aCrossingRequestWithAnImplausibleStampIsNotAdoptedAndDoesNotRestartTheTimer() {
         // A device id that sorts below any hex id makes this phone the follower.
         val recorder = Recorder()
-        val handler = handler(PairingHandler.PairState.Requested, recorder, "")
+        val handler = handler(PairingHandler.PairState.NotPaired, recorder, "")
+        handler.requestPairing()
+        Assert.assertEquals(PairingHandler.PairState.Requested, handler.state)
+        val timer = timerJob(handler)
+        Assert.assertNotNull("requesting arms the timer", timer)
+
         handler.packetReceived(request(-7_200))
         Assert.assertEquals(PairingHandler.PairState.Requested, handler.state)
         Assert.assertEquals(0, recorder.prompts)
+        Assert.assertSame("the timer was not touched", timer, timerJob(handler))
+
         handler.packetReceived(request(-5))
         Assert.assertEquals(PairingHandler.PairState.RequestedByPeer, handler.state)
         Assert.assertEquals(1, recorder.prompts)
+        handler.cancelPairing()
+    }
+
+    /** The window is the signaling's five minutes, on both sides. */
+    @Test
+    fun theStampWindowIsFiveMinutes() {
+        val handler = handler(PairingHandler.PairState.NotPaired, Recorder(), "0")
+        val now = System.currentTimeMillis() / 1000L
+        Assert.assertTrue(handler.timestampIsPlausible(now - 240))
+        Assert.assertTrue(handler.timestampIsPlausible(now + 240))
+        Assert.assertFalse(handler.timestampIsPlausible(now - 360))
+        Assert.assertFalse(handler.timestampIsPlausible(now + 360))
     }
 }

@@ -146,8 +146,18 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
     }
 
     fun packetReceived(np: NetworkPacket) {
-        cancelTimer()
         val wantsPair = np.getBoolean("pair")
+        // A crossing request this side would follow but whose stamp is far from this clock (a replay, or a skewed
+        // clock) is ignored *before* the timer is touched: re-arming here would let such packets keep our own
+        // request alive forever. The desktop makes the same check before it adopts one.
+        if (wantsPair && state == PairState.Requested) {
+            val crossing = np.getLong("timestamp", -1L)
+            if (crossing != -1L && !localGoesFirst() && !timestampIsPlausible(crossing)) {
+                Log.w("PairingHandler", "Ignoring a crossing pair request with an implausible timestamp")
+                return
+            }
+        }
+        cancelTimer()
         if (wantsPair) {
             // A *request* carries a timestamp; a plain acceptance does not.
             // That distinction already breaks the acknowledgement loop below,
@@ -162,12 +172,6 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
                         // Both sides asked at once and this one leads. Its
                         // request stands; the peer will prompt when it arrives.
                         Log.i("PairingHandler", "Ignoring a crossing pair request; this device leads")
-                        armTimer()
-                    } else if (!timestampIsPlausible(incomingTimestamp)) {
-                        // The desktop makes the same check before it adopts a crossing
-                        // request: a stamp far from this clock is a replay or a skewed
-                        // clock, never a negotiation to prompt for.
-                        Log.w("PairingHandler", "Ignoring a crossing pair request with an implausible timestamp")
                         armTimer()
                     } else {
                         // This side follows: abandon our own request and adopt
@@ -279,7 +283,7 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         }
     }
 
-    /** Whether a peer's request stamp is within 30 minutes of this clock; the desktop's `timestamp_is_plausible`. */
+    /** Whether a peer's request stamp is within 5 minutes of this clock; the desktop's `timestamp_is_plausible`. */
     @VisibleForTesting
     internal fun timestampIsPlausible(timestamp: Long): Boolean =
         abs(timestamp - System.currentTimeMillis() / 1000L) <= allowedTimestampDifferenceSeconds
@@ -540,7 +544,7 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
          */
         private const val pairTimeoutSeconds = 30
 
-        private const val allowedTimestampDifferenceSeconds = 1_800 // 30 minutes
+        private const val allowedTimestampDifferenceSeconds = 300 // 5 minutes: the signaling's window (MAX_AGE_MILLIS), and the desktop's
         private const val notPairedNoticeIntervalMillis = 5_000L
 
         // Concatenate in a deterministic order so on both devices the result is the same
