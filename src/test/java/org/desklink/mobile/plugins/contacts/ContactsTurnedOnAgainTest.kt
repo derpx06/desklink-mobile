@@ -34,3 +34,15 @@ class ContactsTurnedOnAgainTest {
         plugin.onDestroy()
     }
 }
+
+class ContactsReadFailedTest {
+    @org.junit.Test
+    fun aFailedReadIsShownUntilTheNextGoodOne() {
+        val id = "0123456789abcdef0123456789abcdef"
+        org.junit.Assert.assertFalse(org.desklink.mobile.plugins.contacts.ContactsPlugin.readFailed(id))
+        org.desklink.mobile.plugins.contacts.ContactsPlugin.markFailedForTest(id, true)
+        org.junit.Assert.assertTrue(org.desklink.mobile.plugins.contacts.ContactsPlugin.readFailed(id))
+        org.desklink.mobile.plugins.contacts.ContactsPlugin.markFailedForTest(id, false)
+        org.junit.Assert.assertFalse(org.desklink.mobile.plugins.contacts.ContactsPlugin.readFailed(id))
+    }
+}

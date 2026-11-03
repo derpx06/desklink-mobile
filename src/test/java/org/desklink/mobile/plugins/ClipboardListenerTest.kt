@@ -58,6 +58,11 @@ class ClipboardListenerTest {
         assertTrue(listener.lastRefusedTooLarge)
         Thread.sleep(50)
         assertEquals(emptyList<String>(), sent)
+        // The next look is its own: a later "nothing to send" is not blamed on the old copy.
+        context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("other app", "small"))
+        ShadowLooper.idleMainLooper()
+        listener.sync(force = true)
+        assertFalse(listener.lastRefusedTooLarge)
     }
 
     @Test

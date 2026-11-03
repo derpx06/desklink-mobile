@@ -97,6 +97,8 @@ class ClipboardPlugin : Plugin() {
         return true
     }
 
+    val computerName: String get() = device.name
+
     /** The desk says its clipboard sharing is off: it ignores a copy, so an explicit send must say so instead of "sent". */
     fun deskIgnoresClipboard(): Boolean = ignores(device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings)
 
@@ -142,6 +144,16 @@ class ClipboardPlugin : Plugin() {
                 // Never in the future, and never below the newest this process has sent (a clock set back must not reorder copies).
                 this["copiedAt"] = copiedAt.coerceIn(0L, now).coerceAtLeast(floor)
             }
+
+        /**
+         * Names of the computers that would take a send from the tile, widget, notification button or offer, when **none** of them does
+         * (each has clipboard sharing off); null when at least one takes it, or there is none. Those paths send to every computer.
+         */
+        @JvmStatic
+        fun ignoringComputers(): String? = runCatching {
+            val plugins = org.desklink.mobile.DeskLinkApplication.getInstance().devices.values.mapNotNull { it.getPlugin(ClipboardPlugin::class.java) }
+            plugins.takeIf { it.isNotEmpty() && it.all(ClipboardPlugin::deskIgnoresClipboard) }?.joinToString(", ") { it.computerName }
+        }.getOrNull()
 
         /** A desk that did not report its settings is given the benefit of the doubt. */
         fun ignores(settings: org.desklink.mobile.plugins.desksettings.DeskSettingsState?): Boolean = settings?.clipboard == false

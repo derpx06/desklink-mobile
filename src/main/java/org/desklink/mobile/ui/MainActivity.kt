@@ -259,6 +259,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             // A Settings page asked for from outside (the desk screen's settings button): the tab, on that page.
             intent.hasExtra(EXTRA_SETTINGS_PAGE) -> {
                 val page = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
+                // A notice about one computer lands on that computer's page.
+                intent.getStringExtra(EXTRA_DEVICE_ID)?.takeIf { DeskLinkApplication.getInstance().getDevice(it)?.isPaired == true }?.let(::select)
                 resetTo(HOME)
                 nav.reset(AppTab.SETTINGS)
                 SettingsPage.of(page)?.let { nav.push(AppTab.SETTINGS, it.route) }

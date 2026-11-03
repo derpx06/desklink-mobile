@@ -148,6 +148,8 @@ class ClipboardListener private constructor(ctx: Context) {
         val key = org.desklink.mobile.plugins.Plugin.getPluginKey(ClipboardPlugin::class.java)
         org.desklink.mobile.DeskLinkApplication.getInstance().devices.values
             .filter { ClipboardOffer.eligible(it.isPaired, it.isPluginEnabled(key), it.hasActiveWebRtcFeatureTransport, ClipboardOffer.enabled(context, it.deviceId)) }
+            // A computer that has clipboard sharing off would ignore the copy: it is not offered.
+            .filter { it.getPlugin(ClipboardPlugin::class.java)?.deskIgnoresClipboard() != true }
             .map { it.name }
     }.getOrDefault(emptyList())
 
@@ -188,6 +190,7 @@ class ClipboardListener private constructor(ctx: Context) {
      */
     @MainThread
     fun sync(force: Boolean): Boolean {
+        lastRefusedTooLarge = false // set only by this call, for the caller that reads it next
         if (observers.isEmpty()) {
             if (force) Log.i(TAG, "clipboard: no desk has clipboard sync on")
             return false

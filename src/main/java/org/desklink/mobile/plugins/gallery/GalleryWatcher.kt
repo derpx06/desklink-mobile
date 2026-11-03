@@ -35,6 +35,13 @@ object GalleryWatcher {
     fun sinceKey(id: String, shots: Boolean) = "gallery_since_${if (shots) "shots" else "camera"}_$id"
     fun shotsKey(id: String) = "gallery_shots_$id"
     fun cameraKey(id: String) = "gallery_camera_$id"
+    /** Set when a chosen folder can no longer be read (revoked, moved or deleted): not listed again until it is chosen again. */
+    fun lostKey(id: String, shots: Boolean) = "gallery_lost_${if (shots) "shots" else "camera"}_$id"
+
+    fun isLost(context: Context, id: String, shots: Boolean) = prefs(context).getBoolean(lostKey(id, shots), false)
+
+    private fun noticeTag(id: String, shots: Boolean) = "gallery-lost:$id:${if (shots) "shots" else "camera"}"
+    private const val NOTICE_ID = 7332
 
     fun isOn(context: Context, id: String) = prefs(context).getBoolean(onKey(id), false)
     fun folders(context: Context, id: String): List<String> = listOfNotNull(prefs(context).getString(shotsKey(id), null), prefs(context).getString(cameraKey(id), null))
@@ -71,7 +78,8 @@ object GalleryWatcher {
         if (!kept) return false
         val key = if (shots) shotsKey(id) else cameraKey(id)
         val old = prefs(context).getString(key, null)
-        prefs(context).edit { putString(key, tree.toString()); putLong(sinceKey(id, shots), System.currentTimeMillis()) }
+        prefs(context).edit { putString(key, tree.toString()); putLong(sinceKey(id, shots), System.currentTimeMillis()); remove(lostKey(id, shots)) }
+        runCatching { androidx.core.app.NotificationManagerCompat.from(context).cancel(noticeTag(id, shots), NOTICE_ID) }
         if (old != null && old != tree.toString()) releaseUnlessUsed(context, old)
         kick(context)
         return true
@@ -161,8 +169,16 @@ object GalleryWatcher {
         val id = device.deviceId
         val ledger = GalleryRules.Ledger(File(context.filesDir, "gallery/$id.json"))
         val p = prefs(context)
+        val chosen = listOf(true, false).mapNotNull { shots -> (if (shots) p.getString(shotsKey(id), null) else p.getString(cameraKey(id), null))?.let { shots to it } }
         val sinces = listOf(true, false).associate { shots -> (if (shots) p.getString(shotsKey(id), null) else p.getString(cameraKey(id), null)) to p.getLong(sinceKey(id, shots), Long.MAX_VALUE) }
-        val found = sinces.keys.filterNotNull().flatMap { tree -> GalleryRules.newest(list(context, Uri.parse(tree)).map { it.copy(folder = tree) }) }
+        val found = chosen.flatMap { (shots, tree) ->
+            if (isLost(context, id, shots)) return@flatMap emptyList() // said once; not asked again until chosen again
+            val listed = list(context, Uri.parse(tree))
+            if (listed == null) {
+                noteLost(context, id, device.name, shots)
+                emptyList()
+            } else GalleryRules.newest(listed.map { it.copy(folder = tree) })
+        }
         val next = GalleryRules.toSend(found, ledger, { sinces[it.folder] ?: Long.MAX_VALUE }, System.currentTimeMillis()).firstOrNull() ?: return
         if (!s.budget.allows(next.size)) {
             retryLater(context, s, s.budget.nextRoomAt() - android.os.SystemClock.elapsedRealtime())
@@ -204,14 +220,44 @@ object GalleryWatcher {
         )
     }
 
+    /**
+     * A chosen folder can no longer be read: remembered (so it is not listed again quietly every minute) and said once, with a way to
+     * choose it again (Settings, Files). Cleared by [setFolder].
+     */
+    @android.annotation.SuppressLint("MissingPermission")
+    internal fun noteLost(context: Context, id: String, deskName: String, shots: Boolean) {
+        if (isLost(context, id, shots)) return
+        prefs(context).edit { putBoolean(lostKey(id, shots), true) }
+        AppLog.event("gallery", "folder can no longer be read")
+        val open = android.app.PendingIntent.getActivity(
+            context, noticeTag(id, shots).hashCode(),
+            Intent(context, org.desklink.mobile.ui.MainActivity::class.java)
+                .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_SETTINGS_PAGE, org.desklink.mobile.ui.compose.screen.settings.SettingsPage.FILES.route)
+                .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_DEVICE_ID, id)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS)
+            .setSmallIcon(org.desklink.mobile.R.drawable.ic_notification)
+            .setContentTitle(context.getString(if (shots) org.desklink.mobile.R.string.gallery_lost_shots else org.desklink.mobile.R.string.gallery_lost_camera))
+            .setContentText(context.getString(org.desklink.mobile.R.string.gallery_lost_text, deskName))
+            .setContentIntent(open)
+            .addAction(0, context.getString(org.desklink.mobile.R.string.gallery_lost_action), open)
+            .setAutoCancel(true)
+            .build()
+        runCatching { androidx.core.app.NotificationManagerCompat.from(context).notify(noticeTag(id, shots), NOTICE_ID, notification) }
+    }
+
     private fun retryLater(context: Context, s: State, delayMs: Long) {
         if (s.retryScheduled) return
         s.retryScheduled = true
         runCatching { worker.schedule({ s.retryScheduled = false; kick(context) }, delayMs.coerceAtLeast(30_000L), TimeUnit.MILLISECONDS) }
     }
 
-    /** One level of a picked folder: images are in Pictures/Screenshots and DCIM/Camera, not below. */
-    private fun list(context: Context, tree: Uri): List<GalleryRules.Found> = runCatching {
+    /** One level of a picked folder: images are in Pictures/Screenshots and DCIM/Camera, not below. Null when it cannot be read at all. */
+    private fun list(context: Context, tree: Uri): List<GalleryRules.Found>? = runCatching {
+        // The grant is gone (revoked, or released by a cleanup): the provider may still answer for a while, but not for long.
+        if (context.contentResolver.persistedUriPermissions.none { it.uri == tree && it.isReadPermission }) return null
         val parent = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val columns = arrayOf(
             DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE,
@@ -224,8 +270,8 @@ object GalleryWatcher {
                     add(GalleryRules.Found(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)).toString(), c.getString(1).orEmpty(), mime, c.getLong(3), c.getLong(4)))
                 }
             }
-        }.orEmpty()
-    }.getOrDefault(emptyList())
+        }
+    }.getOrNull()
 
     /** Unpaired: its choices are in the default preferences (swept by id), its ledger and grants go here. */
     fun forgetDevice(context: Context, id: String) {

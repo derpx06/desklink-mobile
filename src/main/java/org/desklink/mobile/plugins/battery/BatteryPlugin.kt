@@ -45,6 +45,10 @@ class BatteryPlugin : Plugin() {
             if (was) device.sendPacket(outgoing()) // the keys go away: the computer stops following this phone
             return
         }
+        // The computer's Do Not Disturb is off and DeskLink still holds a note of putting the phone back (it ended while the link was
+        // down, or this process restarted): put it back now. The first report is otherwise ignored as an "off", and the note would keep
+        // the phone in Do Not Disturb. It changes nothing if the person changed the filter since.
+        if (deskDnd == false && DndSync.Restore.has(context, device.deviceId)) DndSync.Restore.restoreNow(context, device.deviceId)
         val toSet = dndLoop.fromDesk(deskDnd, DndSync.phoneDnd(context), DndSync.canSet(context))
         if (toSet != null) DndSync.apply(context, device.deviceId, toSet)
         if (!was) device.sendPacket(outgoing()) // the first report after the switch turned on
