@@ -74,7 +74,8 @@ object NotesStore {
     fun <T> with(context: Context, job: (Shelf) -> Pair<T, Boolean>): T {
         // Loaded outside the monitor: a Keystore that is slow to answer never holds up everyone else.
         val loaded = if (synchronized(this) { shelf } == null) load(context.applicationContext) else null
-        return synchronized(this) {
+        var tidied: List<String> = emptyList()
+        val result = synchronized(this) {
             val current = shelf ?: loaded?.also { shelf = it }
             if (current == null) {
                 _unavailable.value = true
@@ -83,11 +84,15 @@ object NotesStore {
             _unavailable.value = false
             val (result, changed) = job(current)
             if (changed) {
+                // After any change, identical conflicted copies are cleared (the desk does the same) and the result is saved with it.
+                if (current.notes.keys.any { Shelf.copyBase(it) != null }) tidied = current.removeDuplicates(false, System.currentTimeMillis())
                 saveSoon()
                 _revision.value++
             }
             result
         }
+        if (tidied.isNotEmpty()) worker.execute { push(context.applicationContext, ShelfKind.NOTES, tidied) }
+        return result
     }
 
     private var saveQueued = false
@@ -159,17 +164,14 @@ object NotesStore {
     // ---- sync --------------------------------------------------------------------------------------------
 
     /** A peer's packet: the answers to send back. */
-    fun onPacket(context: Context, packet: NetworkPacket): List<NetworkPacket> {
+    fun onPacket(context: Context, packet: NetworkPacket, peer: String = ""): List<NetworkPacket> {
         val kind = ShelfKind.of(packet.type) ?: return emptyList()
-        val answers = with(context) { it.handle(kind, packet) }
-        if (kind == ShelfKind.NOTES) cleanUpAfterSync(context)
-        return answers
+        return with(context) { it.handle(kind, packet, peer) }
     }
 
-    /** Clears what merging left behind (identical copies of a note or of each other) and tells the desk. */
-    private fun cleanUpAfterSync(context: Context) {
-        val removed = with(context) { s -> s.removeDuplicates(false, System.currentTimeMillis()).let { it to it.isNotEmpty() } }
-        if (removed.isNotEmpty()) worker.execute { push(context.applicationContext, ShelfKind.NOTES, removed) }
+    /** A desk was unpaired: what the notes remembered of it goes (the notes stay). */
+    fun forgetPeer(context: Context, deviceId: String) {
+        worker.execute { with(context) { s -> s.forgetPeer(deviceId) to false } }
     }
 
     /** "Remove duplicate copies": (copies that would go, copies that stay because their text exists nowhere else). */
@@ -191,11 +193,15 @@ object NotesStore {
         with(context) { it.indexPackets(ShelfKind.SNIPPETS) + it.indexPackets(ShelfKind.NOTES) to false }
 
     private fun push(context: Context, kind: ShelfKind, ids: Collection<String>) {
-        val packets = with(context) { Shelf.itemsPackets(kind, it.itemValues(kind, ids)) to false }
-        if (packets.isEmpty()) return
-        DeskLinkApplication.getInstance().devices.values
+        val devices = DeskLinkApplication.getInstance().devices.values
             .filter { it.isPaired && it.hasActiveWebRtcFeatureTransport && it.getPlugin(NotesPlugin::class.java) != null }
-            .forEach { device -> packets.forEach(device::sendPacket) }
+        val packets = with(context) { s ->
+            // Each of them will hold what is being sent (or the version it held).
+            devices.forEach { s.sentTo(kind, ids, it.deviceId) }
+            Shelf.itemsPackets(kind, s.itemValues(kind, ids)) to false
+        }
+        if (packets.isEmpty()) return
+        devices.forEach { device -> packets.forEach(device::sendPacket) }
     }
 
     private fun pushNoteSoon(context: Context, id: String) = synchronized(pendingNotes) {
@@ -289,19 +295,8 @@ object NotesStore {
      */
     fun editNote(context: Context, id: String, loaded: Long? = null, change: (Note) -> Note): Long? {
         val (ids, modified) = with(context) { s ->
-            val before = s.notes[id] ?: return@with (emptyList<String>() to null) to false
-            var after = change(before).let { it.copy(id = before.id, title = it.title.takeCodePoints(Shelf.MAX_NOTE_TITLE_CHARS)) }
-            if (!Shelf.syncable(after.body) || after.sameContent(before)) return@with (emptyList<String>() to before.modified) to false
-            if (after.deleted) after = after.copy(title = "", body = "")
-            if (loaded != null && loaded != before.modified && loaded > 0) {
-                val mine = after.copy(parent = loaded, modified = later(before.modified), ancestors = listOf(loaded))
-                val before2 = s.notes.keys.toSet()
-                s.mergeNote(mine)
-                ((listOf(id) + (s.notes.keys - before2)) to s.notes[id]?.modified) to true
-            } else {
-                s.notes[id] = Shelf.edited(before, after, s.synced[id], System.currentTimeMillis())
-                (listOf(id) to s.notes[id]?.modified) to true
-            }
+            val edit = s.applyEdit(id, loaded, System.currentTimeMillis(), change)
+            edit to (edit.second != null)
         }
         ids.forEach { pushNoteSoon(context, it) }
         return modified

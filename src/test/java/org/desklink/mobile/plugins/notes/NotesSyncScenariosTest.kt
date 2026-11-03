@@ -7,6 +7,7 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,14 +19,29 @@ import org.robolectric.RobolectricTestRunner
  */
 @RunWith(RobolectricTestRunner::class)
 class NotesSyncScenariosTest {
-    private enum class Side { DESK, PHONE;
+    private enum class Side(val id: String) { DESK("desk"), PHONE("phone");
         val other get() = if (this == DESK) PHONE else DESK
     }
 
-    private class World {
+    private fun wire(packet: NetworkPacket) = NetworkPacket.unserialize(packet.serialize())
+
+    /** Carries [packets] from [x] (called [xId] by [y]) to [y] and everything that comes back, until quiet. */
+    private fun pump(x: Shelf, xId: String, y: Shelf, yId: String, packets: List<NetworkPacket>, dropAcks: Boolean = false) {
+        val queue = ArrayDeque(packets.map { true to it })
+        while (queue.isNotEmpty()) {
+            val (toY, packet) = queue.removeFirst()
+            // What crosses is what the wire carries.
+            val on = wire(packet)
+            val (answers, _) = if (toY) y.handle(ShelfKind.NOTES, on, xId) else x.handle(ShelfKind.NOTES, on, yId)
+            queue.addAll(answers.filter { !(dropAcks && it.getStringOrNull("op") == "ack") }.map { !toY to it })
+        }
+    }
+
+    private inner class World {
         val desk = Shelf()
         val phone = Shelf()
         var linked = false
+        var dropAcks = false
         private var clock = 1_000L
 
         fun shelf(side: Side) = if (side == Side.DESK) desk else phone
@@ -40,13 +56,7 @@ class NotesSyncScenariosTest {
         }
 
         fun deliver(from: Side, packets: List<NetworkPacket>) {
-            val queue = ArrayDeque(packets.map { from to it })
-            while (queue.isNotEmpty()) {
-                val (sender, packet) = queue.removeFirst()
-                val to = sender.other
-                val (answers, _) = shelf(to).handle(ShelfKind.NOTES, packet)
-                queue.addAll(answers.map { to to it })
-            }
+            pump(shelf(from), from.id, shelf(from.other), from.other.id, packets, dropAcks)
         }
 
         fun create(side: Side, body: String): String {
@@ -61,18 +71,20 @@ class NotesSyncScenariosTest {
             val shelf = shelf(side)
             val before = shelf.notes.getValue(id)
             clock += 10
-            shelf.notes[id] = Shelf.edited(before, before.copy(body = body), shelf.synced[id], clock)
+            shelf.notes[id] = Shelf.edited(before, before.copy(body = body), shelf.baseOf(id), clock, shelf.mustKeep(id))
         }
 
         fun delete(side: Side, id: String) {
             val shelf = shelf(side)
             val before = shelf.notes.getValue(id)
             clock += 10
-            shelf.notes[id] = Shelf.edited(before, before.copy(deleted = true, title = "", body = ""), shelf.synced[id], clock)
+            shelf.notes[id] = Shelf.edited(before, before.copy(deleted = true, title = "", body = ""), shelf.baseOf(id), clock, shelf.mustKeep(id))
         }
 
         fun push(side: Side, vararg ids: String) {
             if (!linked) return
+            // What a push records.
+            shelf(side).sentTo(ShelfKind.NOTES, ids.toList(), side.other.id)
             deliver(side, Shelf.itemsPackets(ShelfKind.NOTES, shelf(side).itemValues(ShelfKind.NOTES, ids.toList())))
         }
 
@@ -389,5 +401,328 @@ class NotesSyncScenariosTest {
         }
         w.assertSameNotes()
         assertTrue(w.phone.removeDuplicates(false, 200_000).isEmpty())
+    }
+
+    // ---- two peers, lost and late acknowledgements --------------------------------------------------
+
+    private var tick = 10_000L
+
+    private fun nextTick(): Long {
+        tick += 10
+        return tick
+    }
+
+    private fun editBody(shelf: Shelf, id: String, body: String) {
+        val before = shelf.notes.getValue(id)
+        shelf.notes[id] = Shelf.edited(before, before.copy(body = body), shelf.baseOf(id), nextTick(), shelf.mustKeep(id))
+    }
+
+    private fun syncWith(desk: Shelf, phone: Shelf, phoneId: String) {
+        pump(desk, "desk", phone, phoneId, desk.indexPackets(ShelfKind.NOTES))
+        pump(phone, phoneId, desk, "desk", phone.indexPackets(ShelfKind.NOTES))
+    }
+
+    private fun pushTo(desk: Shelf, phone: Shelf, phoneId: String, id: String) {
+        desk.sentTo(ShelfKind.NOTES, listOf(id), phoneId)
+        pump(desk, "desk", phone, phoneId, Shelf.itemsPackets(ShelfKind.NOTES, desk.itemValues(ShelfKind.NOTES, listOf(id))))
+    }
+
+    private fun copiesIn(shelf: Shelf) = shelf.notes.values.count { !it.deleted && Shelf.isCopy(it) }
+
+    private fun newNote(shelf: Shelf, id: String, body: String): String {
+        val t = nextTick()
+        shelf.notes[id] = Note(id, body = body, created = t, modified = t)
+        return id
+    }
+
+    @Test
+    fun aPhoneAwayThroughManyEditsIsNotARivalWhenAnotherPhoneAcknowledged() {
+        val desk = Shelf()
+        val a = Shelf()
+        val b = Shelf()
+        val id = newNote(desk, "n", "v0")
+        syncWith(desk, a, "a")
+        syncWith(desk, b, "b")
+        // B is away; A takes and acknowledges every edit.
+        for (n in 1..12) {
+            editBody(desk, id, "v$n")
+            pushTo(desk, a, "a", id)
+        }
+        assertEquals("v12", a.notes.getValue(id).body)
+        syncWith(desk, b, "b")
+        for ((name, shelf) in listOf("desk" to desk, "a" to a, "b" to b)) {
+            assertEquals(name, 0, copiesIn(shelf))
+            assertEquals(name, "v12", shelf.notes.getValue(id).body)
+        }
+        // The other way round: A away, B present, then A edits from its old version while the desk moved on: one real conflict.
+        for (n in 13..24) {
+            editBody(desk, id, "v$n")
+            pushTo(desk, b, "b", id)
+        }
+        editBody(a, id, "a says")
+        syncWith(desk, a, "a")
+        syncWith(desk, b, "b")
+        assertEquals(1, copiesIn(desk))
+        assertEquals(1, copiesIn(a))
+        assertEquals(1, copiesIn(b))
+    }
+
+    @Test
+    fun aLostAcknowledgementAndManyEditsAreStillOneSided() {
+        val w = World()
+        val id = w.create(Side.DESK, "v0")
+        w.connect()
+        // The phone takes v1; its acknowledgement never arrives.
+        w.dropAcks = true
+        w.edit(Side.DESK, id, "v1")
+        w.push(Side.DESK, id)
+        w.dropAcks = false
+        assertEquals("v1", w.phone.notes.getValue(id).body)
+        w.disconnect()
+        for (n in 2..12) w.edit(Side.DESK, id, "v$n")
+        w.connect()
+        w.assertNoCopies()
+        w.assertSameNotes()
+        assertEquals("v12", w.live(Side.PHONE).single().body)
+    }
+
+    @Test
+    fun anAcknowledgementDoesNotHideARealConcurrentEdit() {
+        val w = World()
+        val id = w.create(Side.DESK, "base")
+        w.connect()
+        w.edit(Side.DESK, id, "d1")
+        w.push(Side.DESK, id)
+        w.disconnect()
+        w.edit(Side.DESK, id, "d2")
+        w.edit(Side.PHONE, id, "p1")
+        w.connect()
+        for (side in Side.entries) assertEquals("$side", 1, w.copies(side))
+        w.assertSameNotes()
+    }
+
+    @Test
+    fun aLateAcknowledgementNamesAnOlderVersionOfTheChainAndConflictsStayReal() {
+        val desk = Shelf()
+        val phone = Shelf()
+        val id = newNote(desk, "n", "base")
+        syncWith(desk, phone, "p")
+        editBody(desk, id, "d1")
+        val d1 = desk.notes.getValue(id).modified
+        desk.sentTo(ShelfKind.NOTES, listOf(id), "p")
+        val items = Shelf.itemsPackets(ShelfKind.NOTES, desk.itemValues(ShelfKind.NOTES, listOf(id)))
+        // The phone takes d1 and answers; the answer is held back.
+        val ack = phone.handle(ShelfKind.NOTES, wire(items[0]), "desk").first.last()
+        assertEquals("ack", ack.getStringOrNull("op"))
+        editBody(desk, id, "d2")
+        // The late acknowledgement arrives: the phone holds d1 (not d2).
+        desk.handle(ShelfKind.NOTES, wire(ack), "p")
+        assertEquals(d1, desk.held.getValue(id).getValue("p"))
+        // The phone edits from d1 while the desk made d2: a real conflict.
+        editBody(phone, id, "p1")
+        syncWith(desk, phone, "p")
+        assertEquals(1, copiesIn(desk))
+        assertEquals(1, copiesIn(phone))
+        // Never backwards.
+        val before = desk.held.getValue(id).toMap()
+        val stale = NetworkPacket(ShelfKind.NOTES.packetType).apply {
+            this["op"] = "ack"
+            this["items"] = JSONArray().put(JSONObject().put("id", id).put("modified", d1 - 1))
+        }
+        desk.handle(ShelfKind.NOTES, wire(stale), "p")
+        assertEquals(before, desk.held.getValue(id).toMap())
+    }
+
+    @Test
+    fun theAcknowledgementTravelsTheRealHandlePath() {
+        val desk = Shelf()
+        val phone = Shelf()
+        val id = newNote(desk, "n", "hello")
+        val modified = desk.notes.getValue(id).modified
+        val items = Shelf.itemsPackets(ShelfKind.NOTES, desk.itemValues(ShelfKind.NOTES, listOf(id)))
+        val (answers, changed) = phone.handle(ShelfKind.NOTES, wire(items[0]), "desk")
+        assertTrue(changed)
+        val ack = answers.single { it.getStringOrNull("op") == "ack" }
+        assertEquals(ShelfKind.NOTES.packetType, ack.type)
+        val entry = ack.getJSONArray("items")!!.getJSONObject(0)
+        assertEquals(id, entry.getString("id"))
+        assertEquals(modified, entry.getLong("modified"))
+        assertTrue(desk.held.isEmpty())
+        val (back, deskChanged) = desk.handle(ShelfKind.NOTES, wire(ack), "phone")
+        assertTrue(back.isEmpty() && deskChanged)
+        assertEquals(modified, desk.held.getValue(id).getValue("phone"))
+        val (again, changedAgain) = desk.handle(ShelfKind.NOTES, wire(ack), "phone")
+        assertTrue(again.isEmpty() && !changedAgain)
+        // A snippet shelf never acknowledges.
+        val snippet = NetworkPacket(ShelfKind.SNIPPETS.packetType).apply {
+            this["op"] = "items"
+            this["items"] = JSONArray().put(JSONObject().put("id", "s").put("text", "t").put("modified", 5))
+        }
+        assertTrue(phone.handle(ShelfKind.SNIPPETS, wire(snippet), "desk").first.none { it.getStringOrNull("op") == "ack" })
+    }
+
+    @Test
+    fun whatAPeerHeldIsForgottenWhenItIsUnpaired() {
+        val desk = Shelf()
+        val phone = Shelf()
+        val id = newNote(desk, "n", "x")
+        syncWith(desk, phone, "p")
+        assertTrue(id in desk.held || id in desk.sent)
+        desk.forgetPeer("p")
+        assertTrue(desk.held.isEmpty() && desk.sent.isEmpty())
+    }
+
+    // ---- an editor over a note that changed underneath it --------------------------------------------
+
+    @Test
+    fun textTypedOverANoteDeletedUnderneathIsKeptAndBringsItBack() {
+        val shelf = Shelf()
+        val id = newNote(shelf, "n", "mine")
+        val loaded = shelf.notes.getValue(id).modified
+        // The desk deletes it while the editor is open.
+        shelf.applyEdit(id, null, nextTick()) { it.copy(deleted = true) }
+        val (ids, modified) = shelf.applyEdit(id, loaded, nextTick()) { it.copy(body = "typed after") }
+        assertEquals(listOf(id), ids)
+        assertNotNull(modified)
+        val note = shelf.notes.getValue(id)
+        assertTrue(!note.deleted && note.body == "typed after")
+        assertEquals("no junk 'New Note (conflicted copy)'", 1, shelf.notes.size)
+        // Deleting an already deleted note stays a deletion and changes nothing.
+        shelf.applyEdit(id, null, nextTick()) { it.copy(deleted = true) }
+        assertNull(shelf.applyEdit(id, null, nextTick()) { it.copy(deleted = true) }.second)
+        assertTrue(shelf.notes.getValue(id).deleted)
+    }
+
+    @Test
+    fun savingAnUnchangedEditorOverANewerVersionChangesNothing() {
+        val shelf = Shelf()
+        val id = newNote(shelf, "n", "same")
+        val loaded = shelf.notes.getValue(id).modified
+        shelf.applyEdit(id, null, nextTick()) { it.copy(body = "desk's") }
+        val before = shelf.notes.toMap()
+        val (ids, modified) = shelf.applyEdit(id, loaded, nextTick()) { it }
+        assertTrue(ids.isEmpty() && modified == null)
+        assertEquals(before, shelf.notes.toMap())
+    }
+
+    @Test
+    fun typingOverAVersionThatLandedKeepsItAsOneCopyAndReportsTheNewVersion() {
+        val shelf = Shelf()
+        val id = newNote(shelf, "n", "mine")
+        val loaded = shelf.notes.getValue(id).modified
+        val landed = shelf.notes.getValue(id).copy(body = "desk", parent = loaded, modified = loaded + 10, ancestors = listOf(loaded))
+        assertEquals(Merged.TAKEN, shelf.mergeNote(landed))
+        val (ids, modified) = shelf.applyEdit(id, loaded, nextTick()) { it.copy(body = "typed") }
+        assertEquals(2, ids.size)
+        assertEquals(shelf.notes.getValue(id).modified, modified)
+        // Saving again with the version that save left does not make another.
+        val (again, _) = shelf.applyEdit(id, modified, nextTick()) { it.copy(body = "typed more") }
+        assertEquals(listOf(id), again)
+        assertEquals(1, shelf.notes.values.count { Shelf.isCopy(it) })
+    }
+
+    // ---- empty notes, pins, titles ---------------------------------------------------------------------
+
+    @Test
+    fun anEmptyNeverEditedNoteIsNotInTheIndexUntilItIsWrittenIn() {
+        val shelf = Shelf()
+        val blank = newNote(shelf, "blank", "")
+        val spaces = newNote(shelf, "spaces", " \n")
+        val written = newNote(shelf, "written", "text")
+        fun listed() = shelf.indexPackets(ShelfKind.NOTES).flatMap { p ->
+            val items = p.getJSONArray("items")!!
+            (0 until items.length()).map { items.getJSONObject(it).getString("id") }
+        }
+        assertEquals(listOf(written), listed())
+        assertEquals(1, shelf.itemValues(ShelfKind.NOTES, listOf(blank)).size)
+        shelf.applyEdit(blank, null, nextTick()) { it.copy(body = "now it has words") }
+        assertTrue(blank in listed())
+        assertFalse(spaces in listed())
+        // One that was written in and emptied again is a real note and is listed.
+        shelf.applyEdit(blank, null, nextTick()) { it.copy(body = "") }
+        assertTrue(blank in listed())
+    }
+
+    @Test
+    fun aPinnedDuplicatePinsTheNoteThatStays() {
+        val shelf = Shelf()
+        val base = Note("n", body = "Plan\nbody", created = 1, modified = 10)
+        shelf.notes["n"] = base
+        val copy = copyOf(base, "Plan", "Plan\nbody", 51).copy(pinned = true)
+        shelf.notes[copy.id] = copy
+        val changed = shelf.removeDuplicates(false, 500)
+        assertTrue(copy.id in changed && "n" in changed)
+        assertTrue(shelf.notes.getValue(copy.id).deleted)
+        assertTrue("the pin moved to the survivor", shelf.notes.getValue("n").pinned)
+        // A chain: the pin ends on what stays.
+        val chain = Shelf()
+        chain.notes["n"] = base
+        val first = copyOf(base, "Plan", "Plan\nbody", 61)
+        val second = copyOf(base, "Plan", "Plan\nbody", 62).copy(pinned = true)
+        chain.notes[first.id] = first
+        chain.notes[second.id] = second
+        chain.removeDuplicates(false, 500)
+        assertTrue(chain.notes.getValue("n").pinned)
+    }
+
+    @Test
+    fun titlesAreComparedWholeAndTrimmedAlikeOnBothSides() {
+        // A 100-character title and a copy that only kept its first 80: not duplicates.
+        val shelf = Shelf()
+        val base = Note("n", title = "a".repeat(100), body = "body", created = 1, modified = 10)
+        shelf.notes["n"] = base
+        val copy = copyOf(base, "a".repeat(80), "body", 71)
+        shelf.notes[copy.id] = copy
+        assertTrue(shelf.removeDuplicates(true, 500).isEmpty())
+        // The trimmed characters are an explicit set (the desk trims the same).
+        fun note(title: String, body: String) = Note("x", title = title, body = body, created = 1, modified = 1)
+        assertEquals("Hi", note("\u00A0Hi\u3000", "").label)
+        assertEquals("# Head", note("", "\u00A0# Head \u2028\nrest").label)
+        assertEquals("item", note("", "\r\n  \n- item").label)
+        assertEquals("U+0085 is not trimmed", "\u0085x\u0085", note("\u0085x\u0085", "").label)
+    }
+
+    @Test
+    fun bothSidesClearingTheSameDuplicatesAtOnceAgree() {
+        val w = World()
+        val id = w.create(Side.DESK, "Plan\nbody")
+        w.connect()
+        val base = w.desk.notes.getValue(id)
+        for (m in 81L..86L) copyOf(base, "Plan", "Plan\nbody", m).let { w.desk.notes[it.id] = it; w.phone.notes[it.id] = it }
+        val unique = copyOf(base, "Plan", "Plan\nbody v2", 87)
+        w.desk.notes[unique.id] = unique
+        w.phone.notes[unique.id] = unique
+        w.disconnect()
+        // Each side tidies on its own, a moment apart.
+        assertEquals(6, w.desk.removeDuplicates(false, 100_000).size)
+        assertEquals(6, w.phone.removeDuplicates(false, 100_050).size)
+        w.connect()
+        for (side in Side.entries) {
+            assertEquals("$side", 2, w.live(side).size)
+            assertTrue(w.live(side).any { it.id == unique.id })
+        }
+        w.assertSameNotes()
+        w.disconnect()
+        w.connect()
+        w.assertSameNotes()
+        assertEquals(2, w.live(Side.DESK).size)
+    }
+
+    @Test
+    fun findingDuplicatesInABigShelfIsQuick() {
+        val shelf = Shelf()
+        for (n in 0 until 200) {
+            val base = Note("note$n", body = "note$n " + "word ".repeat(400), created = 1, modified = 10)
+            shelf.notes[base.id] = base
+            if (n < 150) for (m in listOf(1000L + n, 2000L + n)) copyOf(base, base.label, base.body, m).let { shelf.notes[it.id] = it }
+        }
+        assertEquals(500, shelf.notes.size)
+        val start = System.nanoTime()
+        val doomed = shelf.duplicateCopies(true)
+        val tidied = shelf.removeDuplicates(false, 5000)
+        val ms = (System.nanoTime() - start) / 1_000_000
+        assertEquals(300, doomed.size)
+        assertEquals(300, tidied.size)
+        assertTrue("took $ms ms", ms < 900)
     }
 }

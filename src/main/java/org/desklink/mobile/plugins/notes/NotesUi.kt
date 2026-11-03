@@ -124,7 +124,10 @@ class NotesUi(
                 shape = RoundedCornerShape(28.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             )
-            val (removable, kept) = remember(revision) { NotesStore.duplicateCopiesPreview(host) }
+            // Counted off the main thread: a big shelf of copies is real work.
+            var preview by remember { mutableStateOf(0 to 0) }
+            LaunchedEffect(revision) { preview = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { NotesStore.duplicateCopiesPreview(host) } }
+            val (removable, kept) = preview
             var confirmTidy by remember { mutableStateOf(false) }
             if (removable + kept > 0) {
                 PillButton(
@@ -297,7 +300,7 @@ class NotesUi(
         DisposableEffect(Unit) { onDispose { latestSave() } }
 
         val revision by NotesStore.revision.collectAsState()
-        LaunchedEffect(revision) {
+        LaunchedEffect(revision, dirty) {
             val current = id ?: return@LaunchedEffect
             val stored = NotesStore.note(context, current)
             when {

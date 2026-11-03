@@ -475,6 +475,8 @@ class DeskLinkApplication : Application() {
             // Either side unpaired: the password belongs to that pairing.
             sessionPasswords[device.deviceId]?.set(null)
             screenResumes[device.deviceId]?.set(false)
+            // The notes stay (they are the person's); what they remembered of that desk goes.
+            org.desklink.mobile.plugins.notes.NotesStore.forgetPeer(this@DeskLinkApplication, device.deviceId)
             RelayLinkProvider.instance?.onTrustChanged()
             onDeviceListChanged()
             if (!device.isReachable) {
