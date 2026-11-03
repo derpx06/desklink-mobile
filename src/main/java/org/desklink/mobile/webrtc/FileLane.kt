@@ -187,6 +187,9 @@ interface FileLanes {
     fun clean() {}
 }
 
+/** The lane hit end-of-stream; [atFrameStart]: between two frames, as when the sender is done. */
+internal class LaneEof(val atFrameStart: Boolean) : IOException("The lane closed")
+
 /** A lane connection's writer: its own thread, so a slow socket never stops the file thread. */
 class TcpLaneOut(private val socket: Socket, private val out: OutputStream, private val raw: Socket = socket) : LaneOut {
     private val queue = LinkedBlockingQueue<ByteArray>()
@@ -431,9 +434,10 @@ class RealFileLanes(
                 guard.cancel(false)
                 admission.release(ip); halfOpen = null
                 tls.soTimeout = FileLaneProtocol.SILENT_MS
-                read(tls.inputStream, host, token.transferId, connection)
+                read(tls.inputStream, raw, host, token.transferId, connection)
             } catch (error: Throwable) {
-                Log.i(TAG, "A lane ended (${error.javaClass.simpleName})")
+                // Before the lane carried anything: a refused or broken handshake is a failure worth seeing.
+                Log.w(TAG, "A lane did not open (${error.javaClass.simpleName}: ${error.message})")
             } finally {
                 guard?.cancel(false)
                 halfOpen?.let { admission.release(it) }
@@ -457,9 +461,16 @@ class RealFileLanes(
             return null
         }
 
-        /** Frames, back to back, until the lane ends; each goes to the file thread through the host. */
-        private fun read(input: InputStream, host: Host, transferId: String, connection: Long) {
+        /**
+         * Frames, back to back, until the lane ends; each goes to the file thread through the host. How it ended is logged here: the
+         * sender closing between frames (the normal end of a transfer) and our own close at its end are debug, anything else is a warning
+         * with what was received, so a lane that dies early says so.
+         */
+        private fun read(input: InputStream, raw: Socket, host: Host, transferId: String, connection: Long) {
             val header = ByteArray(FileV2.FRAME_HEADER_BYTES)
+            val started = System.nanoTime()
+            var frames = 0
+            var bytes = 0L
             try {
                 while (true) {
                     readFully(input, header, FileV2.FRAME_HEADER_BYTES)
@@ -468,12 +479,22 @@ class RealFileLanes(
                     readFully(input, frame, total - FileV2.FRAME_HEADER_BYTES, FileV2.FRAME_HEADER_BYTES)
                     // The frame must belong to this transfer: anything else ends the lane (the transfer carries on over WebRTC).
                     if (frameTransfer(frame) != transferId) throw IOException("A frame of another transfer")
+                    frames++
+                    bytes += total
                     host.onFrame(frame, connection)
                 }
+            } catch (error: Throwable) {
+                val summary = "$frames frames, $bytes bytes, ${(System.nanoTime() - started) / 1_000_000} ms"
+                if (laneEndIsNormal(error, raw.isClosed)) Log.d(TAG, "A lane ended ($summary)")
+                else Log.w(TAG, "A lane broke (${error.javaClass.simpleName}: ${error.message}; $summary)")
             } finally {
                 host.laneClosed(transferId, connection)
             }
         }
+
+        /** The sender closed between two frames, or this side closed the socket (the transfer ended): not a failure. */
+        internal fun laneEndIsNormal(error: Throwable, closedHere: Boolean) =
+            (error is LaneEof && error.atFrameStart) || (closedHere && error is IOException)
 
         internal fun frameTransfer(frame: ByteArray): String {
             val b = java.nio.ByteBuffer.wrap(frame, 8, 16)
@@ -484,7 +505,7 @@ class RealFileLanes(
             var read = 0
             while (read < count) {
                 val n = input.read(into, offset + read, count - read)
-                if (n < 0) throw IOException("The lane closed")
+                if (n < 0) throw LaneEof(atFrameStart = read == 0 && offset == 0)
                 read += n
             }
         }

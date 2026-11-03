@@ -196,6 +196,11 @@ fun ScanScreen(
     nearby: List<NearbyComputer>,
     camera: Boolean,
     onAllowCamera: () -> Unit,
+    /** False while pairing or after a failure or cancel: the camera is off until [onRescan]. */
+    scanning: Boolean = true,
+    /** Why the camera is off, if it is ([QrScanFlow.State.Stopped.message] null: the person cancelled). */
+    stopped: org.desklink.mobile.ui.QrScanFlow.State.Stopped? = null,
+    onRescan: () -> Unit = {},
     /** A new value restarts the camera (it pauses on every code it reads). */
     attempt: Int = 0,
     onCode: (String) -> Unit,
@@ -206,7 +211,7 @@ fun ScanScreen(
 ) {
     DarkSystemBars()
     Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF2A2C31), Color(0xFF0B0B0C))))) {
-        if (camera) androidx.compose.runtime.key(attempt) { QrCamera(onError = onCameraError, onCode = onCode) }
+        if (camera && scanning) androidx.compose.runtime.key(attempt) { QrCamera(onError = onCameraError, onCode = onCode) }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
@@ -214,14 +219,18 @@ fun ScanScreen(
                 }
                 Text(stringResource(R.string.scan_title), fontSize = 18.sp, fontWeight = FontWeight.Medium, color = ScanText, modifier = Modifier.semantics { heading() })
             }
-            Brackets(Modifier.align(Alignment.CenterHorizontally).padding(top = 48.dp).size(232.dp), camera, onAllowCamera)
+            Brackets(Modifier.align(Alignment.CenterHorizontally).padding(top = 48.dp).size(232.dp), camera, onAllowCamera, stopped, onRescan)
+            // After a failure the reason replaces the hint, as a live region so a screen reader says it.
+            val reason = stopped?.message?.takeIf { it.isNotBlank() }
             Text(
-                stringResource(R.string.scan_hint),
+                reason ?: stringResource(R.string.scan_hint),
                 fontSize = 15.sp,
                 lineHeight = 22.sp,
                 color = ScanText.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 24.dp).semantics {
+                    if (reason != null) liveRegion = LiveRegionMode.Assertive
+                },
             )
             Spacer(Modifier.weight(1f))
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -232,7 +241,13 @@ fun ScanScreen(
 }
 
 @Composable
-private fun Brackets(modifier: Modifier, camera: Boolean, onAllowCamera: () -> Unit) {
+private fun Brackets(
+    modifier: Modifier,
+    camera: Boolean,
+    onAllowCamera: () -> Unit,
+    stopped: org.desklink.mobile.ui.QrScanFlow.State.Stopped? = null,
+    onRescan: () -> Unit = {},
+) {
     val density = LocalDensity.current
     Box(
         modifier.drawBehind {
@@ -248,7 +263,12 @@ private fun Brackets(modifier: Modifier, camera: Boolean, onAllowCamera: () -> U
         },
         contentAlignment = Alignment.Center,
     ) {
-        if (!camera) {
+        if (stopped != null) {
+            // Camera off on purpose: said why, and scanning resumes only when asked.
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(20.dp)) {
+                PillButton(stringResource(R.string.scan_again), onRescan, style = PillStyle.Tonal, height = 40.dp)
+            }
+        } else if (!camera) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(24.dp)) {
                 Text(stringResource(R.string.scan_camera_needed), fontSize = 13.sp, color = ScanText.copy(alpha = 0.8f), textAlign = TextAlign.Center)
                 PillButton(stringResource(R.string.scan_allow_camera), onAllowCamera, style = PillStyle.Tonal, height = 40.dp)
@@ -295,6 +315,14 @@ private fun NearbyRow(computer: NearbyComputer, onPair: () -> Unit) {
     }
 }
 
+/**
+ * zxing's `RotationListener` asks `context.applicationContext` for the WindowManager, and the application is not a
+ * visual context: Android logs an IncorrectContextUse error on every resume. Answering with the activity itself fixes it.
+ */
+private class VisualAppContext(base: android.content.Context) : android.content.ContextWrapper(base) {
+    override fun getApplicationContext(): android.content.Context = this
+}
+
 /** zxing's camera view, decoding QR codes until one is read; paused with the screen. */
 @Composable
 internal fun QrCamera(onError: (() -> Unit)? = null, onCode: (String) -> Unit) {
@@ -310,7 +338,7 @@ internal fun QrCamera(onError: (() -> Unit)? = null, onCode: (String) -> Unit) {
         AndroidView(
             modifier = Modifier.fillMaxSize().clearAndSetSemantics { },
             factory = { context ->
-                BarcodeView(context).apply {
+                BarcodeView(VisualAppContext(context)).apply {
                     decoderFactory = DefaultDecoderFactory(listOf(BarcodeFormat.QR_CODE))
                     framingRectSize = com.journeyapps.barcodescanner.Size(width, height)
                     decodeContinuous { result -> result.text?.let { text -> pause(); callback(text) } }

@@ -133,6 +133,9 @@ class DeskLinkApplication : Application() {
         DeviceHelper.initializeDeviceId(this)
         step("Rsa keys") { RsaHelper.initialiseRsaKeys(this) }
         step("TLS certificate") { SslHelper.initialiseCertificate(this) }
+        // Preference files the first screens read; their paths are looked up here, before StrictMode is armed, so the
+        // main thread finds them cached (the lookup checks the disk once per file and Context).
+        listOf("stored_menu_selection", org.desklink.mobile.helpers.PerPeerState.LABELS).forEach { getSharedPreferences(it, MODE_PRIVATE) }
         step("Plugin table") { PluginFactory.initPluginInfo(this) }
         step("Notification channels") { NotificationHelper.initializeChannels(this) }
         CrashReporter.offerPendingReport(this)

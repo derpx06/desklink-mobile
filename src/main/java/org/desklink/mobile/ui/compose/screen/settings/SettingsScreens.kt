@@ -328,7 +328,8 @@ internal data class PermissionNeeds(val accessibility: Boolean = true, val notif
                 calls = any { it.isPluginEnabled(plugin(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)) },
                 contacts = any {
                     it.isPluginEnabled(plugin(org.desklink.mobile.plugins.contacts.ContactsPlugin::class.java)) ||
-                        org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(context, it.deviceId)
+                        // The application context: an activity's own would check the disk for this preferences file again, on the main thread.
+                        org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(context.applicationContext, it.deviceId)
                 },
             )
         }

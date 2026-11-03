@@ -67,8 +67,15 @@ object DeviceHelper {
     }
 
     @JvmStatic
+    /**
+     * The default preferences through the application context. An activity's own context keeps its own table of
+     * preference paths, so its first lookup of a file checks the disk again - on the main thread, as a StrictMode
+     * DiskRead. The application context has these cached from start-up. Same file, same id.
+     */
+    private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context.applicationContext ?: context)
+
     fun getDeviceName(context: Context): String {
-        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+        val preferences = prefs(context)
         if (!preferences.contains(KEY_DEVICE_NAME_PREFERENCE)
             && !preferences.getBoolean(KEY_DEVICE_NAME_FETCHED_FROM_THE_INTERNET, false)
             && !fetchingName
@@ -87,7 +94,7 @@ object DeviceHelper {
                 val connection = url.openConnection()
 
                 // If we get here we managed to download the file. Mark that as done so we don't try again even if we don't end up finding a name.
-                val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+                val preferences = prefs(context)
                 preferences.edit { putBoolean(KEY_DEVICE_NAME_FETCHED_FROM_THE_INTERNET, true) }
 
                 BufferedReader(
@@ -126,12 +133,12 @@ object DeviceHelper {
 
     fun setDeviceName(context: Context, name: String) {
         val filteredName = filterInvalidCharactersFromDeviceNameAndLimitLength(name)
-        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+        val preferences = prefs(context)
         preferences.edit { putString(KEY_DEVICE_NAME_PREFERENCE, filteredName) }
     }
 
     fun initializeDeviceId(context: Context) {
-        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+        val preferences = prefs(context)
         val deviceId = preferences.getString(KEY_DEVICE_ID_PREFERENCE, "")!!
         if (DeviceInfo.isValidDeviceId(deviceId)) {
             return // We already have an ID
@@ -142,7 +149,7 @@ object DeviceHelper {
 
     @JvmStatic
     fun getDeviceId(context: Context): String {
-        val preferences = PreferenceManager.getDefaultSharedPreferences(context)
+        val preferences = prefs(context)
         return preferences.getString(KEY_DEVICE_ID_PREFERENCE, null)!!
     }
 

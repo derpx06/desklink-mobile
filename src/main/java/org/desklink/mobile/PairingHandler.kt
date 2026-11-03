@@ -119,6 +119,23 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         device.sendPacket(np)
     }
 
+    /**
+     * A link to this computer exists: if this phone unpaired it while it could not tell it, tell it now (once per link; the debt is
+     * cleared when the packet is sent). Never while a pairing is being negotiated.
+     */
+    fun sendOwedPairFalse() {
+        val context = device.context
+        if (state != PairState.NotPaired || !device.hasBootstrapLink) return
+        if (!org.desklink.mobile.helpers.OwedPairFalse.owes(context, device.deviceId)) return
+        Log.i("PairingHandler", "Telling ${device.deviceId} we unpaired it while it was out of reach")
+        val np = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR)
+        np["pair"] = false
+        device.sendPacket(np, object : Device.SendPacketStatusCallback() {
+            override fun onSuccess() = org.desklink.mobile.helpers.OwedPairFalse.clear(context, device.deviceId)
+            override fun onFailure(e: Throwable) = Unit // still owed: the next link tries again
+        })
+    }
+
     fun packetReceived(np: NetworkPacket) {
         cancelTimer()
         val wantsPair = np.getBoolean("pair")
@@ -476,11 +493,13 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
         }
         state = PairState.NotPaired
         cancelTimer()
+        // No link to carry it: it is owed, and goes out with the next link (the packet-driven reply below stays as the second chance).
+        if (!device.hasBootstrapLink) runCatching { org.desklink.mobile.helpers.OwedPairFalse.owe(device.context, device.deviceId) }
         sendPairFalse()
         // The local revocation commits regardless of whether the peer heard.
         // If it did not, it keeps behaving as paired until it next sends a
         // feature packet, which `notifyPeerNotPaired` answers with `pair:false`.
-        // That self-heal is why there is no retry queue here.
+        // Beside that self-heal, a `pair:false` that could not be sent is owed (OwedPairFalse).
         callback.unpaired(device)
     }
 

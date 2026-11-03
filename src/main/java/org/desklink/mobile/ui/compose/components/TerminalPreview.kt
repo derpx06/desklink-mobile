@@ -81,7 +81,7 @@ object SessionPreviews {
         if (app.getDevice(deviceId)?.hasActiveWebRtcFeatureTransport != true) return emptyList()
         val client = app.terminalClient(deviceId) ?: return emptyList()
         val state = client.state.value
-        val labels = context.getSharedPreferences(LABEL_PREFS, Context.MODE_PRIVATE)
+        val labels = (context.applicationContext ?: context).getSharedPreferences(LABEL_PREFS, Context.MODE_PRIVATE)
         return state.sessions.filter { !it.gone }.map { session ->
             val screen = client.screenIfOpen(session.id) as? TerminalScreen
             val lines = screen?.let { s ->

@@ -10,6 +10,7 @@ import org.desklink.mobile.helpers.TrustedDevices
 import org.desklink.mobile.helpers.readLineBounded
 import org.desklink.mobile.helpers.security.RsaHelper
 import org.desklink.mobile.helpers.security.SslHelper
+import org.desklink.mobile.webrtc.LaneEof
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -455,5 +456,16 @@ class FileLaneTest {
         assertTrue(lanes.cooling(1_000_000 + 299_999)); assertFalse("never longer than five minutes", lanes.cooling(1_000_000 + 300_000))
         lanes.clean()
         assertFalse(lanes.cooling(1_000_001))
+    }
+
+    @Test
+    fun aSenderThatIsDoneIsNotAFailureButAnythingElseIs() {
+        val normal = RealFileLanes.laneEndIsNormal(LaneEof(atFrameStart = true), closedHere = false)
+        assertTrue("the sender closed between two frames", normal)
+        assertFalse("cut in the middle of a frame", RealFileLanes.laneEndIsNormal(LaneEof(atFrameStart = false), closedHere = false))
+        assertTrue("closed here when the transfer ended", RealFileLanes.laneEndIsNormal(java.net.SocketException("Socket closed"), closedHere = true))
+        assertFalse("reset by the peer", RealFileLanes.laneEndIsNormal(java.net.SocketException("Connection reset"), closedHere = false))
+        assertFalse(RealFileLanes.laneEndIsNormal(java.io.IOException("Not a frame"), closedHere = false))
+        assertFalse("a bug is never normal", RealFileLanes.laneEndIsNormal(IllegalStateException("x"), closedHere = true))
     }
 }

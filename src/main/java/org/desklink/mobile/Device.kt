@@ -340,6 +340,7 @@ class Device : PacketReceiver {
                 Log.i("Device", "pairing successful, adding to trusted devices list")
 
                 hidePairingNotification()
+                runCatching { org.desklink.mobile.helpers.OwedPairFalse.clear(context, deviceInfo.id) } // paired again: nothing is owed
 
                 // Pin the certificate of the link the pairing was negotiated
                 // on, then mark trusted — certificate first, both committed
@@ -887,6 +888,8 @@ class Device : PacketReceiver {
         if (hasChanges || links.size == 1) {
             reloadPluginsFromSettings()
         }
+        // A computer this phone unpaired while out of reach is told now that a link exists.
+        if (!isPaired) runCatching { pairingHandler.sendOwedPairFalse() }
     }
 
     @WorkerThread
