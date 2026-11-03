@@ -158,7 +158,7 @@ class BatteryPlugin : Plugin() {
 
     override fun onDestroy() {
         // It's okay to call this only once, even though we registered it for two filters
-        context.unregisterReceiver(receiver)
+        runCatching { context.unregisterReceiver(receiver) }
         runCatching { context.unregisterReceiver(dndReceiver) }
         DndSync.Restore.restoreLater(context, device.deviceId) // gone for a minute: the phone's own setting comes back
     }

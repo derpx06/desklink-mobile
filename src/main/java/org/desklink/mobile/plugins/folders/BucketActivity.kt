@@ -5,6 +5,7 @@
  */
 package org.desklink.mobile.plugins.folders
 
+import org.desklink.mobile.extensions.isReadable
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -126,6 +127,7 @@ class BucketActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (!intent.isReadable()) return finish()
         BucketEngine.start(this)
         val deviceId = deskFor(intent.getStringExtra(EXTRA_DEVICE)) ?: run {
             Toast.makeText(this, R.string.bucket_no_desk, Toast.LENGTH_LONG).show()
@@ -137,7 +139,7 @@ class BucketActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        takeShare(intent)
+        if (intent.isReadable()) takeShare(intent)
     }
 
     /** The share sheet (one or several files, or text and links). */

@@ -42,7 +42,8 @@ class NetworkPacket private constructor(
     }
 
     fun getStringOrNull(key: String): String? {
-        return if (mBody.has(key)) mBody.getString(key)
+        // opt*, not get*: a peer's wrong-typed field is "absent", never a JSONException in a read loop.
+        return if (mBody.has(key) && !mBody.isNull(key)) mBody.optString(key)
         else null
     }
 
@@ -62,8 +63,12 @@ class NetworkPacket private constructor(
     }
 
     fun getIntOrNull(key: String): Int? {
-        return if (mBody.has(key)) mBody.getInt(key)
-        else null
+        if (!mBody.has(key)) return null
+        return when (val value = mBody.opt(key)) {
+            is Number -> value.toInt()
+            is String -> value.toIntOrNull()
+            else -> null
+        }
     }
 
     fun getInt(key: String, defaultValue: Int): Int {
