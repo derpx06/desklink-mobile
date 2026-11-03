@@ -17,7 +17,7 @@ import org.junit.Test
 /** The vectors the desktop wrote (workspace protocol/testdata/desklink_v9/, byte-identical copies): the phone agrees with each. */
 class DeskSharedFixturesTest {
     private fun fixture(name: String) = JSONObject(javaClass.getResourceAsStream("/shared/$name.json")!!.bufferedReader().readText())
-    private fun cases(f: JSONObject): List<JSONObject> = f.getJSONArray("cases").let { a -> (0 until a.length()).map { a.getJSONObject(it) } }
+    private fun cases(f: JSONObject, key: String = "cases"): List<JSONObject> = f.getJSONArray(key).let { a -> (0 until a.length()).map { a.getJSONObject(it) } }
 
     @Test
     fun caseClashWinnersAgreeWithTheDesksOwnVectors() {
@@ -103,5 +103,26 @@ class DeskSharedFixturesTest {
             for (i in 0 until case.getJSONArray("emails").length()) assertTrue(lines.any { it.startsWith("EMAIL") && it.endsWith(":" + case.getJSONArray("emails").getString(i)) })
             assertTrue(lines.first() == "BEGIN:VCARD" && lines.last() == "END:VCARD")
         }
+    }
+
+    @Test
+    fun receivedFileNamesAreCleanedAndNumberedLikeTheDesk() {
+        val f = fixture("filenames")
+        for (case in cases(f, "sanitize")) {
+            val raw = case.getString("in")
+            assertEquals(raw, case.getString("out"), org.desklink.mobile.webrtc.sanitizeFilename(raw))
+            org.desklink.mobile.webrtc.validateFilename(case.getString("out")) // what the wire check accepts
+        }
+        for (case in cases(f, "unique")) {
+            val taken = case.getJSONArray("taken").let { a -> (0 until a.length()).map { a.getString(it) }.toSet() }
+            val name = case.getString("name")
+            assertEquals(name.take(20), case.getString("out"), org.desklink.mobile.plugins.share.DeviceStorageDestination.uniqueName(name) { it in taken })
+        }
+        // And through the parser, as an offer arrives.
+        val json = JSONObject()
+            .put("protocolVersion", 2).put("action", "offer").put("transferId", "0f8fad5b-d9cb-469f-a165-70867728950e")
+            .put("deviceId", "desk").put("sessionId", 1).put("connectionGeneration", 1).put("transferToken", "t")
+            .put("filename", "photo\u202egpj.exe\u0000")
+        assertEquals("photogpj.exe", org.desklink.mobile.webrtc.WebRtcFileControl.fromJson(json).filename)
     }
 }

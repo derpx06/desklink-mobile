@@ -127,4 +127,68 @@ class OffThreadObserverTest {
             events.close()
         }
     }
+
+    private fun envelope(payload: String = "eA==") = WebRtcEnvelope(
+        protocolVersion = 1, messageId = "m", deviceId = "d", sessionId = 1, connectionGeneration = 1, channel = "events",
+        messageType = "t", timestamp = 0, flags = 0, payloadLength = 1, payloadBase64 = payload,
+    )
+
+    /** A handler that is stuck while the peer keeps sending: the backlog is bounded and the connection fails, loudly and once. */
+    @Test
+    fun `a backlog past its bound fails the connection once instead of growing`() {
+        val release = CountDownLatch(1)
+        val handled = java.util.concurrent.atomic.AtomicInteger()
+        val failures = CopyOnWriteArrayList<Throwable>()
+        val failed = CountDownLatch(1)
+        val target = object : WebRtcTransport.Observer {
+            override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) = Unit
+            override fun onEnvelope(envelope: WebRtcEnvelope) { handled.incrementAndGet(); release.await() }
+            override fun onControlChannelOpen() = Unit
+            override fun onRemoteVideoTrack(track: VideoTrack) = Unit
+            override fun onScreenCaptureStopped(reason: String) = Unit
+            override fun onConnectionStateChanged(state: WebRtcPeerHealth) = Unit
+            override fun onFailure(error: Throwable) { failures += error; failed.countDown() }
+        }
+        val events = DeferredTaskExecutor("test-observer-backlog")
+        try {
+            val observer = OffThreadObserver(target, events, maxQueuedEnvelopes = 10, maxQueuedBytes = Long.MAX_VALUE)
+            repeat(1000) { observer.onEnvelope(envelope()) }
+            assertTrue("the connection is failed", failed.await(2, TimeUnit.SECONDS))
+            release.countDown()
+            val drained = CountDownLatch(1)
+            events.execute { drained.countDown() } // the queue is in order: everything before this has run
+            assertTrue(drained.await(2, TimeUnit.SECONDS))
+            assertEquals("one failure, however many came after", 1, failures.size)
+            assertTrue("no more than the bound was ever queued", handled.get() <= 10)
+        } finally {
+            release.countDown()
+            events.close()
+        }
+    }
+
+    @Test
+    fun `the bytes waiting are bounded too, and a drained queue accepts again`() {
+        val failures = CopyOnWriteArrayList<Throwable>()
+        val seen = java.util.concurrent.atomic.AtomicInteger()
+        val target = object : WebRtcTransport.Observer {
+            override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) = Unit
+            override fun onEnvelope(envelope: WebRtcEnvelope) { seen.incrementAndGet() }
+            override fun onControlChannelOpen() = Unit
+            override fun onRemoteVideoTrack(track: VideoTrack) = Unit
+            override fun onScreenCaptureStopped(reason: String) = Unit
+            override fun onConnectionStateChanged(state: WebRtcPeerHealth) = Unit
+            override fun onFailure(error: Throwable) { failures += error }
+        }
+        val events = DeferredTaskExecutor("test-observer-bytes")
+        val observer = OffThreadObserver(target, events, maxQueuedEnvelopes = 100, maxQueuedBytes = 1000)
+        // Steady traffic, each handled before the next: never near the bound.
+        repeat(200) {
+            observer.onEnvelope(envelope("x".repeat(500)))
+            val deadline = System.nanoTime() + 2_000_000_000L
+            while (seen.get() <= it && System.nanoTime() < deadline) Thread.sleep(1)
+        }
+        assertEquals(200, seen.get())
+        assertTrue(failures.isEmpty())
+        events.close()
+    }
 }

@@ -804,9 +804,6 @@ public class LanLinkProvider extends BaseLinkProvider {
             Log.i("LanLinkProvider", "Won't broadcast UDP packet if TCP socket is not ready yet");
             return;
         }
-        // Every caller but mDNS already checked; a service any host advertises must not make this phone announce itself
-        // (id, name, capabilities, port) on a network the person did not trust.
-        if (!TrustedNetworkHelper.isTrustedNetwork(context)) return;
 
         // TODO: In protocol version 8 this packet doesn't need to contain identity info
         //       since it will be exchanged after the socket is encrypted.

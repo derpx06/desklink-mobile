@@ -145,4 +145,44 @@ class RelayLinkSessionTest {
         assertEquals(1L, frame.getLong("seq"))
         desktop.take(frame)
     }
+
+    /** An h1 is unsigned: one frame from the relay must not end a healthy link. */
+    @Test
+    fun anH1AndEvenAForgedFinDoNotDropAnEstablishedLink() {
+        val phone = phone()
+        val desktop = desktop()
+        handshake(phone, desktop)
+        // Someone replays a plausible h1 (a second phone session's, with the paired identity).
+        val h1 = phone().start()
+        val h2 = sent(desktop.take(h1))
+        assertEquals("h2", h2.getString("k"))
+        assertTrue("the live link is still up", desktop.isEstablished)
+        assertArrayEquals("and still carries data", "still here".toByteArray(), (desktop.take(phone.seal("still here".toByteArray()))[0] as Event.Packet).bytes)
+        // The fin that follows is not from the peer: refused without a trace.
+        val forged = JSONObject().put("k", "fin").put("sig", RelayLinkCrypto.b64(ByteArray(64) { 7 }))
+        assertTrue(desktop.take(forged).isEmpty())
+        assertTrue(desktop.isEstablished)
+        assertArrayEquals("untouched".toByteArray(), (desktop.take(phone.seal("untouched".toByteArray()))[0] as Event.Packet).bytes)
+        // Garbage that is not even an h1 is ignored the same way.
+        assertTrue(desktop.take(JSONObject().put("k", "h1").put("lv", 99)).isEmpty())
+        assertTrue(desktop.take(JSONObject().put("k", "h1")).isEmpty())
+        assertTrue(desktop.isEstablished)
+    }
+
+    @Test
+    fun aPeerThatReallyRestartedTakesOverAtItsFin() {
+        val phone = phone()
+        val desktop = desktop()
+        handshake(phone, desktop)
+        val restarted = phone()
+        val h2 = sent(desktop.take(restarted.start()))
+        val events = restarted.take(h2)
+        // Until the fin proves it, the old session is the one in use.
+        assertTrue(desktop.isEstablished)
+        val taken = desktop.take(sent(events))
+        assertTrue((taken[0] as Event.Established).identity.contains(phoneId))
+        assertArrayEquals("new".toByteArray(), (desktop.take(restarted.seal("new".toByteArray()))[0] as Event.Packet).bytes)
+        // The old session's keys no longer open anything.
+        assertThrows(Exception::class.java) { desktop.take(phone.seal("old".toByteArray())) }
+    }
 }
