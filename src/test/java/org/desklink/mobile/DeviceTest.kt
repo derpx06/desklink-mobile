@@ -292,4 +292,17 @@ class DeviceTest {
             context.getSharedPreferences("testDevice_ping_preferences", Context.MODE_PRIVATE)
         }
     }
+
+    @Test
+    fun unpairSweepsThePeersStateOnTheLifecycleWorkerNotTheCallersThread() {
+        io.mockk.mockkObject(org.desklink.mobile.helpers.PeerState)
+        val swept = java.util.concurrent.atomic.AtomicReference<Thread>()
+        every { org.desklink.mobile.helpers.PeerState.forgetLate(any(), any(), any(), any(), any()) } answers { swept.set(Thread.currentThread()) }
+        val device = Device(context, "testDevice")
+        device.unpair()
+        verify(timeout = 5000) { org.desklink.mobile.helpers.PeerState.forgetLate(any(), eq("testDevice"), any(), any(), any()) }
+        Assert.assertNotSame(Thread.currentThread(), swept.get())
+        // The device is unpaired at once, whatever the sweep is doing.
+        Assert.assertFalse(device.isPaired)
+    }
 }
