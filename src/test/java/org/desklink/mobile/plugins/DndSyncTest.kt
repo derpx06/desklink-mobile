@@ -21,6 +21,16 @@ class DndSyncTest {
     }
 
     @Test
+    fun theFilterToPutBackSurvivesAProcessEndAndGarbageIsIgnored() {
+        val text = DndSync.Restore.encode(1, 2)
+        assertEquals(1 to 2, DndSync.Restore.decode(text))
+        assertNull(DndSync.Restore.decode(null))
+        assertNull(DndSync.Restore.decode("1"))
+        assertNull(DndSync.Restore.decode("a,2"))
+        assertNull(DndSync.Restore.decode("1,2,3"))
+    }
+
+    @Test
     fun theKeysAreReportedOnlyWhileTheComputersSwitchIsOn() {
         assertEquals(emptyMap<String, Boolean>(), DndSync.keys(syncOn = false, dnd = true, canSet = true))
         assertEquals(mapOf("dnd" to true, "dndCanSet" to false), DndSync.keys(syncOn = true, dnd = true, canSet = false))

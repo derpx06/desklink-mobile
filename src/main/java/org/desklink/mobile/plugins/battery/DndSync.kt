@@ -33,7 +33,7 @@ object DndSync {
         if (!manager.isNotificationPolicyAccessGranted) return false
         if (!dnd && Restore.has(deviceId)) return Restore.restoreNow(context, deviceId)
         val target = if (dnd) NotificationManager.INTERRUPTION_FILTER_PRIORITY else NotificationManager.INTERRUPTION_FILTER_ALL
-        Restore.remember(deviceId, manager.currentInterruptionFilter, target)
+        Restore.remember(context, deviceId, manager.currentInterruptionFilter, target)
         manager.setInterruptionFilter(target)
         true
     }.getOrDefault(false)
@@ -54,8 +54,30 @@ object DndSync {
 
         fun has(deviceId: String) = saved.containsKey(deviceId)
 
-        fun remember(deviceId: String, before: Int, setTo: Int) {
-            saved[deviceId] = Saved(saved[deviceId]?.before ?: before, setTo)
+        fun remember(context: Context, deviceId: String, before: Int, setTo: Int) {
+            val kept = Saved(saved[deviceId]?.before ?: before, setTo)
+            saved[deviceId] = kept
+            // Kept on disk too: if Android ends this process while the computer holds the phone in Do Not Disturb, the next start puts it back.
+            store(context).edit().putString(deviceId, encode(kept.before, kept.setTo)).apply()
+        }
+
+        private fun store(context: Context) = context.applicationContext.getSharedPreferences("dnd_restore", Context.MODE_PRIVATE)
+
+        fun encode(before: Int, setTo: Int) = "$before,$setTo"
+
+        /** (before, setTo), or null for anything that is not what [encode] writes. */
+        fun decode(text: String?): Pair<Int, Int>? {
+            val parts = text?.split(',') ?: return null
+            if (parts.size != 2) return null
+            return (parts[0].toIntOrNull() ?: return null) to (parts[1].toIntOrNull() ?: return null)
+        }
+
+        /** After a start: what a previous run changed and never put back is put back in [GONE_MS] unless the computer returns first. */
+        fun resumeAfterRestart(context: Context) {
+            store(context).all.forEach { (id, value) ->
+                val (before, setTo) = decode(value as? String) ?: run { store(context).edit().remove(id).apply(); return@forEach }
+                if (saved.putIfAbsent(id, Saved(before, setTo)) == null) restoreLater(context, id)
+            }
         }
 
         /** Pure: the person's own change since is left alone. */
@@ -64,6 +86,7 @@ object DndSync {
         fun restoreNow(context: Context, deviceId: String): Boolean {
             cancel(deviceId)
             val s = saved.remove(deviceId) ?: return true
+            store(context).edit().remove(deviceId).apply()
             return runCatching {
                 val manager = context.getSystemService(NotificationManager::class.java)
                 if (manager.isNotificationPolicyAccessGranted && shouldRestore(manager.currentInterruptionFilter, s.setTo)) manager.setInterruptionFilter(s.before)

@@ -633,6 +633,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         when {
             clipboard == null -> showMessage(getString(R.string.home_feature_off))
             clipboard.sendNow() -> showMessage(getString(R.string.home_clipboard_sent, device.name))
+            org.desklink.mobile.plugins.clipboard.ClipboardListener.instance(this).lastRefusedTooLarge -> showMessage(getString(R.string.clipboard_too_large))
             else -> showMessage(getString(R.string.clipboard_nothing_sent))
         }
     }

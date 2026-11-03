@@ -187,6 +187,7 @@ class DeskLinkApplication : Application() {
         org.desklink.mobile.helpers.ThreadHelper.execute {
             org.desklink.mobile.helpers.RemovedFeatures.runOnce(this)
             runCatching { org.desklink.mobile.plugins.findmyphone.RingVolume.restoreIfLeft(this) }
+            runCatching { org.desklink.mobile.plugins.battery.DndSync.Restore.resumeAfterRestart(this) }
         }
         // Received files that could not be saved are kept a week; leftovers of a crash a day. Not only when a transfer starts.
         org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { org.desklink.mobile.plugins.share.UnpublishedFiles.prune(this) } }

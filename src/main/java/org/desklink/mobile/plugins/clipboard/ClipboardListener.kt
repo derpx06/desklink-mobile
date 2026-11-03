@@ -71,6 +71,10 @@ class ClipboardListener private constructor(ctx: Context) {
     @Volatile var copiedAt: Long = 0
         private set
 
+    /** The last [sync] found the copy too large for one message (so the caller can say so, not "nothing to send"). */
+    @Volatile var lastRefusedTooLarge: Boolean = false
+        private set
+
     /** The newest time this phone holds a copy of its own. */
     fun newestLocalCopy(): Long = maxOf(updateTimestamp, copiedAt)
 
@@ -207,6 +211,14 @@ class ClipboardListener private constructor(ctx: Context) {
         val previous = currentContent
         val content = readNow() ?: return false
         if (!force && content == previous) return false
+        // One message carries the whole copy: a larger one is said to be too large, never "sent".
+        if (!ClipboardPlugin.fitsWire(content)) {
+            lastRefusedTooLarge = true
+            Log.w(TAG, "clipboard: ${content.length} chars is too large for one message, not sent")
+            if (!force) main.post { android.widget.Toast.makeText(context, org.desklink.mobile.R.string.clipboard_too_large, android.widget.Toast.LENGTH_SHORT).show() }
+            return false
+        }
+        lastRefusedTooLarge = false
         Log.i(TAG, "clipboard: ${content.length} chars to ${observers.size} desk(s) (${if (force) "asked" else "new copy"})")
         ClipboardOffer.cancel(context)
         val targets = observers.toList()

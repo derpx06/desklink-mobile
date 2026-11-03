@@ -75,6 +75,13 @@ class ClipboardPluginTest {
     }
 
     @Test
+    fun aClipboardPacketWithoutTextNeverBlanksTheClipboard() {
+        Assert.assertFalse(clipboardPlugin.onPacketReceived(NetworkPacket("desklink.clipboard")))
+        Assert.assertFalse(clipboardPlugin.onPacketReceived(NetworkPacket("desklink.clipboard").apply { set("content", "") }))
+        verify(exactly = 0) { clipboardListener.setText(any()) }
+    }
+
+    @Test
     fun testReceiveAndDiscardClipboardUpdateTimestampZero() {
         val content = "DLWq7RvblSa6zFPrwLjs9JAdA"
         val timestamp = System.currentTimeMillis()

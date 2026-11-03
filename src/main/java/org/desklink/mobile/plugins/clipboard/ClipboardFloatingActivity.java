@@ -58,7 +58,8 @@ public class ClipboardFloatingActivity extends AppCompatActivity {
             boolean sent = ClipboardListener.instance(this).sync(asked);
             ClipboardOffer.INSTANCE.cancel(this);
             if (asked) {
-                Toast.makeText(this, sent ? R.string.pref_plugin_clipboard_sent : R.string.clipboard_nothing_sent, Toast.LENGTH_SHORT).show();
+                boolean tooLarge = !sent && ClipboardListener.instance(this).getLastRefusedTooLarge();
+                Toast.makeText(this, sent ? R.string.pref_plugin_clipboard_sent : tooLarge ? R.string.clipboard_too_large : R.string.clipboard_nothing_sent, Toast.LENGTH_SHORT).show();
             }
             finish();
         }

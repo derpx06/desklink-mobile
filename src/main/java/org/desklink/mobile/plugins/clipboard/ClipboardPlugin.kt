@@ -36,6 +36,8 @@ class ClipboardPlugin : Plugin() {
         }
         when (np.type) {
             (PACKET_TYPE_CLIPBOARD) -> {
+                // A packet with no text (or an empty one) is not a copy: it must not blank the person's clipboard.
+                if ("content" !in np || content.isEmpty()) return false
                 ClipboardListener.instance(context).setText(content)
                 return true
             }
