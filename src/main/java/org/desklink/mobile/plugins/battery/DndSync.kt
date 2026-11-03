@@ -3,6 +3,7 @@ package org.desklink.mobile.plugins.battery
 
 import android.app.NotificationManager
 import android.content.Context
+import androidx.core.content.edit
 
 /**
  * Do Not Disturb sync (W14). The phone reports its interruption filter in the battery packet (`dnd`, `dndCanSet`) only while the
@@ -58,10 +59,10 @@ object DndSync {
             val kept = Saved(saved[deviceId]?.before ?: before, setTo)
             saved[deviceId] = kept
             // Kept on disk too: if Android ends this process while the computer holds the phone in Do Not Disturb, the next start puts it back.
-            store(context).edit().putString(deviceId, encode(kept.before, kept.setTo)).apply()
+            store(context).edit { putString(deviceId, encode(kept.before, kept.setTo)) }
         }
 
-        private fun store(context: Context) = context.applicationContext.getSharedPreferences("dnd_restore", Context.MODE_PRIVATE)
+        private fun store(context: Context) = context.applicationContext.getSharedPreferences(org.desklink.mobile.helpers.PerPeerState.DND_RESTORE, Context.MODE_PRIVATE)
 
         fun encode(before: Int, setTo: Int) = "$before,$setTo"
 
@@ -75,7 +76,7 @@ object DndSync {
         /** After a start: what a previous run changed and never put back is put back in [GONE_MS] unless the computer returns first. */
         fun resumeAfterRestart(context: Context) {
             store(context).all.forEach { (id, value) ->
-                val (before, setTo) = decode(value as? String) ?: run { store(context).edit().remove(id).apply(); return@forEach }
+                val (before, setTo) = decode(value as? String) ?: run { store(context).edit { remove(id) }; return@forEach }
                 if (saved.putIfAbsent(id, Saved(before, setTo)) == null) restoreLater(context, id)
             }
         }
@@ -86,7 +87,7 @@ object DndSync {
         fun restoreNow(context: Context, deviceId: String): Boolean {
             cancel(deviceId)
             val s = saved.remove(deviceId) ?: return true
-            store(context).edit().remove(deviceId).apply()
+            store(context).edit { remove(deviceId) }
             return runCatching {
                 val manager = context.getSystemService(NotificationManager::class.java)
                 if (manager.isNotificationPolicyAccessGranted && shouldRestore(manager.currentInterruptionFilter, s.setTo)) manager.setInterruptionFilter(s.before)

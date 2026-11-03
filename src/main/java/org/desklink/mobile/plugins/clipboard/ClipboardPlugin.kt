@@ -97,6 +97,9 @@ class ClipboardPlugin : Plugin() {
         return true
     }
 
+    /** The desk says its clipboard sharing is off: it ignores a copy, so an explicit send must say so instead of "sent". */
+    fun deskIgnoresClipboard(): Boolean = ignores(device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings)
+
     /** Home's "Send clipboard to <desk>": whatever is on the clipboard, text or image, sent now. */
     fun sendNow(): Boolean = ClipboardListener.instance(context).sync(force = true)
 
@@ -139,6 +142,9 @@ class ClipboardPlugin : Plugin() {
                 // Never in the future, and never below the newest this process has sent (a clock set back must not reorder copies).
                 this["copiedAt"] = copiedAt.coerceIn(0L, now).coerceAtLeast(floor)
             }
+
+        /** A desk that did not report its settings is given the benefit of the doubt. */
+        fun ignores(settings: org.desklink.mobile.plugins.desksettings.DeskSettingsState?): Boolean = settings?.clipboard == false
 
         /** Too large → not shared (contract "Wire size"). */
         fun fitsWire(content: String) = org.json.JSONObject.quote(content).toByteArray().size <= MAX_SHARED_TEXT_BYTES

@@ -75,6 +75,16 @@ class ClipboardPluginTest {
     }
 
     @Test
+    fun aDeskWithClipboardSharingOffIsKnownToIgnoreAndAnUnknownOneIsNot() {
+        val off = org.desklink.mobile.plugins.desksettings.DeskSettingsState(
+            keepAwake = false, clipboard = false, notifications = true, relayConfigured = false, relay = false, commandAlerts = true, unlockNearby = false,
+        )
+        Assert.assertTrue(ClipboardPlugin.ignores(off))
+        Assert.assertFalse(ClipboardPlugin.ignores(off.copy(clipboard = true)))
+        Assert.assertFalse(ClipboardPlugin.ignores(null))
+    }
+
+    @Test
     fun aClipboardPacketWithoutTextNeverBlanksTheClipboard() {
         Assert.assertFalse(clipboardPlugin.onPacketReceived(NetworkPacket("desklink.clipboard")))
         Assert.assertFalse(clipboardPlugin.onPacketReceived(NetworkPacket("desklink.clipboard").apply { set("content", "") }))

@@ -23,6 +23,7 @@ class PerPeerStateTest {
         PerPeerState.LABELS -> listOf(PerPeerState.labelKey(id, "session-1"))
         PerPeerState.SURFACES -> listOf(PerPeerState.seenKey(id), PerPeerState.finishedKey(id))
         PerPeerState.SHARE_QUEUE -> listOf(id, "attempts_$id")
+        PerPeerState.DND_RESTORE -> listOf(id)
         else -> error("a store without a key list in this test: $store")
     }
 
@@ -30,7 +31,7 @@ class PerPeerStateTest {
     fun unpairClearsEveryRegisteredStoreForThatComputerOnly() {
         for (store in PerPeerState.stores) {
             val prefs = app.getSharedPreferences(store.prefsName, Context.MODE_PRIVATE)
-            prefs.edit { listOf(desk, other).forEach { id -> keysFor(store.prefsName, id).forEach { putString(it, "x") } } }
+            prefs.edit { listOf(desk, other).forEach { id -> keysFor(store.prefsName, id).forEach { putString(it, if (store.prefsName == PerPeerState.DND_RESTORE) "1,2" else "x") } } }
         }
         PeerState.forget(app, desk)
         for (store in PerPeerState.stores) {
