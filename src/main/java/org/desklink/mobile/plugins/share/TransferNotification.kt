@@ -80,7 +80,7 @@ object TransferNotification {
         val percent: String = "%d%%", val about: String = "about %s", val perSecond: String = "%s/s", val join: String = " · ",
         val waitingFor: String = "Waiting for %s", val paused: String = "Paused", val storageFull: String = "Storage is full",
         val publicText: String = "DeskLink · transferring files",
-        val laneFast: String = "fast lane", val laneWebRtc: String = "over WebRTC", val laneRelay: String = "through a relay",
+        val laneFast: String = "fast, over Wi-Fi", val laneWebRtc: String = "over the secure link", val laneRelay: String = "through the internet (slower)",
         val eta: BucketProgress.Words = BucketProgress.Words(),
     )
 

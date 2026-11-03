@@ -40,11 +40,11 @@ class TransferNotificationTest {
     fun theLaneIsNamedOnlyWhenEveryMovingFileIsOnTheSameOne() {
         val fast = item("a.bin", true, 10, 100, bps = 1_000_000).copy(lane = TransferNotification.LANE_FAST)
         val web = item("b.bin", true, 10, 100, bps = 1_000_000).copy(lane = TransferNotification.LANE_WEBRTC)
-        assertTrue(TransferNotification.note("Dell", listOf(fast), 0, 0, false, false, size)!!.text.endsWith("fast lane"))
-        assertTrue(TransferNotification.note("Dell", listOf(web), 0, 0, false, false, size)!!.text.endsWith("over WebRTC"))
-        assertTrue(TransferNotification.note("Dell", listOf(item("c.bin", true, 10, 100).copy(lane = TransferNotification.LANE_RELAY)), 0, 0, false, false, size)!!.text.endsWith("through a relay"))
+        assertTrue(TransferNotification.note("Dell", listOf(fast), 0, 0, false, false, size)!!.text.endsWith("fast, over Wi-Fi"))
+        assertTrue(TransferNotification.note("Dell", listOf(web), 0, 0, false, false, size)!!.text.endsWith("over the secure link"))
+        assertTrue(TransferNotification.note("Dell", listOf(item("c.bin", true, 10, 100).copy(lane = TransferNotification.LANE_RELAY)), 0, 0, false, false, size)!!.text.endsWith("through the internet (slower)"))
         val mixed = TransferNotification.note("Dell", listOf(fast, web), 0, 0, false, false, size)!!.text
-        assertFalse(mixed, mixed.contains("lane") || mixed.contains("WebRTC"))
+        assertFalse(mixed, mixed.contains("Wi-Fi") || mixed.contains("secure link"))
         assertFalse(TransferNotification.note("Dell", listOf(item("d.bin", true, 10, 100)), 0, 0, false, false, size)!!.text.contains("lane"))
     }
 
@@ -185,10 +185,10 @@ class TransferNotificationTest {
     @Test
     fun theLaneWordsComeFromTheResourcesAndAreForgottenWhenTheFileIsDone() {
         val words = TransferNotification.words(app)
-        assertEquals("fast lane", words.laneFast); assertEquals("over WebRTC", words.laneWebRtc); assertEquals("through a relay", words.laneRelay)
+        assertEquals("fast, over Wi-Fi", words.laneFast); assertEquals("over the secure link", words.laneWebRtc); assertEquals("through the internet (slower)", words.laneRelay)
         val desk = "88888888-aaaa-bbbb-cccc-888888888888"
         TransferNotification.lane(desk, "t1", "a.bin", true, TransferNotification.LANE_FAST)
-        assertEquals("fast lane", TransferNotification.laneWord(app, desk, true, "a.bin"))
+        assertEquals("fast, over Wi-Fi", TransferNotification.laneWord(app, desk, true, "a.bin"))
         assertNull("another direction or name is not that file", TransferNotification.laneWord(app, desk, false, "a.bin"))
         TransferNotification.lane(desk, "t1", "a.bin", true, null)
         assertNull(TransferNotification.laneWord(app, desk, true, "a.bin"))
@@ -201,7 +201,7 @@ class TransferNotificationTest {
         TransferNotification.lane(desk, "t2", "same.bin", true, TransferNotification.LANE_WEBRTC)
         assertNull("they disagree: no word beats a wrong one", TransferNotification.laneWord(app, desk, true, "same.bin"))
         TransferNotification.lane(desk, "t2", "same.bin", true, null)
-        assertEquals("the one left shows its own", "fast lane", TransferNotification.laneWord(app, desk, true, "same.bin"))
+        assertEquals("the one left shows its own", "fast, over Wi-Fi", TransferNotification.laneWord(app, desk, true, "same.bin"))
         TransferNotification.lane(desk, "t1", "same.bin", true, null)
         assertNull(TransferNotification.laneWord(app, desk, true, "same.bin"))
     }

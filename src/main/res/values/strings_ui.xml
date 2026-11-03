@@ -547,9 +547,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="transfer_note_waiting" formatted="false">Waiting for %s</string>
     <string name="transfer_note_paused">Paused</string>
     <string name="transfer_note_storage_full">Storage is full</string>
-    <string name="transfer_lane_fast">fast lane</string>
-    <string name="transfer_lane_webrtc">over WebRTC</string>
-    <string name="transfer_lane_relay">through a relay</string>
+    <string name="transfer_lane_fast">fast, over Wi-Fi</string>
+    <string name="transfer_lane_webrtc">over the secure link</string>
+    <string name="transfer_lane_relay">through the internet (slower)</string>
     <string name="transfer_note_public">DeskLink · transferring files</string>
     <string name="bucket_open_action" formatted="false">Open Bucket</string>
     <string name="bucket_pause" formatted="false">Pause sync</string>
