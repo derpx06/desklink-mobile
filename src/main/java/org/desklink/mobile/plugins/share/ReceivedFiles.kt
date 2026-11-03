@@ -11,11 +11,13 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import org.desklink.mobile.helpers.FilesHelper
+import org.desklink.mobile.webrtc.truncateUtf8
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 /** A received file as it now exists for the person: where, under what name. */
@@ -126,14 +128,25 @@ class DeviceStorageDestination(private val context: Context) : ReceiveDestinatio
     }
 
     companion object {
+        /**
+         * `name (n).ext` with the extension kept, and the stem cut so the whole stays within 255 UTF-8 bytes (a longer name fails
+         * to save). An "extension" over 32 bytes is just part of the name, as on the computer.
+         */
+        internal fun numbered(clean: String, n: Int): String {
+            val dot = clean.lastIndexOf('.')
+            val ext = if (dot >= 0) clean.substring(dot + 1) else ""
+            val keepExt = dot >= 0 && ext.isNotEmpty() && ext.toByteArray(StandardCharsets.UTF_8).size <= 32
+            val stem = if (keepExt) clean.substring(0, dot) else clean
+            val suffix = if (keepExt) " ($n).$ext" else " ($n)"
+            return truncateUtf8(stem, 255 - suffix.toByteArray(StandardCharsets.UTF_8).size) + suffix
+        }
+
         /** [name], else `name (2)`, `name (3)`… until [taken] says no. Pure apart from [taken]. */
         fun uniqueName(name: String, taken: (String) -> Boolean): String {
             val clean = name.trimEnd('.').ifEmpty { "bad_name_file" }
-            val base = File(clean).nameWithoutExtension
-            val ext = File(clean).extension.let { if (it.isEmpty()) "" else ".$it" }
             var n = 0
             while (true) {
-                val candidate = if (n == 0) clean else "$base (${n + 1})$ext"
+                val candidate = if (n == 0) clean else numbered(clean, n + 1)
                 if (!taken(candidate) || n > 10_000) return candidate
                 n++
             }
@@ -142,11 +155,9 @@ class DeviceStorageDestination(private val context: Context) : ReceiveDestinatio
         /** `name`, else `name (2)`, `name (3)`… with the extension kept (the computer's rule: the second file is "(2)"). */
         fun uniqueIn(dir: File, name: String): String {
             val clean = name.trimEnd('.').ifEmpty { "bad_name_file" }
-            val base = File(clean).nameWithoutExtension
-            val ext = File(clean).extension.let { if (it.isEmpty()) "" else ".$it" }
             var n = 0
             while (true) {
-                val candidate = if (n == 0) clean else "$base (${n + 1})$ext"
+                val candidate = if (n == 0) clean else numbered(clean, n + 1)
                 if (!File(dir, candidate).exists()) return candidate
                 n++
             }

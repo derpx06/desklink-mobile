@@ -5,6 +5,7 @@
  */
 package org.desklink.mobile.plugins.notes
 
+import org.desklink.mobile.extensions.isReadable
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -100,6 +101,7 @@ class NotesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (!intent.isReadable()) return finish()
         savedInstanceState?.let {
             editing.value = it.getString(STATE_EDITING)
             tab.value = it.getInt(STATE_TAB)
@@ -114,7 +116,7 @@ class NotesActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handle(intent)
+        if (intent.isReadable()) handle(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

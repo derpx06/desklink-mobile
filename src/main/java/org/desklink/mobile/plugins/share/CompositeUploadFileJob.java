@@ -37,7 +37,6 @@ import java.util.List;
  *     {@link Device#sendPacketBlocking(NetworkPacket, Device.SendPacketStatusCallback)}.
  * </p>
  *
- * @see CompositeReceiveFileJob
  * @see SendPacketStatusCallback
  */
 public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {

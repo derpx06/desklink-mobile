@@ -46,7 +46,7 @@ class PingPlugin : Plugin() {
 
         val (id: Int, message: String) = if (np.has("message")) {
             val id = System.currentTimeMillis().toInt()
-            Pair(id, np.getString("message"))
+            Pair(id, np.getString("message").take(MAX_MESSAGE_CHARS))
         } else {
             val id = 42 // A unique id to create only one notification
             Pair(id, "Ping!")
@@ -96,5 +96,7 @@ class PingPlugin : Plugin() {
     companion object {
         private const val PACKET_TYPE_PING = DeskLinkProtocol.PACKET_TYPE_PING
         private const val LOG_TAG = "PingPlugin"
+        /** A ping is a few words; a paired peer's `message` is cut here before it is shown. */
+        private const val MAX_MESSAGE_CHARS = 500
     }
 }

@@ -213,6 +213,11 @@ class MdnsDiscovery {
         override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
             Log.i(LOG_TAG, "MDNS successfully resolved $serviceInfo")
 
+            // Any host on the network can advertise this service: on a network the person did not trust the phone does not
+            // answer it with its identity (id, name, capabilities, port). Custom hosts and the QR hint do not come through
+            // here; they reach sendUdpIdentityPacket directly and are still sent.
+            if (!mayAnswerService(org.desklink.mobile.helpers.TrustedNetworkHelper.isTrustedNetwork(context))) return
+
             // Let the LanLinkProvider handle the connection
             val remoteAddress = serviceInfo.host
             // TODO: In protocol version 8 we should be able to call "identityPacketReceived"
@@ -223,6 +228,10 @@ class MdnsDiscovery {
     }
 
     companion object {
+        /** A service some host advertises is answered with this phone's identity only on a trusted network. */
+        @JvmStatic
+        fun mayAnswerService(trustedNetwork: Boolean) = trustedNetwork
+
         const val LOG_TAG: String = "MdnsDiscovery"
 
         const val SERVICE_TYPE: String = DeskLinkProtocol.MDNS_SERVICE_TYPE

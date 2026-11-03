@@ -21,3 +21,11 @@ inline fun <reified T> Intent.getParcelableArrayListCompat(key: String): ArrayLi
 inline fun <reified T: Parcelable> Intent.getParcelableArrayCompat(key: String): Array<Parcelable>? {
     return IntentCompat.getParcelableArrayExtra(this, key, T::class.java)
 }
+
+/**
+ * Whether this intent's extras can be read at all. Extras from another app are unmarshalled lazily and a crafted one
+ * (a class this app does not have) throws [android.os.BadParcelableException] at the first read, ending the process;
+ * a few of those in two minutes put the app in crash-loop safe mode. Exported entry points ask first and drop the
+ * intent when it cannot be read.
+ */
+fun Intent.isReadable(): Boolean = runCatching { extras?.keySet(); true }.getOrDefault(false)

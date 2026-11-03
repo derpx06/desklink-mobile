@@ -215,6 +215,11 @@ data class WebRtcFileControl(
             fun str(key: String) = value.optString(key).takeIf { value.has(key) && it.isNotEmpty() }
             fun int(key: String) = if (value.has(key)) value.getInt(key) else null
             fun long(key: String) = if (value.has(key)) value.getLong(key) else null
+            // A peer's name is cleaned once, here, so a re-offer's matching, the checkpoint, the row and the saved file all see
+            // the same name (a Bucket file keeps its name: it must equal its path's last segment).
+            val folder = str("folder")
+            val relpath = str("relpath")
+            val filename = str("filename")?.let { if (folder == null && relpath == null) sanitizeFilename(it) else it }
             return WebRtcFileControl(
                 protocolVersion = value.getInt("protocolVersion"),
                 action = WebRtcFileAction.fromWireName(value.getString("action")),
@@ -223,7 +228,7 @@ data class WebRtcFileControl(
                 sessionId = value.getLong("sessionId"),
                 connectionGeneration = value.getLong("connectionGeneration"),
                 transferToken = value.getString("transferToken"),
-                filename = str("filename"),
+                filename = filename,
                 totalSize = long("totalSize"),
                 mtime = long("mtime"),
                 blockSize = int("blockSize"),
@@ -242,8 +247,8 @@ data class WebRtcFileControl(
                 gallery = if (value.has("gallery")) value.getBoolean("gallery") else null,
                 mimeType = str("mimeType")?.take(128),
                 captureId = str("captureId")?.take(64),
-                folder = str("folder"),
-                relpath = str("relpath"),
+                folder = folder,
+                relpath = relpath,
                 contentSha256 = str("contentSha256"),
                 lane = value.optJSONObject("lane")?.let(FileLaneSpec::fromJson),
             )
@@ -416,6 +421,42 @@ internal fun validateToken(value: String) {
     require(value.isNotEmpty() && value.length <= 256 && value.all(Char::isAscii)) {
         "Invalid DeskLink transfer token"
     }
+}
+
+/**
+ * A received name as it is kept and shown: control characters and the bidi marks and overrides (`photo<U+202E>gpj.exe` reads as
+ * `photoexe.jpg`) are dropped, an empty result, `.` or `..` becomes `file`, and at most 255 UTF-8 bytes stay. Mirrors the desktop's
+ * `sanitize_filename`; both pass `shared/filenames.json`.
+ */
+internal fun sanitizeFilename(raw: String): String {
+    val kept = StringBuilder()
+    var i = 0
+    while (i < raw.length) {
+        val cp = raw.codePointAt(i)
+        i += Character.charCount(cp)
+        if (Character.getType(cp) == Character.CONTROL.toInt() || isBidiMark(cp)) continue
+        kept.appendCodePoint(cp)
+    }
+    var name = kept.toString()
+    if (name.toByteArray(StandardCharsets.UTF_8).size > 255) name = truncateUtf8(name, 255)
+    return if (name.isEmpty() || name == "." || name == "..") "file" else name
+}
+
+private fun isBidiMark(cp: Int) =
+    cp == 0x200E || cp == 0x200F || cp == 0x061C || cp == 0x2028 || cp == 0x2029 || cp in 0x202A..0x202E || cp in 0x2066..0x2069
+
+/** The longest prefix of [value] that is at most [maxBytes] UTF-8 bytes, cut on a character boundary. */
+internal fun truncateUtf8(value: String, maxBytes: Int): String {
+    var bytes = 0
+    var i = 0
+    while (i < value.length) {
+        val cp = value.codePointAt(i)
+        val n = String(Character.toChars(cp)).toByteArray(StandardCharsets.UTF_8).size
+        if (bytes + n > maxBytes) break
+        bytes += n
+        i += Character.charCount(cp)
+    }
+    return value.substring(0, i)
 }
 
 /** One path component, at most 255 UTF-8 *bytes* (the desktop counts bytes, not characters). */

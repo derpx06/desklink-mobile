@@ -54,6 +54,13 @@ class RelayLinkSession(private val ids: Identities) {
 
     val role: Role = if (RelayLinkCrypto.isInitiator(ids.localFp, ids.peerFp)) Role.INITIATOR else Role.RESPONDER
     private var state: State = State.Idle
+
+    /**
+     * A handshake begun by an `h1` while a link is up. The live link keeps its keys, and carries on, until the `fin` proves the new
+     * one: an `h1` is not signed, so the relay (or anyone it lets speak as the peer) could otherwise drop a healthy link with one
+     * frame. A peer that really restarted proves itself with its `fin` at once and takes over.
+     */
+    private var candidate: State.AwaitingFin? = null
     private var sendSeq = 0L
     private var receiveSeq = 0L
 
@@ -62,6 +69,7 @@ class RelayLinkSession(private val ids: Identities) {
     /** Forgets the session, e.g. when the peer went offline. */
     fun reset() {
         state = State.Idle
+        candidate = null
         sendSeq = 0
         receiveSeq = 0
     }
@@ -110,7 +118,19 @@ class RelayLinkSession(private val ids: Identities) {
     }
 
     private fun onH1(message: JSONObject): List<Event> {
-        reset()
+        if (state !is State.Established) {
+            reset()
+            val (h2, awaiting) = answerH1(message)
+            state = awaiting
+            return listOf(Event.Send(h2))
+        }
+        // Answered, not adopted: an h1 that does not check out, or a fin that never comes, leaves the live link as it was.
+        val (h2, awaiting) = runCatching { answerH1(message) }.getOrNull() ?: return emptyList()
+        candidate = awaiting
+        return listOf(Event.Send(h2))
+    }
+
+    private fun answerH1(message: JSONObject): Pair<JSONObject, State.AwaitingFin> {
         checkVersion(message)
         val peerEph = decode(message, "eph")
         val peerNonce = decode(message, "nonce")
@@ -127,8 +147,7 @@ class RelayLinkSession(private val ids: Identities) {
             .put("nonce", RelayLinkCrypto.b64(mine.nonce))
             .put("identity", ids.localIdentity)
             .put("sig", RelayLinkCrypto.sign(ids.localKey, Role.RESPONDER, transcript))
-        state = State.AwaitingFin(keys, transcript, identity)
-        return listOf(Event.Send(h2))
+        return h2 to State.AwaitingFin(keys, transcript, identity)
     }
 
     private fun onH2(message: JSONObject): List<Event> {
@@ -154,6 +173,18 @@ class RelayLinkSession(private val ids: Identities) {
     }
 
     private fun onFin(message: JSONObject): List<Event> {
+        val pending = candidate
+        if (state is State.Established && pending != null) {
+            candidate = null
+            val proven = runCatching {
+                RelayLinkCrypto.verify(ids.peerKey, Role.INITIATOR, pending.transcript, text(message, "sig"))
+            }.getOrDefault(false)
+            if (!proven) return emptyList() // a forged or stale fin: the live link stays
+            state = State.Established(pending.keys)
+            sendSeq = 0
+            receiveSeq = 0
+            return listOf(Event.Established(pending.identity))
+        }
         val awaiting = state as? State.AwaitingFin ?: throw IllegalArgumentException("Unexpected relay link fin")
         state = State.Idle
         require(RelayLinkCrypto.verify(ids.peerKey, Role.INITIATOR, awaiting.transcript, text(message, "sig"))) {

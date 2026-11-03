@@ -7,6 +7,7 @@
 
 package org.desklink.mobile.ui
 
+import org.desklink.mobile.extensions.isReadable
 import android.Manifest
 import android.content.Intent
 import android.content.SharedPreferences
@@ -185,6 +186,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (!intent.isReadable()) return finish()
         // Long-press on the clipboard tile: the snippets (F6), not the home screen.
         if (savedInstanceState == null && clipboardTileLongPress(intent)) {
             startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, snippets = true))
@@ -241,6 +243,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (!intent.isReadable()) return
         setIntent(intent)
         // A long-press on the clipboard tile while this activity is already up arrives here, not in onCreate.
         if (clipboardTileLongPress(intent)) {

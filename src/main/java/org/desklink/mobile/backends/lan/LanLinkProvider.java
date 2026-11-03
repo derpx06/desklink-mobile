@@ -20,6 +20,7 @@ import androidx.annotation.WorkerThread;
 import org.json.JSONException;
 import org.desklink.mobile.backends.BaseLink;
 import org.desklink.mobile.backends.BaseLinkProvider;
+import org.desklink.mobile.BuildConfig;
 import org.desklink.mobile.DeviceHost;
 import org.desklink.mobile.DeviceInfo;
 import org.desklink.mobile.helpers.DeviceHelper;
@@ -200,7 +201,8 @@ public class LanLinkProvider extends BaseLinkProvider {
 
         InetAddress address = socket.getInetAddress();
 
-        if (!isPrivateAddress(address)) {
+        // Loopback is another app on this phone, not a computer: only debug builds (the emulator is reached over it) take it.
+        if (!isPrivateAddress(address) || (address.isLoopbackAddress() && !BuildConfig.DEBUG)) {
             Log.i("LanLinkProvider", "Discarding TCP packet from a non-local IP");
             closeQuietly(socket);
             return;
@@ -729,7 +731,7 @@ public class LanLinkProvider extends BaseLinkProvider {
                     ThreadHelper.execute(() -> {
                         try {
                             tcpPacketReceived(socket);
-                        } catch (IOException | CertificateException e) {
+                        } catch (Exception e) { // anything a stranger's first packet provokes closes its socket
                             try { socket.close(); } catch (IOException ignored) { }
                             Log.e("LanLinkProvider", "Exception receiving incoming TCP connection", e);
                         }

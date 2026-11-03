@@ -21,7 +21,12 @@ class MprisMediaNotificationReceiver : BroadcastReceiver() {
         // The notification's own buttons go to [MprisNotificationActionReceiver], which is not exported.
         if (Intent.ACTION_MEDIA_BUTTON != intent.action) return
         val mediaSession = MprisMediaSession.getMediaSession() ?: return
-        mediaSession.controller.dispatchMediaButtonEvent(intent.getParcelableCompat(Intent.EXTRA_KEY_EVENT))
+        // Any app may send this broadcast: no key event, or one that cannot be unparcelled, is dropped, not a crash
+        // (dispatchMediaButtonEvent throws on null).
+        runCatching {
+            val event = intent.getParcelableCompat<android.view.KeyEvent>(Intent.EXTRA_KEY_EVENT) ?: return
+            mediaSession.controller.dispatchMediaButtonEvent(event)
+        }
     }
 
     companion object {

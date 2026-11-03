@@ -49,7 +49,13 @@ internal class DeferredTaskExecutor(
 internal class OffThreadObserver(
     private val target: WebRtcTransport.Observer,
     private val events: DeferredTaskExecutor,
+    private val maxQueuedEnvelopes: Int = MAX_QUEUED_ENVELOPES,
+    private val maxQueuedBytes: Long = MAX_QUEUED_BYTES,
 ) : WebRtcTransport.Observer {
+    private val queuedEnvelopes = java.util.concurrent.atomic.AtomicInteger()
+    private val queuedBytes = java.util.concurrent.atomic.AtomicLong()
+    private val overflowed = java.util.concurrent.atomic.AtomicBoolean()
+
     private fun post(action: () -> Unit) {
         try {
             events.execute(action)
@@ -62,7 +68,39 @@ internal class OffThreadObserver(
     override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) =
         post { target.onSignalingNeeded(type, payload) }
 
-    override fun onEnvelope(envelope: WebRtcEnvelope) = post { target.onEnvelope(envelope) }
+    /**
+     * The queue behind [events] holds what the handlers have not got to yet. A peer that sends faster than they work (or one
+     * that wedges a handler) used to grow it until the process ran out of memory. Past the bound nothing is dropped and carried
+     * on as if it were not: the connection is failed, which rebuilds it, and the next feature-ready resyncs every snapshot
+     * (`desklink.sync.have`). What is already queued is still worked off; envelopes that arrive meanwhile belong to a connection
+     * that is being replaced.
+     */
+    override fun onEnvelope(envelope: WebRtcEnvelope) {
+        if (overflowed.get()) return
+        val size = envelope.payloadBase64.length.toLong()
+        if (queuedEnvelopes.get() >= maxQueuedEnvelopes || queuedBytes.get() + size > maxQueuedBytes) {
+            overflow()
+            return
+        }
+        queuedEnvelopes.incrementAndGet()
+        queuedBytes.addAndGet(size)
+        post {
+            try {
+                target.onEnvelope(envelope)
+            } finally {
+                queuedEnvelopes.decrementAndGet()
+                queuedBytes.addAndGet(-size)
+            }
+        }
+    }
+
+    private fun overflow() {
+        if (!overflowed.compareAndSet(false, true)) return
+        val error = IllegalStateException("The peer sent more than could be handled (${queuedEnvelopes.get()} messages waiting); restarting the connection")
+        android.util.Log.e("OffThreadObserver", error.message ?: "inbound backlog")
+        // Not through [events]: that queue is the one that is full.
+        runCatching { Thread({ runCatching { target.onFailure(error) } }, "DeskLink-WebRTC-Backlog").start() }
+    }
 
     // Liveness is answered where it arrives: queued behind a slow handler, a healthy peer would look dead.
     override fun onLivenessEnvelope(envelope: WebRtcEnvelope) = target.onLivenessEnvelope(envelope)
@@ -78,4 +116,10 @@ internal class OffThreadObserver(
     // event thread would put every frame behind unrelated callbacks.
     override fun onFileFrame(frame: ByteArray) = target.onFileFrame(frame)
     override fun onFileBufferedLow() = target.onFileBufferedLow()
+
+    companion object {
+        /** Messages waiting for the handlers; a burst of a few hundred is ordinary, this many is a stuck or hostile peer. */
+        const val MAX_QUEUED_ENVELOPES = 5000
+        const val MAX_QUEUED_BYTES = 24L * 1024 * 1024
+    }
 }

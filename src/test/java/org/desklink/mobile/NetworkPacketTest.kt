@@ -61,4 +61,20 @@ class NetworkPacketTest {
         Assert.assertEquals(parsed.incomingCapabilities, deviceInfo.incomingCapabilities)
         Assert.assertEquals(parsed.outgoingCapabilities, deviceInfo.outgoingCapabilities)
     }
+
+    @Test
+    fun aWrongTypedFieldReadsAsAbsentInsteadOfThrowing() {
+        // A stranger's first packet reaches these getters in the TCP accept path; a JSONException there
+        // used to end the accept task with its socket still open.
+        val np = unserialize("{\"type\":\"t\",\"body\":{\"v\":\"x\",\"o\":{\"a\":1},\"n\":null,\"i\":9,\"s\":\"12\"}}")
+        Assert.assertNull(np.getIntOrNull("v"))
+        Assert.assertNull(np.getIntOrNull("o"))
+        Assert.assertNull(np.getIntOrNull("n"))
+        Assert.assertNull(np.getIntOrNull("missing"))
+        Assert.assertEquals(9, np.getIntOrNull("i"))
+        Assert.assertEquals(12, np.getIntOrNull("s"))
+        Assert.assertNull(np.getStringOrNull("n"))
+        Assert.assertNull(np.getStringOrNull("missing"))
+        Assert.assertEquals("x", np.getStringOrNull("v"))
+    }
 }

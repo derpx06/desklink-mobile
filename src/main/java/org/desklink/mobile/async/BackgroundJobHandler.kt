@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit
 class BackgroundJobHandler {
     private constructor(corePoolSize: Int, maxPoolSize: Int, keepAliveTime: Long, unit: TimeUnit, workQueue: BlockingQueue<Runnable>) {
         this.threadPoolExecutor = MyThreadPoolExecutor(corePoolSize, maxPoolSize, keepAliveTime, unit, workQueue)
+        if (keepAliveTime > 0) this.threadPoolExecutor.allowCoreThreadTimeOut(true)
         this.handler = Handler(Looper.getMainLooper())
     }
 
@@ -127,7 +128,9 @@ class BackgroundJobHandler {
 
         @JvmStatic
         fun newFixedThreadPoolBackgroundJobHandler(numThreads: Int): BackgroundJobHandler {
-            return BackgroundJobHandler(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue())
+            // Idle workers exit (core threads included): a handler that is never shut down (one per SharePlugin
+            // instance, re-made on every plugin reload) kept up to numThreads parked threads for good.
+            return BackgroundJobHandler(numThreads, numThreads, 30L, TimeUnit.SECONDS, LinkedBlockingQueue())
         }
     }
 }

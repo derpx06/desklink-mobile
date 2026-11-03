@@ -77,7 +77,6 @@ public class SharePlugin extends Plugin {
     private final BackgroundJobHandler backgroundJobHandler;
     private final Handler handler;
 
-    private CompositeReceiveFileJob receiveFileJob;
     private CompositeUploadFileJob uploadFileJob;
     private final Callback receiveFileJobCallback;
 
@@ -433,18 +432,14 @@ public class SharePlugin extends Plugin {
     private class Callback implements BackgroundJob.Callback<Void> {
         @Override
         public void onResult(@NonNull BackgroundJob job, Void result) {
-            if (job == receiveFileJob) {
-                receiveFileJob = null;
-            } else if (job == uploadFileJob) {
+            if (job == uploadFileJob) {
                 uploadFileJob = null;
             }
         }
 
         @Override
         public void onError(@NonNull BackgroundJob job, @NonNull Throwable error) {
-            if (job == receiveFileJob) {
-                receiveFileJob = null;
-            } else if (job == uploadFileJob) {
+            if (job == uploadFileJob) {
                 uploadFileJob = null;
             }
         }
@@ -457,9 +452,7 @@ public class SharePlugin extends Plugin {
             if (job != null) {
                 job.cancel();
 
-                if (job == receiveFileJob) {
-                    receiveFileJob = null;
-                } else if (job == uploadFileJob) {
+                if (job == uploadFileJob) {
                     uploadFileJob = null;
                 }
             }

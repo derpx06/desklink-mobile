@@ -6,6 +6,7 @@
 
 package org.desklink.mobile.plugins.share
 
+import org.desklink.mobile.extensions.isReadable
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
@@ -130,6 +131,7 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!intent.isReadable()) return finish()
 
         mSharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
 

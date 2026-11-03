@@ -60,6 +60,7 @@ import java.util.concurrent.Executors
 class BackgroundService : Service() {
     private lateinit var applicationInstance: DeskLinkApplication
     private var networkCallback: NetworkCallback? = null
+    private var screenReceiver: DeskLinkBroadcastReceiver? = null
     private var defaultNetworkCallback: NetworkCallback? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private var connectionWakeLock: PowerManager.WakeLock? = null
@@ -240,7 +241,8 @@ class BackgroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
             filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION)
         }
-        registerReceiver(DeskLinkBroadcastReceiver(), filter)
+        screenReceiver = DeskLinkBroadcastReceiver()
+        registerReceiver(screenReceiver, filter)
 
         // Watch for changes on all network connections except cellular networks
         val networkRequestBuilder = createNonCellularNetworkRequestBuilder()
@@ -521,6 +523,8 @@ class BackgroundService : Service() {
         Log.d("DeskLink/BgService", "onDestroy")
         if (safeStart) return super.onDestroy()
         initialized = false
+        screenReceiver?.let { runCatching { unregisterReceiver(it) } }
+        screenReceiver = null
         leaseRecheck.removeCallbacks(leaseRecheckTask)
         networkMovedDebounce.removeCallbacks(networkMovedTask)
         networkCallback?.let { callback ->
