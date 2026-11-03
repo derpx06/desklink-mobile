@@ -185,6 +185,8 @@ class RelayLinkSession(private val ids: Identities) {
             receiveSeq = 0
             return listOf(Event.Established(pending.identity))
         }
+        // A fin with nothing to complete (a late or forged one, or a repeat) never ends a link that is up.
+        if (state is State.Established) return emptyList()
         val awaiting = state as? State.AwaitingFin ?: throw IllegalArgumentException("Unexpected relay link fin")
         state = State.Idle
         require(RelayLinkCrypto.verify(ids.peerKey, Role.INITIATOR, awaiting.transcript, text(message, "sig"))) {

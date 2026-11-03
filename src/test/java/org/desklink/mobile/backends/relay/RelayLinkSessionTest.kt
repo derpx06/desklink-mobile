@@ -170,6 +170,17 @@ class RelayLinkSessionTest {
     }
 
     @Test
+    fun aLateOrForgedFinWithNoHandshakeInFlightDoesNotDropAnEstablishedLink() {
+        val phone = phone()
+        val desktop = desktop()
+        handshake(phone, desktop)
+        val forged = JSONObject().put("k", "fin").put("sig", RelayLinkCrypto.b64(ByteArray(64) { 7 }))
+        assertTrue("no candidate: ignored, not thrown", desktop.take(forged).isEmpty())
+        assertTrue(desktop.isEstablished)
+        assertArrayEquals("still carries data".toByteArray(), (desktop.take(phone.seal("still carries data".toByteArray()))[0] as Event.Packet).bytes)
+    }
+
+    @Test
     fun aPeerThatReallyRestartedTakesOverAtItsFin() {
         val phone = phone()
         val desktop = desktop()
