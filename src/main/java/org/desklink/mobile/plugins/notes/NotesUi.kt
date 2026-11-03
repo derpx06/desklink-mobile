@@ -124,6 +124,43 @@ class NotesUi(
                 shape = RoundedCornerShape(28.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             )
+            // Counted off the main thread: a big shelf of copies is real work.
+            var preview by remember { mutableStateOf(0 to 0) }
+            LaunchedEffect(revision) { preview = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { NotesStore.duplicateCopiesPreview(host) } }
+            val (removable, kept) = preview
+            var confirmTidy by remember { mutableStateOf(false) }
+            if (removable + kept > 0) {
+                PillButton(
+                    stringResource(R.string.notes_tidy),
+                    {
+                        if (removable == 0) {
+                            Toast.makeText(host, host.getString(R.string.notes_tidy_none, kept), Toast.LENGTH_LONG).show()
+                        } else {
+                            confirmTidy = true
+                        }
+                    },
+                    style = PillStyle.Tonal,
+                    height = 48.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            if (confirmTidy) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { confirmTidy = false },
+                    title = { Text(stringResource(R.string.notes_tidy_title)) },
+                    text = { Text(stringResource(R.string.notes_tidy_body, removable, kept)) },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            confirmTidy = false
+                            val removed = NotesStore.removeDuplicateCopies(host)
+                            Toast.makeText(host, host.getString(R.string.notes_tidy_done, removed), Toast.LENGTH_SHORT).show()
+                        }) { Text(stringResource(R.string.notes_tidy_confirm)) }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { confirmTidy = false }) { Text(stringResource(android.R.string.cancel)) }
+                    },
+                )
+            }
             Box(Modifier.weight(1f)) {
                 if (notes.isEmpty()) {
                     EmptyState(
@@ -243,7 +280,10 @@ class NotesUi(
                 if (title.isBlank() && body.isBlank()) return
                 id = NotesStore.newNote(context, title, body) ?: return Toast.makeText(context, R.string.notes_full, Toast.LENGTH_SHORT).show()
             } else {
-                NotesStore.editNote(context, current, loaded = shown) { it.copy(title = title, body = body, pinned = pinned) }
+                // The version this save left, read in the same step as the save: a read afterwards could be the desk's edit that
+                // landed in between, which the next save would then type over without a word.
+                NotesStore.editNote(context, current, loaded = shown) { it.copy(title = title, body = body, pinned = pinned) }?.let { shown = it }
+                return
             }
             shown = id?.let { NotesStore.note(context, it)?.modified } ?: shown
         }
@@ -260,7 +300,7 @@ class NotesUi(
         DisposableEffect(Unit) { onDispose { latestSave() } }
 
         val revision by NotesStore.revision.collectAsState()
-        LaunchedEffect(revision) {
+        LaunchedEffect(revision, dirty) {
             val current = id ?: return@LaunchedEffect
             val stored = NotesStore.note(context, current)
             when {

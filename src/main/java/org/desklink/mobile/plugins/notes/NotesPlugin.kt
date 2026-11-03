@@ -47,7 +47,7 @@ class NotesPlugin : Plugin() {
     override fun onPacketReceived(np: NetworkPacket): Boolean {
         if (ShelfKind.of(np.type) == null) return false
         if (!limiter.allow(np.type)) return true
-        ThreadHelper.execute { NotesStore.onPacket(context, np).forEach(device::sendPacket) }
+        ThreadHelper.execute { NotesStore.onPacket(context, np, device.deviceId).forEach(device::sendPacket) }
         return true
     }
 
