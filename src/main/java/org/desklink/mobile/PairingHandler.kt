@@ -163,6 +163,12 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
                         // request stands; the peer will prompt when it arrives.
                         Log.i("PairingHandler", "Ignoring a crossing pair request; this device leads")
                         armTimer()
+                    } else if (!timestampIsPlausible(incomingTimestamp)) {
+                        // The desktop makes the same check before it adopts a crossing
+                        // request: a stamp far from this clock is a replay or a skewed
+                        // clock, never a negotiation to prompt for.
+                        Log.w("PairingHandler", "Ignoring a crossing pair request with an implausible timestamp")
+                        armTimer()
                     } else {
                         // This side follows: abandon our own request and adopt
                         // the leader's negotiation, timestamp included.
@@ -238,8 +244,7 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
                             Log.w("PairingHandler", "Ignoring a pair request with no timestamp")
                             return
                         }
-                        val currentTimestamp = System.currentTimeMillis() / 1000L
-                        if (abs(incomingTimestamp - currentTimestamp) > allowedTimestampDifferenceSeconds) {
+                        if (!timestampIsPlausible(incomingTimestamp)) {
                             Log.w("PairingHandler", "Ignoring a pair request with an implausible timestamp")
                             callback.pairingFailed(device.context.getString(R.string.error_clocks_not_match))
                             return
@@ -273,6 +278,11 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
             }
         }
     }
+
+    /** Whether a peer's request stamp is within 30 minutes of this clock; the desktop's `timestamp_is_plausible`. */
+    @VisibleForTesting
+    internal fun timestampIsPlausible(timestamp: Long): Boolean =
+        abs(timestamp - System.currentTimeMillis() / 1000L) <= allowedTimestampDifferenceSeconds
 
     fun verificationKey(): String? {
         return if (device.protocolVersion >= 8) {

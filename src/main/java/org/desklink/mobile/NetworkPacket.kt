@@ -208,6 +208,11 @@ class NetworkPacket private constructor(
         return mBody.has(key)
     }
 
+    /** Whether [key] holds a JSON boolean; [getBoolean] also reads the strings "true" and "false". */
+    fun isBoolean(key: String): Boolean {
+        return mBody.opt(key) is Boolean
+    }
+
     operator fun contains(key: String): Boolean {
         return has(key)
     }

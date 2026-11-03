@@ -51,4 +51,65 @@ class PairingHandlerTest {
         Assert.assertEquals("304181", PairingHandler.getVerificationKeyV7(certB, certA))
         Assert.assertEquals("326935", PairingHandler.getVerificationKeyV7(certA, certA))
     }
+
+}
+
+/** Clock skew and crossing requests, against a handler with a mocked device. */
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+class PairingHandlerClockTest {
+    private val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+
+    private class Recorder : PairingHandler.PairingCallback {
+        val failures = mutableListOf<String>()
+        var prompts = 0
+        override fun incomingPairRequest() { prompts++ }
+        override fun pairingSuccessful() = Unit
+        override fun pairingFailed(error: String) { failures += error }
+        override fun unpaired(device: Device) = Unit
+    }
+
+    private fun request(secondsFromNow: Long) = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR).apply {
+        this["pair"] = true
+        this["timestamp"] = System.currentTimeMillis() / 1000L + secondsFromNow
+    }
+
+    private fun handler(state: PairingHandler.PairState, recorder: Recorder, otherId: String): PairingHandler {
+        org.desklink.mobile.helpers.DeviceHelper.initializeDeviceId(app)
+        val device = io.mockk.mockk<Device>(relaxed = true)
+        io.mockk.every { device.context } returns app
+        io.mockk.every { device.deviceId } returns otherId
+        io.mockk.every { device.protocolVersion } returns 9
+        return PairingHandler(device, recorder, state)
+    }
+
+    @Test
+    fun aRequestFromASkewedClockSaysSoAndNeverPrompts() {
+        for (skew in listOf(-7_200L, 7_200L, -86_400L)) {
+            val recorder = Recorder()
+            val handler = handler(PairingHandler.PairState.NotPaired, recorder, "0")
+            handler.packetReceived(request(skew))
+            Assert.assertEquals(PairingHandler.PairState.NotPaired, handler.state)
+            Assert.assertEquals(0, recorder.prompts)
+            Assert.assertEquals(listOf(app.getString(R.string.error_clocks_not_match)), recorder.failures)
+        }
+        val recorder = Recorder()
+        val handler = handler(PairingHandler.PairState.NotPaired, recorder, "0")
+        handler.packetReceived(request(-600))
+        Assert.assertEquals(PairingHandler.PairState.RequestedByPeer, handler.state)
+        Assert.assertEquals(1, recorder.prompts)
+    }
+
+    /** The follower of two crossing requests adopts the leader's only if its stamp is plausible, as the desktop does. */
+    @Test
+    fun aCrossingRequestWithAnImplausibleStampIsNotAdopted() {
+        // A device id that sorts below any hex id makes this phone the follower.
+        val recorder = Recorder()
+        val handler = handler(PairingHandler.PairState.Requested, recorder, "")
+        handler.packetReceived(request(-7_200))
+        Assert.assertEquals(PairingHandler.PairState.Requested, handler.state)
+        Assert.assertEquals(0, recorder.prompts)
+        handler.packetReceived(request(-5))
+        Assert.assertEquals(PairingHandler.PairState.RequestedByPeer, handler.state)
+        Assert.assertEquals(1, recorder.prompts)
+    }
 }
