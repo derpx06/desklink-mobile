@@ -172,7 +172,11 @@ class FileSender(
                 if (message.reason == FileLaneProtocol.NACK_REASON) onLaneNack(requireNotNull(message.blockIndex), requireNotNull(message.pass))
                 else onNack(requireNotNull(message.blockIndex), requireNotNull(message.pass))
             // "no-progress" is informational: it never stops the sender.
-            WebRtcFileAction.PAUSE -> if (message.reason != FileCodes.NO_PROGRESS) peerPaused = FileCodes.pauseReason(message.reason)
+            WebRtcFileAction.PAUSE -> if (message.reason != FileCodes.NO_PROGRESS) {
+                peerPaused = FileCodes.pauseReason(message.reason)
+                // A long hold (no space, the person) lets the lane go; a backlog is short and keeps it.
+                if (peerPaused != FileCodes.BACKLOG) releaseLane()
+            }
             WebRtcFileAction.RESUME -> {
                 peerPaused = null
                 touch()
@@ -311,6 +315,27 @@ class FileSender(
         switchToWebRtc(minOf(blockIndex, hashes.size, blocksTotal))
     }
 
+    /**
+     * The receiver holds the transfer still for a long while: its lane is let go (an idle one would only be found silent by the receiver and
+     * counted a failure). No failure is counted and no back-off set; a lane is asked for again once the transfer moves ([maybePromote]).
+     */
+    private fun releaseLane() {
+        val lane = laneOut ?: return
+        runCatching { lane.close() }
+        laneOut = null
+        if (ended) return
+        laneFailedAt = clock()
+        laneRetryPending = laneOffered && laneFailures < FileLaneProtocol.MAX_FAILURES
+        switchToWebRtc(ackedBlocks)
+    }
+
+    /** Since when a promotion waits for the blocks in flight to be acknowledged (0: none does). */
+    private var promoteSince = 0L
+
+    /** Tests: bytes sent and not yet acknowledged when the last promotion re-offered. */
+    internal var promoteInFlight = -1L
+        private set
+
     private fun laneAllowed() = laneFailures < FileLaneProtocol.MAX_FAILURES && lanes?.cooling(clock()) != true && lanes?.canOffer(totalSize) == true
 
     private fun noteLaneFailure() {
@@ -326,9 +351,18 @@ class FileSender(
      * transfer has not failed [FileLaneProtocol.MAX_FAILURES] times.
      */
     private fun maybePromote(now: Long) {
-        if (!laneRetryPending || !laneOffered || laneOut != null || laneDialling || state != State.STREAMING || peerPaused != null) return
+        if (!laneRetryPending || !laneOffered || laneOut != null || laneDialling || state != State.STREAMING || peerPaused != null) {
+            promoteSince = 0L
+            return
+        }
         val wait = FileLaneProtocol.RETRY_MS shl (laneFailures - 1).coerceIn(0, 5)
         if (now - laneFailedAt < wait || !laneAllowed()) return
+        // The receiver restarts at its verified block and what is in flight past it is thrown away: finish the block in progress and
+        // let the acknowledgements catch up first (PROMOTE_DRAIN_MS at most, then it goes ahead anyway).
+        if (promoteSince == 0L) promoteSince = maxOf(now, 1L)
+        if (!(emitted == 0 && sentBytes() == ackedBytes()) && now - promoteSince < FileLaneProtocol.PROMOTE_DRAIN_MS) return
+        promoteInFlight = sentBytes() - ackedBytes()
+        promoteSince = 0L
         laneRetryPending = false
         pass = (pass + 1) and 0xff // the receiver tells the restarted stream from frames still in the pipe by its pass
         state = State.OFFERED
@@ -395,6 +429,8 @@ class FileSender(
                     }
                     return
                 }
+                // A lane promotion waits for the blocks in flight: the block in progress is finished, no new one begins.
+                if (promoteSince != 0L && emitted == 0) return
                 if (block == null && !prepareBlock()) return
                 emitFrame()
             }

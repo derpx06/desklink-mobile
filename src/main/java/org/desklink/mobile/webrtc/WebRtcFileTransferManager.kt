@@ -540,7 +540,7 @@ class WebRtcFileTransferManager(
                 link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.REFUSED, message = "That transfer does not match"))
                 return
             }
-            existing.onReoffer() // the sender did not get our accept: answered again from where we are
+            existing.onReoffer(message.lane) // the sender did not get our accept: answered again from where we are
             return
         }
         // Already in place (a crash, or a `complete` that never arrived, before the sender heard it): "I have all of it", then

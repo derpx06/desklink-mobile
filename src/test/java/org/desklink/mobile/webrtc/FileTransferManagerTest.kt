@@ -776,12 +776,62 @@ class FileTransferManagerTest {
         assertEquals(1, phone.sent.count { it.action == WebRtcFileAction.OFFER })
         phone.now += FileLaneProtocol.RETRY_MS + 1
         phone.tick()
+        // Data is in flight on the data channel: the promotion waits for it to be acknowledged (it would be thrown away)...
+        assertEquals("not while blocks are in flight", 1, phone.sent.count { it.action == WebRtcFileAction.OFFER })
+        // ...but not for ever.
+        phone.now += FileLaneProtocol.PROMOTE_DRAIN_MS + 1
+        phone.tick()
         assertEquals("a re-offer asked for a lane again", 2, phone.sent.count { it.action == WebRtcFileAction.OFFER })
         val ok = runUntilDone(future)
         assertTrue("failed: ${recorder.failures} ${phone.sent.map { it.action.wireName + ":" + (it.message ?: "") }.takeLast(12)} desk=${desk.sent.map { it.action.wireName + ":" + (it.message ?: "") }.takeLast(8)}", ok)
         assertEquals("the second lane was dialled and carried the rest", 2, phoneLanes.dialed)
         assertEquals("the tcp lane was announced twice", 2, phone.sent.count { it.action == WebRtcFileAction.LANE && it.lane?.kind == FileLaneSpec.TCP })
         assertArrayEquals(bytes, desk.delivered.single().bytes)
+    }
+
+    @Test
+    fun aTransferPausedForSpaceLetsItsLaneGoWithoutAFailureAndAsksForOneAgain() {
+        phoneLanes.offer = true; deskLanes.issues = true
+        val bytes = data(24 * FileV2.BLOCK_BYTES + 7)
+        val recorder = Recorder()
+        val future = startSend(share(bytes, "big.bin"), recorder)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (desk.sent.count { it.action == WebRtcFileAction.BLOCK_ACK } < 1 && System.nanoTime() < deadline) { if (pump(maxMessages = 1) == 0) Thread.sleep(2) }
+        val offered = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.PAUSE, offered.transferId, offered.transferToken) { copy(reason = FileCodes.STORAGE_FULL) })
+        pump(maxMessages = 10)
+        assertEquals("a pause is not a failed lane", 0, phoneLanes.failedCalls)
+        assertEquals("the lane was let go", 1, webrtcSwitches(phone).size)
+        assertTrue(phoneLanes.out!!.closed)
+        phone.now += FileLaneProtocol.RETRY_MS + 1
+        phone.tick()
+        assertEquals("not asked for again while it is held", 1, phone.sent.count { it.action == WebRtcFileAction.OFFER })
+        phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.RESUME, offered.transferId, offered.transferToken))
+        pump(maxMessages = 1)
+        phone.tick()
+        phone.now += FileLaneProtocol.PROMOTE_DRAIN_MS + 1 // whatever the resume sent is given this long to be acknowledged
+        phone.tick()
+        assertEquals("a lane is asked for again once it moves", 2, phone.sent.count { it.action == WebRtcFileAction.OFFER })
+        assertTrue("failed: ${recorder.failures}", runUntilDone(future))
+        assertEquals(0, phoneLanes.failedCalls)
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
+    }
+
+    @Test
+    fun aReOfferWithoutALaneGetsNoTokenInItsAccept() {
+        deskLanes.issues = true
+        val id = java.util.UUID.randomUUID().toString()
+        fun offer(lane: FileLaneSpec?) = desk.control(WebRtcFileAction.OFFER, id, "t".repeat(32)) {
+            copy(filename = "big.bin", totalSize = 9L * 1024 * 1024, mtime = 1L, blockSize = FileV2.BLOCK_BYTES, maxFrameBytes = FileV2.FRAME_BYTES_PROVEN, lane = lane)
+        }
+        desk.manager.handleControl(deskWire, offer(FileLaneSpec(v = FileLaneProtocol.V)))
+        while (desk.runner.runPending()) Unit
+        desk.manager.handleControl(deskWire, offer(null))
+        while (desk.runner.runPending()) Unit
+        val accepts = desk.sent.filter { it.action == WebRtcFileAction.ACCEPT }
+        assertEquals(2, accepts.size)
+        assertNotNull("the first offer asked for a lane", accepts[0].lane?.token)
+        assertNull("this offer did not: no token is issued", accepts[1].lane)
     }
 
     @Test
@@ -882,6 +932,8 @@ class FileTransferManagerTest {
         while (webrtcSwitches(phone).isEmpty() && System.nanoTime() < deadline) { if (pump(maxMessages = 1) == 0) Thread.sleep(2) }
         phone.now += FileLaneProtocol.RETRY_MS + 1
         phone.tick()
+        phone.now += FileLaneProtocol.PROMOTE_DRAIN_MS + 1 // blocks in flight are given up to this long to be acknowledged
+        phone.tick()
         while (phoneLanes.dialed < 2 && System.nanoTime() < deadline) { if (pump(maxMessages = 2) == 0) Thread.sleep(2) }
         val id = phone.sent.first { it.action == WebRtcFileAction.OFFER }.transferId
         val older = phoneLanes.outs.first()
@@ -924,7 +976,11 @@ class FileTransferManagerTest {
         while (!future.isDone && System.nanoTime() < deadline) {
             if (pump(maxMessages = 1) == 0) Thread.sleep(2)
             val switches = webrtcSwitches(phone).size
-            if (switches > seen) { seen = switches; phone.now += 400_000; phone.tick() } // far past every back-off
+            if (switches > seen) {
+                seen = switches
+                phone.now += 400_000; phone.tick() // far past every back-off
+                phone.now += FileLaneProtocol.PROMOTE_DRAIN_MS + 1; phone.tick() // and past the wait for blocks in flight
+            }
         }
         assertTrue(future.get(5, TimeUnit.SECONDS))
         assertEquals("three lanes, then the data channel for good", 3, phoneLanes.dialed)
@@ -956,7 +1012,8 @@ class FileTransferManagerTest {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
         while ((phoneLanes.out?.frames ?: 0) < 5 && System.nanoTime() < deadline) { if (pump(maxMessages = 2) == 0) Thread.sleep(2) }
         val offered = phone.sent.first { it.action == WebRtcFileAction.OFFER }
-        phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.PAUSE, offered.transferId, offered.transferToken) { copy(reason = FileCodes.STORAGE_FULL) })
+        // A backlog is a short hold: the lane stays (a long one, no space, lets it go: see aTransferPausedForSpace...).
+        phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.PAUSE, offered.transferId, offered.transferToken) { copy(reason = FileCodes.BACKLOG) })
         pump(maxMessages = 5)
         phone.now += FileLaneProtocol.STALL_MS * 3
         phone.tick()

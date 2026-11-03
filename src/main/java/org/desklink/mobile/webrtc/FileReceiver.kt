@@ -84,6 +84,9 @@ class FileReceiver(
     private var rewinds = 0
     private var restarts = 0
     private var pausedFor: String? = null
+
+    /** The latest offer of this transfer asked for a lane. */
+    private var laneAsked = offer.lane?.v == FileLaneProtocol.V
     private var pausedAt = 0L
     private var peerPaused = false
     private var noProgress = false
@@ -182,7 +185,7 @@ class FileReceiver(
             prefixSha256 = FileHashes.prefixHash(hashes, hashes.size),
             maxFrameBytes = frameMax,
             // The sender asked for the lane and ours can carry it: a port and a one-time token (else the data channel carries the file).
-            lane = if (offer.lane?.v == FileLaneProtocol.V && hashes.size < blocksTotal) lanes?.issue(id) else null,
+            lane = if (laneAsked && hashes.size < blocksTotal) lanes?.issue(id) else null,
         ),
     )
 
@@ -260,8 +263,9 @@ class FileReceiver(
     }
 
     /** The same transfer offered again while it is live (the sender lost our accept): answered from where we are. */
-    fun onReoffer() {
+    fun onReoffer(lane: FileLaneSpec? = offer.lane) {
         if (ended || publishing || file == null) return
+        laneAsked = lane?.v == FileLaneProtocol.V // this offer decides: one without a lane (the sender gave up on them) gets no token
         pausedFor = null
         truncateTo(hashes.size)
         awaitingStart = true
