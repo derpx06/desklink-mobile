@@ -165,13 +165,20 @@ class FileTransferManagerTest {
         override fun cooling(nowMs: Long) = coolingNow
         override fun failed(nowMs: Long) { failedCalls++ }
         override fun clean() { cleanCalls++ }
+        /** The dial is not answered until [heldDial] is called (a connection still being made). */
+        var holdDial = false
+        var heldDial: (() -> Unit)? = null
+
         override fun dial(transferId: String, spec: FileLaneSpec, pass: Int, startBlock: Int, result: (LaneOut?) -> Unit) {
             dialed++
             if (!dialOk) return result(null)
-            val connection = ++serial
-            peer().onLaneAccepted(transferId, pass, startBlock, connection) // as the real listener does once the token is good
-            if (failFirstOnly && dialed > 1) failAfterFrames = Int.MAX_VALUE
-            result(FakeOut(peer(), transferId, connection).also { out = it; outs += it })
+            val finish = {
+                val connection = ++serial
+                peer().onLaneAccepted(transferId, pass, startBlock, connection) // as the real listener does once the token is good
+                if (failFirstOnly && dialed > 1) failAfterFrames = Int.MAX_VALUE
+                result(FakeOut(peer(), transferId, connection).also { out = it; outs += it })
+            }
+            if (holdDial) heldDial = finish else finish()
         }
     }
 
@@ -806,14 +813,73 @@ class FileTransferManagerTest {
         phone.now += FileLaneProtocol.RETRY_MS + 1
         phone.tick()
         assertEquals("not asked for again while it is held", 1, phone.sent.count { it.action == WebRtcFileAction.OFFER })
+        // The data channel is full, so nothing is sent after the resume: a promotion has nothing in flight to wait for.
+        phone.bufferedAmount = 1L shl 40
         phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.RESUME, offered.transferId, offered.transferToken))
         pump(maxMessages = 1)
         phone.tick()
-        phone.now += FileLaneProtocol.PROMOTE_DRAIN_MS + 1 // whatever the resume sent is given this long to be acknowledged
-        phone.tick()
         assertEquals("a lane is asked for again once it moves", 2, phone.sent.count { it.action == WebRtcFileAction.OFFER })
+        assertEquals("with nothing in flight to throw away", 0L, phone.manager.senderForTest(offered.transferId)!!.promoteInFlight)
+        phone.bufferedAmount = 0
         assertTrue("failed: ${recorder.failures}", runUntilDone(future))
         assertEquals(0, phoneLanes.failedCalls)
+        assertEquals("the second lane was dialled and announced", 2, phone.sent.count { it.action == WebRtcFileAction.LANE && it.lane?.kind == FileLaneSpec.TCP })
+        assertEquals(2, phoneLanes.dialed)
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
+    }
+
+    @Test
+    fun aPauseWhileTheLaneIsStillBeingDialledAbandonsThatDialWithoutAFailure() {
+        phoneLanes.offer = true; deskLanes.issues = true; phoneLanes.holdDial = true
+        val bytes = data(3 * FileV2.BLOCK_BYTES + 17)
+        val future = startSend(share(bytes, "big.bin"), Recorder())
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (phoneLanes.heldDial == null && System.nanoTime() < deadline) { if (pump(maxMessages = 1) == 0) Thread.sleep(2) }
+        val offered = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.PAUSE, offered.transferId, offered.transferToken) { copy(reason = FileCodes.STORAGE_FULL) })
+        pump(maxMessages = 3)
+        phoneLanes.heldDial!!.invoke() // the connection arrives: nobody wants it any more
+        pump(maxMessages = 3)
+        assertTrue("it was closed, not used", phoneLanes.out!!.closed)
+        assertTrue("and never announced", phone.sent.none { it.action == WebRtcFileAction.LANE && it.lane?.kind == FileLaneSpec.TCP })
+        assertEquals(0, phoneLanes.failedCalls)
+        phoneLanes.holdDial = false
+        phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.RESUME, offered.transferId, offered.transferToken))
+        assertTrue(runUntilDone(future))
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
+    }
+
+    @Test
+    fun aPauseWhenEveryBlockIsAcknowledgedClosesTheLaneAndDoesNotSayDoneAgain() {
+        phoneLanes.offer = true; deskLanes.issues = true
+        val bytes = data(3 * FileV2.BLOCK_BYTES + 17)
+        val future = startSend(share(bytes, "big.bin"), Recorder())
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (phone.sent.none { it.action == WebRtcFileAction.DONE } && System.nanoTime() < deadline) { if (pump(maxMessages = 1) == 0) Thread.sleep(2) }
+        val offered = phone.sent.first { it.action == WebRtcFileAction.OFFER }
+        phone.manager.handleControl(phoneWire, phone.control(WebRtcFileAction.PAUSE, offered.transferId, offered.transferToken) { copy(reason = FileCodes.STORAGE_FULL) })
+        assertTrue(runUntilDone(future))
+        assertEquals("done is said once", 1, phone.sent.count { it.action == WebRtcFileAction.DONE })
+        assertTrue("and nothing was carried on over the data channel", webrtcSwitches(phone).isEmpty())
+        assertArrayEquals(bytes, desk.delivered.single().bytes)
+    }
+
+    @Test
+    fun aPromotionWaitingForAcknowledgementsNeverFreezesTheTransferWhenTheLaneIsNoLongerAllowed() {
+        phoneLanes.offer = true; deskLanes.issues = true
+        phoneLanes.failFirstOnly = true
+        phoneLanes.failAfterFrames = 20
+        val bytes = data(24 * FileV2.BLOCK_BYTES + 7)
+        val future = startSend(share(bytes, "big.bin"), Recorder())
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
+        while (webrtcSwitches(phone).isEmpty() && System.nanoTime() < deadline) { if (pump(maxMessages = 1) == 0) Thread.sleep(2) }
+        phone.now += FileLaneProtocol.RETRY_MS + 1
+        phone.tick() // the wait for acknowledgements begins; no new block starts
+        phoneLanes.coolingNow = true // and the lane is no longer allowed (the peer is backing off)
+        phone.now += 1
+        phone.tick()
+        assertTrue("the transfer goes on over the data channel", runUntilDone(future))
+        assertEquals("no lane was asked for", 1, phone.sent.count { it.action == WebRtcFileAction.OFFER })
         assertArrayEquals(bytes, desk.delivered.single().bytes)
     }
 

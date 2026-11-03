@@ -350,7 +350,7 @@ class WebRtcFileTransferManager(
     private val senderListener: FileSender.Listener = object : FileSender.Listener {
         override fun progress(sender: FileSender, bytesDone: Long) {
             val entry = sends[sender.transferId] ?: return
-            org.desklink.mobile.plugins.share.TransferNotification.lane(device.deviceId, sender.filename, true, laneKind(sender.onFastLane))
+            org.desklink.mobile.plugins.share.TransferNotification.lane(device.deviceId, sender.transferId, sender.filename, true, laneKind(sender.onFastLane))
             val percent = if (sender.totalSize == 0L) 100 else (bytesDone * 100 / sender.totalSize).toInt().coerceIn(0, 100)
             entry.callback.onPayloadProgressChanged(percent)
         }
@@ -361,7 +361,7 @@ class WebRtcFileTransferManager(
             val entry = sends[id] ?: return
             if (entry.sender !== sender) return
             sends.remove(id)
-            org.desklink.mobile.plugins.share.TransferNotification.lane(sender.wire.peerDeviceId, sender.filename, true, null)
+            org.desklink.mobile.plugins.share.TransferNotification.lane(sender.wire.peerDeviceId, sender.transferId, sender.filename, true, null)
             if (outcome != FileSender.Outcome.SUSPENDED && outcome != FileSender.Outcome.BUSY) {
                 // A slot is free: the next stored send, if any, starts (after this one's own bookkeeping below).
                 runner.post { currentWire?.let(::startStoredSends) }
@@ -668,7 +668,7 @@ class WebRtcFileTransferManager(
                     else -> TransferProgress.cancel(job)
                 }
             }
-            org.desklink.mobile.plugins.share.TransferNotification.lane(receiver.wire.peerDeviceId, receiver.filename, false, null)
+            org.desklink.mobile.plugins.share.TransferNotification.lane(receiver.wire.peerDeviceId, receiver.id, receiver.filename, false, null)
             if (outcome == FileReceiver.Outcome.CANCELLED) synchronized(savingNotes) { savingNotes.remove(receiver.id) }?.let { runCatching { it.cancel() } }
             if (receives[receiver.id] === receiver) { receives.remove(receiver.id); lanes?.forget(receiver.id) } // a token for it is void
             // A Bucket file that did not arrive (the delivered one was taken out of the map when it was handed over).
@@ -774,7 +774,7 @@ class WebRtcFileTransferManager(
             queuedBytes.addAndGet(-message.size.toLong())
             receives[frame.transferId.toString()]?.takeIf { !viaLane || it.laneCurrent(connection) }?.let {
                 // A frame from a lane the receiver has left (or never took) is dropped: the data channel carries the stream now.
-                org.desklink.mobile.plugins.share.TransferNotification.lane(device.deviceId, it.filename, false, laneKind(viaLane))
+                org.desklink.mobile.plugins.share.TransferNotification.lane(device.deviceId, it.id, it.filename, false, laneKind(viaLane))
                 it.onFrame(frame)
             }
             resumeIfDrained()
@@ -843,6 +843,10 @@ class WebRtcFileTransferManager(
 
     @androidx.annotation.VisibleForTesting
     internal fun tickNow() = runner.post { tick() }
+
+    /** Tests: the live sender of a transfer. */
+    @androidx.annotation.VisibleForTesting
+    internal fun senderForTest(id: String): FileSender? = sends[id]?.sender
 
     /**
      * The session ended. Checkpoints are kept (to the last verified block) so the next connection

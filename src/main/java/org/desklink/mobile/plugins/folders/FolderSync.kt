@@ -374,6 +374,13 @@ object FolderSync {
         return missing.takeIf { it.size * 5 > expected.size }
     }
 
+    /**
+     * A scan that stopped at its item cap did not see everything: a synced path it did not reach is not gone, so it is kept as it is
+     * (never tombstoned, and so never deleted on the computer). Nothing when the scan was complete.
+     */
+    fun unseenWhenTruncated(manifest: Map<String, Entry>, found: Set<String>, truncated: Boolean): Set<String> =
+        if (truncated) manifest.filter { (path, entry) -> !entry.deleted && path !in found }.keys else emptySet()
+
     /** F8b: an incoming file of [size] fits when [free] keeps [MIN_FREE_BYTES] after it. */
     fun enoughSpace(free: Long, size: Long): Boolean = size in 0..MAX_BUCKET_FILE_BYTES && free - size >= MIN_FREE_BYTES
 

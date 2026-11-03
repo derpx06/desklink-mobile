@@ -470,7 +470,7 @@ class BucketUi(
             if (summary.bytesPerSecond > 0 && !summary.paused) {
                 Text(
                     BucketSyncNotification.words(host).perSecond.format(org.desklink.mobile.helpers.Sizes.iec(summary.bytesPerSecond)),
-                    fontSize = 12.sp, color = t.textFaint, fontFamily = MonoFamily,
+                    fontSize = 12.sp, color = t.textDim, fontFamily = MonoFamily,
                 )
             }
         }
@@ -597,7 +597,7 @@ class BucketUi(
                         Spacer(Modifier.height(6.dp))
                         Text(stringResource(R.string.bucket_empty_body, desk), fontSize = 14.sp, color = t.textDim, textAlign = TextAlign.Center)
                         Spacer(Modifier.height(16.dp))
-                        Text(stringResource(R.string.bucket_ways_in), fontSize = 12.sp, lineHeight = 17.sp, color = t.textFaint, textAlign = TextAlign.Center)
+                        Text(stringResource(R.string.bucket_ways_in), fontSize = 12.sp, lineHeight = 17.sp, color = t.textDim, textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -616,7 +616,7 @@ class BucketUi(
                     Column {
                         Text(
                             stringResource(R.string.bucket_not_synced, view.notSynced.size) + "\n" + reasons.joinToString("\n"),
-                            fontSize = 12.sp, lineHeight = 17.sp, color = t.textFaint, modifier = Modifier.padding(top = 8.dp),
+                            fontSize = 12.sp, lineHeight = 17.sp, color = t.textDim, modifier = Modifier.padding(top = 8.dp),
                         )
                         if (view.notSynced.any { it.second == Skip.COULDNT_FETCH }) {
                             TextButton(onClick = { BucketEngine.retryGaveUp(deviceId) }) { Text(stringResource(R.string.bucket_retry_fetch)) }
@@ -769,9 +769,9 @@ class BucketUi(
                     if (progressLine != null) {
                         Text(progressLine, fontSize = 11.sp, color = t.accentText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     } else if (item.restored) {
-                        Text(stringResource(R.string.bucket_restored_note, desk), fontSize = 11.sp, color = t.textFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(stringResource(R.string.bucket_restored_note, desk), fontSize = 11.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     } else if (tile.state == BucketItem.State.WAITING || tile.state == BucketItem.State.CONFLICT) {
-                        Text(state, fontSize = 11.sp, color = if (tile.state == BucketItem.State.CONFLICT) t.coralText else t.textFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(state, fontSize = 11.sp, color = if (tile.state == BucketItem.State.CONFLICT) t.coralText else t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 IconButton(onClick = onMenu, modifier = Modifier.size(48.dp)) {
