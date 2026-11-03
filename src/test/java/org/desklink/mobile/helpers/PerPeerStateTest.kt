@@ -44,10 +44,23 @@ class PerPeerStateTest {
     @Test
     fun everyPreferencesFileTheAppOpensIsEitherPerComputerAndRegisteredOrSaidToBeNot() {
         val named = Regex("""getSharedPreferences\(\s*"([^"]+)"""")
-        val constants = Regex("""const val \w+ = "([^"]+)"""")
-        val known = PerPeerState.stores.map { it.prefsName }.toSet() + PerPeerState.NOT_PER_PEER
-        val found = File("src/main/java").walkTopDown().filter { it.isFile && (it.extension == "kt" || it.extension == "java") }
-            .flatMap { named.findAll(it.readText()).map { m -> m.groupValues[1] } }.toSet()
+        val constants = Regex("""(?:const val|static final String) (\w+)(?::\s*String)?\s*=\s*"([^"]+)"""")
+        val viaConstant = Regex("""getSharedPreferences\(\s*([A-Za-z_][A-Za-z0-9_.]*)\s*,""")
+        val known = PerPeerState.stores.map { it.prefsName }.toSet() + PerPeerState.NOT_PER_PEER.keys
+        val sources = File("src/main/java").walkTopDown().filter { it.isFile && (it.extension == "kt" || it.extension == "java") }.map { it.readText() }.toList()
+        // `const val NAME = "file"` / `static final String NAME = "file"`: a bare name is looked up in its own file, a qualified one anywhere.
+        val everywhere = sources.flatMap { constants.findAll(it).map { m -> m.groupValues[1] to m.groupValues[2] } }.toMap()
+        val found = sources.flatMap { text ->
+            val local = constants.findAll(text).associate { it.groupValues[1] to it.groupValues[2] }
+            named.findAll(text).map { it.groupValues[1] } +
+                viaConstant.findAll(text).mapNotNull { m ->
+                    val ref = m.groupValues[1]
+                    if ('.' in ref) everywhere[ref.substringAfterLast('.')] else local[ref]
+                }
+        }.toSet()
+        // A name that is not a preferences-file constant (a variable holding a per-device name such as "<id>_<plugin>_preferences") is
+        // checked by its own tests; only constants with a known value are held to the list.
         assertEquals("a preferences file opened by name that is not registered in PerPeerState", emptySet<String>(), found - known)
+        assertTrue("the walk resolves constants (it saw ${found.size} files)", "desklink_owed_pair_false" in found)
     }
 }

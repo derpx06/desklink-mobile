@@ -12,7 +12,7 @@ import java.security.cert.Certificate
  * fingerprint is the certificate the computer had when it was unpaired, so only that computer (not an impostor under its id) is told.
  */
 object OwedPairFalse {
-    private const val PREFS = "desklink_owed_pair_false"
+    const val PREFS = "desklink_owed_pair_false"
     private const val KEY = "ids"
 
     private fun prefs(context: Context) = (context.applicationContext ?: context).getSharedPreferences(PREFS, Context.MODE_PRIVATE)
