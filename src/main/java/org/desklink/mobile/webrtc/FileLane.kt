@@ -41,6 +41,9 @@ object FileLaneProtocol {
     /** First wait before a failed lane is asked for again; doubled with each failure in a row. */
     const val RETRY_MS = 10_000L
 
+    /** A promotion waits this long at most for the blocks in flight to be acknowledged before it re-offers. */
+    const val PROMOTE_DRAIN_MS = 2_000L
+
     /** Lane failures one transfer gets; after the third it stays on the data channel. */
     const val MAX_FAILURES = 3
 

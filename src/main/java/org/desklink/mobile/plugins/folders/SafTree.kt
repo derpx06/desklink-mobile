@@ -28,7 +28,7 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
     data class Item(val documentId: String, val dir: Boolean, val size: Long, val mtime: Long)
 
     /** A scan: what may sync (files and folders), and what may not, with why. */
-    data class Scan(val found: Map<String, Item>, val skipped: List<Pair<String, Skip>>)
+    data class Scan(val found: Map<String, Item>, val skipped: List<Pair<String, Skip>>, val truncated: Boolean = false)
 
     private val treeRoot = DocumentsContract.getTreeDocumentId(tree)
 
@@ -71,6 +71,7 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
     fun scan(maxItems: Int = FolderSync.MAX_BUCKET_ITEMS): Scan {
         val found = HashMap<String, Item>()
         val skipped = mutableListOf<Pair<String, Skip>>()
+        var truncated = false
         val queue = ArrayDeque<Pair<String, String>>()
         queue += rootId to ""
         while (queue.isNotEmpty()) {
@@ -81,7 +82,7 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
                 val reason = FolderSync.skipReason(path, item.dir) ?: if (!item.dir && item.size > FolderSync.MAX_BUCKET_FILE_BYTES) Skip.TOO_LARGE else null
                 when {
                     reason != null -> if (skipped.size < MAX_SKIPPED) skipped += path to reason
-                    found.size >= maxItems -> Unit
+                    found.size >= maxItems -> truncated = true
                     else -> {
                         found[path] = item
                         if (item.dir) queue += item.documentId to "$path/"
@@ -89,7 +90,7 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
                 }
             }
         }
-        return Scan(found, skipped)
+        return Scan(found, skipped, truncated)
     }
 
     /** Every file and folder below this tree's root, keyed by path (capped, so a huge tree cannot exhaust memory). */

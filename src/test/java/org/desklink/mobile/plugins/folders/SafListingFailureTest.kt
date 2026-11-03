@@ -68,4 +68,16 @@ class SafListingFailureTest {
         assertNull("a small folder is never held", FolderSync.suspiciousShrink(setOf("a", "b", "c"), emptySet()))
         assertNull("nothing missing", FolderSync.suspiciousShrink(expected, expected))
     }
+
+    @Test
+    fun aScanThatStoppedAtItsCapSaysSoAndWhatItDidNotReachIsKeptNotTombstoned() {
+        val whole = tree.scan()
+        assertEquals(false, whole.truncated)
+        val cut = tree.scan(maxItems = 1)
+        assertEquals(true, cut.truncated)
+        val manifest = whole.found.keys.associateWith { Entry(1, 1, "a".repeat(64)) } + ("old.txt" to Entry(0, 5, "", deleted = true))
+        val unseen = FolderSync.unseenWhenTruncated(manifest, cut.found.keys, cut.truncated)
+        assertEquals(whole.found.keys - cut.found.keys, unseen)
+        assertEquals(emptySet<String>(), FolderSync.unseenWhenTruncated(manifest, whole.found.keys, whole.truncated))
+    }
 }

@@ -187,11 +187,23 @@ class TransferNotificationTest {
         val words = TransferNotification.words(app)
         assertEquals("fast lane", words.laneFast); assertEquals("over WebRTC", words.laneWebRtc); assertEquals("through a relay", words.laneRelay)
         val desk = "88888888-aaaa-bbbb-cccc-888888888888"
-        TransferNotification.lane(desk, "a.bin", true, TransferNotification.LANE_FAST)
+        TransferNotification.lane(desk, "t1", "a.bin", true, TransferNotification.LANE_FAST)
         assertEquals("fast lane", TransferNotification.laneWord(app, desk, true, "a.bin"))
         assertNull("another direction or name is not that file", TransferNotification.laneWord(app, desk, false, "a.bin"))
-        TransferNotification.lane(desk, "a.bin", true, null)
+        TransferNotification.lane(desk, "t1", "a.bin", true, null)
         assertNull(TransferNotification.laneWord(app, desk, true, "a.bin"))
+    }
+
+    @Test
+    fun twoFilesOfOneNameKeepTheirOwnLaneAndNeverShowTheOthersWord() {
+        val desk = "99999999-aaaa-bbbb-cccc-999999999999"
+        TransferNotification.lane(desk, "t1", "same.bin", true, TransferNotification.LANE_FAST)
+        TransferNotification.lane(desk, "t2", "same.bin", true, TransferNotification.LANE_WEBRTC)
+        assertNull("they disagree: no word beats a wrong one", TransferNotification.laneWord(app, desk, true, "same.bin"))
+        TransferNotification.lane(desk, "t2", "same.bin", true, null)
+        assertEquals("the one left shows its own", "fast lane", TransferNotification.laneWord(app, desk, true, "same.bin"))
+        TransferNotification.lane(desk, "t1", "same.bin", true, null)
+        assertNull(TransferNotification.laneWord(app, desk, true, "same.bin"))
     }
 
     @Test

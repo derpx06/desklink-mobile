@@ -172,7 +172,11 @@ class FileSender(
                 if (message.reason == FileLaneProtocol.NACK_REASON) onLaneNack(requireNotNull(message.blockIndex), requireNotNull(message.pass))
                 else onNack(requireNotNull(message.blockIndex), requireNotNull(message.pass))
             // "no-progress" is informational: it never stops the sender.
-            WebRtcFileAction.PAUSE -> if (message.reason != FileCodes.NO_PROGRESS) peerPaused = FileCodes.pauseReason(message.reason)
+            WebRtcFileAction.PAUSE -> if (message.reason != FileCodes.NO_PROGRESS) {
+                peerPaused = FileCodes.pauseReason(message.reason)
+                // A long hold (no space, the person) lets the lane go; a backlog is short and keeps it.
+                if (peerPaused != FileCodes.BACKLOG) releaseLane()
+            }
             WebRtcFileAction.RESUME -> {
                 peerPaused = null
                 touch()
@@ -268,9 +272,10 @@ class FileSender(
         dialler.dial(transferId, spec, pass, ackedBlocks) { out ->
             post {
                 laneDialling = false
-                if (ended || out == null) {
-                    out?.close()
-                    if (!ended) noteLaneFailure() // connect refused or past 3 s: the data channel carries it, a re-offer asks again later
+                val abandoned = dialAbandoned.also { dialAbandoned = false }
+                if (ended || out == null || abandoned) {
+                    out?.close() // let go while it was being made (a pause): nobody is waiting for it
+                    if (!ended && !abandoned) noteLaneFailure() // connect refused or past 3 s: the data channel carries it, a re-offer asks again later
                 } else {
                     laneOut = out
                     laneWasUp = true
@@ -311,6 +316,47 @@ class FileSender(
         switchToWebRtc(minOf(blockIndex, hashes.size, blocksTotal))
     }
 
+    /**
+     * The receiver holds the transfer still for a long while: its lane is let go (an idle one would only be found silent by the receiver and
+     * counted a failure). No failure is counted and no back-off set; a lane is asked for again once the transfer moves ([maybePromote]).
+     */
+    private fun releaseLane() {
+        if (ended) return
+        val lane = laneOut
+        if (lane == null) {
+            // A dial under way is let go when it completes; nothing was sent on a lane yet.
+            if (!laneDialling) return
+            dialAbandoned = true
+            letGo()
+            return
+        }
+        runCatching { lane.close() }
+        laneOut = null
+        letGo()
+        // Every block acknowledged and `complete` awaited: nothing to carry on, and `done` is not said again.
+        if (state != State.AWAITING_COMPLETE) switchToWebRtc(ackedBlocks)
+    }
+
+    /** A lane let go by a pause: no failure, no back-off; asked for again after a wait that grows, and not for ever. */
+    private fun letGo() {
+        laneFailedAt = clock()
+        laneReleases++
+        laneRetryPending = laneOffered && laneFailures < FileLaneProtocol.MAX_FAILURES && laneReleases < FileLaneProtocol.MAX_FAILURES
+    }
+
+    /** The lane being dialled was let go: its connection is closed when it arrives. */
+    private var dialAbandoned = false
+
+    /** Times a long pause let the lane go (no failure counted). */
+    private var laneReleases = 0
+
+    /** Since when a promotion waits for the blocks in flight to be acknowledged (0: none does). */
+    private var promoteSince = 0L
+
+    /** Tests: bytes sent and not yet acknowledged when the last promotion re-offered. */
+    internal var promoteInFlight = -1L
+        private set
+
     private fun laneAllowed() = laneFailures < FileLaneProtocol.MAX_FAILURES && lanes?.cooling(clock()) != true && lanes?.canOffer(totalSize) == true
 
     private fun noteLaneFailure() {
@@ -326,13 +372,26 @@ class FileSender(
      * transfer has not failed [FileLaneProtocol.MAX_FAILURES] times.
      */
     private fun maybePromote(now: Long) {
-        if (!laneRetryPending || !laneOffered || laneOut != null || laneDialling || state != State.STREAMING || peerPaused != null) return
-        val wait = FileLaneProtocol.RETRY_MS shl (laneFailures - 1).coerceIn(0, 5)
-        if (now - laneFailedAt < wait || !laneAllowed()) return
+        if (!canPromote(now)) {
+            promoteSince = 0L // whatever started a wait for acknowledgements has gone: never leave the stream held
+            return
+        }
+        // The receiver restarts at its verified block and what is in flight past it is thrown away: finish the block in progress and
+        // let the acknowledgements catch up first (PROMOTE_DRAIN_MS at most, then it goes ahead anyway).
+        if (promoteSince == 0L) promoteSince = maxOf(now, 1L)
+        if (!(emitted == 0 && sentBytes() == ackedBytes()) && now - promoteSince < FileLaneProtocol.PROMOTE_DRAIN_MS) return
+        promoteInFlight = sentBytes() - ackedBytes()
+        promoteSince = 0L
         laneRetryPending = false
         pass = (pass + 1) and 0xff // the receiver tells the restarted stream from frames still in the pipe by its pass
         state = State.OFFERED
         start()
+    }
+
+    private fun canPromote(now: Long): Boolean {
+        if (!laneRetryPending || !laneOffered || laneOut != null || laneDialling || state != State.STREAMING || peerPaused != null) return false
+        val wait = FileLaneProtocol.RETRY_MS shl (laneFailures + laneReleases - 1).coerceIn(0, 5)
+        return now - laneFailedAt >= wait && laneAllowed()
     }
 
     private fun switchToWebRtc(from: Int) {
@@ -395,6 +454,8 @@ class FileSender(
                     }
                     return
                 }
+                // A lane promotion waits for the blocks in flight: the block in progress is finished, no new one begins.
+                if (promoteSince != 0L && emitted == 0 && clock() - promoteSince < 2 * FileLaneProtocol.PROMOTE_DRAIN_MS) return
                 if (block == null && !prepareBlock()) return
                 emitFrame()
             }

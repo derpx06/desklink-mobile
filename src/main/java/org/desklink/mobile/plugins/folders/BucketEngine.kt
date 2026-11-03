@@ -1181,7 +1181,8 @@ object BucketEngine {
         live.confirmedEmpty = false
         // A path already synced that now loses a clash is kept as it is, never tombstoned.
         val leftOutSynced = live.manifest.filter { (path, entry) -> !entry.deleted && path !in found && FolderSync.isLeftOut(path, clashes) }.keys
-        val keep = live.toRequest.toSet() + live.outstanding + settling.filter { live.manifest[it]?.deleted == false } + leftOutSynced
+        val keep = live.toRequest.toSet() + live.outstanding + settling.filter { live.manifest[it]?.deleted == false } + leftOutSynced +
+            FolderSync.unseenWhenTruncated(live.manifest, found.keys, scan.truncated)
         // Many files "gone" at once is more likely a partial listing than that many deletions: held until a second scan
         // names the same missing files.
         val expected = live.manifest.filter { (path, entry) -> !entry.deleted && path !in keep }.keys

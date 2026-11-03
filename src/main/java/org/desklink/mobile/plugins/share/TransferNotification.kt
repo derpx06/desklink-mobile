@@ -52,13 +52,22 @@ object TransferNotification {
     const val LANE_WEBRTC = "webrtc"
     const val LANE_RELAY = "relay"
 
-    private val laneKinds = java.util.concurrent.ConcurrentHashMap<String, String>()
+    /** By `device|direction|name` (all the notification knows of a file), then by transfer id: two files of one name each keep their own. */
+    private val laneKinds = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<String, String>>()
 
-    /** Which way a file is moving ([LANE_FAST], [LANE_WEBRTC] or [LANE_RELAY]), for the detail line. */
-    fun lane(deviceId: String, name: String, upload: Boolean, kind: String?) {
+    /** Which way a file is moving ([LANE_FAST], [LANE_WEBRTC] or [LANE_RELAY]), for the detail line; null [kind] forgets [transferId]. */
+    fun lane(deviceId: String, transferId: String, name: String, upload: Boolean, kind: String?) {
         val key = "$deviceId|$upload|$name"
-        if (kind == null) laneKinds.remove(key) else laneKinds[key] = kind
+        if (kind == null) {
+            laneKinds[key]?.let { kinds -> kinds.remove(transferId); if (kinds.isEmpty()) laneKinds.remove(key, kinds) }
+        } else {
+            laneKinds.computeIfAbsent(key) { java.util.concurrent.ConcurrentHashMap() }[transferId] = kind
+        }
     }
+
+    /** The lane every file of that name agrees on; null when none is known or two of them move differently (no word beats a wrong one). */
+    private fun laneKindOf(deviceId: String, upload: Boolean, name: String): String? =
+        laneKinds["$deviceId|$upload|$name"]?.values?.toSet()?.singleOrNull()
 
     enum class Action { CANCEL, PAUSE_SYNC, RESUME_SYNC, NONE }
 
@@ -323,7 +332,7 @@ object TransferNotification {
         val now = SystemClock.elapsedRealtime()
         val items = d.jobs.values.map { j ->
             val remaining = (j.total - j.done).coerceAtLeast(0)
-            Item(j.name, j.upload, j.done, j.total, j.meter.etaSeconds(remaining, now), j.meter.bytesPerSecond(now), j.waiting, j.saving, lane = laneKinds["$deviceId|${j.upload}|${j.name}"])
+            Item(j.name, j.upload, j.done, j.total, j.meter.etaSeconds(remaining, now), j.meter.bytesPerSecond(now), j.waiting, j.saving, lane = laneKindOf(deviceId, j.upload, j.name))
         } + d.bucket.map { it.copy(waiting = it.waiting || !d.bucketLinkUp || d.bucketPaused) }
         val w = words(context)
         val note = note(desk, items, d.finishedInSet, d.finishedBytes, d.bucketPaused, d.storageFull, { Sizes.iec(it) }, w) ?: return@synchronized
@@ -392,7 +401,7 @@ object TransferNotification {
     )
 
     /** The lane a moving file is on, in words, for Home's row; null when not known. */
-    fun laneWord(context: Context, deviceId: String, upload: Boolean, name: String): String? = when (laneKinds["$deviceId|$upload|$name"]) {
+    fun laneWord(context: Context, deviceId: String, upload: Boolean, name: String): String? = when (laneKindOf(deviceId, upload, name)) {
         LANE_FAST -> context.getString(R.string.transfer_lane_fast)
         LANE_WEBRTC -> context.getString(R.string.transfer_lane_webrtc)
         LANE_RELAY -> context.getString(R.string.transfer_lane_relay)
