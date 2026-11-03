@@ -50,6 +50,22 @@ class ClipboardListenerTest {
     }
 
     @Test
+    fun aCopyTooLargeForOneMessageIsRefusedAndSaidSoNeverSent() {
+        val huge = "x".repeat(org.desklink.mobile.plugins.clipboard.ClipboardPlugin.MAX_SHARED_TEXT_BYTES + 1)
+        context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("other app", huge))
+        ShadowLooper.idleMainLooper()
+        assertFalse(listener.sync(force = true))
+        assertTrue(listener.lastRefusedTooLarge)
+        Thread.sleep(50)
+        assertEquals(emptyList<String>(), sent)
+        // The next look is its own: a later "nothing to send" is not blamed on the old copy.
+        context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("other app", "small"))
+        ShadowLooper.idleMainLooper()
+        listener.sync(force = true)
+        assertFalse(listener.lastRefusedTooLarge)
+    }
+
+    @Test
     fun aPhoneCopyGoesOutOnce() {
         copyElsewhere("from the phone")
         awaitSent(1)

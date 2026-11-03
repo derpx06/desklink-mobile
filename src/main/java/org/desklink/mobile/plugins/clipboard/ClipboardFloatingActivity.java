@@ -55,10 +55,19 @@ public class ClipboardFloatingActivity extends AppCompatActivity {
             // We are now sure that clipboard can be accessed from here. A tap (tile, notification,
             // widget) sends whatever is there; the automatic path sends only a new copy.
             boolean asked = shouldShowToast();
+            // Every computer that would take it has clipboard sharing off: say so instead of "sent".
+            String ignoring = asked ? ClipboardPlugin.ignoringComputers() : null;
+            if (ignoring != null) {
+                ClipboardOffer.INSTANCE.cancel(this);
+                Toast.makeText(this, getString(R.string.clipboard_desk_off, ignoring), Toast.LENGTH_LONG).show();
+                finish();
+                return;
+            }
             boolean sent = ClipboardListener.instance(this).sync(asked);
             ClipboardOffer.INSTANCE.cancel(this);
             if (asked) {
-                Toast.makeText(this, sent ? R.string.pref_plugin_clipboard_sent : R.string.clipboard_nothing_sent, Toast.LENGTH_SHORT).show();
+                boolean tooLarge = !sent && ClipboardListener.instance(this).getLastRefusedTooLarge();
+                Toast.makeText(this, sent ? R.string.pref_plugin_clipboard_sent : tooLarge ? R.string.clipboard_too_large : R.string.clipboard_nothing_sent, Toast.LENGTH_SHORT).show();
             }
             finish();
         }

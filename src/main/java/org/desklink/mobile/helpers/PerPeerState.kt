@@ -15,6 +15,7 @@ object PerPeerState {
     const val LABELS = "desklink_terminal_labels"
     const val SURFACES = "desk_surfaces"
     const val SHARE_QUEUE = "share_queue"
+    const val DND_RESTORE = "dnd_restore"
 
     fun labelKey(deviceId: String, sessionId: String) = "$deviceId/$sessionId"
     fun seenKey(deviceId: String) = "seen_$deviceId"
@@ -24,6 +25,7 @@ object PerPeerState {
         Store(LABELS) { key, id -> key.startsWith("$id/") },
         Store(SURFACES) { key, id -> key == seenKey(id) || key == finishedKey(id) },
         Store(SHARE_QUEUE) { key, id -> key == id || key == "attempts_$id" },
+        Store(DND_RESTORE) { key, id -> key == id },
     )
 
     /** Preference files that hold nothing per computer (the pairing registry itself, app-wide choices, transfer-id keyed state). */

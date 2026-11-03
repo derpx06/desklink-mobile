@@ -76,6 +76,7 @@ class SendSelectedTextActivity : AppCompatActivity() {
 
     private fun send(text: String, device: Device) {
         val plugin = device.getPlugin(ClipboardPlugin::class.java) ?: return end(R.string.send_selected_no_computer)
+        if (plugin.deskIgnoresClipboard()) return end(0, getString(R.string.clipboard_desk_off, device.name))
         val sent = plugin.sendSelected(text)
         org.desklink.mobile.helpers.AppLog.event("clipboard", if (sent) "selected text sent" else "selected text not sent")
         end(if (sent) 0 else R.string.send_selected_too_large, if (sent) getString(R.string.send_selected_sent, device.name) else null)

@@ -30,7 +30,6 @@ import android.text.TextUtils
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.fragment.app.DialogFragment
-import org.apache.commons.collections4.multimap.ArrayListValuedHashMap
 import org.json.JSONArray
 import org.json.JSONObject
 import org.desklink.mobile.NetworkPacket
@@ -60,7 +59,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private val notificationDeliveryLock = Any()
     private val postedNotifications = mutableSetOf<String>()
     private val pendingIntents = PendingReplies<RepliableNotification>(MAX_PENDING_REPLIES)
-    private val pendingActions = ArrayListValuedHashMap<String, Notification.Action>()
+    private val pendingActions = PendingActions<Notification.Action>()
     private var serviceReady = false
     private lateinit var sharedPreferences: SharedPreferences
     private val keyguardManager: KeyguardManager by lazy { context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
@@ -445,12 +444,12 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private fun extractActions(notification: Notification, key: String): JSONArray? {
         val notiActions = notification.actions
         if (notiActions.isNullOrEmpty()) {
+            pendingActions.remove(key) // an update that dropped its buttons keeps none of the old ones
             return null
         }
 
         val jsonArray = JSONArray()
-        // An update replaces the actions of the key, it does not add to them.
-        synchronized(pendingActions) { pendingActions.remove(key) }
+        val kept = mutableListOf<Notification.Action>()
         for (action in notiActions) {
             val title = action.title
                 ?: continue
@@ -461,10 +460,10 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
 
             jsonArray.put(title.toString())
-
-            // A list is automatically created if it doesn't already exist.
-            pendingActions.put(key, action)
+            kept += action
         }
+        // An update replaces the actions of the key, it does not add to them.
+        pendingActions.replace(key, kept)
 
         return jsonArray
     }
@@ -651,14 +650,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private fun triggerNotificationAction(np: NetworkPacket) {
         val key = np.getString("key")
         val title = np.getString("action")
-        var intent: PendingIntent? = null
-
-        for (a in pendingActions.get(key)) {
-            if (a.title == title) {
-                intent = a.actionIntent
-                break
-            }
-        }
+        val intent: PendingIntent? = pendingActions.find(key) { it.title?.toString() == title }?.actionIntent
 
         if (intent != null) {
             try {

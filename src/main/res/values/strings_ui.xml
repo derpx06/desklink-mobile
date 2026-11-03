@@ -166,6 +166,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_desk_may_play">Let %1$s play sound here</string>
     <string name="settings_desk_may_play_summary">%1$s can send its sound to this phone without asking first. End it from Home</string>
     <string name="clipboard_nothing_sent">The clipboard has no text to send</string>
+    <string name="clipboard_desk_off">%1$s has clipboard sharing turned off, so it would ignore this. Turn it on there, or in Settings.</string>
+    <string name="clipboard_too_large">That copy is too large to send to your computer</string>
     <string name="settings_clipboard_auto">Automatic sync (advanced)</string>
     <string name="settings_clipboard_auto_grant">Sends each copy without a tap. Needs a one-time command from a computer with adb — tap to copy it: %1$s</string>
     <string name="settings_clipboard_auto_grant_oem">On OPPO, realme and OnePlus first turn on Developer options → Disable permission monitoring; on Xiaomi, USB debugging (Security settings). Otherwise the command is refused.</string>
@@ -835,6 +837,12 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_gallery_screenshots">Screenshots folder</string>
     <string name="settings_gallery_camera">Camera folder</string>
     <string name="settings_gallery_folder_none">Not chosen</string>
+    <string name="settings_gallery_folder_lost">Can no longer be read. Tap to choose it again</string>
+    <string name="gallery_lost_shots">DeskLink can no longer read your screenshots folder</string>
+    <string name="gallery_lost_camera">DeskLink can no longer read your camera folder</string>
+    <string name="gallery_lost_text">Choose it again so new pictures keep going to %1$s.</string>
+    <string name="gallery_lost_action">Choose folder</string>
+    <string name="settings_contacts_share_failed">Your contacts could not be read just now, so %1$s may be out of date. They are tried again when they change</string>
     <string name="settings_dnd_share">Share Do Not Disturb with %1$s</string>
     <string name="settings_dnd_share_on">Do Not Disturb follows %1$s, both ways</string>
     <string name="settings_dnd_access">Do Not Disturb access</string>

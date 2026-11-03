@@ -627,15 +627,18 @@ private fun GalleryRows(desk: DeskSettings, changed: () -> Unit) {
     if (on) {
         val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
         val none = stringResource(R.string.settings_gallery_folder_none)
-        fun shown(key: String) = prefs.getString(key, null)?.let { Uri.parse(it).lastPathSegment?.substringAfterLast(':') } ?: none
+        val lost = stringResource(R.string.settings_gallery_folder_lost)
+        fun shown(key: String, isShots: Boolean) =
+            if (org.desklink.mobile.plugins.gallery.GalleryWatcher.isLost(context, desk.id, isShots)) lost
+            else prefs.getString(key, null)?.let { Uri.parse(it).lastPathSegment?.substringAfterLast(':') } ?: none
         GroupRow(
             stringResource(R.string.settings_gallery_screenshots), icon = R.drawable.sym_folder_zip,
-            subtitle = shown(org.desklink.mobile.plugins.gallery.GalleryWatcher.shotsKey(desk.id)),
+            subtitle = shown(org.desklink.mobile.plugins.gallery.GalleryWatcher.shotsKey(desk.id), true),
             onClick = { runCatching { shots.launch(org.desklink.mobile.plugins.gallery.GalleryWatcher.pickerStart("Pictures/Screenshots")) } },
         ) { Chevron() }
         GroupRow(
             stringResource(R.string.settings_gallery_camera), icon = R.drawable.sym_folder_zip,
-            subtitle = shown(org.desklink.mobile.plugins.gallery.GalleryWatcher.cameraKey(desk.id)),
+            subtitle = shown(org.desklink.mobile.plugins.gallery.GalleryWatcher.cameraKey(desk.id), false),
             onClick = { runCatching { camera.launch(org.desklink.mobile.plugins.gallery.GalleryWatcher.pickerStart("DCIM/Camera")) } },
         ) { Chevron() }
     }
@@ -677,6 +680,7 @@ private fun FilesGroup(desk: DeskSettings?, actions: SettingsActions, prefs: and
                 subtitle = when {
                     !desk.contactsOn -> stringResource(R.string.settings_contacts_share_off, desk.name)
                     !desk.contactsReadable -> stringResource(R.string.settings_contacts_share_permission, desk.name)
+                    org.desklink.mobile.plugins.contacts.ContactsPlugin.readFailed(desk.id) -> stringResource(R.string.settings_contacts_share_failed, desk.name)
                     else -> stringResource(R.string.settings_contacts_share_on, desk.name)
                 },
                 checked = desk.contactsOn,

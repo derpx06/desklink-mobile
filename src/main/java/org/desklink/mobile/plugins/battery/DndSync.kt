@@ -3,6 +3,7 @@ package org.desklink.mobile.plugins.battery
 
 import android.app.NotificationManager
 import android.content.Context
+import androidx.core.content.edit
 
 /**
  * Do Not Disturb sync (W14). The phone reports its interruption filter in the battery packet (`dnd`, `dndCanSet`) only while the
@@ -31,9 +32,15 @@ object DndSync {
     fun apply(context: Context, deviceId: String, dnd: Boolean): Boolean = runCatching {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (!manager.isNotificationPolicyAccessGranted) return false
-        if (!dnd && Restore.has(deviceId)) return Restore.restoreNow(context, deviceId)
-        val target = if (dnd) NotificationManager.INTERRUPTION_FILTER_PRIORITY else NotificationManager.INTERRUPTION_FILTER_ALL
-        Restore.remember(deviceId, manager.currentInterruptionFilter, target)
+        if (!dnd) {
+            // Off: what was saved is put back (only if the person did not change it since); with nothing saved there is nothing to
+            // put back, and nothing is remembered (a note made now would later push the phone into a Do Not Disturb of the person's own).
+            if (Restore.has(context, deviceId)) return Restore.restoreNow(context, deviceId)
+            manager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
+            return true
+        }
+        val target = NotificationManager.INTERRUPTION_FILTER_PRIORITY
+        Restore.remember(context, deviceId, manager.currentInterruptionFilter, target)
         manager.setInterruptionFilter(target)
         true
     }.getOrDefault(false)
@@ -41,29 +48,71 @@ object DndSync {
     /**
      * What the phone's filter was before DeskLink changed it, so it can be put back when the switch turns off, the computer is
      * unpaired, or the link stays gone for [GONE_MS]. Only when the filter still is what DeskLink set: a change the person made
-     * since is theirs.
+     * since is theirs. Kept on disk too, so a process that ended in between does not lose it.
      */
     object Restore {
         const val GONE_MS = 60_000L
 
         private class Saved(val before: Int, val setTo: Int)
 
-        private val saved = java.util.concurrent.ConcurrentHashMap<String, Saved>()
+        /** Guarded by this object's lock, like every read-modify-write below. */
+        private val saved = HashMap<String, Saved>()
         private val pending = HashMap<String, Runnable>()
         private val handler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
 
-        fun has(deviceId: String) = saved.containsKey(deviceId)
+        private fun stored(context: Context, deviceId: String): Saved? =
+            decode(store(context).getString(deviceId, null))?.let { Saved(it.first, it.second) }
 
-        fun remember(deviceId: String, before: Int, setTo: Int) {
-            saved[deviceId] = Saved(saved[deviceId]?.before ?: before, setTo)
+        /** Something is to be put back: in memory, or on disk from a run that ended (before [resumeAfterRestart] read it). */
+        @Synchronized
+        fun has(context: Context, deviceId: String) = saved.containsKey(deviceId) || stored(context, deviceId) != null
+
+        /**
+         * DeskLink is about to set [setTo] while the filter is [current]. The first filter is kept across repeated changes, unless the
+         * person changed it meanwhile ([current] is not what DeskLink set): then what they chose is what comes back.
+         */
+        @Synchronized
+        fun remember(context: Context, deviceId: String, current: Int, setTo: Int) {
+            val old = saved[deviceId] ?: stored(context, deviceId)
+            val kept = Saved(if (old != null && current == old.setTo) old.before else current, setTo)
+            saved[deviceId] = kept
+            // Kept on disk too: if Android ends this process while the computer holds the phone in Do Not Disturb, the next start puts it back.
+            store(context).edit { putString(deviceId, encode(kept.before, kept.setTo)) }
+        }
+
+        private fun store(context: Context) = context.applicationContext.getSharedPreferences(org.desklink.mobile.helpers.PerPeerState.DND_RESTORE, Context.MODE_PRIVATE)
+
+        fun encode(before: Int, setTo: Int) = "$before,$setTo"
+
+        /** (before, setTo), or null for anything that is not what [encode] writes. */
+        fun decode(text: String?): Pair<Int, Int>? {
+            val parts = text?.split(',') ?: return null
+            if (parts.size != 2) return null
+            return (parts[0].toIntOrNull() ?: return null) to (parts[1].toIntOrNull() ?: return null)
+        }
+
+        /** After a start: what a previous run changed and never put back is put back in [GONE_MS] unless the computer returns first. */
+        @Synchronized
+        fun resumeAfterRestart(context: Context) {
+            store(context).all.forEach { (id, value) ->
+                val (before, setTo) = decode(value as? String) ?: run { store(context).edit { remove(id) }; return@forEach }
+                if (!saved.containsKey(id)) {
+                    saved[id] = Saved(before, setTo)
+                    restoreLater(context, id)
+                }
+            }
         }
 
         /** Pure: the person's own change since is left alone. */
         fun shouldRestore(current: Int, setTo: Int) = current == setTo
 
+        @Synchronized
         fun restoreNow(context: Context, deviceId: String): Boolean {
             cancel(deviceId)
-            val s = saved.remove(deviceId) ?: return true
+            // From memory, else from disk (an unpair or a switch-off before [resumeAfterRestart] ran).
+            val s = saved.remove(deviceId) ?: stored(context, deviceId)
+            store(context).edit { remove(deviceId) }
+            if (s == null) return true
             return runCatching {
                 val manager = context.getSystemService(NotificationManager::class.java)
                 if (manager.isNotificationPolicyAccessGranted && shouldRestore(manager.currentInterruptionFilter, s.setTo)) manager.setInterruptionFilter(s.before)
@@ -73,7 +122,7 @@ object DndSync {
 
         /** The link is gone: after [GONE_MS] without it coming back (see [cancel]) the filter is put back. */
         fun restoreLater(context: Context, deviceId: String) {
-            if (!has(deviceId)) return
+            if (!has(context, deviceId)) return
             val app = context.applicationContext
             val task = Runnable { restoreNow(app, deviceId) }
             synchronized(pending) { pending.remove(deviceId)?.let(handler::removeCallbacks); pending[deviceId] = task }
@@ -81,6 +130,11 @@ object DndSync {
         }
 
         fun cancel(deviceId: String) = synchronized(pending) { pending.remove(deviceId)?.let(handler::removeCallbacks) }
+
+        /** A process that ended: memory is gone, the disk note stays. */
+        @androidx.annotation.VisibleForTesting
+        @Synchronized
+        internal fun dropMemoryForTest() = saved.clear()
     }
 
     /**

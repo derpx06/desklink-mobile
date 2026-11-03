@@ -259,6 +259,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             // A Settings page asked for from outside (the desk screen's settings button): the tab, on that page.
             intent.hasExtra(EXTRA_SETTINGS_PAGE) -> {
                 val page = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
+                // A notice about one computer lands on that computer's page.
+                intent.getStringExtra(EXTRA_DEVICE_ID)?.takeIf { DeskLinkApplication.getInstance().getDevice(it)?.isPaired == true }?.let(::select)
                 resetTo(HOME)
                 nav.reset(AppTab.SETTINGS)
                 SettingsPage.of(page)?.let { nav.push(AppTab.SETTINGS, it.route) }
@@ -632,7 +634,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val clipboard = device.getPlugin(org.desklink.mobile.plugins.clipboard.ClipboardPlugin::class.java)
         when {
             clipboard == null -> showMessage(getString(R.string.home_feature_off))
+            clipboard.deskIgnoresClipboard() -> showMessage(getString(R.string.clipboard_desk_off, device.name))
             clipboard.sendNow() -> showMessage(getString(R.string.home_clipboard_sent, device.name))
+            org.desklink.mobile.plugins.clipboard.ClipboardListener.instance(this).lastRefusedTooLarge -> showMessage(getString(R.string.clipboard_too_large))
             else -> showMessage(getString(R.string.clipboard_nothing_sent))
         }
     }

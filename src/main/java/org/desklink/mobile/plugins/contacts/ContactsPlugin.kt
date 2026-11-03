@@ -127,8 +127,10 @@ class ContactsPlugin : Plugin() {
         if (!force && !device.hasActiveWebRtcFeatureTransport) return // the next feature-ready sends it
         val stamps = runCatching { readStamps(context) }.getOrElse {
             Log.w(TAG, "Could not read contacts (${it.javaClass.simpleName})")
+            failed.add(device.deviceId) // said in the Contacts setting row
             return
         }
+        failed.remove(device.deviceId)
         if (!force && stamps == lastSent) return
         // Feature-ready and the desk's own refresh are `force`: the first is a new link, where the
         // desk may already hold exactly this book; a refresh asks for it, so it is always sent.
@@ -144,13 +146,23 @@ class ContactsPlugin : Plugin() {
         if (uids.isEmpty()) return
         val cards = runCatching { readCards(context, uids) }.getOrElse {
             Log.w(TAG, "Could not read contacts (${it.javaClass.simpleName})")
+            failed.add(device.deviceId)
             return
         }
+        failed.remove(device.deviceId)
         ContactsBook.vcardPackets(cards.associate { it.uid to ContactsBook.vcard(it) }).forEach { device.sendBulk(it) }
     }
 
     companion object {
         private const val TAG = "DeskLink/Contacts"
+
+        /** Computers whose last read of the contacts failed (permission present but the database refused): the Contacts row says so. */
+        private val failed: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+        fun readFailed(deviceId: String): Boolean = deviceId in failed
+
+        @androidx.annotation.VisibleForTesting
+        internal fun markFailedForTest(deviceId: String, on: Boolean) { if (on) failed.add(deviceId) else failed.remove(deviceId) }
 
         /** The book's rev: every uid with its stamp. */
         fun contactsRev(stamps: Map<String, Long>): String = SyncDigest.rev(stamps.entries.sortedBy { it.key }.map { "${it.key}=${it.value}" })
