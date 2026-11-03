@@ -109,14 +109,14 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
     // branch in `sendPacketBlocking` and falls through to an empty link list,
     // where the send is dropped and **no callback ever fires**. The guard read
     // as "the peer is there" while the packet went nowhere.
-    private fun sendPairFalse() {
+    private fun sendPairFalse(settlesDebtOf: String? = null) {
         if (!device.hasBootstrapLink) {
             Log.i("PairingHandler", "No bootstrap link for pair:false; the peer will be told when it next sends anything")
             return
         }
         val np = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR)
         np["pair"] = false
-        device.sendPacket(np)
+        if (settlesDebtOf == null) device.sendPacket(np) else device.sendPacket(np, settlesDebt(device.context, settlesDebtOf))
     }
 
     /**
@@ -125,15 +125,24 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
      */
     fun sendOwedPairFalse() {
         val context = device.context
-        if (state != PairState.NotPaired || !device.hasBootstrapLink) return
-        if (!org.desklink.mobile.helpers.OwedPairFalse.owes(context, device.deviceId)) return
-        Log.i("PairingHandler", "Telling ${device.deviceId} we unpaired it while it was out of reach")
-        val np = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR)
-        np["pair"] = false
-        device.sendPacket(np, object : Device.SendPacketStatusCallback() {
-            override fun onSuccess() = org.desklink.mobile.helpers.OwedPairFalse.clear(context, device.deviceId)
-            override fun onFailure(e: Throwable) = Unit // still owed: the next link tries again
-        })
+        val id = device.deviceId
+        if (!org.desklink.mobile.helpers.OwedPairFalse.owes(context, id)) return
+        // Only the computer that was unpaired is told: the link must show that certificate, not just claim the id.
+        val linkFingerprint = runCatching { org.desklink.mobile.helpers.OwedPairFalse.fingerprint(device.certificate) }.getOrNull()
+        if (!org.desklink.mobile.helpers.OwedPairFalse.mayTell(context, id, linkFingerprint)) return
+        // The check and the enqueue are one step under the state lock: a pairing that starts meanwhile is not met by a pair:false.
+        synchronized(stateLock) {
+            if (state != PairState.NotPaired || !device.hasBootstrapLink) return
+            Log.i("PairingHandler", "Telling $id we unpaired it while it was out of reach")
+            val np = NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR)
+            np["pair"] = false
+            device.sendPacket(np, settlesDebt(context, id))
+        }
+    }
+
+    private fun settlesDebt(context: android.content.Context, id: String) = object : Device.SendPacketStatusCallback() {
+        override fun onSuccess() = org.desklink.mobile.helpers.OwedPairFalse.clear(context, id)
+        override fun onFailure(e: Throwable) = Unit // still owed: the next link tries again
     }
 
     fun packetReceived(np: NetworkPacket) {
@@ -491,11 +500,13 @@ class PairingHandler(private val device: Device, private val callback: PairingCa
             Log.i("PairingHandler", "Ignoring duplicate local unpair request")
             return
         }
+        // The certificate being unpaired, read while it is still the pairing's.
+        val fingerprint = runCatching { org.desklink.mobile.helpers.OwedPairFalse.fingerprint(device.certificate) }.getOrNull()
         state = PairState.NotPaired
         cancelTimer()
-        // No link to carry it: it is owed, and goes out with the next link (the packet-driven reply below stays as the second chance).
-        if (!device.hasBootstrapLink) runCatching { org.desklink.mobile.helpers.OwedPairFalse.owe(device.context, device.deviceId) }
-        sendPairFalse()
+        // Always owed until the packet is on its way: a pair:false lost in the queue, or never sendable, is paid by the next link.
+        runCatching { org.desklink.mobile.helpers.OwedPairFalse.owe(device.context, device.deviceId, fingerprint) }
+        sendPairFalse(settlesDebtOf = device.deviceId)
         // The local revocation commits regardless of whether the peer heard.
         // If it did not, it keeps behaving as paired until it next sends a
         // feature packet, which `notifyPeerNotPaired` answers with `pair:false`.

@@ -104,4 +104,14 @@ class QrPairingCancelTest {
         org.junit.Assert.assertEquals("the new pairing is undone", 1, undone)
         org.junit.Assert.assertEquals("and the old one comes back", 1, restored)
     }
+
+    @org.junit.Test
+    fun theOldPairingComingBackVoidsWhatWasOwedForDroppingIt() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<DeskLinkApplication>()
+        val id = "da179a91_f064_478e_be8c_1935d7544d54"
+        val backup = PairingBackup.capture(app, id)
+        org.desklink.mobile.helpers.OwedPairFalse.owe(app, id, "abcd")
+        QrPairing.restoreOld(app, backup)
+        org.junit.Assert.assertFalse(org.desklink.mobile.helpers.OwedPairFalse.owes(app, id))
+    }
 }

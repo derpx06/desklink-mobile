@@ -144,10 +144,18 @@ object QrPairing {
             private set
         internal var undo: (() -> Unit)? = null
 
+        /** The pairing completed: nothing is taken back any more, and [cancel] does nothing (leaving the scan screen must not unpair it). */
+        @Volatile
+        var succeeded = false
+            private set
+
+        internal fun markSucceeded() { succeeded = true }
+
         /** The pairing a replace dropped to make room: put back when the replace is cancelled, as when it fails. */
         internal var restoreOld: (() -> Unit)? = null
 
         fun cancel() {
+            if (succeeded) return
             cancelled = true
             runCatching { undo?.invoke() }
             runCatching { restoreOld?.invoke() }
@@ -194,21 +202,28 @@ object QrPairing {
             conflictingPairing(application, code)?.let { existing ->
                 if (!replaceExisting) throw ReplacesPairing(existing.name)
                 backup = PairingBackup.capture(application, existing.deviceId).also { saved ->
-                    attempt.restoreOld = { saved.restore(application); application.loadRememberedDevice(saved.deviceId) }
+                    attempt.restoreOld = { restoreOld(application, saved) }
                 }
                 existing.unpair()
             }
             try {
                 connectAndProve(application, code, onProgress, attempt)
                 // Cancelled while it was completing: the new pairing is undone (see Attempt.cancel) and the old one comes back.
-                if (attempt.cancelled) backup?.let { it.restore(application); application.loadRememberedDevice(it.deviceId) }
+                if (attempt.cancelled) backup?.let { restoreOld(application, it) }
             } catch (error: Throwable) {
-                backup?.let { it.restore(application); application.loadRememberedDevice(it.deviceId) }
+                backup?.let { restoreOld(application, it) }
                 throw error
             }
         } finally {
             pendingDesktopId = null
         }
+    }
+
+    /** The old pairing comes back: whatever was owed to that computer for dropping it is void. */
+    internal fun restoreOld(application: DeskLinkApplication, backup: PairingBackup) {
+        backup.restore(application)
+        application.loadRememberedDevice(backup.deviceId)
+        runCatching { org.desklink.mobile.helpers.OwedPairFalse.clear(application, backup.deviceId) }
     }
 
     private fun connectAndProve(application: DeskLinkApplication, code: Code, onProgress: (Stage) -> Unit, attempt: Attempt) {

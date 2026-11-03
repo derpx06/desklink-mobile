@@ -345,6 +345,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         if (fresh.isNotEmpty()) {
             val id = fresh.first()
             select(id)
+            qrFlow.succeeded(id) // a QR pairing that completed: leaving the scan screen must not take it back
             if (stack.any { it == SCAN || it.startsWith(PAIR_PREFIX) }) resetTo(HOME)
             showMessage(getString(R.string.pair_paired_with, paired.first { it.deviceId == id }.name))
         } else if (selectedId !in ids) {
@@ -747,7 +748,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             .map { NearbyComputer(it.deviceId, it.name) }
         // Leaving the scan screen ends any pairing it started and the next visit scans afresh.
         androidx.compose.runtime.DisposableEffect(Unit) {
-            onDispose { qrAttempt?.cancel(); qrAttempt = null; qrFlow.reset() }
+            onDispose { qrFlow.leave { id -> DeskLinkApplication.getInstance().getDevice(id)?.isPaired == true } }
         }
         val flowState = qrFlow.state
         ScanScreen(
@@ -786,18 +787,22 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     /** A scanned code that would replace an existing pairing, waiting for the person's answer. */
     private var qrConflict by mutableStateOf<Pair<QrPairing.Code, String>?>(null)
 
-    private var qrAttempt: QrPairing.Attempt? = null
-
     private fun startQrPairing(code: QrPairing.Code, replaceExisting: Boolean) {
         if (!qrFlow.start(code.desktopId)) return
-        qrAttempt = QrPairing.pair(
-            DeskLinkApplication.getInstance(),
-            code,
-            replaceExisting,
-            onProgress = { stage -> runOnUiThread { qrFlow.progress(code.desktopId, stage) } },
-        ) { error ->
-            if (error != null) runOnUiThread { qrFlow.fail(code.desktopId, error) }
-        }
+        val token = (qrFlow.state as QrScanFlow.State.Pairing).token
+        // Every callback names its attempt: one that was cancelled or replaced can no longer move the screen.
+        qrFlow.attach(
+            token,
+            QrPairing.pair(
+                DeskLinkApplication.getInstance(),
+                code,
+                replaceExisting,
+                onProgress = { stage -> runOnUiThread { qrFlow.progress(token, stage) } },
+            ) { error ->
+                // The worker has already taken back what it did.
+                if (error != null) runOnUiThread { qrFlow.fail(token, error, undo = false) }
+            },
+        )
     }
 
     /** Connecting → verifying → paired, over the scan screen; paired goes to the desk's Home. Any failure ends it with a sentence. */
@@ -809,6 +814,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val paired = device?.isPaired == true
         LaunchedEffect(paired) {
             if (paired) {
+                qrFlow.succeeded(id) // from here nothing can undo it, whatever leaves the screen
                 kotlinx.coroutines.delay(700)
                 if (qrFlow.state is QrScanFlow.State.Pairing) {
                     qrFlow.reset()
@@ -822,9 +828,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         androidx.compose.runtime.DisposableEffect(device) {
             val callback = object : org.desklink.mobile.PairingHandler.PairingCallback {
                 override fun incomingPairRequest() = Unit
-                override fun pairingSuccessful() = Unit
+                override fun pairingSuccessful() = runOnUiThread { qrFlow.succeeded(id) }
                 override fun pairingFailed(error: String) = runOnUiThread {
-                    if (qrFlow.fail(id, error)) { qrAttempt?.cancel(); qrAttempt = null }
+                    // A failure report about a computer that is paired is not this attempt failing: never take a pairing back for it.
+                    if (DeskLinkApplication.getInstance().getDevice(id)?.isPaired != true) qrFlow.fail(token, error)
                 }
                 override fun unpaired(device: Device) = Unit
             }
@@ -838,7 +845,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             val message = getString(
                 if ((qrFlow.state as? QrScanFlow.State.Pairing)?.stage == QrPairing.Stage.VERIFYING) R.string.qr_progress_timeout else R.string.qr_error_not_reached,
             )
-            if (qrFlow.timedOut(token, message)) { qrAttempt?.cancel(); qrAttempt = null }
+            qrFlow.timedOut(token, message)
         }
         val label = when {
             paired -> getString(R.string.qr_progress_paired, device?.name.orEmpty())
@@ -865,7 +872,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             // A way out whatever stage it hangs at. Scanning stays off until the person scans again.
             dismissButton = {
                 // Really cancels: the dial and the wait stop, a negotiation is ended, a pairing that completed meanwhile is undone.
-                TextButton(onClick = { qrFlow.cancel(); qrAttempt?.cancel(); qrAttempt = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { qrFlow.cancel() }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

@@ -42,46 +42,79 @@ class QrScanFlow {
     /** The code was read but is not usable (not ours, or waiting on the person's answer): stop, with a [message] if there is one. */
     fun reject(message: String?): Boolean = stopFrom<State.Scanning>(message)
 
-    /** Begin pairing with [id]. Refused only while an attempt is already running. */
+    /** The running attempt (the dial/wait/proof worker), owned here so that every way out takes it back, and a finished one is left alone. */
+    private var attempt: QrPairing.Attempt? = null
+
+    /** Begin pairing with [id]; the new attempt's token is in [state]. Refused only while an attempt is already running. */
     fun start(id: String): Boolean {
         if (state is State.Pairing) return false
         state = State.Pairing(id, QrPairing.Stage.CONNECTING, ++tokens)
         return true
     }
 
-    fun progress(id: String, stage: QrPairing.Stage) {
-        val s = state as? State.Pairing ?: return
-        if (s.id == id) state = s.copy(stage = stage)
+    /** The worker that [start] began for [token]; ignored if that attempt has already ended (it reported its own failure at once). */
+    fun attach(token: Int, started: QrPairing.Attempt) {
+        if ((state as? State.Pairing)?.token == token) attempt = started
     }
 
-    /** The attempt for [id] failed. False when it was no longer the live one (cancelled, timed out, replaced). */
-    fun fail(id: String, message: String): Boolean {
+    fun progress(token: Int, stage: QrPairing.Stage) {
+        val s = state as? State.Pairing ?: return
+        if (s.token == token) state = s.copy(stage = stage)
+    }
+
+    /**
+     * The attempt [token] failed. False when it was no longer the live one (cancelled, timed out, replaced). [undo]: also take back what
+     * it did (a refusal after the proof, a replace to restore); false when the worker itself reported the failure and has already.
+     */
+    fun fail(token: Int, message: String, undo: Boolean = true): Boolean {
         val s = state as? State.Pairing ?: return false
-        if (s.id != id) return false
+        if (s.token != token) return false
         state = State.Stopped(message)
+        release(undo)
         return true
     }
 
     /** [token]'s attempt took too long. */
-    fun timedOut(token: Int, message: String): Boolean {
-        val s = state as? State.Pairing ?: return false
-        if (s.token != token) return false
-        state = State.Stopped(message)
+    fun timedOut(token: Int, message: String): Boolean = fail(token, message)
+
+    /** The person cancelled: stopped, silently, and the attempt is taken back. */
+    fun cancel(): Boolean {
+        if (state !is State.Pairing) return false
+        state = State.Stopped(null)
+        release(undo = true)
         return true
     }
 
-    /** The person cancelled: stopped, silently. */
-    fun cancel(): Boolean = stopFrom<State.Pairing>(null)
+    /** The pairing for [id] completed: its attempt can no longer be cancelled or undone, by anything. */
+    fun succeeded(id: String) {
+        if ((state as? State.Pairing)?.id == id) attempt?.markSucceeded()
+    }
+
+    /**
+     * The scan screen is left. A pairing still being negotiated is taken back, unless [isPaired] says it completed (a race with the
+     * screen noticing); one that succeeded is never touched.
+     */
+    fun leave(isPaired: (String) -> Boolean) {
+        (state as? State.Pairing)?.let { if (isPaired(it.id)) attempt?.markSucceeded() }
+        release(undo = true)
+        reset()
+    }
 
     /** The person asked to scan again. */
     fun rescan() {
         if (state is State.Stopped) reset()
     }
 
-    /** Back to a fresh scan (leaving or re-entering the scan screen). */
+    /** Back to a fresh scan. */
     fun reset() {
         state = State.Scanning
         round++
+    }
+
+    private fun release(undo: Boolean) {
+        val a = attempt
+        attempt = null
+        if (undo) a?.cancel() // a no-op for an attempt that succeeded
     }
 
     private inline fun <reified S : State> stopFrom(message: String?): Boolean {
