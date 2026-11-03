@@ -118,7 +118,10 @@ object NotesStore {
         while (true) {
             try {
                 val opened = if (!file.baseFile.exists()) Shelf() else Shelf.fromStored(JSONObject(String(open(file.readFully()), Charsets.UTF_8)))
-                if (opened.prune(System.currentTimeMillis())) write(opened.toStored().toString())
+                val now = System.currentTimeMillis()
+                val pruned = opened.prune(now)
+                val tidied = opened.removeDuplicates(false, now).isNotEmpty()
+                if (pruned || tidied) write(opened.toStored().toString())
                 return opened
             } catch (e: Exception) {
                 if (isTransient(e)) {
@@ -158,7 +161,29 @@ object NotesStore {
     /** A peer's packet: the answers to send back. */
     fun onPacket(context: Context, packet: NetworkPacket): List<NetworkPacket> {
         val kind = ShelfKind.of(packet.type) ?: return emptyList()
-        return with(context) { it.handle(kind, packet) }
+        val answers = with(context) { it.handle(kind, packet) }
+        if (kind == ShelfKind.NOTES) cleanUpAfterSync(context)
+        return answers
+    }
+
+    /** Clears what merging left behind (identical copies of a note or of each other) and tells the desk. */
+    private fun cleanUpAfterSync(context: Context) {
+        val removed = with(context) { s -> s.removeDuplicates(false, System.currentTimeMillis()).let { it to it.isNotEmpty() } }
+        if (removed.isNotEmpty()) worker.execute { push(context.applicationContext, ShelfKind.NOTES, removed) }
+    }
+
+    /** "Remove duplicate copies": (copies that would go, copies that stay because their text exists nowhere else). */
+    fun duplicateCopiesPreview(context: Context): Pair<Int, Int> = with(context) { s ->
+        val doomed = s.duplicateCopies(true).size
+        val copies = s.notes.values.count { !it.deleted && Shelf.isCopy(it) }
+        (doomed to copies - doomed) to false
+    }
+
+    /** Deletes the duplicate copies (a delete like any other: it syncs); how many went. */
+    fun removeDuplicateCopies(context: Context): Int {
+        val removed = with(context) { s -> s.removeDuplicates(true, System.currentTimeMillis()).let { it to it.isNotEmpty() } }
+        if (removed.isNotEmpty()) worker.execute { push(context.applicationContext, ShelfKind.NOTES, removed) }
+        return removed.size
     }
 
     /** Both indexes, for a desk whose link just became ready. */
@@ -262,23 +287,24 @@ object NotesStore {
      * typing), the edit is merged as a sibling of it, so the desk's version is kept as a "conflicted copy" instead of being
      * overwritten without a word.
      */
-    fun editNote(context: Context, id: String, loaded: Long? = null, change: (Note) -> Note) {
-        val ids = with(context) { s ->
-            val before = s.notes[id] ?: return@with emptyList<String>() to false
+    fun editNote(context: Context, id: String, loaded: Long? = null, change: (Note) -> Note): Long? {
+        val (ids, modified) = with(context) { s ->
+            val before = s.notes[id] ?: return@with (emptyList<String>() to null) to false
             var after = change(before).let { it.copy(id = before.id, title = it.title.takeCodePoints(Shelf.MAX_NOTE_TITLE_CHARS)) }
-            if (!Shelf.syncable(after.body) || after.sameContent(before)) return@with emptyList<String>() to false
+            if (!Shelf.syncable(after.body) || after.sameContent(before)) return@with (emptyList<String>() to before.modified) to false
             if (after.deleted) after = after.copy(title = "", body = "")
             if (loaded != null && loaded != before.modified && loaded > 0) {
                 val mine = after.copy(parent = loaded, modified = later(before.modified), ancestors = listOf(loaded))
                 val before2 = s.notes.keys.toSet()
                 s.mergeNote(mine)
-                (listOf(id) + (s.notes.keys - before2)) to true
+                ((listOf(id) + (s.notes.keys - before2)) to s.notes[id]?.modified) to true
             } else {
                 s.notes[id] = Shelf.edited(before, after, s.synced[id], System.currentTimeMillis())
-                listOf(id) to true
+                (listOf(id) to s.notes[id]?.modified) to true
             }
         }
         ids.forEach { pushNoteSoon(context, it) }
+        return modified
     }
 
     /** Now, but strictly after [previous] even within one millisecond. */

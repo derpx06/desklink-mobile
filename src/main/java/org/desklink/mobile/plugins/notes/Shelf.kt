@@ -87,7 +87,8 @@ class Shelf {
             take(incoming)
             return Merged.TAKEN
         }
-        if (local.modified == incoming.modified) {
+        // Equal `modified` is the same version only if it says the same (two sides can edit in the same millisecond); otherwise siblings.
+        if (local.modified == incoming.modified && local.sameContent(incoming)) {
             synced[local.id] = local.modified
             return Merged.SAME
         }
@@ -105,12 +106,29 @@ class Shelf {
         }
         val (winner, loser) = if (incomingWins) incoming to local else local to incoming
         val conflict = !winner.sameContent(loser) && !winner.deleted && !loser.deleted
-        val copy = if (conflict) loser.copy(id = "${loser.id}~${loser.modified}", title = "${loser.label} (conflicted copy)", parent = loser.modified) else null
-        // Ours stays and the copy is already here: resolved before.
-        if (!incomingWins && (copy == null || notes[copy.id] == copy)) return Merged.KEPT_OURS
-        copy?.let(::take)
+        val copy = if (conflict) loser.copy(id = "${loser.id}~${loser.modified}", title = "${loser.label} $COPY_SUFFIX", parent = loser.modified) else null
+        // A copy that is already here, as it was, edited or deleted, was resolved before: it is never written over (that
+        // reverted the person's edits to it and brought deleted copies back).
+        val fresh = copy?.takeIf { it.id !in notes }
+        if (!incomingWins && (!conflict || fresh == null)) return Merged.KEPT_OURS
+        fresh?.let(::take)
         take(winner)
-        return if (conflict) Merged.CONFLICT else Merged.TAKEN
+        return if (fresh != null) Merged.CONFLICT else Merged.TAKEN
+    }
+
+    /**
+     * The peer holds [modified] of note [id] (it took it, or listed it): the version our next edit names as its `parent`,
+     * when it is one of ours and newer than what we had. Whether `synced` moved.
+     */
+    fun acknowledge(id: String, modified: Long): Boolean {
+        val note = notes[id] ?: return false
+        val chain = listOf(note.modified) + note.ancestors
+        val at = chain.indexOf(modified)
+        if (at < 0) return false
+        val held = synced[id]?.let(chain::indexOf)?.takeIf { it >= 0 } ?: Int.MAX_VALUE
+        if (at >= held) return false
+        synced[id] = modified
+        return true
     }
 
     private fun take(note: Note) {
@@ -165,13 +183,38 @@ class Shelf {
     /** A packet from a peer: the packets to answer with, and whether the shelf changed (to save). */
     fun handle(kind: ShelfKind, packet: NetworkPacket): Pair<List<NetworkPacket>, Boolean> = when (packet.getStringOrNull("op")) {
         "index" -> {
-            val ids = wanted(kind, packet.getJSONArray("items") ?: JSONArray())
+            val index = packet.getJSONArray("items") ?: JSONArray()
+            // What the peer lists exactly as we hold it, it holds: the base of our next edit.
+            var held = false
+            if (kind == ShelfKind.NOTES) {
+                for (i in 0 until minOf(index.length(), MAX_INDEX_ENTRIES)) {
+                    val entry = index.optJSONObject(i) ?: continue
+                    val id = entry.opt("id") as? String ?: continue
+                    val modified = (entry.opt("modified") as? Number)?.toLong() ?: continue
+                    if (acknowledge(id, modified)) held = true
+                }
+            }
+            val ids = wanted(kind, index)
             ids.chunked(FETCH_IDS).map { chunk ->
                 NetworkPacket(kind.packetType).apply {
                     this["op"] = "fetch"
                     this["ids"] = chunk
                 }
-            } to false
+            } to held
+        }
+        "ack" -> {
+            // The peer took these versions of ours (older builds never send this).
+            var changed = false
+            if (kind == ShelfKind.NOTES) {
+                val raw = packet.getJSONArray("items") ?: JSONArray()
+                for (i in 0 until minOf(raw.length(), MAX_ITEMS_PER_PACKET)) {
+                    val entry = raw.optJSONObject(i) ?: continue
+                    val id = entry.opt("id") as? String ?: continue
+                    val modified = (entry.opt("modified") as? Number)?.toLong() ?: continue
+                    if (acknowledge(id, modified)) changed = true
+                }
+            }
+            emptyList<NetworkPacket>() to changed
         }
         "fetch" -> {
             val raw = packet.getJSONArray("ids") ?: JSONArray()
@@ -182,6 +225,7 @@ class Shelf {
             val raw = packet.getJSONArray("items") ?: JSONArray()
             var changed = false
             val sendBack = mutableListOf<String>()
+            val held = mutableListOf<Pair<String, Long>>()
             for (i in 0 until minOf(raw.length(), MAX_ITEMS_PER_PACKET)) {
                 val item = raw.optJSONObject(i) ?: continue
                 when (kind) {
@@ -197,8 +241,11 @@ class Shelf {
                         if (note.id !in notes && notes.size >= MAX_STORED_NOTES - 1) continue
                         when (mergeNote(note)) {
                             Merged.KEPT_OURS -> sendBack += note.id
-                            Merged.SAME -> Unit
-                            Merged.TAKEN -> changed = true
+                            Merged.SAME -> held += note.id to note.modified
+                            Merged.TAKEN -> {
+                                changed = true
+                                held += note.id to note.modified
+                            }
                             // The peer resolves it alike once it has ours.
                             Merged.CONFLICT -> {
                                 changed = true
@@ -208,9 +255,40 @@ class Shelf {
                     }
                 }
             }
-            itemsPackets(kind, itemValues(kind, sendBack)) to changed
+            // Tell the sender it now has these versions here (its next edit then names one as its base instead of an older one).
+            val acks = held.chunked(FETCH_IDS).map { chunk ->
+                NetworkPacket(kind.packetType).apply {
+                    this["op"] = "ack"
+                    this["items"] = JSONArray(chunk.map { (id, modified) -> JSONObject().put("id", id).put("modified", modified) })
+                }
+            }
+            (itemsPackets(kind, itemValues(kind, sendBack)) + acks) to changed
         }
         else -> emptyList<NetworkPacket>() to false
+    }
+
+    // ---- duplicate conflicted copies -----------------------------------------------------------------------
+
+    /**
+     * Which live copies to delete. A copy goes only when something that stays says the same: [everywhere] is the person's
+     * "Remove duplicate copies" (any other live note, or the lowest-id one of identical copies); without it, only the note it
+     * was made from, or an identical copy of the same note. A copy whose text is anywhere else unique is never listed.
+     */
+    fun duplicateCopies(everywhere: Boolean): List<String> {
+        val live = notes.values.filter { !it.deleted }
+        return live.filter { isCopy(it) }.filter { copy ->
+            val key = contentKey(copy)
+            val base = copyBase(copy.id)
+            live.any { !isCopy(it) && it.id != copy.id && (everywhere || it.id == base) && contentKey(it) == key } ||
+                live.any { isCopy(it) && it.id < copy.id && (everywhere || copyBase(it.id) == base) && contentKey(it) == key }
+        }.map { it.id }
+    }
+
+    /** Deletes (as the person would: a tombstone that syncs) the copies [duplicateCopies] lists. The ids deleted. */
+    fun removeDuplicates(everywhere: Boolean, now: Long): List<String> = duplicateCopies(everywhere).filter { id ->
+        val before = notes[id] ?: return@filter false
+        notes[id] = edited(before, before.copy(deleted = true, title = "", body = ""), synced[id], now)
+        true
     }
 
     /** Drops tombstones older than 90 days. Whether anything went. */
@@ -326,6 +404,26 @@ class Shelf {
         )
 
         const val MAX_ANCESTORS = 8
+
+        /** What a conflicted copy's title ends with (the desk's wording, character for character). */
+        const val COPY_SUFFIX = "(conflicted copy)"
+
+        /** The note a conflicted copy was made from: copies are `<id>~<modified>`. */
+        fun copyBase(id: String): String? {
+            val at = id.lastIndexOf('~')
+            if (at <= 0 || at == id.length - 1) return null
+            return id.substring(0, at).takeIf { id.substring(at + 1).all { it in '0'..'9' } }
+        }
+
+        fun isCopy(note: Note) = copyBase(note.id) != null && note.title.endsWith(COPY_SUFFIX)
+
+        /** What a note says, for telling duplicates: a copy's title without the suffix, or a note's label, and the body. */
+        fun contentKey(note: Note): Pair<String, String> {
+            if (!isCopy(note)) return note.label to note.body
+            var title = note.title
+            while (title.endsWith(COPY_SUFFIX)) title = title.removeSuffix(COPY_SUFFIX).trimEnd()
+            return title to note.body
+        }
 
         /** A wire item, or null when a required field is missing or of the wrong type. */
         fun snippetFrom(o: JSONObject): Snippet? {

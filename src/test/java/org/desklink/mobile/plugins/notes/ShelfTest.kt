@@ -110,7 +110,9 @@ class ShelfTest {
         assertEquals("fetch", fetches[0].getString("op"))
         val (items, _) = desk.handle(ShelfKind.NOTES, wire(fetches[0]))
         val (back, changed) = phone.handle(ShelfKind.NOTES, wire(items[0]))
-        assertTrue(changed && back.isEmpty())
+        // Nothing to send back but the acknowledgement that it took the note.
+        assertTrue(changed && back.all { it.getString("op") == "ack" })
+        assertEquals(1, back.size)
         assertEquals("hello", phone.notes["n"]!!.body)
 
         val junk = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_NOTES).apply {
