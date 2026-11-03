@@ -77,9 +77,13 @@ class QrScanFlow {
     /** [token]'s attempt took too long. */
     fun timedOut(token: Int, message: String): Boolean = fail(token, message)
 
-    /** The person cancelled: stopped, silently, and the attempt is taken back. */
-    fun cancel(): Boolean {
-        if (state !is State.Pairing) return false
+    /**
+     * The person cancelled: stopped, silently, and the attempt is taken back. False when nothing was cancelled: no attempt, or the
+     * pairing had completed ([isPaired]) before the screen noticed, in which case it is marked done and left alone (the caller goes Home).
+     */
+    fun cancel(isPaired: (String) -> Boolean): Boolean {
+        val s = state as? State.Pairing ?: return false
+        if (isPaired(s.id)) { attempt?.markSucceeded(); return false }
         state = State.Stopped(null)
         release(undo = true)
         return true

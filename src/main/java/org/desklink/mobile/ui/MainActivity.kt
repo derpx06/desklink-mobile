@@ -872,7 +872,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             // A way out whatever stage it hangs at. Scanning stays off until the person scans again.
             dismissButton = {
                 // Really cancels: the dial and the wait stop, a negotiation is ended, a pairing that completed meanwhile is undone.
-                TextButton(onClick = { qrFlow.cancel() }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = {
+                    // Paired already (Cancel tapped as it completed, or during the "Paired" pause): that is not cancelled, it goes Home.
+                    if (!qrFlow.cancel { DeskLinkApplication.getInstance().getDevice(it)?.isPaired == true } && qrFlow.state is QrScanFlow.State.Pairing) {
+                        qrFlow.reset()
+                        select(id)
+                        resetTo(HOME)
+                    }
+                }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

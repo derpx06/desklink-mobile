@@ -186,6 +186,8 @@ object QrPairing {
 
     private fun pairBlocking(application: DeskLinkApplication, code: Code, replaceExisting: Boolean, onProgress: (Stage) -> Unit, attempt: Attempt) {
         pendingDesktopId = code.desktopId
+        // The old pairing is put back by whoever gets there first (Cancel on the UI thread, or this worker's own failure), once.
+        val restored = java.util.concurrent.atomic.AtomicBoolean(false)
         org.desklink.mobile.backends.lan.UnpairedLimits.shared.reserve(code.desktopId)
         try {
             // Never unpaired on a scan's say-so alone: a code shown elsewhere
@@ -202,21 +204,25 @@ object QrPairing {
             conflictingPairing(application, code)?.let { existing ->
                 if (!replaceExisting) throw ReplacesPairing(existing.name)
                 backup = PairingBackup.capture(application, existing.deviceId).also { saved ->
-                    attempt.restoreOld = { restoreOld(application, saved) }
+                    attempt.restoreOld = { restoreOnce(restored, application, saved) }
                 }
                 existing.unpair()
             }
             try {
                 connectAndProve(application, code, onProgress, attempt)
                 // Cancelled while it was completing: the new pairing is undone (see Attempt.cancel) and the old one comes back.
-                if (attempt.cancelled) backup?.let { restoreOld(application, it) }
+                if (attempt.cancelled) backup?.let { restoreOnce(restored, application, it) }
             } catch (error: Throwable) {
-                backup?.let { restoreOld(application, it) }
+                backup?.let { restoreOnce(restored, application, it) }
                 throw error
             }
         } finally {
             pendingDesktopId = null
         }
+    }
+
+    internal fun restoreOnce(done: java.util.concurrent.atomic.AtomicBoolean, application: DeskLinkApplication, backup: PairingBackup) {
+        if (done.compareAndSet(false, true)) restoreOld(application, backup)
     }
 
     /** The old pairing comes back: whatever was owed to that computer for dropping it is void. */

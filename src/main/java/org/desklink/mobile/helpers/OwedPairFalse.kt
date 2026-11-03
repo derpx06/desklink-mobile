@@ -17,7 +17,13 @@ object OwedPairFalse {
 
     private fun prefs(context: Context) = (context.applicationContext ?: context).getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    private fun read(context: Context): Set<String> = prefs(context).getStringSet(KEY, emptySet()).orEmpty()
+    private fun read(context: Context): Set<String> {
+        val all = prefs(context).getStringSet(KEY, emptySet()).orEmpty()
+        // A plain-id entry (the first format, no certificate) cannot be paid to the right computer: dropped.
+        val valid = all.filter { ':' in it }.toSet()
+        if (valid.size != all.size) prefs(context).edit().putStringSet(KEY, valid).apply()
+        return valid
+    }
 
     private fun idOf(entry: String) = entry.substringBefore(':')
 

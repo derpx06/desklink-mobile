@@ -27,7 +27,7 @@ class QrScanFlowTest {
     fun cancelStopsScanningUntilTheUserRescans() {
         val flow = QrScanFlow()
         flow.start("desk")
-        assertTrue(flow.cancel())
+        assertTrue(flow.cancel { false })
         assertEquals(State.Stopped(null), flow.state)
         assertFalse(flow.accepts())
         val before = flow.round
@@ -60,7 +60,7 @@ class QrScanFlowTest {
         val flow = QrScanFlow()
         flow.start("desk")
         val first = token(flow)
-        flow.cancel()
+        flow.cancel { false }
         flow.rescan()
         flow.start("desk")
         assertFalse("a stale timer of the cancelled attempt", flow.timedOut(first, "late"))
@@ -74,7 +74,7 @@ class QrScanFlowTest {
         val flow = QrScanFlow()
         flow.start("desk")
         val old = token(flow)
-        flow.cancel()
+        flow.cancel { false }
         assertFalse(flow.fail(old, "canceled by user"))
         assertEquals(State.Stopped(null), flow.state)
         flow.progress(old, QrPairing.Stage.VERIFYING)
@@ -154,7 +154,7 @@ class QrScanFlowTest {
         val flow = QrScanFlow()
         flow.start("desk")
         flow.attach(token(flow), attempt(undone))
-        flow.cancel()
+        flow.cancel { false }
         flow.leave { false }
         assertEquals(1, undone[0])
     }
@@ -177,6 +177,18 @@ class QrScanFlowTest {
         val t = token(flow)
         flow.fail(t, "not reached", undo = false)
         flow.attach(t, attempt(undone))
+        flow.leave { false }
+        assertEquals(0, undone[0])
+    }
+
+    @Test
+    fun cancelTappedAfterThePairingCompletedDoesNotUndoIt() {
+        val undone = intArrayOf(0)
+        val flow = QrScanFlow()
+        flow.start("desk")
+        flow.attach(token(flow), attempt(undone))
+        assertFalse("nothing was cancelled", flow.cancel { it == "desk" })
+        assertTrue(flow.state is State.Pairing)
         flow.leave { false }
         assertEquals(0, undone[0])
     }

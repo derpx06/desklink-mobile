@@ -144,4 +144,15 @@ class OwedPairFalseTest {
         assertTrue("a pairing that starts meanwhile cannot interleave", held)
         OwedPairFalse.clear(app, "desk8")
     }
+
+    @Test
+    fun aPlainIdEntryFromTheFirstFormatIsDroppedOnRead() {
+        app.getSharedPreferences("desklink_owed_pair_false", android.content.Context.MODE_PRIVATE).edit()
+            .putStringSet("ids", setOf("legacy", "kept:abcd")).commit()
+        assertFalse(OwedPairFalse.owes(app, "legacy"))
+        assertTrue(OwedPairFalse.owes(app, "kept"))
+        val stored = app.getSharedPreferences("desklink_owed_pair_false", android.content.Context.MODE_PRIVATE).getStringSet("ids", null)
+        assertTrue(stored == setOf("kept:abcd"))
+        OwedPairFalse.clear(app, "kept")
+    }
 }

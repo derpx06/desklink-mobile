@@ -114,4 +114,18 @@ class QrPairingCancelTest {
         QrPairing.restoreOld(app, backup)
         org.junit.Assert.assertFalse(org.desklink.mobile.helpers.OwedPairFalse.owes(app, id))
     }
+
+    @org.junit.Test
+    fun theOldPairingIsPutBackOnceWhoeverGetsThereFirst() {
+        val app = androidx.test.core.app.ApplicationProvider.getApplicationContext<DeskLinkApplication>()
+        val id = "da179a91_f064_478e_be8c_1935d7544d54"
+        val backup = PairingBackup.capture(app, id)
+        val done = java.util.concurrent.atomic.AtomicBoolean(false)
+        org.desklink.mobile.helpers.OwedPairFalse.owe(app, id, "abcd")
+        QrPairing.restoreOnce(done, app, backup)
+        org.desklink.mobile.helpers.OwedPairFalse.owe(app, id, "abcd") // a second restore would clear this again
+        QrPairing.restoreOnce(done, app, backup)
+        org.junit.Assert.assertTrue("the second caller did nothing", org.desklink.mobile.helpers.OwedPairFalse.owes(app, id))
+        org.desklink.mobile.helpers.OwedPairFalse.clear(app, id)
+    }
 }
