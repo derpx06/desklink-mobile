@@ -125,6 +125,8 @@ fun GroupRow(
     val action = when {
         checked != null && onClick != null -> Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch) { onClick() }
         onClick != null -> Modifier.clickable(enabled = enabled, onClick = onClick)
+        // A switch the phone only shows (set at the desk): still announced as a switch, and as off or on.
+        checked != null -> Modifier.toggleable(value = checked, enabled = false, role = Role.Switch) {}
         else -> Modifier
     }
     Row(
@@ -145,9 +147,8 @@ fun GroupRow(
                 Text(
                     it,
                     style = if (monoSubtitle) TextStyle(fontFamily = MonoFamily, fontSize = 13.sp) else TextStyle(fontSize = 13.sp, lineHeight = 17.sp),
+                    // Never cut: what a setting says is what it does (and a command to copy must be whole).
                     color = t.textDim,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -187,6 +188,7 @@ fun PillButton(
     Row(
         modifier
             .heightIn(min = maxOf(height, 48.dp))
+            .alpha(if (enabled) 1f else 0.38f)
             .clip(shape)
             .background(bg)
             .then(if (style == PillStyle.Outlined) Modifier.border(1.dp, t.hairlineStrong, shape) else Modifier)
@@ -199,6 +201,14 @@ fun PillButton(
             Icon(painterResource(icon), contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
         }
-        Text(text, color = fg, fontSize = if (height >= 52.dp) 16.sp else 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        // Wraps at a large font size instead of being cut: the label is the button.
+        Text(
+            text,
+            color = fg,
+            fontSize = if (height >= 52.dp) 16.sp else 14.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 0.dp),
+        )
     }
 }

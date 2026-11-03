@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -44,7 +45,7 @@ fun SessionPasswordDialog(wrong: Boolean, onSubmit: (String) -> Unit, onDismiss:
         properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
         title = { Text(stringResource(R.string.session_password_title)) },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
                 Text(stringResource(R.string.session_password_message))
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(

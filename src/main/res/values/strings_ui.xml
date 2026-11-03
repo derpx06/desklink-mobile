@@ -25,6 +25,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_your_computers">Your computers</string>
     <string name="home_pair">Pair</string>
     <string name="navigate_up">Back</string>
+    <string name="licenses_scroll_top">Scroll to top</string>
+    <string name="licenses_scroll_bottom">Scroll to bottom</string>
 
     <!-- Device -->
     <string name="device_encryption">Encryption</string>
@@ -60,7 +62,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="setting_dynamic_colors">Use wallpaper colours</string>
     <string name="setting_relay_connected">Connected via relay</string>
     <string name="setting_advanced_network">Advanced network</string>
-    <string name="setting_advanced_network_summary">Relay server, TURN and STUN</string>
+    <string name="setting_advanced_network_summary">Relay and connection servers, for experts</string>
     <!-- UI v4: Home -->
     <string name="home_unavailable_connecting">Still connecting to %1$s</string>
     <string name="home_unavailable_unreachable">Can\'t set up the connection to %1$s yet. DeskLink keeps trying.</string>
@@ -72,14 +74,14 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_connected_internet">Connected over the internet</string>
     <string name="home_short_wifi">Connected · Wi‑Fi</string>
     <string name="home_short_relay">Connected · Relay</string>
-    <string name="home_meta_connecting">lan → relay</string>
+    <string name="home_meta_connecting">Wi‑Fi, then the internet</string>
     <string name="home_meta_rtt">%1$d ms</string>
     <string name="home_meta_relay">%1$d ms · encrypted</string>
     <string name="home_meta_encrypted">encrypted</string>
     <string name="home_offline_body">%1$s may be asleep or off the network. Your terminals keep running there.</string>
     <string name="home_trying_paths">Trying Wi‑Fi, then the relay</string>
     <string name="home_looking_on_wifi">Looking for %1$s on this Wi‑Fi</string>
-    <string name="home_meta_connecting_lan">lan</string>
+    <string name="home_meta_connecting_lan">Wi‑Fi</string>
     <string name="home_live_screen">you\'re viewing the desk screen</string>
     <plurals name="home_live_terminals">
         <item quantity="one">%1$d terminal open</item>
@@ -87,6 +89,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     </plurals>
     <string name="home_live_phone_screen">the desk sees your screen</string>
     <string name="home_desk_screen">Desk screen</string>
+    <string name="settings_scroll_reverse_summary">Flip which way scrolling goes when this phone is the touchpad</string>
+    <string name="settings_use_relay_fallback">Use a relay when a direct connection fails</string>
+    <string name="settings_use_relay_fallback_summary">Slower, but works on networks that block direct connections</string>
+    <string name="home_action_unavailable">Not available right now</string>
     <string name="home_send_files">Send files</string>
     <string name="home_send_link">Send a link</string>
     <string name="home_lock_desk">Lock desk</string>
@@ -169,7 +175,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="clipboard_desk_off">%1$s has clipboard sharing turned off, so it would ignore this. Turn it on there, or in Settings.</string>
     <string name="clipboard_too_large">That copy is too large to send to your computer</string>
     <string name="settings_clipboard_auto">Automatic sync (advanced)</string>
-    <string name="settings_clipboard_auto_grant">Sends each copy without a tap. Needs a one-time command from a computer with adb — tap to copy it: %1$s</string>
+    <string name="settings_clipboard_auto_grant">Sends each copy without a tap. Needs a one-time setup from a computer (it uses adb). Tap to copy the command: %1$s</string>
     <string name="settings_clipboard_auto_grant_oem">On OPPO, realme and OnePlus first turn on Developer options → Disable permission monitoring; on Xiaomi, USB debugging (Security settings). Otherwise the command is refused.</string>
     <string name="settings_clipboard_auto_copied">Command copied. Run it, then turn this on</string>
     <string name="settings_clipboard_auto_on">Each copy on this phone goes to %1$s on its own. When Android asks about device logs, choose Allow</string>
@@ -195,14 +201,14 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <!-- UI v4: pairing -->
     <string name="welcome_title">Your computer,\nin your pocket.</string>
-    <string name="welcome_body">Pair once with your Linux desktop. Then pick up its terminals, screen and files from anywhere.</string>
+    <string name="welcome_body">Pair once with your Linux computer. On it, open DeskLink and choose Pair a phone: it shows a QR code. Scan that code here.</string>
     <string name="welcome_terminals">Terminals that follow you</string>
     <string name="welcome_screens">Screens in both directions</string>
     <string name="welcome_encrypted">No account, encrypted end to end</string>
     <string name="welcome_pair">Pair with a Computer</string>
     <string name="scan_title">Scan the code</string>
     <string name="scan_again">Scan again</string>
-    <string name="scan_hint">Point your camera at the code on your computer</string>
+    <string name="scan_hint">Point your camera at the QR code on your computer (DeskLink → Pair a phone)</string>
     <string name="scan_camera_needed">The camera reads the code DeskLink shows on your computer</string>
     <string name="scan_allow_camera">Allow camera</string>
     <string name="scan_camera_denied">Without the camera, pair with a computer on this network below</string>
@@ -250,8 +256,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="accessibility_setup_ask">%1$s wants to control this phone</string>
     <string name="accessibility_setup_ask_text">Tap to turn on DeskLink in Accessibility</string>
     <string name="settings_desk_notifications_summary">Reply from the computer</string>
-    <string name="settings_relay_not_set_up">No relay server set up. Enter one in Settings → Advanced</string>
-    <string name="settings_reach_anywhere_summary">Encrypted relay when off Wi‑Fi</string>
+    <string name="settings_relay_not_set_up">Not set up yet. Add a relay address in Settings → Advanced → Network</string>
+    <string name="settings_reach_anywhere_summary">Keeps working off Wi‑Fi, through an encrypted relay</string>
     <string name="settings_paired_key">Paired · key %1$s</string>
 
     <!-- UI v4: live sessions -->
@@ -699,7 +705,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="sg_sound">Sound</string>
     <string name="sg_sound_summary">%1$s\'s sound here, this phone\'s media there</string>
     <string name="sg_control">Control</string>
-    <string name="sg_control_summary">Glide, typing, the desk screen</string>
+    <string name="sg_control_summary">Mouse and keyboard across devices, the desk screen</string>
     <string name="sg_files">Files</string>
     <string name="sg_files_summary">The Bucket and where received files go</string>
     <string name="sg_privacy">Privacy &amp; security</string>

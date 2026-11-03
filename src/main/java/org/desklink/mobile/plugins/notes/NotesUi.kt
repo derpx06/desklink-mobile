@@ -167,6 +167,8 @@ class NotesUi(
                         R.drawable.sym_edit_note,
                         stringResource(if (query.isBlank()) R.string.notes_empty_title else R.string.notes_no_match),
                         stringResource(R.string.notes_empty_body),
+                        // Scrolls clear of the New note button, which floats over the bottom.
+                        Modifier.verticalScroll(rememberScrollState()).padding(bottom = 88.dp),
                     )
                 } else {
                     LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -190,12 +192,12 @@ class NotesUi(
         DeskCard(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { if (note.pinned) contentDescription = "${note.label}, $pinned" }, onClick = onOpen) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(note.label, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text(note.label, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     if (note.pinned) Icon(painterResource(R.drawable.sym_keep_filled), contentDescription = null, tint = t.accentText, modifier = Modifier.size(18.dp))
                 }
                 val preview = note.body.lineSequence().map(String::trim).filter(String::isNotEmpty).drop(if (note.title.isBlank()) 1 else 0).joinToString("  ")
                 if (preview.isNotEmpty()) Text(preview, fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(DateUtils.getRelativeTimeSpanString(note.modified).toString(), fontSize = 12.sp, color = t.textFaint)
+                Text(DateUtils.getRelativeTimeSpanString(note.modified).toString(), fontSize = 12.sp, color = t.textDim)
             }
         }
     }
@@ -230,7 +232,7 @@ class NotesUi(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(snippet.label, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(snippet.label, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 if (snippet.text.trim() != snippet.label) {
                                     Text(snippet.text.trim(), fontFamily = MonoFamily, fontSize = 12.sp, color = t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
@@ -347,7 +349,7 @@ class NotesUi(
             }
             val titleHint = stringResource(R.string.notes_title_hint)
             Box(Modifier.padding(horizontal = 20.dp)) {
-                if (title.isEmpty()) Text(titleHint, fontSize = 26.sp, fontWeight = FontWeight.Medium, color = t.textFaint)
+                if (title.isEmpty()) Text(titleHint, fontSize = 26.sp, fontWeight = FontWeight.Medium, color = t.textDim)
                 BasicTextField(
                     value = title,
                     onValueChange = { title = it.replace("\n", "").take(Shelf.MAX_NOTE_TITLE_CHARS); dirty = true },
@@ -378,7 +380,7 @@ class NotesUi(
                     )
                 } else {
                     Box {
-                        if (body.isEmpty()) Text(bodyHint, fontSize = 16.sp, color = t.textFaint)
+                        if (body.isEmpty()) Text(bodyHint, fontSize = 16.sp, color = t.textDim)
                         BasicTextField(
                             value = body,
                             onValueChange = { body = it; dirty = true },

@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -672,7 +673,7 @@ internal fun NowPlayingOverlay(media: HomeMedia?, actions: HomeActions, cardArt:
         ) {
             // Everything but the artwork fades in after it has started to move.
             val fade = Modifier.graphicsLayer { alpha = ((progress.value - 0.35f) / 0.65f).coerceIn(0f, 1f) }
-            Row(fade.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(fade.fillMaxWidth().heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
                     Icon(painterResource(R.drawable.sym_expand_more), contentDescription = stringResource(R.string.home_media_close), tint = t.text)
                 }

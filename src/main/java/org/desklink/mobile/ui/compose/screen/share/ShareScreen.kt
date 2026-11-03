@@ -146,7 +146,7 @@ private fun ShareScreenCardContent(device: DeviceUiModel) {
                 Text(
                     text = stringResource(id = R.string.device_not_reachable),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFCC2222),
+                    color = MaterialTheme.colorScheme.error,
                     fontSize = 14.sp,
                     maxLines = 1
                 )

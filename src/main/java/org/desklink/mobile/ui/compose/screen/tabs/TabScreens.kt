@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
@@ -108,8 +111,14 @@ fun FilesTab(
                 Icon(painterResource(R.drawable.sym_upload_file), contentDescription = stringResource(R.string.home_send_files), tint = t.text)
             }
         }
-        sendAgain.forEach { item -> SendAgainCard(item, onSendAgain, onDismissSendAgain) }
-        unsaved.forEach { item -> UnsavedCard(item, item.id in retrying, onRetryUnsaved, onDiscardUnsaved) }
+        if (sendAgain.isNotEmpty() || unsaved.isNotEmpty()) {
+            // Notices scroll inside a share of the screen: several of them, or a large font, must not push the files off it.
+            val share = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.45f).dp
+            Column(Modifier.heightIn(max = share).verticalScroll(rememberScrollState())) {
+                sendAgain.forEach { item -> SendAgainCard(item, onSendAgain, onDismissSendAgain) }
+                unsaved.forEach { item -> UnsavedCard(item, item.id in retrying, onRetryUnsaved, onDiscardUnsaved) }
+            }
+        }
         Box(Modifier.weight(1f)) {
             bucket.Screen(deviceId, onBack = {}, embedded = true) {
                 recentTransfers(deskName, live, records, revision, actions, limit = if (showAll) Int.MAX_VALUE else RECENT_LIMIT, onShowAll = { showAll = true })
@@ -141,7 +150,8 @@ private fun SendAgainCard(
             stringResource(if (item.unreadable) R.string.send_again_body_unreadable else R.string.send_again_body_changed),
             fontSize = 13.sp, color = t.text,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PillButton(stringResource(R.string.send_again_button), { onSendAgain(item.id) }, height = 48.dp)
             PillButton(stringResource(R.string.send_again_dismiss), { onDismiss(item.id) }, style = PillStyle.Outlined, height = 48.dp)
         }
@@ -171,7 +181,8 @@ private fun UnsavedCard(
             if (item.storageFull) stringResource(R.string.files_unsaved_body_full) else stringResource(R.string.files_unsaved_body),
             fontSize = 13.sp, color = t.text,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // While it runs a second tap would start a second copy: the buttons do nothing until it has an answer.
             PillButton(
                 stringResource(if (busy) R.string.files_saving_label else R.string.files_unsaved_retry),
@@ -239,10 +250,13 @@ private fun ClipboardSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
 @Composable
 private fun Segments(selected: Int, onSelect: (Int) -> Unit) {
     val t = tokens
+    // Three equal slots: the labels grow with the font size up to 120 %, then wrap.
+    org.desklink.mobile.ui.compose.components.CappedFontScale(1.2f) {
     Row(
         Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(t.fill).padding(4.dp).selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+
         listOf(R.string.notes_tab_notes, R.string.notes_tab_snippets, R.string.notes_tab_clipboard).forEachIndexed { index, label ->
             val on = index == selected
             Box(
@@ -254,9 +268,17 @@ private fun Segments(selected: Int, onSelect: (Int) -> Unit) {
                     .selectable(selected = on, role = Role.Tab) { onSelect(index) },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(stringResource(label), fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal, color = if (on) t.text else t.textDim)
+                Text(
+                    stringResource(label),
+                    fontSize = 15.sp,
+                    fontWeight = if (on) FontWeight.Medium else FontWeight.Normal,
+                    color = if (on) t.text else t.textDim,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+                )
             }
         }
+    }
     }
 }
 
@@ -375,9 +397,10 @@ fun TerminalsTab(
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)
                     .heightIn(min = 56.dp)
+                    .alpha(if (connected) 1f else 0.38f)
                     .clip(RoundedCornerShape(18.dp))
                     .background(t.accentContainer)
-                    .selectable(selected = false, role = Role.Button) { if (connected) onNew() }
+                    .selectable(selected = false, enabled = connected, role = Role.Button) { onNew() }
                     .padding(start = 16.dp, end = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),

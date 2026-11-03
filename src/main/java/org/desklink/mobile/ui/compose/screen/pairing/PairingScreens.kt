@@ -141,7 +141,8 @@ fun WelcomeScreen(onPair: () -> Unit, onSettings: () -> Unit) {
         ) {
             Text(stringResource(R.string.welcome_install_title), fontSize = 15.sp, fontWeight = FontWeight.Medium)
             Text(stringResource(R.string.welcome_install_text, DESKTOP_APP_URL), fontSize = 14.sp, color = t.textDim)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 PillButton(stringResource(R.string.welcome_install_copy), {
                     context.getSystemService(android.content.ClipboardManager::class.java)
                         ?.setPrimaryClip(android.content.ClipData.newPlainText("DeskLink", DESKTOP_APP_URL))

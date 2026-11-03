@@ -50,6 +50,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -205,8 +206,8 @@ private fun Empty(onSendFiles: () -> Unit) {
     val t = tokens
     Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         IconCircle(R.drawable.sym_swap_vert, 56.dp, 26.dp, background = t.accentContainer, tint = t.onAccentContainer)
-        Text(stringResource(R.string.transfers_empty_title), fontSize = 16.sp, fontWeight = FontWeight.Medium)
-        Text(stringResource(R.string.transfers_empty_body), fontSize = 14.sp, color = t.textDim)
+        Text(stringResource(R.string.transfers_empty_title), fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.transfers_empty_body), fontSize = 14.sp, color = t.textDim, textAlign = TextAlign.Center)
         PillButton(stringResource(R.string.home_send_files), onSendFiles, height = 48.dp, icon = R.drawable.sym_upload_file)
     }
 }
@@ -281,7 +282,7 @@ private fun FileCard(record: TransferRecord, deskName: String, revision: Int, ac
                 Text(record.name, fontFamily = MonoFamily, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
                 Text(
                     if (preview.missing) stringResource(R.string.transfers_missing) else "$size · $time",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = if (preview.missing) t.red else t.textDim,
                     maxLines = if (preview.missing) 2 else 1,
                 )
@@ -340,7 +341,7 @@ private val ViewerBg = Color(0xFF0B0B0C)
 
 @Composable
 private fun ViewerHeader(title: String, onBack: () -> Unit) {
-    Row(Modifier.fillMaxWidth().statusBarsPadding().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().statusBarsPadding().heightIn(min = 56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
             Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.navigate_up), tint = Color.White)
         }

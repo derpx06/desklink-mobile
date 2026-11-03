@@ -20,9 +20,11 @@ import org.desklink.mobile.ui.compose.screen.tabs.FilesTab
 import org.desklink.mobile.ui.compose.screen.tabs.NotesTab
 import org.desklink.mobile.ui.compose.screen.tabs.TerminalsTab
 import org.desklink.mobile.ui.compose.screen.transfers.TransferActions
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -120,3 +122,13 @@ class NarrowScreenShots : ScreenShots() { override val form = "narrow" }
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w900dp-h700dp-xhdpi")
 class TabletScreenShots : ScreenShots() { override val form = "tablet" }
+
+/** The narrowest phone at the largest system font size: where a label gets cut or a row spills over its neighbour. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w320dp-h640dp-xhdpi")
+class HugeTextScreenShots : ScreenShots() {
+    override val form = "huge"
+
+    @Before fun fontScale() = RuntimeEnvironment.setFontScale(2.0f)
+}

@@ -31,6 +31,18 @@ fun rememberHaptics(): (HapticFeedbackType) -> Unit {
     return remember(haptics) { { type -> haptics.performHapticFeedback(type) } }
 }
 
+/**
+ * Text in chrome that has a fixed number of equal slots (the tab bar, a segmented control) grows with the
+ * system font size only up to [max]: past that a word no longer fits its slot and would be cut or broken.
+ * The words themselves stay readable and the rest of the screen still scales to 200 %.
+ */
+@Composable
+fun CappedFontScale(max: Float, content: @Composable () -> Unit) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val capped = remember(density, max) { androidx.compose.ui.unit.Density(density.density, minOf(density.fontScale, max)) }
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides capped, content = content)
+}
+
 /** Numbers that line up and do not jitter as they change: battery, round trip, sizes. */
 val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
 
