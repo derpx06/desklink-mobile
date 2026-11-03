@@ -32,6 +32,8 @@ class RelayLink internal constructor(
 
     override fun getName(): String = "RelayLink"
 
+    override fun pairingTransport() = org.desklink.mobile.backends.PairingTransport.Kind.RELAY
+
     override fun getDeviceInfo(): DeviceInfo = deviceInfo
 
     override fun disconnect() = provider.dropLink(this)
@@ -53,11 +55,7 @@ class RelayLink internal constructor(
     companion object {
         /** Whether [packet] may cross a relay link at all, in either direction. */
         @JvmStatic
-        fun allowedOnRelay(packet: NetworkPacket): Boolean = when (packet.type) {
-            DeskLinkProtocol.PACKET_TYPE_WEBRTC_SIGNAL_V1, DeskLinkProtocol.PACKET_TYPE_HEARTBEAT -> true
-            // Only an unpair notice: pairing itself never happens off the LAN.
-            DeskLinkProtocol.PACKET_TYPE_PAIR -> packet.has("pair") && !packet.getBoolean("pair", true)
-            else -> false
-        }
+        fun allowedOnRelay(packet: NetworkPacket): Boolean =
+            org.desklink.mobile.backends.PairingTransport.packetMayCross(org.desklink.mobile.backends.PairingTransport.Kind.RELAY, packet)
     }
 }

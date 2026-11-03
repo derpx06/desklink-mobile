@@ -120,6 +120,11 @@ class DeskLinkApplication : Application() {
         // The crash-loop times are read here, off the main thread, so the service's safe-mode check answers from memory.
         org.desklink.mobile.helpers.CrashLoop.preload(this)
         org.desklink.mobile.helpers.AppLog.init(this)
+        // Hidden, no settings row; inert while OFF_LAN_PAIRING_COMPILED is false (see PairingTransport).
+        org.desklink.mobile.backends.PairingTransport.requested = runCatching {
+            android.preference.PreferenceManager.getDefaultSharedPreferences(this)
+                .getBoolean(org.desklink.mobile.backends.PairingTransport.OFF_LAN_PREFERENCE, false)
+        }.getOrDefault(false)
         org.desklink.mobile.helpers.AppLog.event("app", "started ${BuildConfig.VERSION_NAME}")
         // "Stopped, tap to restart": a feature that threw is reloaded from its settings.
         org.desklink.mobile.helpers.Guarded.restart = {

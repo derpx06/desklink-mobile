@@ -39,6 +39,11 @@ public abstract class BaseLink {
 
     public abstract DeviceInfo getDeviceInfo();
 
+    /** The carrier, as far as pairing is concerned (see {@link PairingTransport}); a new carrier names itself here. */
+    public PairingTransport.Kind pairingTransport() {
+        return PairingTransport.Kind.LAN;
+    }
+
     public String getDeviceId() {
         return getDeviceInfo().id;
     }
