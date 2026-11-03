@@ -119,6 +119,18 @@ class SettingsParityTest {
         assertEquals((0 until desk.length()).map { desk.getJSONObject(it).getString("title") }, groupTitles())
     }
 
+    // Rows the desk marks as its own (no counterpart here) are not on the phone.
+    @Test
+    fun theRowsTheDeskMarksAsItsOwnAreNotOnThePhone() {
+        for (i in 0 until desk.length()) {
+            val only = desk.getJSONObject(i).optJSONArray("deskOnlyRows") ?: continue
+            val phoneRows = rows(phoneGroups[i])
+            for (j in 0 until only.length()) {
+                assertEquals(only.getString(j), false, only.getString(j) in phoneRows)
+            }
+        }
+    }
+
     @Test
     fun theRowsTheContractCallsTheSameAreTheSameWordsOnBothAndUnpairIsLastOnBoth() {
         val same = mapOf(
