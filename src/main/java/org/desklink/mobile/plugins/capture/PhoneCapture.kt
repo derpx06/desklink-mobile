@@ -37,7 +37,8 @@ data class CaptureRequest(
     val at: Long = System.currentTimeMillis(),
 ) {
     companion object {
-        val KINDS = setOf("photo", "scan", "text", "qr")
+        /** `text` only in a build with a recogniser (`-Pdesklink.ocr=true`); otherwise it is answered `unsupported`. */
+        val KINDS = setOf("photo", "scan", "qr") + if (DeviceTextRecogniser.available) setOf("text") else emptySet()
         val TARGETS = setOf("clipboard", "file")
 
         /** Null for a kind this phone cannot capture (answered `capture-cancelled {unsupported}`). */

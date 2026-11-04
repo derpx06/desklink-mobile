@@ -64,9 +64,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -178,10 +175,7 @@ class CaptureActivity : AppCompatActivity() {
     private fun recognise(bitmap: Bitmap) {
         busy = true
         stage = Stage.TEXT
-        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            .process(InputImage.fromBitmap(bitmap, 0))
-            .addOnSuccessListener { result -> text = result.text; busy = false }
-            .addOnFailureListener { text = ""; busy = false }
+        DeviceTextRecogniser.recognise(bitmap, onResult = { text = it; busy = false }, onError = { text = ""; busy = false })
     }
 
     private fun cancel(reason: String) {

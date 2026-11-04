@@ -6,8 +6,8 @@ from version 1.3.0.
 DeskLink connects your phone to your own computer running DeskLink. It has no
 account, no ads and no advertising or tracking SDKs. We do not collect, sell or share
 your data: what the app reads goes to the computer you paired, and nowhere else.
-(The one component that talks to Google on its own, ML Kit text recognition, is
-described under "Other network requests".)
+(The one component that could talk to Google on its own, ML Kit text recognition, is
+not in the default build; see "Other network requests".)
 
 ## What the app accesses, and why
 
@@ -63,7 +63,7 @@ DeskLink relay (you can turn this off, or point the app at your own relay).
 - The app downloads Google Play's public list of device models
   (`storage.googleapis.com`) to show a friendly name for your phone. No personal
   data is sent with this request.
-- **ML Kit text recognition** (Google) reads text out of photos you take to insert on
+- **ML Kit text recognition** (Google) is switched off in the default build and present only in a build made with `-Pdesklink.ocr=true`. There it reads text out of photos you take to insert on
   the computer. The recognition runs on the phone, but Google's ML Kit library may send
   usage and performance metrics and an installation identifier to Google. Nothing you
   photograph is sent.
