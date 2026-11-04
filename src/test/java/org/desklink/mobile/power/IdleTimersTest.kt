@@ -41,6 +41,7 @@ class IdleTimersTest {
         "plugins/terminal/TerminalActivity.kt" to "list refresh and preview scrape; StartedEffect, only while the terminal screen is started",
         "ui/MainActivity.kt" to "the 1 Hz UI tick inside repeatOnLifecycle(STARTED), and the 20 s QR proof wait",
         "ui/compose/components/Primitives.kt" to "connection stats poll; StartedEffect, only while on screen",
+        "ui/compose/screen/home/HomeScreen.kt" to "the minute clock of the Recent files' \"4 min. ago\"; StartedEffect, only while Home is on screen",
         "ui/compose/screen/home/HomeMediaUi.kt" to "the seek bar; StartedEffect and only while the media is playing",
         "ui/compose/screen/tabs/TabScreens.kt" to "terminal list refresh and previews; StartedEffect, only while the tab is on screen",
         "BackgroundService.kt" to "the work-lease recheck: re-arms only while work holds the lease, and the lease lapses on its own",

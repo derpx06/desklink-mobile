@@ -48,7 +48,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -664,12 +663,17 @@ private fun RecentFiles(state: HomeState, actions: HomeActions) {
     }
 }
 
+/** "4 min. ago" moves on once a minute, and only while Home is on screen (StartedEffect): nothing else on Home ticks. */
 @Composable
-private fun minuteClock() = produceState(System.currentTimeMillis()) {
-    while (true) {
-        delay(60_000)
-        value = System.currentTimeMillis()
+private fun minuteClock(): androidx.compose.runtime.State<Long> {
+    val now = remember { androidx.compose.runtime.mutableLongStateOf(System.currentTimeMillis()) }
+    org.desklink.mobile.ui.compose.components.StartedEffect(Unit) {
+        while (true) {
+            now.longValue = System.currentTimeMillis()
+            delay(60_000)
+        }
     }
+    return now
 }
 
 @Composable
