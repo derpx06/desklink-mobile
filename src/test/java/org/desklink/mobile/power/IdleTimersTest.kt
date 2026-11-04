@@ -39,6 +39,7 @@ class IdleTimersTest {
     private val allowedLoops = mapOf(
         "plugins/mousepad/MousePadActivity.kt" to "the control retry (stops after a refusal) and the controls auto-hide; only while the screen view is started",
         "plugins/terminal/TerminalActivity.kt" to "list refresh and preview scrape; StartedEffect, only while the terminal screen is started",
+        "plugins/terminal/TerminalView.kt" to "a one-shot 150 ms debounce of the grid request after a layout change (the keyboard animating in); never re-posts",
         "ui/MainActivity.kt" to "the 1 Hz UI tick inside repeatOnLifecycle(STARTED), and the 20 s QR proof wait",
         "ui/compose/components/Primitives.kt" to "connection stats poll; StartedEffect, only while on screen",
         "ui/compose/screen/home/HomeScreen.kt" to "the minute clock of the Recent files' \"4 min. ago\"; StartedEffect, only while Home is on screen",
