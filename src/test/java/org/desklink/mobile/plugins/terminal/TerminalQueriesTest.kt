@@ -46,11 +46,12 @@ class TerminalQueriesTest {
 
     @Test
     fun startupSequencesNeverReachTheScreenAsText() {
-        for ((name, bytes) in silent) {
+        val leaked = silent.mapNotNull { (name, bytes) ->
             val s = screen()
             s.write("\u001b[2J\u001b[H$bytes".toByteArray())
-            assertEquals("$name left text on the screen", "", s.show())
+            s.show().takeIf { it.isNotEmpty() }?.let { "$name: \"$it\"" }
         }
+        assertTrue("left text on the screen: $leaked", leaked.isEmpty())
     }
 
     @Test
