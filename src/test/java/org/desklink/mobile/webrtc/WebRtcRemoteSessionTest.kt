@@ -415,6 +415,53 @@ class WebRtcRemoteSessionTest {
         assertEquals(1080, controller.snapshot().screenHeight)
     }
 
+    /** The owner's "DeskLink control requires an active remote view": control was asked for while the
+     * view was still being set up, and the error was shown as the computer's refusal. */
+    @Test
+    fun `control asked for before the view is live is queued and returned once it is`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        val id = controller.beginView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+
+        assertNull("no throw, nothing to send yet", controller.requestControl())
+        assertFalse("the view is not live yet", controller.takeQueuedControl())
+
+        controller.accept(control(WebRtcRemoteSessionControlKind.SCREEN_READY, id), wire, attemptId)
+        assertTrue(controller.takeQueuedControl())
+        assertFalse("once", controller.takeQueuedControl())
+        assertEquals(id, controller.requestControl())
+        assertEquals(WebRtcRemoteSessionState.REQUESTING_CONTROL, controller.snapshot().state)
+    }
+
+    @Test
+    fun `a locked or stopped session queues instead of throwing, and a new view forgets the wish`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        assertNull(controller.requestControl())
+        controller.beginView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        controller.markScreenReady(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        controller.pauseLocked()
+        assertNull(controller.requestControl())
+        controller.beginView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        assertFalse(controller.takeQueuedControl())
+    }
+
+    @Test
+    fun `a view restart drops the granted lease and a late denial never undoes a grant`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        val id = controller.beginView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        controller.markScreenReady(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        controller.accept(grant(id, owner = "phone", leaseId = "lease"), wire, attemptId)
+        assertTrue(controller.snapshot().hasControlLease)
+
+        val late = control(WebRtcRemoteSessionControlKind.CONTROL_DENIED, id).copy(reason = "late")
+        assertFalse("ignored: the grant wins", controller.accept(late, wire, attemptId))
+        assertEquals(WebRtcRemoteSessionState.CONTROLLING, controller.snapshot().state)
+        assertTrue(controller.snapshot().hasControlLease)
+
+        controller.beginView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        assertFalse("a new view starts without control", controller.snapshot().hasControlLease)
+        assertEquals(WebRtcRemoteSessionState.REQUESTING_VIEW, controller.snapshot().state)
+    }
+
     private fun grant(
         remoteSessionId: String,
         owner: String,

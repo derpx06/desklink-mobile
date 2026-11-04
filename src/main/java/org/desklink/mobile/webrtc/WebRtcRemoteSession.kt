@@ -347,6 +347,7 @@ class WebRtcRemoteSessionController(
 
     @Synchronized
     fun beginView(direction: WebRtcScreenDirection): String {
+        controlQueued = false
         clearLease()
         clearGeometry()
         val id = UUID.randomUUID().toString()
@@ -367,14 +368,30 @@ class WebRtcRemoteSessionController(
 
     private var offered: String? = null
 
+    /**
+     * Asks for control of the shared view. Before the view is active (the request is still
+     * going out, the phone is locked, the session was just restarted) nothing can be sent and
+     * nothing is an error: the wish is remembered and [takeQueuedControl] hands it back the
+     * moment the view is live. Returns the session id to ask under, or null when not now.
+     */
     @Synchronized
-    fun requestControl(): String {
-        require(state == WebRtcRemoteSessionState.VIEWING || state == WebRtcRemoteSessionState.REQUESTING_CONTROL) {
-            "DeskLink control requires an active remote view"
+    fun requestControl(): String? {
+        if (state != WebRtcRemoteSessionState.VIEWING && state != WebRtcRemoteSessionState.REQUESTING_CONTROL) {
+            // Controlling already (the screen only lags behind): nothing to ask.
+            controlQueued = state != WebRtcRemoteSessionState.CONTROLLING
+            return null
         }
+        controlQueued = false
         state = WebRtcRemoteSessionState.REQUESTING_CONTROL
         return requireNotNull(sessionId)
     }
+
+    /** A control request made before the view was active: true once, when the view is. */
+    @Synchronized
+    fun takeQueuedControl(): Boolean =
+        (controlQueued && state == WebRtcRemoteSessionState.VIEWING).also { if (it) controlQueued = false }
+
+    private var controlQueued = false
 
     @Synchronized
     fun markScreenReady(expectedDirection: WebRtcScreenDirection): String {
@@ -525,6 +542,9 @@ class WebRtcRemoteSessionController(
             }
             WebRtcRemoteSessionControlKind.CONTROL_DENIED -> {
                 if (!isCurrent(message)) return false
+                // A grant wins over a denial that was answered to an earlier, repeated request:
+                // control already held stays held (and the caller must not announce a refusal).
+                if (state == WebRtcRemoteSessionState.CONTROLLING && lease != null) return false
                 // Failure to grant input must not tear down a working screen
                 // view. Retain its identity so the user can retry after
                 // changing the desktop's input-permission decision.
@@ -705,6 +725,7 @@ class WebRtcRemoteSessionController(
     }
 
     private fun stopInternal(newState: WebRtcRemoteSessionState) {
+        controlQueued = false
         clearLease()
         clearGeometry()
         sessionId = null

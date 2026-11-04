@@ -30,6 +30,10 @@ class ScreenControlPlugin : Plugin() {
     var remoteControlRefused by mutableStateOf(false)
         private set
 
+    /** Why the computer refused control, while it is refused; null otherwise. Shown once per distinct reason. */
+    var controlDenial by mutableStateOf<String?>(null)
+        private set
+
     /** True once a frame of the current view has reached a renderer. */
     var remoteLive by mutableStateOf(false)
         private set
@@ -182,15 +186,28 @@ class ScreenControlPlugin : Plugin() {
     fun onRemoteControlGranted() {
         remoteControlEnabled = true
         remoteControlRefused = false
+        controlDenial = null
         latestStatus = context.getString(R.string.remote_control_enabled)
     }
 
+    /**
+     * The computer refused control. A grant already held wins over a denial (the answer to an
+     * earlier, repeated request arriving late), and the same refusal is announced once.
+     */
     fun onRemoteControlDenied(reason: String?) {
-        remoteControlEnabled = false
+        if (remoteControlEnabled) return
+        val text = reason?.takeIf(String::isNotBlank) ?: context.getString(R.string.remote_control_denied)
+        if (remoteControlRefused && controlDenial == text) return
         remoteControlRefused = true
+        controlDenial = text
         latestStatus = reason?.takeIf(String::isNotBlank)?.let {
             context.getString(R.string.remote_control_denied_reason, it)
-        } ?: context.getString(R.string.remote_control_denied)
+        } ?: text
+    }
+
+    /** The phone could not ask (no live view yet, link not ready): not a refusal, so nothing sticks and asking goes on. */
+    fun onRemoteControlUnavailable() {
+        if (!remoteControlEnabled) latestStatus = context.getString(R.string.remote_control_requesting)
     }
 
     /** A view or control request was refused for the session password. A lockout is only shown:
@@ -269,6 +286,7 @@ class ScreenControlPlugin : Plugin() {
 
     private fun resetView() {
         remoteControlRefused = false
+        controlDenial = null
         desktopTextFocused = false
         frameSeen.set(false)
         remoteLive = false
