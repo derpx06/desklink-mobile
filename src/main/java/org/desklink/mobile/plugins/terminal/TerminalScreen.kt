@@ -209,6 +209,37 @@ class TerminalScreen(
         }
     }
 
+    override fun setReplaying(replaying: Boolean) {
+        quiet = replaying
+    }
+
+    override fun resize(rows: Int, cols: Int) {
+        val changed = synchronized(lock) {
+            val r = rows.coerceAtLeast(MIN_CELLS)
+            val c = cols.coerceAtLeast(MIN_CELLS)
+            if (r == emulator.mRows && c == emulator.mColumns) {
+                false
+            } else {
+                emulator.resize(c, r)
+                true
+            }
+        }
+        if (changed) listener?.onScreenChanged()
+    }
+
+    override fun onEnded(exitStatus: Long?) {
+        observer?.onEnded(this, exitStatus)
+    }
+
+    /** All text, scrollback included, for tests and copy-all. */
+    fun transcript(): String = synchronized(lock) { emulator.screen.transcriptText }
+
+    /** The visible screen's last [lastRows] rows as plain text; what a person would see. */
+    fun tailText(lastRows: Int): String = synchronized(lock) {
+        val screenRows = emulator.mRows
+        emulator.screen.getSelectedText(0, (screenRows - lastRows).coerceAtLeast(0), emulator.mColumns, screenRows - 1)
+    }
+
     /**
      * The emulator wants a client for logging and the cursor style; there is no local session.
      * Every method is a no-op, so no android.util.Log call can be reached from a JVM test.
