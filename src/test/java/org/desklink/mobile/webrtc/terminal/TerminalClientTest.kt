@@ -228,7 +228,7 @@ class TerminalClientTest {
     // ---- attach and output offsets ---------------------------------------------------------------
 
     @Test
-    fun attachingAFreshSessionAsksForTheWholeStreamThenTakesThePhonesGeometry() {
+    fun attachingAFreshSessionAsksForTheWholeStreamThenAsksForThePhonesGeometry() {
         val h = Harness()
         h.ready()
         h.listed(bash) // the desktop's session is 24x80
@@ -253,7 +253,61 @@ class TerminalClientTest {
         assertEquals(TerminalAction.RESIZE, resize.action)
         assertEquals(50, resize.rows)
         assertEquals(100, resize.cols)
+        assertEquals(null, resize.claimSize)
+        // Only a request: the screen has the size the desktop says, until it says another.
+        assertEquals(24 to 80, h.sinks["t1"]!!.size)
+        h.listed(bash.copy(rows = 50, cols = 100))
         assertEquals(50 to 100, h.sinks["t1"]!!.size)
+    }
+
+    @Test
+    fun aDeskWindowRefusingTheResizeLeavesTheScreenAtTheDesksSize() {
+        val h = Harness()
+        h.ready(); h.listed(bash.copy(deskWindow = true)); h.open(rows = 24, cols = 80)
+        h.client.attachOrResize("t1", 20, 45)
+        // The desk owns the size: it answers with the list at its own size and the screen never changed.
+        h.listed(bash.copy(deskWindow = true))
+        assertEquals(24 to 80, h.sinks["t1"]!!.size)
+        assertTrue(h.sinks["t1"]!!.events.none { it == "resize:20,45" })
+    }
+
+    @Test
+    fun theSizeIsClaimedWhenThePersonAsksAndAgainAfterAReattach() {
+        val h = Harness()
+        h.ready(); h.listed(bash.copy(deskWindow = true)); h.open(rows = 24, cols = 80)
+        h.client.attachOrResize("t1", 30, 50)
+        h.client.claimSize("t1", true)
+        assertEquals(true, h.controls(TerminalAction.RESIZE).last().claimSize)
+        h.listed(bash.copy(deskWindow = true, phoneSize = true, rows = 30, cols = 50))
+        assertEquals(30 to 50, h.sinks["t1"]!!.size)
+        assertTrue(h.session().phoneSize)
+
+        // The link drops and comes back: attaching gave the claim up on the desk, so it is asked for again.
+        h.client.onLinkLost(wire)
+        h.ready()
+        h.attached("t1", rows = 24, cols = 80)
+        assertEquals(true, h.controls(TerminalAction.RESIZE).last().claimSize)
+
+        // The desk takes the size back (typed in): the phone stops asking.
+        h.listed(bash.copy(deskWindow = true, phoneSize = true))
+        h.listed(bash.copy(deskWindow = true))
+        h.client.onLinkLost(wire)
+        h.ready()
+        h.attached("t1")
+        assertEquals(null, h.controls(TerminalAction.RESIZE).last().claimSize)
+    }
+
+    @Test
+    fun aSessionThePhoneCreatedAsksForItsSizeOnTheFirstAttach() {
+        val h = Harness()
+        h.ready(); h.listed()
+        h.client.create(30, 50)
+        h.fromHost(h.hostControl(TerminalAction.CREATED).copy(terminalId = "t9", rows = 30, cols = 50))
+        h.listed(TerminalSessionInfo("t9", "bash", 30, 50, deskWindow = true, phoneSize = true))
+        h.client.sink("t9", 30, 50)
+        h.client.attachOrResize("t9", 30, 50)
+        h.attached("t9", rows = 30, cols = 50)
+        assertEquals(true, h.controls(TerminalAction.RESIZE).last().claimSize)
     }
 
     @Test
@@ -265,7 +319,7 @@ class TerminalClientTest {
         h.client.attachOrResize("t1", 30, 100) // the keyboard opened mid-attach
         assertEquals(24 to 80, h.sinks["t1"]!!.size)
         h.attached("t1")
-        assertEquals(30 to 100, h.sinks["t1"]!!.size)
+        assertEquals(24 to 80, h.sinks["t1"]!!.size)
         assertEquals(30, h.controls(TerminalAction.RESIZE).last().rows)
     }
 
@@ -435,6 +489,7 @@ class TerminalClientTest {
         val h = Harness()
         h.ready(); h.listed(bash); h.open(rows = 24, cols = 80)
         h.client.attachOrResize("t1", 50, 100) // the phone resized the desktop's terminal
+        h.listed(bash.copy(rows = 50, cols = 100)) // and the desktop said so
         h.client.onLinkLost(wire)
         h.ready()
         assertEquals("not the 24x80 the list once said", 50 to 100, h.sinks["t1"]!!.size)

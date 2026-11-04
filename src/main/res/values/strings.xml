@@ -410,6 +410,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_hide_keyboard">Hide keyboard</string>
     <string name="terminal_key_escape">Escape</string>
     <string name="terminal_key_tab">Tab</string>
+    <string name="terminal_key_shift_tab">Shift Tab</string>
+    <string name="terminal_use_phone_size">Use phone size</string>
+    <string name="terminal_use_desk_size">Use desk size</string>
+    <string name="terminal_fit_width">Fit width</string>
+    <string name="terminal_actual_size">Actual size</string>
     <string name="terminal_key_ctrl">Control</string>
     <string name="terminal_key_alt">Alt</string>
     <string name="terminal_key_armed">armed for the next key</string>
