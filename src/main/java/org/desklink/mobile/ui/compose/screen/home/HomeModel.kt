@@ -28,7 +28,7 @@ object HomeModel {
     fun pairedDevices(): List<Device> =
         DeskLinkApplication.getInstance().devices.values.filter { it.isPaired }.sortedBy { it.name.lowercase() }
 
-    fun build(context: Context, device: Device, paired: List<Device>, historyCount: Int? = null): HomeState {
+    fun build(context: Context, device: Device, paired: List<Device>, history: List<org.desklink.mobile.plugins.share.TransferRecord> = emptyList()): HomeState {
         val app = DeskLinkApplication.getInstance()
         val id = device.deviceId
         val connection = device.toUiModel().connection
@@ -65,11 +65,14 @@ object HomeModel {
                     },
                     progress = if (tr.finished) 1f else tr.percent?.let { it / 100f },
                     upload = tr.upload,
+                    active = !tr.finished && !tr.failed && !tr.saving,
                 )
             },
             clipboardOn = device.isPluginEnabled(clipboardKey),
             deskSoundOn = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(context, id),
-            historyCount = historyCount ?: org.desklink.mobile.plugins.share.TransferHistory.store(context).forDevice(id).size,
+            historyCount = history.size,
+            recent = HomeDerive.recentFiles(history),
+            clipboardPreview = if (device.isPluginEnabled(clipboardKey)) org.desklink.mobile.plugins.clipboard.ClipboardListener.instance(context).preview().let(HomeDerive::clipboardPreview) else null,
             canUnlock = connection == DeviceConnection.LOCAL &&
                 device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby == true &&
                 device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java) != null &&
@@ -77,6 +80,15 @@ object HomeModel {
             relayAvailable = org.desklink.mobile.backends.relay.RelaySettings.enabled(context) &&
                 org.desklink.mobile.backends.relay.RelayLinkProvider.statusLive.value == org.desklink.mobile.backends.relay.RelayLinkProvider.Status.ONLINE,
         )
+    }
+
+    /** How many of the computer's notifications are in this phone's shade now (0 when it does not mirror them). */
+    fun deskNotificationCount(context: Context, device: Device): Int {
+        val key = Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java)
+        if (!device.isPluginEnabled(key)) return 0
+        val prefix = device.deviceId + "/"
+        val manager = context.getSystemService(android.app.NotificationManager::class.java) ?: return 0
+        return runCatching { manager.activeNotifications.count { it.tag?.startsWith(prefix) == true } }.getOrDefault(0)
     }
 
     /** The time of the last position report; 0 when there is none (a value built from the clock would tick Home every second). */

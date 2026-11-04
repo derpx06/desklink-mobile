@@ -38,13 +38,13 @@ import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.components.IconCircle
 import org.desklink.mobile.ui.compose.tokens
 
-/** Home's Notes card: pinned and latest notes (3 rows), one tap to any, and New note. Local-first: always shown. */
+/** Home's Notes card: pinned and latest notes (`limit` rows), one tap to any, and New note. Local-first: always shown. */
 @Composable
-fun NotesHomeCard(onOpenList: () -> Unit, onOpenNote: (String) -> Unit, onNew: () -> Unit) {
+fun NotesHomeCard(onOpenList: () -> Unit, onOpenNote: (String) -> Unit, onNew: () -> Unit, limit: Int = 3) {
     val t = tokens
     val context = LocalContext.current
     val revision by NotesStore.revision.collectAsState()
-    val notes = remember(revision) { NotesStore.notes(context).take(3) }
+    val notes = remember(revision) { NotesStore.notes(context).take(limit) }
     val shape = RoundedCornerShape(24.dp)
     Column(Modifier.fillMaxWidth().clip(shape).background(t.surface).border(1.dp, t.hairline, shape)) {
         Row(

@@ -121,7 +121,25 @@ fun WelcomeScreen(onPair: () -> Unit, onSettings: () -> Unit) {
         )
         Spacer(Modifier.height(14.dp))
         Text(stringResource(R.string.welcome_body), fontSize = 16.sp, lineHeight = 24.sp, color = t.textDim)
-        Spacer(Modifier.height(26.dp))
+        Spacer(Modifier.height(20.dp))
+        // Where the code is: the step people get stuck on.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(t.accentContainer, RoundedCornerShape(20.dp))
+                .padding(16.dp)
+                .semantics(mergeDescendants = true) {},
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(painterResource(R.drawable.sym_qr_code_scanner), contentDescription = null, tint = t.onAccentContainer, modifier = Modifier.size(24.dp))
+                Text(stringResource(R.string.welcome_qr_title), fontSize = 16.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer, modifier = Modifier.semantics { heading() })
+            }
+            listOf(R.string.welcome_qr_1, R.string.welcome_qr_2, R.string.welcome_qr_3).forEachIndexed { i, text ->
+                Text("${i + 1}.  " + stringResource(text), fontSize = 15.sp, lineHeight = 21.sp, color = t.onAccentContainer)
+            }
+        }
+        Spacer(Modifier.height(20.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             WelcomeRow(R.drawable.sym_terminal, stringResource(R.string.welcome_terminals))
             WelcomeRow(R.drawable.sym_devices, stringResource(R.string.welcome_screens))

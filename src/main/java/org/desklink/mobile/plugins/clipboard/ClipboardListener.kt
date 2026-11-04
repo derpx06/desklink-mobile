@@ -75,6 +75,16 @@ class ClipboardListener private constructor(ctx: Context) {
     @Volatile var lastRefusedTooLarge: Boolean = false
         private set
 
+    /**
+     * The text DeskLink last saw on this clipboard, for a one-line preview on Home; null when the current copy is marked sensitive
+     * (a password manager's). It reads only the description: no clipboard access toast.
+     */
+    fun preview(): String? {
+        val description = try { cm.primaryClipDescription } catch (_: Exception) { null }
+        if (description != null && isSensitive(description)) return null
+        return currentContent
+    }
+
     /** The newest time this phone holds a copy of its own. */
     fun newestLocalCopy(): Long = maxOf(updateTimestamp, copiedAt)
 

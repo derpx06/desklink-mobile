@@ -201,7 +201,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <!-- UI v4: pairing -->
     <string name="welcome_title">Your computer,\nin your pocket.</string>
-    <string name="welcome_body">Pair once with your Linux computer. On it, open DeskLink and choose Pair a phone: it shows a QR code. Scan that code here.</string>
+    <string name="welcome_body">Pair once with your Linux computer, then it is all one tap away.</string>
     <string name="welcome_terminals">Terminals that follow you</string>
     <string name="welcome_screens">Screens in both directions</string>
     <string name="welcome_encrypted">No account, encrypted end to end</string>
@@ -886,4 +886,28 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_downloads_folder">Downloads folder</string>
     <string name="bucket_retry_fetch">Try the files that could not be fetched again</string>
     <string name="notes_draft_discarded">This note was changed on the computer, so the unsaved text from before was dropped.</string>
+    <!-- Home: the redesigned dashboard -->
+    <string name="home_cant_reach">Can\'t reach %1$s</string>
+    <string name="home_tile_update">Update needed</string>
+    <string name="home_send_clipboard_short">Send clipboard</string>
+    <string name="home_tile_clipboard_hint">Send what you copied</string>
+    <string name="home_tile_clipboard_preview">“%1$s”</string>
+    <string name="home_tile_clipboard_off">Sharing is off</string>
+    <string name="home_tile_screen_hint">See and control it</string>
+    <string name="home_tile_ring_hint">Make it ring</string>
+    <string name="home_tile_lock_hint">Lock its screen</string>
+    <string name="home_tile_terminals_hint">Run commands</string>
+    <string name="home_happening_now">Happening now</string>
+    <string name="home_recent_files">Recent files</string>
+    <string name="home_see_all">See all</string>
+    <string name="home_open_file">Open</string>
+    <string name="home_recent_files_empty">Files you send to or get from %1$s show up here.</string>
+    <plurals name="home_mirrored">
+        <item quantity="one">Showing %1$d notification from %2$s here</item>
+        <item quantity="other">Showing %1$d notifications from %2$s here</item>
+    </plurals>
+    <string name="welcome_qr_title">Where to find the QR code</string>
+    <string name="welcome_qr_1">On your computer, open DeskLink.</string>
+    <string name="welcome_qr_2">Choose Pair a phone.</string>
+    <string name="welcome_qr_3">Scan the code it shows with this phone.</string>
 </resources>

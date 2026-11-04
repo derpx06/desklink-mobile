@@ -535,9 +535,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val stats = rememberConnectionStats(device.deviceId)
         // The history only changes when its revision does: not re-read and re-sorted every second.
         val history = TransferHistory.revision
-        val historyCount = androidx.compose.runtime.remember(history, device.deviceId) { TransferHistory.store(this).forDevice(device.deviceId).size }
-        val state = HomeModel.build(this, device, paired, historyCount).let { s ->
-            if (s.ready && stats != null) s.copy(path = stats.path, rttMs = stats.roundTripTimeMs?.toInt()) else s
+        val records = androidx.compose.runtime.remember(history, device.deviceId) { TransferHistory.store(this).forDevice(device.deviceId) }
+        // The computer's notifications in the shade: a system query, so every five seconds, not every second.
+        val mirrored = androidx.compose.runtime.remember(tick / 5, device.deviceId) { HomeModel.deskNotificationCount(this, device) }
+        val state = HomeModel.build(this, device, paired, records).let { s ->
+            (if (s.ready && stats != null) s.copy(path = stats.path, rttMs = stats.roundTripTimeMs?.toInt()) else s).copy(deskNotifications = mirrored)
         }
         var sharingInfo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
         // One actions object per computer: a new one every second would make Home recompose even when nothing changed.
@@ -709,6 +711,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     else -> showMessage(getString(R.string.settings_waiting_for, device.name))
                 }
             },
+            onSendClipboard = { sendClipboard(device) },
+            onCancelTransfer = {
+                TransferProgress.visibleFor(id)?.takeIf { !it.finished }?.let { sendBroadcast(TransferProgress.cancelIntent(this, it)) }
+                showMessage(getString(R.string.transfers_cancelled))
+            },
+            onOpenRecent = { record -> transferActions(device).onOpen(record) },
+            onTerminals = { nav.select(AppTab.TERMINALS) },
             onNotes = { nav.select(AppTab.NOTES) },
             onNote = { noteId -> nav.select(AppTab.NOTES); notesEditing.value = noteId },
             onNewNote = { nav.select(AppTab.NOTES); notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW },

@@ -42,17 +42,38 @@ abstract class ScreenShots : ShotTest() {
     private fun home(connection: DeviceConnection, block: HomeState.() -> HomeState = { this }) =
         HomeState("d1", desk, connection, computers).block()
 
+    private fun record(i: Int, name: String, sent: Boolean, minutesAgo: Long, size: Long) =
+        org.desklink.mobile.plugins.share.TransferRecord("r$i", "d1", desk, name, size, sent, System.currentTimeMillis() - minutesAgo * 60_000, "file:///x/$name", null)
+
+    private val sampleFiles = listOf(
+        record(1, "invoice-october.pdf", sent = false, minutesAgo = 4, size = 482_000),
+        record(2, "holiday-photo.jpg", sent = true, minutesAgo = 95, size = 3_400_000),
+        record(3, "notes.txt", sent = false, minutesAgo = 60 * 30, size = 2_100),
+    )
+
     @Test fun homeConnected() = shoot("home-connected") {
-        HomeScreen(home(DeviceConnection.LOCAL) { copy(rttMs = 12, historyCount = 7, clipboardOn = true) }, noopHome)
+        HomeScreen(
+            home(DeviceConnection.LOCAL) {
+                copy(rttMs = 12, historyCount = 7, clipboardOn = true, recent = sampleFiles, clipboardPreview = "https://example.com/a/long/address/that/goes/on", deskNotifications = 3)
+            },
+            noopHome,
+        )
     }
 
     @Test fun homeLiveAndTransferring() = shoot("home-live") {
         HomeScreen(
             home(DeviceConnection.AWAY) {
-                copy(live = LiveSessions(screen = true, terminals = 2), transfer = HomeTransfer("holiday-photos.zip", "42%", 0.42f, upload = true), historyCount = 3)
+                copy(
+                    live = LiveSessions(screen = true, terminals = 2), transfer = HomeTransfer("holiday-photos.zip", "42%", 0.42f, upload = true),
+                    historyCount = 3, recent = sampleFiles.take(2), clipboardOn = true,
+                )
             },
             noopHome,
         )
+    }
+
+    @Test fun homeNotPaired() = shoot("home-not-paired") {
+        org.desklink.mobile.ui.compose.screen.pairing.WelcomeScreen(onPair = {}, onSettings = {})
     }
 
     @Test fun homeConnecting() = shoot("home-connecting") { HomeScreen(home(DeviceConnection.CONNECTING), noopHome) }
@@ -122,6 +143,12 @@ class NarrowScreenShots : ScreenShots() { override val form = "narrow" }
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w900dp-h700dp-xhdpi")
 class TabletScreenShots : ScreenShots() { override val form = "tablet" }
+
+/** A phone on its side: wide enough for two columns, not tall. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w800dp-h360dp-xxhdpi")
+class LandscapeScreenShots : ScreenShots() { override val form = "landscape" }
 
 /** The narrowest phone at the largest system font size: where a label gets cut or a row spills over its neighbour. */
 @RunWith(RobolectricTestRunner::class)
