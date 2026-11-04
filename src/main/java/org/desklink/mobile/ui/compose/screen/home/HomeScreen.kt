@@ -580,24 +580,35 @@ private fun LiveRow(live: LiveSessions, onEnd: () -> Unit) {
 private fun TransferRow(transfer: HomeTransfer, actions: HomeActions) {
     val t = tokens
     val shape = RoundedCornerShape(20.dp)
-    Row(
-        Modifier.fillMaxWidth().clip(shape).background(t.surface).border(1.dp, t.hairline, shape),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    val canCancel = HomeDerive.canCancel(transfer)
+    // At a large system font the Cancel button goes under the file, and the percentage under its name.
+    val big = LocalDensity.current.fontScale > 1.4f
+    val cancel: @Composable () -> Unit = {
+        TextButton(onClick = actions.onCancelTransfer, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text(stringResource(R.string.cancel), color = t.accentText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+    val file: @Composable (Modifier) -> Unit = { modifier ->
         Row(
-            Modifier
-                .weight(1f)
+            modifier
                 .clickable(role = Role.Button, onClick = actions.onOpenFiles)
                 .semantics(mergeDescendants = true) {}
-                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = if (HomeDerive.canCancel(transfer)) 0.dp else 16.dp),
+                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = if (canCancel && !big) 0.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             IconCircle(if (transfer.upload) R.drawable.sym_upload else R.drawable.sym_download, 36.dp, 20.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(transfer.name, fontFamily = MonoFamily, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f))
-                    Text(transfer.label, fontSize = 12.sp, color = t.textDim)
+                val name: @Composable (Modifier) -> Unit = { Text(transfer.name, fontFamily = MonoFamily, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis, modifier = it) }
+                val label: @Composable () -> Unit = { Text(transfer.label, fontSize = 12.sp, color = t.textDim) }
+                if (big) {
+                    name(Modifier)
+                    label()
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        name(Modifier.weight(1f))
+                        label()
+                    }
                 }
                 if (transfer.progress == null) {
                     LinearProgressIndicator(Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, gapSize = 0.dp)
@@ -606,10 +617,16 @@ private fun TransferRow(transfer: HomeTransfer, actions: HomeActions) {
                 }
             }
         }
-        if (HomeDerive.canCancel(transfer)) {
-            TextButton(onClick = actions.onCancelTransfer, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.cancel), color = t.accentText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
+    }
+    if (big) {
+        Column(Modifier.fillMaxWidth().clip(shape).background(t.surface).border(1.dp, t.hairline, shape)) {
+            file(Modifier.fillMaxWidth())
+            if (canCancel) Box(Modifier.fillMaxWidth().padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) { cancel() }
+        }
+    } else {
+        Row(Modifier.fillMaxWidth().clip(shape).background(t.surface).border(1.dp, t.hairline, shape), verticalAlignment = Alignment.CenterVertically) {
+            file(Modifier.weight(1f))
+            if (canCancel) cancel()
         }
     }
 }
