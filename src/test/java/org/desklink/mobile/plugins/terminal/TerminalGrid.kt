@@ -35,7 +35,7 @@ object TerminalGrid {
         } else {
             emptyList()
         }
-        Case(name, cols, bin.readBytes(), resizes, File(bin.parentFile, "$stem.grid").readText(), File(bin.parentFile, "$stem.snap").readBytes())
+        Case(name, cols, bin.readBytes(), resizes, File(bin.parentFile, "$stem.grid").takeIf { it.exists() }?.readText().orEmpty(), File(bin.parentFile, "$stem.snap").takeIf { it.exists() }?.readBytes() ?: ByteArray(0))
     }
 
     /** Feeds [bytes] in pieces of [piece] bytes (0 = all at once), applying the resizes at their offsets. */
