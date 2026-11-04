@@ -1000,6 +1000,9 @@ class TerminalClientTest {
         val resize = h.controls(TerminalAction.RESIZE).single()
         assertEquals(40, resize.rows)
         assertEquals(60, resize.cols)
+        // The screen follows the desktop's answer, not the request.
+        assertEquals(24 to 80, h.sinks["t1"]!!.size)
+        h.listed(bash.copy(rows = 40, cols = 60))
         assertEquals(40 to 60, h.sinks["t1"]!!.size)
     }
 
