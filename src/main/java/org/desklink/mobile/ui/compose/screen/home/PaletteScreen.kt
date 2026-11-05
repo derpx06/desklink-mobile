@@ -30,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -70,6 +72,8 @@ fun PaletteScreen(
     val clipboard = LocalClipboardManager.current
     var query by rememberSaveable { mutableStateOf(initialQuery) }
     val focus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     BackHandler(onBack = onClose)
 
@@ -109,7 +113,11 @@ fun PaletteScreen(
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().imePadding()) {
         Row(Modifier.padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             DeskIconButton(R.drawable.sym_arrow_back, stringResource(R.string.palette_close), onClose)
-            DeskSearchField(query, { query = it }, stringResource(R.string.palette_hint), stringResource(R.string.palette_clear), Modifier.weight(1f), focus)
+            DeskSearchField(
+                query, { query = it }, stringResource(R.string.palette_hint), stringResource(R.string.palette_clear), Modifier.weight(1f), focus,
+                // The Search key: the list is already filtered as you type, so it only puts the keyboard away.
+                onSearch = { focusManager.clearFocus(); keyboard?.hide() },
+            )
         }
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),

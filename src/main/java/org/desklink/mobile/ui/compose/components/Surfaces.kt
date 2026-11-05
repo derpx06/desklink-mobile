@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -160,7 +161,8 @@ fun DeskBottomSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -
 
 /**
  * A 52 dp stadium field on the raised surface for searching: the text at 16 sp, the accent caret, a dim [placeholder],
- * and a clear button once something is typed. [label] is what TalkBack calls the field (a placeholder is not a label).
+ * and a clear button once something is typed. TalkBack calls the field [label] (the placeholder by default: a placeholder
+ * is not a label once something is typed). The IME's Search key calls [onSearch].
  */
 @Composable
 fun DeskSearchField(
@@ -171,6 +173,7 @@ fun DeskSearchField(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     onSearch: () -> Unit = {},
+    label: String = placeholder,
 ) {
     val t = tokens
     Row(
@@ -187,7 +190,9 @@ fun DeskSearchField(
                 cursorBrush = SolidColor(t.accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                modifier = Modifier.fillMaxWidth().then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+                modifier = Modifier.fillMaxWidth()
+                    .semantics { contentDescription = label }
+                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
             )
         }
         if (value.isNotEmpty()) {
