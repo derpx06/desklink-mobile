@@ -32,8 +32,12 @@ object PaletteModel {
     const val FOUND_PER_GROUP = 6
 
     /** Lower-case, accents removed, so "Café" is found by "cafe". */
+    private val MARKS = Regex("\\p{M}+")
+    private val NOT_WORD = Regex("[^\\p{L}\\p{N}]+")
+    private val BLANKS = Regex("\\s+")
+
     internal fun fold(text: String): String =
-        Normalizer.normalize(text, Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "").lowercase()
+        Normalizer.normalize(text, Normalizer.Form.NFD).replace(MARKS, "").lowercase()
 
     /**
      * How well [item] matches every word of the query: 0 the title starts with it, 1 a word of the title does, 2 the title
@@ -41,7 +45,7 @@ object PaletteModel {
      */
     internal fun score(item: PaletteItem, words: List<String>): Int? {
         val title = fold(item.title)
-        val titleWords = title.split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() }
+        val titleWords = title.split(NOT_WORD).filter { it.isNotEmpty() }
         val rest = fold(item.hint + " " + item.keywords)
         var total = 0
         for (word in words) {
@@ -62,7 +66,7 @@ object PaletteModel {
      * left out, so an empty list means "Nothing matches".
      */
     fun search(items: List<PaletteItem>, query: String): List<PaletteSection> {
-        val words = fold(query).split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val words = fold(query).split(BLANKS).filter { it.isNotEmpty() }
         return PaletteGroup.entries.mapNotNull { group ->
             val inGroup = items.filter { it.group == group }
             val shown = if (words.isEmpty()) {
@@ -107,7 +111,8 @@ object PaletteModel {
             if (o.clipboard) add(Action.SEND_CLIPBOARD)
             if (o.link) add(Action.SEND_LINK)
             if (o.screen) add(Action.DESK_SCREEN)
-            if (o.terminal) add(Action.NEW_TERMINAL)
+            // Terminals travel on their own channel, not as a feature packet: no capability to ask, so always offered.
+            add(Action.NEW_TERMINAL)
         }
         add(Action.OPEN_TERMINALS)
         add(Action.NEW_NOTE)
