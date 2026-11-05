@@ -65,6 +65,10 @@ enum class ControlMode {
     View,
 }
 
+/** The mouse buttons, keyboard and Super key work exactly when the computer has granted control and the view is not watch-only. */
+fun controlInputEnabled(controlGranted: Boolean, mode: ControlMode): Boolean =
+    controlGranted && mode != ControlMode.View
+
 private val PillBg = Color(0xD1141416)
 private val PillText = Color(0xFFF2F2F3)
 private val PillSelected = Color(0xFFF2F2F3)
@@ -97,32 +101,55 @@ fun DeskControls(
     onMore: () -> Unit,
     /** Why control was refused (the desk's portal, a password), shown inside the amber notice. */
     reason: String? = null,
+    /** The strip is shown (not dismissed, not timed out); it also vanishes by itself the moment control is granted. */
+    noticeVisible: Boolean = true,
+    onDismissNotice: () -> Unit = {},
+    /** Set once the computer has refused: asks it to share again (its permission prompt comes back). */
+    onAllowControl: (() -> Unit)? = null,
+    /** One-time line above the bottom pill saying what it is for. */
+    hint: String? = null,
     /** F2: "mirror" or "extend", and switching between them (re-asks the desk). */
     display: String = "mirror",
     onDisplay: (String) -> Unit = {},
     keys: @Composable () -> Unit = {},
     moreMenu: @Composable () -> Unit = {},
 ) {
-    val input = controlEnabled && mode != ControlMode.View
+    val input = controlInputEnabled(controlEnabled, mode)
     Box(Modifier.fillMaxSize()) {
-        // Control is what the desk grants; until then, say so where the eye already is.
-        if (live && !controlEnabled && mode != ControlMode.View) {
+        // One compact strip, only while something is missing: control not yet granted (or watch-only).
+        // Granted, dismissed or timed out, it is gone; it never repeats for the same state.
+        if (live && noticeVisible && (!controlEnabled || mode == ControlMode.View)) {
             Row(
                 Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 14.dp)
+                    .padding(top = 8.dp)
                     .background(AmberNotice, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .padding(start = 12.dp, end = 4.dp)
                     .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(painterResource(R.drawable.sym_front_hand), contentDescription = null, tint = OnAmber, modifier = Modifier.size(16.dp))
-                Column(Modifier.widthIn(max = 460.dp)) {
-                    Text(stringResource(R.string.remote_allow_control_first, deviceName), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
-                    reason?.takeIf(String::isNotBlank)?.let {
-                        Text(it, fontSize = 11.sp, color = OnAmber, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.widthIn(max = 380.dp)) {
+                    if (!controlEnabled) {
+                        Text(stringResource(R.string.remote_allow_control_first, deviceName), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
+                        reason?.takeIf(String::isNotBlank)?.let {
+                            Text(it, fontSize = 11.sp, color = OnAmber, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    } else {
+                        Text(stringResource(R.string.remote_view_only_hint), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
                     }
+                }
+                if (onAllowControl != null && !controlEnabled) {
+                    Box(
+                        Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onAllowControl),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(stringResource(R.string.remote_allow_control_action), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OnAmber, modifier = Modifier.padding(horizontal = 8.dp))
+                    }
+                }
+                IconButton(onClick = onDismissNotice, modifier = Modifier.size(48.dp)) {
+                    Icon(painterResource(R.drawable.sym_close), contentDescription = stringResource(R.string.remote_notice_dismiss), tint = OnAmber, modifier = Modifier.size(16.dp))
                 }
             }
         }
@@ -181,8 +208,12 @@ fun DeskControls(
                 }
                 Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     keys()
+                    hint?.let {
+                        Text(it, fontSize = 11.sp, color = PillText, modifier = Modifier.background(PillBg, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp))
+                    }
                     Pill {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 3.dp)) {
+                        val toolbarLabel = stringResource(R.string.remote_toolbar_label, deviceName)
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 3.dp).semantics { contentDescription = toolbarLabel }) {
                             ModeSwitch(mode, onMode)
                             Box(Modifier.padding(horizontal = 4.dp).size(1.dp, 22.dp).background(Color.White.copy(alpha = 0.14f)))
                             PillText(stringResource(R.string.remote_left_click), input, description = stringResource(R.string.remote_left_click_description), onClick = onLeft)

@@ -656,7 +656,15 @@ class WebRtcSessionCoordinator(
                     require(currentTransport(binding, attemptId).isReadyForPackets()) {
                         "DeskLink WebRTC feature transport is not ready"
                     }
-                    val remoteSessionId = remoteSession.requestControl()
+                    // Not yet a live view: remembered, and asked for as soon as the view is live.
+                    val remoteSessionId = remoteSession.requestControl() ?: run {
+                        // Already holding the lease: the screen only lagged behind, so say so.
+                        if (remoteSession.snapshot().hasControlLease) {
+                            device.getPlugin(ScreenControlPlugin::class.java)?.onRemoteControlGranted()
+                        }
+                        publish("RemoteControlQueued", null)
+                        return@synchronized
+                    }
                     sendRemoteSessionControlLocked(
                         binding,
                         attemptId,
@@ -722,7 +730,8 @@ class WebRtcSessionCoordinator(
         publish("RemoteSessionFailed", error.message)
         val plugin = device.getPlugin(ScreenControlPlugin::class.java) ?: return
         if (control) {
-            plugin.onRemoteControlDenied(error.message)
+            // The phone could not even ask: not the computer's refusal, so nothing sticks.
+            plugin.onRemoteControlUnavailable()
         } else {
             // These are `require` failures ("session is not active", "transport
             // is not ready"); the user needs to know to wait and retry.
@@ -1913,6 +1922,8 @@ class WebRtcSessionCoordinator(
                     // the desktop's picture decoded but was never shown.
                     transport?.remoteVideoTrack()?.let { track -> screen?.onRemoteVideoTrack(track) }
                     screen?.onRemoteScreenReady(message.screenWidth, message.screenHeight, message.screenCount, message.display)
+                    // Control asked for before the view was live goes out now.
+                    if (remoteSession.takeQueuedControl()) requestRemoteControl()
                 }
             }
             WebRtcRemoteSessionControlKind.RESUME -> {

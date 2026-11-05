@@ -7,6 +7,7 @@ import io.mockk.mockk
 import org.desklink.mobile.Device
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -130,5 +131,55 @@ class ScreenControlPluginRemoteViewTest {
 
         assertFalse(plugin.remoteControlEnabled)
         assertEquals(1920, plugin.remoteScreenWidth)
+    }
+
+    /** Mirror and Extend share one gate: the buttons follow the grant, never the display mode. */
+    @Test
+    fun `left right keyboard and super follow the grant in mirror and extend alike`() {
+        fun enabled(mode: org.desklink.mobile.plugins.mousepad.ControlMode) =
+            org.desklink.mobile.plugins.mousepad.controlInputEnabled(plugin.remoteControlEnabled, mode)
+        val touch = org.desklink.mobile.plugins.mousepad.ControlMode.Touch
+        for (display in listOf(ScreenDisplay.MIRROR, ScreenDisplay.EXTEND)) {
+            plugin.onRemoteScreenRequesting()
+            plugin.onRemoteScreenReady(1920, 1080, display = display)
+            assertEquals(display, plugin.remoteDisplay)
+            assertFalse("$display: not requested", enabled(touch))
+            plugin.onRemoteControlRequesting()
+            assertFalse("$display: requested", enabled(touch))
+            plugin.onRemoteControlDenied("view only")
+            assertFalse("$display: denied", enabled(touch))
+            assertEquals("view only", plugin.controlDenial)
+            plugin.onRemoteControlGranted()
+            assertTrue("$display: denied then granted", enabled(touch))
+            assertNull("the notice's reason is gone with the grant", plugin.controlDenial)
+            assertFalse("watch-only stays off", enabled(org.desklink.mobile.plugins.mousepad.ControlMode.View))
+            plugin.onRemoteScreenReady(1280, 720, display = display)
+            assertTrue("$display: a rotation's screen-ready keeps control", enabled(touch))
+            plugin.onRemoteControlStopped()
+            assertFalse("$display: granted then revoked", enabled(touch))
+        }
+    }
+
+    @Test
+    fun `a late or repeated denial neither undoes a grant nor repeats`() {
+        plugin.onRemoteControlGranted()
+        plugin.onRemoteControlDenied("answer to an earlier request")
+        assertTrue(plugin.remoteControlEnabled)
+        assertFalse(plugin.remoteControlRefused)
+        assertNull(plugin.controlDenial)
+
+        plugin.onRemoteControlStopped()
+        plugin.onRemoteControlDenied("same")
+        val shown = ScreenControlPlugin.latestStatus
+        plugin.onRemoteControlDenied("same")
+        assertEquals(shown, ScreenControlPlugin.latestStatus)
+        assertEquals("same", plugin.controlDenial)
+    }
+
+    @Test
+    fun `failing to ask is not a refusal and sticks to nothing`() {
+        plugin.onRemoteControlUnavailable()
+        assertFalse(plugin.remoteControlRefused)
+        assertNull(plugin.controlDenial)
     }
 }

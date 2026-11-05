@@ -268,7 +268,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         // A text input on the desktop took focus: up comes the keyboard, the
         // way it does for the phone's own fields — and down when it leaves.
         val textFocused = plugin?.desktopTextFocused == true
-        val input = controlEnabled && controlMode != ControlMode.View
+        val input = controlInputEnabled(controlEnabled, controlMode)
         LaunchedEffect(textFocused, input) {
             if (input && autoKeyboard) setKeyboardShown(textFocused)
         }
@@ -567,14 +567,6 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         }
     }
 
-    /** Stages that are progress, not a reason: the notice does not repeat them. */
-    private fun progressStages() = setOf(
-        getString(R.string.remote_screen_requesting),
-        getString(R.string.remote_screen_waiting_frame),
-        getString(R.string.remote_control_requesting),
-        getString(R.string.remote_screen_connected),
-    )
-
     private fun deviceName(): String = DeskNames.of(deviceId)
 
     /**
@@ -649,7 +641,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             factory = { context ->
                 KeyListenerView(context, null).also {
                     it.setDeviceId(deviceId)
-                    it.setInputEnabled(screenControlPlugin()?.remoteControlEnabled == true && controlMode != ControlMode.View)
+                    it.setInputEnabled(controlInputEnabled(screenControlPlugin()?.remoteControlEnabled == true, controlMode))
                     it.setStickyModifiers(stickyModifiers)
                     keyboardView = it
                 }
@@ -677,8 +669,32 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             }
         }
         val deviceName = remember { deviceName() }
-        val input = controlEnabled && controlMode != ControlMode.View
+        val input = controlInputEnabled(controlEnabled, controlMode)
         val keyboardUp = WindowInsets.isImeVisible
+        // The strip is dismissed by the person or after a while, once per distinct state (a new refusal is a new
+        // state); control granted clears it at once, and a later loss of control may show it again.
+        val plugin = screenControlPlugin()
+        val denial = plugin?.controlDenial
+        val noticeKey = (denial ?: "waiting") + "/" + controlMode.name
+        var dismissedKey by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(controlEnabled, noticeKey) {
+            if (controlEnabled && controlMode != ControlMode.View) {
+                dismissedKey = null
+            } else {
+                kotlinx.coroutines.delay(NOTICE_AUTO_HIDE_MS)
+                dismissedKey = noticeKey
+            }
+        }
+        // What the bottom pill is for, said once.
+        val hintPrefs = remember { androidx.preference.PreferenceManager.getDefaultSharedPreferences(this@MousePadActivity) }
+        var hint by remember { mutableStateOf(if (hintPrefs.getBoolean("remote_toolbar_hint_seen", false)) null else getString(R.string.remote_toolbar_hint, deviceName)) }
+        LaunchedEffect(live) {
+            if (live && hint != null) {
+                kotlinx.coroutines.delay(HINT_MS)
+                hint = null
+                hintPrefs.edit().putBoolean("remote_toolbar_hint_seen", true).apply()
+            }
+        }
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             DesktopScreen(
                 modifier = Modifier.fillMaxSize(),
@@ -711,7 +727,11 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 },
                 keys = { if (keyboardUp) KeyBar(input, onUsed = touch) },
                 onMore = { touch(); more = true },
-                reason = ScreenControlPlugin.latestStatus.takeUnless { it in progressStages() },
+                reason = denial,
+                noticeVisible = dismissedKey != noticeKey,
+                onDismissNotice = { dismissedKey = noticeKey },
+                onAllowControl = if (plugin?.remoteControlRefused == true) ({ requestDesktopScreen() }) else null,
+                hint = hint,
                 display = displayMode,
                 onDisplay = { mode ->
                     touch()
@@ -755,11 +775,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                             },
                         )
                         androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(stringResource(if (screenControlPlugin()?.remoteControlRefused == true) R.string.remote_control_ask_again else R.string.remote_screen_retry)) },
-                            onClick = {
-                                more = false
-                                val control = screenControlPlugin(); if (control?.remoteControlRefused == true) control.askControlAgain() else requestDesktopScreen()
-                            },
+                            text = { Text(stringResource(if (screenControlPlugin()?.remoteControlRefused == true) R.string.remote_allow_control_action else R.string.remote_screen_retry)) },
+                            // Both start the view again, which brings the computer's permission prompt back.
+                            onClick = { more = false; requestDesktopScreen() },
                         )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(stringResource(R.string.settings)) },
@@ -944,6 +962,8 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         /** Well inside the desktop's per-packet limit even at four bytes a character. */
         private const val TEXT_CHUNK_CHARS = 200
         private const val CONTROL_RETRY_MS = 3_000L
+        private const val NOTICE_AUTO_HIDE_MS = 12_000L
+        private const val HINT_MS = 7_000L
         private const val CONTROLS_HIDE_MS = 4_000L
         // Desktop `specialKey` codes (KeyListenerView.SpecialKeysMap, and the
         // desktop's `special_key_to_keysym`).

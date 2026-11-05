@@ -293,6 +293,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <!-- UI v4: desk screen -->
     <string name="remote_mode_view">View</string>
     <string name="remote_allow_control_first">Allow Control on %1$s first</string>
+    <string name="remote_allow_control_action">Allow control</string>
+    <string name="remote_notice_dismiss">Dismiss</string>
+    <string name="remote_view_only_hint">Watching only. Switch to Touch or Trackpad to control.</string>
+    <string name="remote_toolbar_label">Controls for %1$s: mouse buttons, keyboard and Super key</string>
+    <string name="remote_toolbar_hint">These buttons control %1$s, not this phone</string>
     <string name="remote_left_click">Left</string>
     <string name="remote_right_click">Right</string>
     <string name="remote_left_click_description">Left click</string>
