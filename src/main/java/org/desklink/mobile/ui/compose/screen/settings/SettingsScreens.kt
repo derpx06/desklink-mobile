@@ -7,6 +7,9 @@
 
 package org.desklink.mobile.ui.compose.screen.settings
 
+import org.desklink.mobile.ui.compose.components.DeskTextField
+import org.desklink.mobile.ui.compose.components.DialogAction
+import org.desklink.mobile.ui.compose.components.DeskDialog
 import android.Manifest
 import android.app.StatusBarManager
 import android.content.ComponentName
@@ -195,9 +198,11 @@ internal fun SettingsColumn(title: String, onBack: (() -> Unit)?, subtitle: Stri
     val t = tokens
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
         // A tab's first page has no back arrow: the bar below is how you leave it.
-        if (onBack != null) ScreenHeader(onBack) else Spacer(Modifier.height(8.dp))
+        // A pushed page: back arrow and title on one row (the design's sub-page bar).
+        if (onBack != null) ScreenHeader(onBack, title = title) else Spacer(Modifier.height(8.dp))
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            LargeTitle(title, subtitle = subtitle)
+            if (onBack == null) LargeTitle(title, subtitle = subtitle)
+            else if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = t.textDim, modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp))
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 content()
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars).padding(bottom = 10.dp))
@@ -585,27 +590,23 @@ internal fun TextDialog(
     onConfirm: (String) -> Unit,
 ) {
     var text by rememberSaveable { mutableStateOf(initial) }
-    AlertDialog(
+    DeskDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                OutlinedTextField(value = text, onValueChange = { text = filter(it) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            }
-        },
-        confirmButton = { TextButton(onClick = { onConfirm(text.trim()) }) { Text(confirm) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        title = title,
+        text = { DeskTextField(text, { text = filter(it) }, Modifier.fillMaxWidth(), label = title, singleLine = true) },
+        confirm = DialogAction(confirm) { onConfirm(text.trim()) },
+        dismiss = DialogAction(stringResource(R.string.cancel)) { onDismiss() },
     )
 }
 
 @Composable
 internal fun ChoiceDialog(title: String, options: List<String>, selected: Int, onDismiss: () -> Unit, onChoose: (Int) -> Unit) {
-    AlertDialog(
+    DeskDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        title = title,
+        // The dialog scrolls its body: four options at a large font size are taller than a phone held sideways.
         text = {
-            // Scrolls: four options at a large font size are taller than a phone held sideways.
-            Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
+            Column(Modifier.selectableGroup()) {
                 options.forEachIndexed { index, option ->
                     ListItem(
                         headlineContent = { Text(option) },
@@ -616,7 +617,7 @@ internal fun ChoiceDialog(title: String, options: List<String>, selected: Int, o
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismiss = DialogAction(stringResource(R.string.cancel)) { onDismiss() },
     )
 }
 

@@ -51,8 +51,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** The design's three stadium buttons. [Primary] = the one action of a screen, [Tonal] = a quiet one, [Outlined] = the other choice beside it. */
-enum class DeskButtonStyle { Primary, Tonal, Outlined }
+/** The design's three stadium buttons. [Primary] = the one action of a screen, [Tonal] = a quiet one, [Outlined] = the other choice beside it, [Danger] = the confirm of something that cannot be undone (coral container). */
+enum class DeskButtonStyle { Primary, Tonal, Outlined, Danger }
 
 /** The design presses every tappable down to 97 % for 120 ms. */
 @Composable
@@ -83,6 +83,7 @@ fun StadiumButton(
         !enabled -> (if (style == DeskButtonStyle.Outlined) Color.Transparent else t.text.copy(alpha = 0.12f)) to t.text.copy(alpha = 0.38f)
         style == DeskButtonStyle.Primary -> t.accent to t.onAccent
         style == DeskButtonStyle.Tonal -> t.accentContainer to t.onAccentContainer
+        style == DeskButtonStyle.Danger -> t.coralContainer to t.coralText
         else -> Color.Transparent to t.accentText
     }
     val shape = DeskLinkShape.stadium

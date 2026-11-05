@@ -75,6 +75,11 @@ class UiTokensTest {
         // The desk screen's amber notice and coral End, and the presenter's Next card.
         assertTrue(contrast(Color(0xFF2A1D00), Color(0xFFF5B84A)) >= 4.5)
         assertTrue(contrast(Color(0xFF2A0D06), Color(0xFFFF7C66)) >= 4.5)
+        // The desk screen's End (coral text on the coral container) and a destructive dialog button, in both themes.
+        assertTrue(contrast(Color(0xFFFF9A88), Color(0xFF34201C)) >= 4.5)
+        for (t in listOf(LightTokens, DarkTokens)) assertTrue("danger button ${t.isDark}", contrast(t.coralText, t.coralContainer) >= 4.5)
+        // Key caps and chips on the glass: light text on the cap.
+        assertTrue(contrast(Color(0xFFF2F2F3), Color(0xEB1E1E21).compositeOver(Color.Black)) >= 4.5)
         assertTrue(contrast(Color(0xFF14204F), Color(0xFFA9B8FF)) >= 4.5)
         assertTrue(contrast(Color(0xFFF2F2F3), Color(0xEB141416).compositeOver(Color.White)) >= 4.5)
     }

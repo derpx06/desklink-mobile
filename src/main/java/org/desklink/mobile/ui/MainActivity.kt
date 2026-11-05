@@ -7,6 +7,8 @@
 
 package org.desklink.mobile.ui
 
+import org.desklink.mobile.ui.compose.components.DialogAction
+import org.desklink.mobile.ui.compose.components.DeskDialog
 import org.desklink.mobile.extensions.isReadable
 import android.Manifest
 import android.content.Intent
@@ -564,11 +566,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             if (apply && clipboard) setPluginEnabled(device, HomeModel.clipboardKey, true)
             if (apply && notifications) setPluginEnabled(device, Plugin.getPluginKey(NotificationsPlugin::class.java), true)
         }
-        AlertDialog(
+        DeskDialog(
             onDismissRequest = { finish(apply = false) },
-            title = { Text(stringResource(R.string.first_share_title, device.name)) },
+            title = stringResource(R.string.first_share_title, device.name),
             text = {
-                androidx.compose.foundation.layout.Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                androidx.compose.foundation.layout.Column {
                     Text(stringResource(R.string.first_share_body, device.name))
                     androidx.compose.foundation.layout.Spacer(Modifier.height(12.dp))
                     androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().toggleable(value = clipboard, role = androidx.compose.ui.semantics.Role.Checkbox, onValueChange = { clipboard = it }).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -582,7 +584,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     Text(stringResource(R.string.first_share_later), Modifier.padding(top = 8.dp), style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
                 }
             },
-            confirmButton = { TextButton(onClick = { finish(apply = true) }) { Text(stringResource(R.string.first_share_done)) } },
+            confirm = DialogAction(stringResource(R.string.first_share_done)) { finish(apply = true) },
         )
     }
 
@@ -617,11 +619,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val actions = androidx.compose.runtime.remember(device, computersRequest) { homeActions(device) { sharingInfo = true } }
         HomeScreen(state, actions)
         if (sharingInfo) {
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { sharingInfo = false },
-                title = { Text(stringResource(R.string.home_share_screen_title, device.name)) },
+                title = stringResource(R.string.home_share_screen_title, device.name),
                 text = { Text(stringResource(R.string.home_share_screen_body, device.name)) },
-                confirmButton = { TextButton(onClick = { sharingInfo = false }) { Text(stringResource(R.string.ok)) } },
+                confirm = DialogAction(stringResource(R.string.ok)) { sharingInfo = false },
             )
         }
     }
@@ -878,12 +880,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         )
         QrProgress()
         qrConflict?.let { (code, name) ->
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { qrConflict = null; pop() },
-                title = { Text(stringResource(R.string.qr_replace_pairing_title, name)) },
+                title = stringResource(R.string.qr_replace_pairing_title, name),
                 text = { Text(stringResource(R.string.qr_replace_pairing_message)) },
-                confirmButton = { TextButton(onClick = { qrConflict = null; startQrPairing(code, replaceExisting = true) }) { Text(stringResource(R.string.qr_replace_pairing_confirm)) } },
-                dismissButton = { TextButton(onClick = { qrConflict = null; pop() }) { Text(stringResource(R.string.cancel)) } },
+                confirm = DialogAction(stringResource(R.string.qr_replace_pairing_confirm), destructive = true) { qrConflict = null; startQrPairing(code, replaceExisting = true) },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { qrConflict = null; pop() },
             )
         }
     }
@@ -959,7 +961,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             stage == QrPairing.Stage.CONNECTING -> getString(R.string.qr_progress_connecting)
             else -> getString(R.string.qr_progress_verifying, device?.name.orEmpty())
         }
-        AlertDialog(
+        DeskDialog(
             onDismissRequest = {},
             text = {
                 androidx.compose.foundation.layout.Row(
@@ -975,18 +977,15 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     Text(label)
                 }
             },
-            confirmButton = {},
             // A way out whatever stage it hangs at. Scanning stays off until the person scans again.
-            dismissButton = {
-                // Really cancels: the dial and the wait stop, a negotiation is ended, a pairing that completed meanwhile is undone.
-                TextButton(onClick = {
-                    // Paired already (Cancel tapped as it completed, or during the "Paired" pause): that is not cancelled, it goes Home.
-                    if (!qrFlow.cancel { DeskLinkApplication.getInstance().getDevice(it)?.isPaired == true } && qrFlow.state is QrScanFlow.State.Pairing) {
-                        qrFlow.reset()
-                        select(id)
-                        settleAfterPairing()
-                    }
-                }) { Text(stringResource(R.string.cancel)) }
+            // Really cancels: the dial and the wait stop, a negotiation is ended, a pairing that completed meanwhile is undone.
+            dismiss = DialogAction(stringResource(R.string.cancel)) {
+                // Paired already (Cancel tapped as it completed, or during the "Paired" pause): that is not cancelled, it goes Home.
+                if (!qrFlow.cancel { DeskLinkApplication.getInstance().getDevice(it)?.isPaired == true } && qrFlow.state is QrScanFlow.State.Pairing) {
+                    qrFlow.reset()
+                    select(id)
+                    settleAfterPairing()
+                }
             },
         )
     }

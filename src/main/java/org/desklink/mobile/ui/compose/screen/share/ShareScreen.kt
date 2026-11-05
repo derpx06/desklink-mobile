@@ -37,7 +37,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.desklink.mobile.extensions.safeDrawingBottomPadding
 import org.desklink.mobile.ui.compose.DeskLinkTheme
-import org.desklink.mobile.ui.compose.components.KdeCard
+import org.desklink.mobile.ui.compose.DeskLinkShape
+import org.desklink.mobile.ui.compose.DeskLinkType
+import org.desklink.mobile.ui.compose.components.DeskCard
+import org.desklink.mobile.ui.compose.components.GlyphSquircle
+import org.desklink.mobile.ui.compose.tokens
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
 import org.desklink.mobile.ui.compose.components.DeskLinkThemePreviews
 import org.desklink.mobile.ui.compose.components.SectionHeader
 import org.desklink.mobile.ui.compose.model.device.DeviceUiModel
@@ -87,8 +94,8 @@ private fun ShareScreenContent(
                 .fillMaxSize()
                 .padding(
                     top = 4.dp,
-                    start = 8.dp,
-                    end = 8.dp
+                    start = 16.dp,
+                    end = 16.dp
                 ),
             contentPadding = safeDrawingBottomPadding(),
             state = state
@@ -100,58 +107,38 @@ private fun ShareScreenContent(
                 items = devices,
                 key = { device -> device.id }
             ) { device ->
-                KdeCard(
+                DeskCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp),
-                    content = { ShareScreenCardContent(device = device) },
-                    onClick = { onDeviceClick(device.id) }
-                )
+                    shape = DeskLinkShape.group,
+                    onClick = { onDeviceClick(device.id) },
+                ) { ShareScreenCardContent(device = device) }
             }
         }
     }
 }
 
+/** A computer to send to: its glyph, its name, and in coral why it cannot be reached; 72 dp tall, the whole card is the button. */
 @Composable
 private fun ShareScreenCardContent(device: DeviceUiModel) {
+    val t = tokens
     Row(
         modifier = Modifier
-            .wrapContentSize()
-            .defaultMinSize(minHeight = 48.dp)
-            .padding(all = 32.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 72.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        if (device.icon > 0) {
-            Image(
-                imageVector = ImageVector.vectorResource(id = device.icon),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(color = MaterialTheme.colorScheme.onSurfaceVariant),
-                modifier = Modifier
-                    .padding(start = 12.dp)
-                    .size(32.dp)
-                    .wrapContentHeight()
-            )
-        }
-        Column(
-            modifier = Modifier
-                .padding(start = 8.dp)
-        ) {
-            Text(
-                text = device.name,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 18.sp
-            )
+        if (device.icon > 0) GlyphSquircle(device.icon, dimmed = !device.isReachable)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(device.name, style = DeskLinkType.cardTitle, color = t.text)
             if (!device.isReachable) {
-                Text(
-                    text = stringResource(id = R.string.device_not_reachable),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = 14.sp,
-                    maxLines = 1
-                )
+                Text(stringResource(id = R.string.device_not_reachable), fontSize = 14.sp, color = t.coralText)
             }
         }
+        Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = t.textDim, modifier = Modifier.size(22.dp))
     }
 }
 

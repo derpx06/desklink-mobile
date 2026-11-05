@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package org.desklink.mobile.ui.compose.screen.settings
 
+import org.desklink.mobile.ui.compose.components.DialogAction
+import org.desklink.mobile.ui.compose.components.DeskDialog
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
@@ -874,17 +876,12 @@ private fun UnpairRow(desk: DeskSettings?, actions: SettingsActions) {
         onClick = { confirmUnpair = true },
     )
     if (confirmUnpair) {
-        AlertDialog(
+        DeskDialog(
             onDismissRequest = { confirmUnpair = false },
-            title = { Text(stringResource(R.string.device_unpair_title, desk.name)) },
+            title = stringResource(R.string.device_unpair_title, desk.name),
             text = { Text(stringResource(R.string.device_unpair_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = { confirmUnpair = false; actions.onUnpair() },
-                    colors = ButtonDefaults.textButtonColors(contentColor = t.red),
-                ) { Text(stringResource(R.string.device_menu_unpair)) }
-            },
-            dismissButton = { TextButton(onClick = { confirmUnpair = false }) { Text(stringResource(R.string.cancel)) } },
+            confirm = DialogAction(stringResource(R.string.device_menu_unpair), destructive = true) { confirmUnpair = false; actions.onUnpair() },
+            dismiss = DialogAction(stringResource(R.string.cancel)) { confirmUnpair = false },
         )
     }
 }

@@ -8,15 +8,20 @@ package org.desklink.mobile.plugins.mousepad
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -52,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.MonoFamily
+import org.desklink.mobile.ui.compose.components.rememberReducedMotion
 
 /** How a touch on the desk's picture acts. */
 enum class ControlMode {
@@ -75,8 +81,13 @@ private val PillSelected = Color(0xFFF2F2F3)
 private val PillOnSelected = Color(0xFF18181B)
 private val AmberNotice = Color(0xEBF5B84A)
 private val OnAmber = Color(0xFF2A1D00)
-private val EndCoral = Color(0xFFFF7C66)
-private val OnCoral = Color(0xFF2A0D06)
+/** The design's End: the coral container with coral text (6.6:1), not a solid coral slab over the picture. */
+private val EndBg = Color(0xFF34201C)
+private val EndText = Color(0xFFFF9A88)
+private val ChipBg = Color.White.copy(alpha = 0.08f)
+private val LiveDot = Color(0xFF3FD1A2)
+private val KeyBg = Color(0xEB1E1E21)
+private val KeyEdge = Color(0xFF38383D)
 
 /**
  * The desk screen's floating pills: back, name and latency top left; End (coral) top right; the
@@ -111,6 +122,12 @@ fun DeskControls(
     /** F2: "mirror" or "extend", and switching between them (re-asks the desk). */
     display: String = "mirror",
     onDisplay: (String) -> Unit = {},
+    /** Edge to edge (true) or the whole desktop (false), and flipping it. */
+    fill: Boolean = false,
+    onFill: () -> Unit = {},
+    /** Whether the desk's sound plays here, and flipping it. */
+    soundOn: Boolean = false,
+    onSound: () -> Unit = {},
     keys: @Composable () -> Unit = {},
     moreMenu: @Composable () -> Unit = {},
 ) {
@@ -153,15 +170,28 @@ fun DeskControls(
                 }
             }
         }
-        AnimatedVisibility(visible = visible, modifier = Modifier.fillMaxSize(), enter = fadeIn(), exit = fadeOut()) {
+        val still = rememberReducedMotion()
+        AnimatedVisibility(
+            visible = visible,
+            modifier = Modifier.fillMaxSize(),
+            enter = if (still) EnterTransition.None else fadeIn(),
+            exit = if (still) ExitTransition.None else fadeOut(),
+        ) {
             Box(Modifier.fillMaxSize().padding(12.dp)) {
-                Pill(Modifier.align(Alignment.TopStart)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 14.dp)) {
-                        PillIcon(R.drawable.sym_arrow_back, stringResource(R.string.remote_close), onClick = onBack)
-                        Text(deviceName, fontFamily = MonoFamily, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp))
-                        rttMs?.let {
-                            Spacer(Modifier.width(6.dp))
-                            Text(stringResource(R.string.home_meta_rtt, it.toInt()), fontFamily = MonoFamily, fontSize = 11.sp, color = PillText.copy(alpha = 0.7f))
+                // Back, then the computer's name with its live dot and the round trip: one glass capsule each, like the design.
+                Row(Modifier.align(Alignment.TopStart), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill { PillIcon(R.drawable.sym_arrow_back, stringResource(R.string.remote_close), onClick = onBack) }
+                    Pill {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp),
+                        ) {
+                            Box(Modifier.size(8.dp).background(if (live) LiveDot else PillText.copy(alpha = 0.45f), CircleShape))
+                            Text(deviceName, fontFamily = MonoFamily, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp))
+                            rttMs?.let {
+                                Text(stringResource(R.string.home_meta_rtt, it.toInt()), fontFamily = MonoFamily, fontSize = 11.sp, color = PillText.copy(alpha = 0.7f), maxLines = 1)
+                            }
                         }
                     }
                 }
@@ -189,21 +219,21 @@ fun DeskControls(
                         }
                     }
                 }
-                // End: coral, as everywhere a session is live.
+                // End: the coral container, as everywhere a session is live; 48 dp to touch.
                 Box(
                     Modifier
                         .align(Alignment.TopEnd)
                         .heightIn(min = 48.dp)
                         .clickable(role = Role.Button, onClick = onEnd),
-                    contentAlignment = Alignment.TopCenter,
+                    contentAlignment = Alignment.Center,
                 ) {
                     Row(
-                        Modifier.height(32.dp).background(EndCoral, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp),
+                        Modifier.heightIn(min = 44.dp).background(EndBg, CircleShape).padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Box(Modifier.size(6.dp).background(OnCoral, CircleShape))
-                        Text(stringResource(R.string.active_session_end), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OnCoral)
+                        Icon(painterResource(R.drawable.sym_close), contentDescription = null, tint = EndText, modifier = Modifier.size(18.dp))
+                        Text(stringResource(R.string.active_session_end), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = EndText)
                     }
                 }
                 Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -213,13 +243,15 @@ fun DeskControls(
                     }
                     Pill {
                         val toolbarLabel = stringResource(R.string.remote_toolbar_label, deviceName)
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 3.dp).semantics { contentDescription = toolbarLabel }) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 3.dp).semantics { contentDescription = toolbarLabel }) {
                             ModeSwitch(mode, onMode)
                             Box(Modifier.padding(horizontal = 4.dp).size(1.dp, 22.dp).background(Color.White.copy(alpha = 0.14f)))
                             PillText(stringResource(R.string.remote_left_click), input, description = stringResource(R.string.remote_left_click_description), onClick = onLeft)
                             PillText(stringResource(R.string.remote_right_click), input, description = stringResource(R.string.remote_right_click_description), onClick = onRight)
-                            PillIcon(R.drawable.sym_keyboard, stringResource(R.string.remote_key_keyboard), enabled = input, onClick = onKeyboard)
                             PillText("super", input, mono = true, description = stringResource(R.string.remote_key_super), onClick = onSuper)
+                            ToolChip(R.drawable.sym_keyboard, stringResource(R.string.remote_key_keyboard), enabled = input, onClick = onKeyboard)
+                            ToolChip(R.drawable.sym_aspect_ratio, stringResource(if (fill) R.string.remote_zoom_fit else R.string.remote_zoom_fill), selected = fill, onClick = onFill)
+                            ToolChip(if (soundOn) R.drawable.sym_volume_up else R.drawable.sym_volume_mute, stringResource(if (soundOn) R.string.remote_sound_off else R.string.remote_sound_on), selected = soundOn, onClick = onSound)
                             Box {
                                 PillIcon(R.drawable.sym_more_vert, stringResource(R.string.extra_options), onClick = onMore)
                                 moreMenu()
@@ -278,9 +310,52 @@ internal fun PillText(
             },
             maxLines = 1,
             modifier = Modifier
-                .background(if (selected) PillSelected else Color.Transparent, RoundedCornerShape(18.dp))
+                .background(if (selected) PillSelected else ChipBg, RoundedCornerShape(18.dp))
                 .padding(horizontal = 12.dp, vertical = 9.dp),
         )
+    }
+}
+
+/** A key cap of the keyboard row: a 40 dp rounded rectangle on near-black glass with a hairline, 48 dp to touch. A [label] or an [icon]. */
+@Composable
+internal fun KeyCap(label: String?, description: String?, enabled: Boolean, @DrawableRes icon: Int? = null, selected: Boolean = false, onClick: () -> Unit) {
+    val ink = if (selected) PillOnSelected else if (enabled) PillText else PillText.copy(alpha = 0.45f)
+    Box(
+        Modifier
+            .heightIn(min = 48.dp)
+            .widthIn(min = 48.dp)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { this.selected = selected; description?.let { contentDescription = it } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .heightIn(min = 40.dp)
+                .widthIn(min = 44.dp)
+                .background(if (selected) PillSelected else KeyBg, RoundedCornerShape(10.dp))
+                .border(1.dp, KeyEdge, RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (label != null) Text(label, fontFamily = MonoFamily, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ink, maxLines = 1)
+            if (icon != null) Icon(painterResource(icon), contentDescription = null, tint = ink, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/** An icon chip (a 36 dp round, 48 dp to touch): selected is the light fill, like the mode switch. */
+@Composable
+internal fun ToolChip(@DrawableRes icon: Int, description: String, enabled: Boolean = true, selected: Boolean = false, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(48.dp)
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { this.selected = selected; contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(36.dp).background(if (selected) PillSelected else ChipBg, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(painterResource(icon), contentDescription = null, tint = if (selected) PillOnSelected else if (enabled) PillText else PillText.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
+        }
     }
 }
 

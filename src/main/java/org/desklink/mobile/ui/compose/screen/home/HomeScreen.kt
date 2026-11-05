@@ -7,6 +7,9 @@
 package org.desklink.mobile.ui.compose.screen.home
 
 
+import org.desklink.mobile.ui.compose.components.DialogAction
+import org.desklink.mobile.ui.compose.components.DeskDialog
+import org.desklink.mobile.ui.compose.components.DeskTextField
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
@@ -1007,25 +1010,23 @@ internal fun ComputersContent(state: HomeState, onDismiss: () -> Unit, actions: 
 private fun SendLinkDialog(onDismiss: () -> Unit, onSend: (String) -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
     val url = normalizedUrl(text)
-    AlertDialog(
+    DeskDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.home_send_link_title)) },
+        title = stringResource(R.string.home_send_link_title),
+        // The dialog scrolls its body: at a large font size, or sideways with the keyboard up, the field stays reachable.
         text = {
-            // At a large font size, or sideways with the keyboard up, the field must stay reachable.
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-            OutlinedTextField(
+            DeskTextField(
                 value = text,
                 onValueChange = { text = it.take(2048) },
+                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("https://", fontFamily = MonoFamily) },
+                placeholder = "https://",
                 textStyle = androidx.compose.ui.text.TextStyle(fontFamily = MonoFamily, fontSize = 14.sp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                modifier = Modifier.fillMaxWidth(),
             )
-            }
         },
-        confirmButton = { TextButton(onClick = { url?.let(onSend) }, enabled = url != null) { Text(stringResource(R.string.home_send)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        confirm = DialogAction(stringResource(R.string.home_send), enabled = url != null) { url?.let(onSend) },
+        dismiss = DialogAction(stringResource(R.string.cancel)) { onDismiss() },
     )
 }
 
