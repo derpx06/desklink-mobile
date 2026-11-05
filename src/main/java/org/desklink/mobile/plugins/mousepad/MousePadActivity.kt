@@ -649,6 +649,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     @Composable
     private fun KeyBar(controlEnabled: Boolean, modifier: Modifier = Modifier, onUsed: () -> Unit = {}) {
         val pad = { mousePadPlugin() }
+        val keyScroll = rememberScrollState()
         fun special(code: Int) {
             onUsed()
             val np = NetworkPacket(MousePadPlugin.PACKET_TYPE_MOUSEPAD_REQUEST)
@@ -657,7 +658,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             pad()?.sendPacket(np)
         }
         Row(
-            modifier = modifier.horizontalScroll(rememberScrollState()),
+            modifier = modifier.edgeFade(keyScroll).horizontalScroll(keyScroll),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -801,8 +802,21 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                         requestDesktopScreen()
                     }
                 },
-                moreMenu = {
+                moreMenu = { compact ->
                     androidx.compose.material3.DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                        if (compact) {
+                            // The bottom pill is too narrow for these two: same switches, same names.
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(stringResource(R.string.remote_zoom_fill)) },
+                                trailingIcon = { androidx.compose.material3.Switch(checked = fillScreen, onCheckedChange = null) },
+                                onClick = { more = false; touch(); fillScreen = !fillScreen },
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(stringResource(R.string.remote_desk_sound)) },
+                                trailingIcon = { androidx.compose.material3.Switch(checked = soundOn, onCheckedChange = null) },
+                                onClick = { more = false; onSoundToggle() },
+                            )
+                        }
                         if (zoomTransform.scale > 1f) {
                             androidx.compose.material3.DropdownMenuItem(
                                 text = { Text(stringResource(R.string.remote_zoom_reset)) },

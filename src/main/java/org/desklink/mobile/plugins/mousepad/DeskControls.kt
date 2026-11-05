@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -43,7 +45,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -129,9 +143,15 @@ fun DeskControls(
     soundOn: Boolean = false,
     onSound: () -> Unit = {},
     keys: @Composable () -> Unit = {},
-    moreMenu: @Composable () -> Unit = {},
+    /** Gets whether the bottom pill is too narrow for Fit and Sound: they then belong in the menu. */
+    moreMenu: @Composable (compact: Boolean) -> Unit = {},
 ) {
     val input = controlInputEnabled(controlEnabled, mode)
+    // Narrower than the full tool row (about 600 dp): Fit and Sound move into More, and what is left scrolls with a fading edge.
+    val compact = LocalConfiguration.current.screenWidthDp < COMPACT_BELOW_DP
+    // Large text: the top row has no room for the round trip or End's word, so the name keeps the space.
+    val endLabel = stringResource(R.string.active_session_end)
+    val bigText = LocalDensity.current.fontScale >= 1.5f
     Box(Modifier.fillMaxSize()) {
         // One compact strip, only while something is missing: control not yet granted (or watch-only).
         // Granted, dismissed or timed out, it is gone; it never repeats for the same state.
@@ -178,26 +198,46 @@ fun DeskControls(
             exit = if (still) ExitTransition.None else fadeOut(),
         ) {
             Box(Modifier.fillMaxSize().padding(12.dp)) {
+                // One column: large text pushes Mirror/Extend down instead of overlapping, and End never covers the name.
+                Column(Modifier.align(Alignment.TopStart).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // Back, then the computer's name with its live dot and the round trip: one glass capsule each, like the design.
-                Row(Modifier.align(Alignment.TopStart), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Pill { PillIcon(R.drawable.sym_arrow_back, stringResource(R.string.remote_close), onClick = onBack) }
-                    Pill {
+                    Pill(Modifier.weight(1f, fill = false)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp),
                         ) {
                             Box(Modifier.size(8.dp).background(if (live) LiveDot else PillText.copy(alpha = 0.45f), CircleShape))
-                            Text(deviceName, fontFamily = MonoFamily, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp))
-                            rttMs?.let {
-                                Text(stringResource(R.string.home_meta_rtt, it.toInt()), fontFamily = MonoFamily, fontSize = 11.sp, color = PillText.copy(alpha = 0.7f), maxLines = 1)
+                            Text(deviceName, fontFamily = MonoFamily, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp).weight(1f, fill = false))
+                            rttMs?.takeIf { !bigText }?.let {
+                                Text(stringResource(R.string.home_meta_rtt, it.toInt()), fontFamily = MonoFamily, fontSize = 11.sp, color = PillText.copy(alpha = 0.7f), maxLines = 1, softWrap = false)
                             }
                         }
                     }
                 }
+                // End: the coral container, as everywhere a session is live; 48 dp to touch.
+                Box(
+                    Modifier
+                        .heightIn(min = 48.dp)
+                        .clickable(role = Role.Button, onClick = onEnd),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(
+                        Modifier.heightIn(min = 44.dp).background(EndBg, CircleShape).padding(horizontal = 16.dp).semantics(mergeDescendants = true) { contentDescription = endLabel },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(painterResource(R.drawable.sym_close), contentDescription = null, tint = EndText, modifier = Modifier.size(18.dp))
+                        if (!bigText) Text(stringResource(R.string.active_session_end), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = EndText)
+                    }
+                }
+                    }
                 // F2: Mirror | Extend, under the name (the top centre is the amber notice's).
-                Pill(Modifier.align(Alignment.TopStart).padding(top = 56.dp)) {
-                    Row(Modifier.padding(horizontal = 3.dp).selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
+                Pill {
+                    Row(Modifier.padding(3.dp).selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
                         listOf("mirror" to R.string.remote_display_mirror, "extend" to R.string.remote_display_extend).forEach { (value, label) ->
                             val selected = display == value
                             Box(
@@ -212,29 +252,13 @@ fun DeskControls(
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (selected) PillOnSelected else PillText,
                                     modifier = Modifier
-                                        .background(if (selected) PillSelected else Color.Transparent, RoundedCornerShape(16.dp))
+                                        .background(if (selected) PillSelected else Color.Transparent, CircleShape)
                                         .padding(horizontal = 14.dp, vertical = 8.dp),
                                 )
                             }
                         }
                     }
                 }
-                // End: the coral container, as everywhere a session is live; 48 dp to touch.
-                Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .heightIn(min = 48.dp)
-                        .clickable(role = Role.Button, onClick = onEnd),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(
-                        Modifier.heightIn(min = 44.dp).background(EndBg, CircleShape).padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(painterResource(R.drawable.sym_close), contentDescription = null, tint = EndText, modifier = Modifier.size(18.dp))
-                        Text(stringResource(R.string.active_session_end), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = EndText)
-                    }
                 }
                 Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     keys()
@@ -243,18 +267,21 @@ fun DeskControls(
                     }
                     Pill {
                         val toolbarLabel = stringResource(R.string.remote_toolbar_label, deviceName)
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 3.dp).semantics { contentDescription = toolbarLabel }) {
+                        val scroll = rememberScrollState()
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.edgeFade(scroll).horizontalScroll(scroll).padding(horizontal = 3.dp).semantics { contentDescription = toolbarLabel }) {
                             ModeSwitch(mode, onMode)
                             Box(Modifier.padding(horizontal = 4.dp).size(1.dp, 22.dp).background(Color.White.copy(alpha = 0.14f)))
                             PillText(stringResource(R.string.remote_left_click), input, description = stringResource(R.string.remote_left_click_description), onClick = onLeft)
                             PillText(stringResource(R.string.remote_right_click), input, description = stringResource(R.string.remote_right_click_description), onClick = onRight)
                             ToolChip(R.drawable.sym_keyboard, stringResource(R.string.remote_key_keyboard), enabled = input, onClick = onKeyboard)
-                            // Switches with fixed names: a screen reader says "Desk sound, on", not a label that flips with the state.
-                            ToolChip(R.drawable.sym_aspect_ratio, stringResource(R.string.remote_zoom_fill), selected = fill, toggle = true, onClick = onFill)
-                            ToolChip(if (soundOn) R.drawable.sym_volume_up else R.drawable.sym_volume_mute, stringResource(R.string.remote_desk_sound), selected = soundOn, toggle = true, onClick = onSound)
+                            if (!compact) {
+                                // Switches with fixed names: a screen reader says "Desk sound, on", not a label that flips with the state.
+                                ToolChip(R.drawable.sym_aspect_ratio, stringResource(R.string.remote_zoom_fill), selected = fill, toggle = true, onClick = onFill)
+                                ToolChip(if (soundOn) R.drawable.sym_volume_up else R.drawable.sym_volume_mute, stringResource(R.string.remote_desk_sound), selected = soundOn, toggle = true, onClick = onSound)
+                            }
                             Box {
                                 PillIcon(R.drawable.sym_more_vert, stringResource(R.string.extra_options), onClick = onMore)
-                                moreMenu()
+                                moreMenu(compact)
                             }
                         }
                     }
@@ -359,6 +386,18 @@ internal fun ToolChip(@DrawableRes icon: Int, description: String, enabled: Bool
     }
 }
 
+internal const val COMPACT_BELOW_DP = 600
+
+/** Fades the edge a scroller continues past, so a clipped row reads as scrollable. */
+internal fun Modifier.edgeFade(state: ScrollState, width: Dp = 20.dp): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val w = width.toPx()
+        if (state.canScrollBackward) drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), 0f, w), size = Size(w, size.height), blendMode = BlendMode.DstIn)
+        if (state.canScrollForward) drawRect(Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), size.width - w, size.width), topLeft = Offset(size.width - w, 0f), size = Size(w, size.height), blendMode = BlendMode.DstIn)
+    }
+
 @Composable
 internal fun PillIcon(@DrawableRes icon: Int, description: String, enabled: Boolean = true, onClick: () -> Unit) {
     IconButton(
@@ -381,8 +420,12 @@ private fun ModeSwitch(mode: ControlMode, onMode: (ControlMode) -> Unit) {
     )
     Row(
         Modifier
-            .padding(start = 2.dp)
-            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(18.dp))
+            .padding(start = 6.dp)
+            // Drawn 4 dp in from the 48 dp touch height, so the pill's round end does not cut its corner.
+            .drawBehind {
+                val inset = 4.dp.toPx()
+                drawRoundRect(Color.White.copy(alpha = 0.06f), Offset(0f, inset), Size(size.width, size.height - 2 * inset), CornerRadius((size.height - 2 * inset) / 2))
+            }
             .selectableGroup(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -396,9 +439,9 @@ private fun ModeSwitch(mode: ControlMode, onMode: (ControlMode) -> Unit) {
             ) {
                 Row(
                     Modifier
-                        .padding(horizontal = 2.dp)
-                        .height(32.dp)
-                        .background(if (selected) PillSelected else Color.Transparent, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 2.dp, vertical = 4.dp)
+                        .heightIn(min = 32.dp)
+                        .background(if (selected) PillSelected else Color.Transparent, CircleShape)
                         .padding(start = 10.dp, end = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
