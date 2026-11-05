@@ -545,6 +545,9 @@ class WebRtcRemoteSessionController(
                 // A grant wins over a denial that was answered to an earlier, repeated request:
                 // control already held stays held (and the caller must not announce a refusal).
                 if (state == WebRtcRemoteSessionState.CONTROLLING && lease != null) return false
+                // A denial is only about a control request: it does not promote a view still being
+                // requested, and does not un-pause a locked screen.
+                if (state != WebRtcRemoteSessionState.REQUESTING_CONTROL && state != WebRtcRemoteSessionState.VIEWING) return false
                 // Failure to grant input must not tear down a working screen
                 // view. Retain its identity so the user can retry after
                 // changing the desktop's input-permission decision.

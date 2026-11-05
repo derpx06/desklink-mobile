@@ -105,6 +105,9 @@ class TerminalPainter(private val regular: Typeface, private val bold: Typeface)
         val cursorRow = e.cursorRow
         val cursorCol = e.cursorCol
         val cursorShape = e.cursorStyle
+        // A snapshot or resize while scrolled back can leave the view's top row out of range, and
+        // Termux throws for a row it does not hold.
+        val topRow = topRow.coerceIn(-screen.activeTranscriptRows, 0)
 
         for (r in 0 until e.mRows) {
             val row = topRow + r

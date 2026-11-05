@@ -80,10 +80,19 @@ class ClipboardListener private constructor(ctx: Context) {
      * (a password manager's). It reads only the description: no clipboard access toast.
      */
     fun preview(): String? {
-        val description = try { cm.primaryClipDescription } catch (_: Exception) { null }
-        if (description != null && isSensitive(description)) return null
-        return currentContent
+        // Home asks every second: the binder call is repeated at most every 2 s, and not at all
+        // after a copy changed (that resets the stamp, so a sensitive copy is never shown).
+        val now = SystemClock.elapsedRealtime()
+        if (now - sensitiveCheckedAt >= PREVIEW_CHECK_MS || sensitiveCheckedAt == 0L) {
+            val description = try { cm.primaryClipDescription } catch (_: Exception) { null }
+            previewSensitive = description != null && isSensitive(description)
+            sensitiveCheckedAt = now
+        }
+        return if (previewSensitive) null else currentContent
     }
+
+    @Volatile private var sensitiveCheckedAt = 0L
+    @Volatile private var previewSensitive = false
 
     /** The newest time this phone holds a copy of its own. */
     fun newestLocalCopy(): Long = maxOf(updateTimestamp, copiedAt)
@@ -127,6 +136,7 @@ class ClipboardListener private constructor(ctx: Context) {
     /** Something was copied (the system says THAT, not what). In front: read and sync now. Behind: only an offer, never a read. */
     @MainThread
     private fun onPrimaryClipChanged() {
+        sensitiveCheckedAt = 0L
         // Something was copied here (we may not be allowed to read it): the computer's older copy must not overwrite it on reconnect.
         if (remoteSetAt == 0L || SystemClock.elapsedRealtime() - remoteSetAt >= 2_000) copiedAt = System.currentTimeMillis()
         val inFront = runCatching {
@@ -377,6 +387,7 @@ class ClipboardListener private constructor(ctx: Context) {
     }
 
     companion object {
+        private const val PREVIEW_CHECK_MS = 2_000L
         private const val TAG = "DeskLink/Clipboard"
         /** The old stored switch: it made a grant alone start the watch at launch. Removed quietly (see RemovedFeatures). */
         const val KEY_AUTO_SYNC = "clipboard_auto_sync"

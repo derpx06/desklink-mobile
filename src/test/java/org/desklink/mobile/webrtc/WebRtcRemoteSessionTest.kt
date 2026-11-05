@@ -462,6 +462,20 @@ class WebRtcRemoteSessionTest {
         assertEquals(WebRtcRemoteSessionState.REQUESTING_VIEW, controller.snapshot().state)
     }
 
+    @Test
+    fun `a control denial changes nothing unless control was being requested or held`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        val id = controller.beginView(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        val denial = control(WebRtcRemoteSessionControlKind.CONTROL_DENIED, id).copy(reason = "no")
+        assertFalse("not promoted to viewing", controller.accept(denial, wire, attemptId))
+        assertEquals(WebRtcRemoteSessionState.REQUESTING_VIEW, controller.snapshot().state)
+
+        controller.markScreenReady(WebRtcScreenDirection.DESKTOP_TO_PHONE)
+        controller.pauseLocked()
+        assertFalse("not un-paused", controller.accept(denial, wire, attemptId))
+        assertEquals(WebRtcRemoteSessionState.PAUSED_LOCKED, controller.snapshot().state)
+    }
+
     private fun grant(
         remoteSessionId: String,
         owner: String,

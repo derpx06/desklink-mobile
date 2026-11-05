@@ -130,6 +130,21 @@ class TerminalScreen(
      *  * kitty keyboard protocol sequences with a `=` or `<` marker (`CSI = 5 ; 1 u`) are dropped for the
      *    same reason.
      */
+    /**
+     * The last [count] lines a person would see, trailing blank rows skipped: read row by row from the
+     * bottom, so Home's every-second preview never builds the whole screen's text under the lock.
+     */
+    fun tailLines(count: Int): List<String> = synchronized(lock) {
+        val out = ArrayDeque<String>()
+        var r = emulator.mRows - 1
+        while (r >= 0 && out.size < count) {
+            val line = emulator.screen.getSelectedText(0, r, emulator.mColumns, r).trimEnd()
+            if (out.isNotEmpty() || line.isNotEmpty()) out.addFirst(line)
+            r--
+        }
+        out.toList()
+    }
+
     private fun filterLocked(data: ByteArray) {
         val out = ByteArray(data.size + STASH_MAX + 2)
         var n = 0

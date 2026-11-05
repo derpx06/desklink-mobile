@@ -1009,6 +1009,7 @@ class TerminalActivity : AppCompatActivity() {
                         send
                     },
                     onText = type,
+                    onRaw = host::send,
                     onMic = if (canDictate) ::dictate else null,
                     onPaste = { paste(context, screen, snackbar) },
                     onKeyboard = {
@@ -1199,6 +1200,8 @@ class TerminalActivity : AppCompatActivity() {
         /** Starts a press of an arrow; the returned sender repeats it while held. */
         onArrow: (Int) -> (() -> Unit),
         onText: (String) -> Unit,
+        /** Bytes as they are: no armed Ctrl or Alt is applied to, or used up by, them. */
+        onRaw: (ByteArray) -> Unit,
         onMic: (() -> Unit)?,
         onPaste: () -> Unit,
         onKeyboard: () -> Unit,
@@ -1235,7 +1238,7 @@ class TerminalActivity : AppCompatActivity() {
                             Key("tab", stringResource(R.string.terminal_key_tab)) { onKey(KeyEvent.KEYCODE_TAB) }
                         }
                         // Shift+Tab: Claude Code cycles its mode with it, shells and menus go backwards.
-                        Key("⇧Tab", stringResource(R.string.terminal_key_shift_tab)) { onText("\u001b[Z", ) }
+                        Key("⇧Tab", stringResource(R.string.terminal_key_shift_tab)) { onRaw("\u001b[Z".toByteArray()) }
                         for (symbol in listOf("|", "~", "/", "-", "_", "\\", "`")) Key(symbol, null) { onText(symbol) }
                         Key("Home", stringResource(R.string.terminal_key_home)) { onKey(KeyEvent.KEYCODE_MOVE_HOME) }
                         Key("End", stringResource(R.string.terminal_key_end)) { onKey(KeyEvent.KEYCODE_MOVE_END) }

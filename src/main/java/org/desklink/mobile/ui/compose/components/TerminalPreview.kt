@@ -84,9 +84,7 @@ object SessionPreviews {
         val labels = (context.applicationContext ?: context).getSharedPreferences(LABEL_PREFS, Context.MODE_PRIVATE)
         return state.sessions.filter { !it.gone }.map { session ->
             val screen = client.screenIfOpen(session.id) as? TerminalScreen
-            val lines = screen?.let { s ->
-                s.tailText(s.rows).lines().map(String::trimEnd).dropLastWhile(String::isBlank).takeLast(lineCount)
-            }.orEmpty()
+            val lines = screen?.tailLines(lineCount).orEmpty()
             SessionPreview(
                 id = session.id,
                 name = labels.getString(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, session.id), null)

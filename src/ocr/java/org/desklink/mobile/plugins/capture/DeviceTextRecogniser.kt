@@ -11,9 +11,11 @@ object DeviceTextRecogniser : TextRecogniser {
     override val available = true
 
     override fun recognise(bitmap: Bitmap, onResult: (String) -> Unit, onError: () -> Unit) {
-        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            .process(InputImage.fromBitmap(bitmap, 0))
+        // One client per picture, so it is closed when the picture is done (it holds a native model).
+        val client = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        client.process(InputImage.fromBitmap(bitmap, 0))
             .addOnSuccessListener { result -> onResult(result.text) }
             .addOnFailureListener { onError() }
+            .addOnCompleteListener { client.close() }
     }
 }
