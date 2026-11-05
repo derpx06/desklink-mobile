@@ -75,6 +75,7 @@ import org.desklink.mobile.ui.compose.DeskIconButton
 import org.desklink.mobile.ui.compose.PrimaryButton
 import org.desklink.mobile.ui.compose.SecondaryButton
 import org.desklink.mobile.ui.compose.screen.transfers.FileFilter
+import org.desklink.mobile.ui.compose.screen.transfers.FilesView
 import org.desklink.mobile.ui.compose.screen.transfers.LiveTransfer
 import org.desklink.mobile.ui.compose.screen.transfers.RECENT_LIMIT
 import org.desklink.mobile.ui.compose.screen.transfers.TransferActions
@@ -129,11 +130,14 @@ fun FilesTab(
             }
         }
         Box(Modifier.weight(1f)) {
+            // Filtered and grouped when the files, the chip or "Show all" change, not on every tick of the screen.
+            val limit = if (showAll) Int.MAX_VALUE else RECENT_LIMIT
+            val view = androidx.compose.runtime.remember(records, filter, limit) { FilesView.of(records, FileFilter.entries[filter], limit) }
             bucket.Screen(deviceId, onBack = {}, embedded = true, onSendFiles = actions.onSendFiles, below = {
                 recentTransfers(
                     deskName, live, records, revision, actions,
                     filter = FileFilter.entries[filter], onFilter = { filter = it.ordinal; showAll = false },
-                    limit = if (showAll) Int.MAX_VALUE else RECENT_LIMIT, onShowAll = { showAll = true },
+                    view = view, limit = limit, onShowAll = { showAll = true },
                 )
             })
         }
@@ -208,14 +212,18 @@ fun NotesTab(
 ) {
     org.desklink.mobile.ui.compose.SecureWindow()
     val t = tokens
-    val editing = notes.editing.value
-    if (editing != null) {
-        // The editor has its own header; the tab bar waits.
-        notes.Editor(editing) { notes.editing.value = null }
-        return
-    }
+    // Declared before the editor takes over, so the search and the segment are still there when it closes.
     var segment by rememberSaveable { mutableIntStateOf(0) }
     var query by rememberSaveable { mutableStateOf("") }
+    val editing = notes.editing.value
+    if (editing != null) {
+        // The editor has its own header. A different note (or a new one) starts a fresh editor; the tab bar floats over it,
+        // so the keyboard leaves room only for what the bar does not already cover.
+        androidx.compose.runtime.key(editing) {
+            notes.Editor(editing, barInset = if (org.desklink.mobile.ui.compose.shell.isWide()) 0.dp else org.desklink.mobile.ui.compose.shell.TabBarHeight) { notes.editing.value = null }
+        }
+        return
+    }
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
         LargeTitle(stringResource(R.string.notes_title), Modifier.padding(top = 12.dp), subtitle = stringResource(R.string.notes_subtitle)) {
             ClipboardSwitch(clipboardOn, onClipboard)
@@ -311,8 +319,8 @@ fun TerminalsTab(
     val connected = state.link == TerminalLinkState.CONNECTED
     val locked = state.passwordNeeded != null
     // Sessions can also start at the desk, which is not announced: look again while this tab is on screen.
-    org.desklink.mobile.ui.compose.components.StartedEffect(client, connected, locked) {
-        while (client != null && connected && !locked) {
+    org.desklink.mobile.ui.compose.components.StartedEffect(client, connected, locked, state.notAllowed) {
+        while (client != null && connected && !locked && !state.notAllowed) {
             client.refresh()
             kotlinx.coroutines.delay(REFRESH_MS)
         }

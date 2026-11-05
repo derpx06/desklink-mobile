@@ -8,9 +8,10 @@ data class CheckLine(val line: Int, val label: String, val done: Boolean)
 object NotesModel {
     private val CHECK = Regex("""^\s*[-*] \[([ xX])] ?(.*)$""")
 
+    /** The ticked and unticked boxes with something written after them (an empty box has no words for TalkBack, so it is not listed). */
     fun checklist(body: String): List<CheckLine> =
         body.split('\n').mapIndexedNotNull { i, raw ->
-            CHECK.matchEntire(raw.removeSuffix("\r"))?.let { CheckLine(i, it.groupValues[2].trim(), it.groupValues[1] != " ") }
+            CHECK.matchEntire(raw.removeSuffix("\r"))?.let { CheckLine(i, it.groupValues[2].trim(), it.groupValues[1] != " ") }?.takeIf { it.label.isNotEmpty() }
         }
 
     /** [body] with the checkbox on [line] set to [done]; unchanged when that line is not a checkbox. */

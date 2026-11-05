@@ -45,4 +45,13 @@ class FilesModelTest {
         assertEquals(BucketBreakdown(150, 40, 7), b)
         assertEquals(197, b.total)
     }
+
+    @Test fun theViewCountsEveryMatchButShowsOnlyTheLimit() {
+        val now = 1_700_000_000_000L
+        val files = (1..5).map { rec("p$it.jpg", now - it) } + rec("a.zip", now)
+        val view = org.desklink.mobile.ui.compose.screen.transfers.FilesView.of(files, FileFilter.IMAGES, 3)
+        assertEquals(5, view.matching)
+        assertEquals(3, view.groups.sumOf { it.second.size })
+        assertEquals(1, org.desklink.mobile.ui.compose.screen.transfers.FilesView.of(files, FileFilter.ARCHIVES, 12).matching)
+    }
 }

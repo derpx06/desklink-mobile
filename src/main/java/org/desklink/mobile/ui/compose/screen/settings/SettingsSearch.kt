@@ -14,12 +14,13 @@ data class SettingsEntry(val page: SettingsPage, val title: String, val summary:
  * here fails there instead of being unfindable.
  */
 object SettingsIndex {
-    class Row(val page: SettingsPage, @StringRes val title: Int, @StringRes val summary: Int? = null)
+    /** [needsDesk]: the row exists only while a computer is paired (it is not on the page without one). */
+    class Row(val page: SettingsPage, @StringRes val title: Int, @StringRes val summary: Int? = null, val needsDesk: Boolean = false)
 
     val rows: List<Row> = listOf(
         Row(SettingsPage.CONNECTION, R.string.settings_phone_name),
         Row(SettingsPage.CONNECTION, R.string.settings_connect_on_startup, R.string.settings_connect_on_startup_summary),
-        Row(SettingsPage.CONNECTION, R.string.settings_keep_awake, R.string.settings_keep_awake_summary),
+        Row(SettingsPage.CONNECTION, R.string.settings_keep_awake, R.string.settings_keep_awake_summary, needsDesk = true),
         Row(SettingsPage.CONNECTION, R.string.home_pair_another),
         Row(SettingsPage.NOTIFICATIONS, R.string.settings_phone_notifications, R.string.settings_desk_notifications_summary),
         Row(SettingsPage.NOTIFICATIONS, R.string.sg_choose_apps, R.string.sg_choose_apps_summary),
@@ -60,7 +61,7 @@ object SettingsIndex {
         Row(SettingsPage.APPEARANCE, R.string.settings_theme),
         Row(SettingsPage.APPEARANCE, R.string.setting_dynamic_colors, R.string.settings_dynamic_colors_summary),
         Row(SettingsPage.ADVANCED, R.string.settings_phone_relay),
-        Row(SettingsPage.ADVANCED, R.string.settings_desk_relay, R.string.settings_reach_anywhere_summary),
+        Row(SettingsPage.ADVANCED, R.string.settings_desk_relay, R.string.settings_reach_anywhere_summary, needsDesk = true),
         Row(SettingsPage.ADVANCED, R.string.setting_advanced_network, R.string.setting_advanced_network_summary),
         Row(SettingsPage.ADVANCED, R.string.trusted_networks, R.string.trusted_networks_desc),
         Row(SettingsPage.ADVANCED, R.string.custom_device_list, R.string.custom_devices_settings_summary),
@@ -71,12 +72,14 @@ object SettingsIndex {
     )
 
     /** Rows and pages with their words in [deskName]'s terms (a string with no "%s" simply ignores the name). */
-    fun entries(context: Context, deskName: String, pages: List<SettingsPage>): List<SettingsEntry> {
+    fun rowsFor(page: SettingsPage, hasDesk: Boolean): List<Row> = rows.filter { it.page == page && (hasDesk || !it.needsDesk) }
+
+    fun entries(context: Context, deskName: String, pages: List<SettingsPage>, hasDesk: Boolean = true): List<SettingsEntry> {
         // A line that wants a number ("%d devices added manually") has no words to search yet: it is left out.
         fun text(id: Int) = runCatching { context.getString(id, deskName) }.getOrDefault("")
         return pages.flatMap { page ->
             listOf(SettingsEntry(page, text(page.title), text(page.summary))) +
-                rows.filter { it.page == page }.map { SettingsEntry(page, text(it.title), it.summary?.let(::text)?.takeIf(String::isNotEmpty)) }
+                rowsFor(page, hasDesk).map { SettingsEntry(page, text(it.title), it.summary?.let(::text)?.takeIf(String::isNotEmpty)) }
         }
     }
 }

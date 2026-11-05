@@ -41,7 +41,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -301,7 +304,7 @@ class NotesUi(
     // ---- editor ---------------------------------------------------------------------------------------------
 
     @Composable
-    fun Editor(start: String, onDone: () -> Unit) {
+    fun Editor(start: String, barInset: Dp = 0.dp, onDone: () -> Unit) {
         val t = tokens
         val context = LocalContext.current
         var id by rememberSaveable { mutableStateOf(start.takeIf { it != NEW }) }
@@ -367,7 +370,7 @@ class NotesUi(
             }
         }
 
-        Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().imePadding()) {
+        Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets(bottom = barInset)))) {
             val tooLong = !Shelf.syncable(body)
             BackHandler(tooLong) { Toast.makeText(context, R.string.notes_too_long, Toast.LENGTH_SHORT).show() }
             ScreenHeader({ if (tooLong) Toast.makeText(context, R.string.notes_too_long, Toast.LENGTH_SHORT).show() else { save(); onDone() } }) {

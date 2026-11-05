@@ -175,7 +175,7 @@ class NotesActivity : AppCompatActivity() {
             Lists()
         } else {
             BackHandler { editing.value = null }
-            Editor(id) { editing.value = null }
+            androidx.compose.runtime.key(id) { Editor(id) { editing.value = null } }
         }
     }
 

@@ -90,8 +90,7 @@ object SessionPreviews {
         return state.sessions.filter { !it.gone }.map { session ->
             val screen = client.screenIfOpen(session.id) as? TerminalScreen
             val lines = screen?.tailLines(lineCount).orEmpty()
-            val waiting = screen != null && session.exitStatus == null &&
-                org.desklink.mobile.plugins.terminal.classifyAttention(screen.tailLines(14).joinToString("\n")) == org.desklink.mobile.plugins.terminal.TerminalAttention.WAITING
+            val waiting = screen != null && isWaiting(session.attached, session.exitStatus, screen.tailLines(WAITING_LINES))
             SessionPreview(
                 id = session.id,
                 name = labels.getString(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, session.id), null)
@@ -105,6 +104,17 @@ object SessionPreviews {
             )
         }
     }
+
+    /** The last lines the notification tracker looks at: a prompt older than these has been answered or scrolled away. */
+    const val WAITING_LINES = 4
+
+    /**
+     * The card says "Waiting for your input" only for a session this phone is receiving right now (a frozen screen of one it
+     * left is history) that has not exited, and whose last [WAITING_LINES] lines ask something.
+     */
+    fun isWaiting(attached: Boolean, exitStatus: Long?, tail: List<String>): Boolean =
+        attached && exitStatus == null &&
+            org.desklink.mobile.plugins.terminal.classifyAttention(tail.takeLast(WAITING_LINES).joinToString("\n")) == org.desklink.mobile.plugins.terminal.TerminalAttention.WAITING
 
     fun badgeOf(title: String) = when (title) {
         TerminalProtocol.LAUNCHER_CLAUDE -> "CC"

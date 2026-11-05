@@ -30,6 +30,16 @@ enum class FileFilter(@StringRes val label: Int) {
     }
 }
 
+/** What the list shows for one filter and limit: how many files match, and the first [limit] of them by day. Built once per input, not per frame. */
+data class FilesView(val matching: Int, val groups: List<Pair<Long, List<TransferRecord>>>) {
+    companion object {
+        fun of(records: List<TransferRecord>, filter: FileFilter, limit: Int): FilesView {
+            val matching = records.filter(filter::matches)
+            return FilesView(matching.size, groupByDay(matching.take(limit)))
+        }
+    }
+}
+
 /** Files by day, newest first (the list arrives newest first and keeps its order inside a day). */
 fun groupByDay(records: List<TransferRecord>): List<Pair<Long, List<TransferRecord>>> =
     records.groupBy { dayStart(it.time) }.toList().sortedByDescending { it.first }

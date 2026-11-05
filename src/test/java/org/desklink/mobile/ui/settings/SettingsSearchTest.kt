@@ -2,6 +2,7 @@
 package org.desklink.mobile.ui.settings
 
 import org.desklink.mobile.ui.compose.screen.settings.SettingsEntry
+import org.desklink.mobile.ui.compose.screen.settings.SettingsIndex
 import org.desklink.mobile.ui.compose.screen.settings.SettingsPage
 import org.desklink.mobile.ui.compose.screen.settings.SettingsSearch
 import org.junit.Assert.assertEquals
@@ -77,5 +78,14 @@ class SettingsSearchTest {
         assertEquals(listOf(entries[1]), SettingsSearch.search(entries, "  speed "))
         assertTrue(SettingsSearch.search(entries, "clipboard speed").isEmpty())
         assertTrue(SettingsSearch.search(entries, "   ").isEmpty())
+    }
+
+    @Test fun rowsThatExistOnlyWithAComputerAreNotSearchableWithout() {
+        fun titles(hasDesk: Boolean) = groups.values.flatMap { SettingsPage.valueOf(it).let { page -> SettingsIndex.rowsFor(page, hasDesk) } }.map { it.title }
+        val keepAwake = org.desklink.mobile.R.string.settings_keep_awake
+        val deskRelay = org.desklink.mobile.R.string.settings_desk_relay
+        assertTrue(keepAwake in titles(true) && deskRelay in titles(true))
+        assertTrue(keepAwake !in titles(false) && deskRelay !in titles(false))
+        assertTrue("phone-only rows stay", org.desklink.mobile.R.string.settings_phone_name in titles(false))
     }
 }

@@ -143,6 +143,8 @@ fun androidx.compose.foundation.lazy.LazyListScope.recentTransfers(
     actions: TransferActions,
     filter: FileFilter = FileFilter.ALL,
     onFilter: (FileFilter) -> Unit = {},
+    /** [FilesView.of] for [records], [filter] and the limit: the caller keeps it between frames. */
+    view: FilesView = FilesView.of(records, filter, RECENT_LIMIT),
     limit: Int = RECENT_LIMIT,
     onShowAll: (() -> Unit)? = null,
 ) {
@@ -152,15 +154,13 @@ fun androidx.compose.foundation.lazy.LazyListScope.recentTransfers(
         return
     }
     item(key = "recent-chips") { FilterChips(filter, onFilter) }
-    val matching = records.filter(filter::matches)
-    if (matching.isEmpty()) {
+    if (view.matching == 0) {
         item(key = "recent-none") {
             Text(stringResource(R.string.files_filter_none), fontSize = 14.sp, color = tokens.textDim, modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp))
         }
         return
     }
-    val groups = groupByDay(matching.take(limit))
-    groups.forEach { (day, items) ->
+    view.groups.forEach { (day, items) ->
         item(key = "day$day") {
             val context = LocalContext.current
             SectionHeader(dayLabel(context, day), Modifier.padding(top = 8.dp))
@@ -169,9 +169,9 @@ fun androidx.compose.foundation.lazy.LazyListScope.recentTransfers(
             FileRow(record, deskName, revision, actions, first = i == 0, last = i == items.lastIndex)
         }
     }
-    if (matching.size > limit && onShowAll != null) {
+    if (view.matching > limit && onShowAll != null) {
         item(key = "recent-more") {
-            DeskTextButton(stringResource(R.string.files_show_all, matching.size), onShowAll)
+            DeskTextButton(stringResource(R.string.files_show_all, view.matching), onShowAll)
         }
     }
 }

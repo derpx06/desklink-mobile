@@ -46,4 +46,10 @@ class NotesModelTest {
         assertEquals(listOf("p3"), (blocks[2] as NotesModel.Block.Row).notes.map { it.id })
         assertEquals("one column at a large font", 4, NotesModel.blocks(notes, 1).size)
     }
+
+    @Test fun anEmptyBoxIsNotListed() {
+        val body = "- [ ] \n- [x] Real\n- [ ]\n- [ ] Also"
+        assertEquals(listOf(CheckLine(1, "Real", true), CheckLine(3 + 0, "Also", false)).map { it.label }, NotesModel.checklist(body).map { it.label })
+        assertEquals(3, NotesModel.checklist(body).last().line)
+    }
 }

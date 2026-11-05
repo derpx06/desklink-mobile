@@ -157,7 +157,7 @@ private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: 
     val pages = if (desk == null) SettingsPage.WITHOUT_COMPUTER else SettingsPage.entries
     val name = desk?.name ?: stringResource(R.string.settings_your_computer)
     var query by rememberSaveable { mutableStateOf("") }
-    val entries = remember(name, pages) { SettingsIndex.entries(context, name, pages) }
+    val entries = remember(name, pages, desk != null) { SettingsIndex.entries(context, name, pages, hasDesk = desk != null) }
     val results = remember(entries, query) { SettingsSearch.search(entries, query) }
     SettingsColumn(stringResource(R.string.settings), null) {
         if (desk != null) ComputerCard(desk, { onOpen(SettingsPage.CONNECTION.route) }, onSwitchComputer)
