@@ -91,7 +91,7 @@ private val KeyEdge = Color(0xFF38383D)
 
 /**
  * The desk screen's floating pills: back, name and latency top left; End (coral) top right; the
- * amber notice while the desk has not allowed control; and the mode, clicks, keyboard and Super
+ * amber notice while the desk has not allowed control; and the mode, clicks and keyboard
  * at the bottom, with [keys] above them while the keyboard is up.
  */
 @Composable
@@ -108,7 +108,6 @@ fun DeskControls(
     onLeft: () -> Unit,
     onRight: () -> Unit,
     onKeyboard: () -> Unit,
-    onSuper: () -> Unit,
     onMore: () -> Unit,
     /** Why control was refused (the desk's portal, a password), shown inside the amber notice. */
     reason: String? = null,
@@ -248,7 +247,6 @@ fun DeskControls(
                             Box(Modifier.padding(horizontal = 4.dp).size(1.dp, 22.dp).background(Color.White.copy(alpha = 0.14f)))
                             PillText(stringResource(R.string.remote_left_click), input, description = stringResource(R.string.remote_left_click_description), onClick = onLeft)
                             PillText(stringResource(R.string.remote_right_click), input, description = stringResource(R.string.remote_right_click_description), onClick = onRight)
-                            PillText("super", input, mono = true, description = stringResource(R.string.remote_key_super), onClick = onSuper)
                             ToolChip(R.drawable.sym_keyboard, stringResource(R.string.remote_key_keyboard), enabled = input, onClick = onKeyboard)
                             ToolChip(R.drawable.sym_aspect_ratio, stringResource(if (fill) R.string.remote_zoom_fit else R.string.remote_zoom_fill), selected = fill, onClick = onFill)
                             ToolChip(if (soundOn) R.drawable.sym_volume_up else R.drawable.sym_volume_mute, stringResource(if (soundOn) R.string.remote_sound_off else R.string.remote_sound_on), selected = soundOn, onClick = onSound)

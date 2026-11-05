@@ -39,7 +39,7 @@ class Wave5BehaviourTest {
                 DeskControls(
                     visible = true, deviceName = "arch-desk", rttMs = 12, live = true, controlEnabled = granted, mode = mode,
                     onMode = {}, onBack = { log += "back" }, onEnd = { log += "end" }, onLeft = { log += "left" }, onRight = { log += "right" },
-                    onKeyboard = { log += "keyboard" }, onSuper = { log += "super" }, onMore = {},
+                    onKeyboard = { log += "keyboard" }, onMore = {},
                     fill = false, onFill = { log += "fill" }, soundOn = false, onSound = { log += "sound" },
                 )
             }
@@ -48,13 +48,13 @@ class Wave5BehaviourTest {
 
     @Test fun controlsAreEnabledOnlyWhenGranted() {
         desk(granted = true)
-        for (label in listOf("Left click", "Right click", "Super key", "Keyboard")) compose.onNodeWithContentDescription(label).assertIsEnabled()
+        for (label in listOf("Left click", "Right click", "Keyboard")) compose.onNodeWithContentDescription(label).assertIsEnabled()
         compose.onNodeWithContentDescription("Edge to edge").assertIsEnabled()
     }
 
     @Test fun controlsAreDisabledUntilGranted() {
         desk(granted = false)
-        for (label in listOf("Left click", "Right click", "Super key", "Keyboard")) compose.onNodeWithContentDescription(label).assertIsNotEnabled()
+        for (label in listOf("Left click", "Right click", "Keyboard")) compose.onNodeWithContentDescription(label).assertIsNotEnabled()
         // Viewing options never need control.
         compose.onNodeWithContentDescription("Edge to edge").assertIsEnabled()
         compose.onNodeWithContentDescription("Close remote control").assertIsEnabled()
@@ -85,6 +85,11 @@ class Wave5BehaviourTest {
         val live = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)
         compose.onAllNodes(live).assertCountEquals(1)
         compose.onNode(live).assertTextEquals("Reconnecting")
+    }
+
+    @Test fun superIsOnlyOnTheKeyRow() {
+        desk(granted = true)
+        compose.onNodeWithContentDescription("Super key").assertDoesNotExist()
     }
 
     @Test fun dialogButtonsCallTheirActions() {

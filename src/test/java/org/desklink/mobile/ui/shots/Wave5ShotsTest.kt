@@ -158,7 +158,7 @@ abstract class Wave5Shots : ShotTest() {
         ) {
             DeskControls(
                 visible = visible, deviceName = desk, rttMs = 12, live = true, controlEnabled = granted, mode = mode,
-                onMode = {}, onBack = {}, onEnd = {}, onLeft = {}, onRight = {}, onKeyboard = {}, onSuper = {}, onMore = {},
+                onMode = {}, onBack = {}, onEnd = {}, onLeft = {}, onRight = {}, onKeyboard = {}, onMore = {},
                 reason = reason, onAllowControl = if (!granted) ({}) else null, display = "mirror",
                 fill = fill, soundOn = soundOn,
                 keys = { if (keys) androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {

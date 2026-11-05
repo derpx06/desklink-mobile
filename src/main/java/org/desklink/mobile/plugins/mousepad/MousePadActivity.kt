@@ -693,7 +693,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     /**
      * The desktop filling the screen, like a video in landscape, with the design's floating pills:
      * back, name and latency top left; End top right; the amber notice while control is not
-     * granted; and the mode, clicks, keyboard and Super at the bottom. They fade after a few
+     * granted; and the mode, clicks and keyboard at the bottom (Super is a key cap while the keyboard is up). They fade after a few
      * seconds; the handle in the corner (or a tap on the bars beside the picture) brings them back.
      */
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -763,12 +763,6 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 onLeft = { touch(); mousePadPlugin()?.sendLeftClick() },
                 onRight = { touch(); mousePadPlugin()?.sendRightClick() },
                 onKeyboard = { touch(); toggleKeyboard() },
-                onSuper = {
-                    touch()
-                    val np = NetworkPacket(MousePadPlugin.PACKET_TYPE_MOUSEPAD_REQUEST)
-                    np["specialKey"] = SPECIAL_SUPER
-                    mousePadPlugin()?.sendPacket(np)
-                },
                 fill = fillScreen,
                 onFill = { touch(); fillScreen = !fillScreen },
                 soundOn = soundOn,
