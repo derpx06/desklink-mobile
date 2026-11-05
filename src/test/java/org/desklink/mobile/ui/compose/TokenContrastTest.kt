@@ -64,8 +64,9 @@ class TokenContrastTest {
             Triple("done check item", t.onAccentContainer.copy(alpha = 0.75f), t.accentContainer),
             // StatusPill: its word in the status colour on that colour's 12 % tint, over the card.
             *listOf("mintText" to t.mintText, "accent" to t.accent, "amber" to t.amber, "textDim" to t.textDim).flatMap { (name, c) ->
+                val word = if (name == "amber") t.text else c // the pill writes amber's word in the text colour
                 // Over the card only: on the bare window mintText is 4.2:1 in light, so the pill is always placed on a card.
-                listOf(Triple("$name on its pill over surface", c, c.copy(alpha = 0.12f).compositeOver(t.surface)))
+                listOf(Triple("$name on its pill over surface", word, c.copy(alpha = 0.12f).compositeOver(t.surface)))
             }.toTypedArray(),
             // SegmentedControl, selected: dark draws onAccentContainer on the accent container.
             Triple("onAccentContainer on selected segment", t.onAccentContainer, t.accentContainer),

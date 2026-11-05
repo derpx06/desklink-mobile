@@ -171,7 +171,8 @@ fun StatusPill(connection: DeviceConnection, modifier: Modifier = Modifier, want
     ) {
         StatusDot(tint, size = 7.dp)
         Spacer(Modifier.width(6.dp))
-        Text(label, style = MaterialTheme.typography.labelMedium, color = tint)
+        // Amber is 4.3:1 as light-theme text on its tint: the word stays in the text colour, the dot says amber.
+        Text(label, style = MaterialTheme.typography.labelMedium, color = if (color == tokens.amber) tokens.text else tint)
     }
 }
 
