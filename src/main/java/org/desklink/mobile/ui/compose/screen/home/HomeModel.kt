@@ -96,7 +96,6 @@ object HomeModel {
             clipboard = device.getPlugin(ClipboardPlugin::class.java) != null,
             link = share,
             screen = device.getPlugin(ScreenControlPlugin::class.java) != null,
-            terminal = true,
             ring = menu(R.string.ring),
             ping = menu(R.string.send_ping),
             lock = menu(R.string.lock_remote_device),

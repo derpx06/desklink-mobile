@@ -131,7 +131,6 @@ data class HomeOffers(
     val clipboard: Boolean = true,
     val link: Boolean = true,
     val screen: Boolean = true,
-    val terminal: Boolean = true,
     val ring: Boolean = true,
     val ping: Boolean = true,
     val lock: Boolean = true,
@@ -232,7 +231,8 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
     val t = tokens
     var sheet by rememberSaveable { mutableStateOf(false) }
     var linkDialog by rememberSaveable { mutableStateOf(false) }
-    var palette by rememberSaveable { mutableStateOf(false) }
+    // Not saved: coming back to Home (rotation, the pager recreating the page) must not pop the keyboard.
+    var palette by remember { mutableStateOf(false) }
     val notReady = notReadyMessage(state)
     val gate = { action: () -> Unit -> if (HomeDerive.usable(state)) action() else actions.onUnavailable(notReady) }
     // The Home tab's long-press asks for the computers sheet.
@@ -332,16 +332,16 @@ private fun connectionLabel(connection: DeviceConnection, path: WebRtcConnection
 )
 
 @Composable
-fun connectionShort(connection: DeviceConnection): String = stringResource(
-    when (connection) {
-        DeviceConnection.LOCAL -> R.string.home_short_wifi
-        DeviceConnection.AWAY -> R.string.home_short_relay
-        DeviceConnection.CONNECTED -> R.string.connection_connected
-        DeviceConnection.CONNECTING -> R.string.connection_connecting
-        DeviceConnection.OFFLINE -> R.string.connection_offline
-        DeviceConnection.UNAVAILABLE -> R.string.connection_unavailable
-    },
-)
+fun connectionShort(connection: DeviceConnection): String = stringResource(connectionShortRes(connection))
+
+fun connectionShortRes(connection: DeviceConnection): Int = when (connection) {
+    DeviceConnection.LOCAL -> R.string.home_short_wifi
+    DeviceConnection.AWAY -> R.string.home_short_relay
+    DeviceConnection.CONNECTED -> R.string.connection_connected
+    DeviceConnection.CONNECTING -> R.string.connection_connecting
+    DeviceConnection.OFFLINE -> R.string.connection_offline
+    DeviceConnection.UNAVAILABLE -> R.string.connection_unavailable
+}
 
 // ---- greeting -----------------------------------------------------------------------------------------
 
@@ -393,9 +393,10 @@ private fun StatusChip(text: String, dot: androidx.compose.ui.graphics.Color, in
 
 /** The computer's name with the switcher chevron: one tap target for the whole block, one sentence for TalkBack. */
 @Composable
-private fun NameBlock(state: HomeState, onSwitch: () -> Unit, modifier: Modifier = Modifier, header: @Composable () -> Unit, footer: @Composable () -> Unit) {
+private fun NameBlock(state: HomeState, onSwitch: () -> Unit, spoken: List<String?>, modifier: Modifier = Modifier, header: @Composable () -> Unit, footer: @Composable () -> Unit) {
     val t = tokens
-    val switchDescription = stringResource(R.string.home_switch_computer, state.name, connectionShort(state.connection))
+    // What the card shows is what TalkBack says: the switch sentence, then the status words, the round trip and the update note.
+    val switchDescription = (listOf(stringResource(R.string.home_switch_computer, state.name, connectionShort(state.connection))) + spoken.filterNotNull()).joinToString(". ")
     val big = LocalDensity.current.fontScale > 1.4f
     Column(
         modifier
@@ -449,7 +450,7 @@ private fun Hero(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActi
     HeroCard(Modifier.animateContentSize()) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
             NameBlock(
-                state, onSwitch, Modifier.weight(1f),
+                state, onSwitch, listOf(status, meta, detail), Modifier.weight(1f),
                 header = {
                     val ink = if (connecting) t.accentText else t.mintText
                     StatusChip(status, if (connecting) t.accent else t.mint, ink, t.surface)
@@ -511,7 +512,7 @@ private fun OfflineHero(state: HomeState, actions: HomeActions, onSwitch: () -> 
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
             NameBlock(
-                state, onSwitch, Modifier.weight(1f),
+                state, onSwitch, listOf(word, body), Modifier.weight(1f),
                 header = { StatusChip(word, t.textFaint, t.textDim, t.fill) },
                 footer = { Text(body, fontSize = 13.sp, lineHeight = 19.sp, color = t.textDim, modifier = Modifier.padding(top = 4.dp)) },
             )
