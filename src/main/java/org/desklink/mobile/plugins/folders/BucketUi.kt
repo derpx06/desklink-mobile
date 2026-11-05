@@ -322,7 +322,7 @@ class BucketUi(
                 onRemove = { confirmRemove = true },
             ) else if (embedded) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) { headerActions() }
-            } else ScreenHeader(onBack, actions = headerActions)
+            } else ScreenHeader(onBack, title = path.substringAfterLast('/').takeIf { on && it.isNotEmpty() }, actions = headerActions)
             // Only inside a folder: at the top it would be an empty 48 dp band under the header.
             if (on && !selecting && path.isNotEmpty()) Breadcrumb(path) { path = it }
             if (!embedded && (!on || path.isEmpty())) LargeTitle(stringResource(R.string.bucket_title), subtitle = if (on && view!!.summary == null) status(view, desk) else if (!on) stringResource(R.string.bucket_subtitle, desk) else null)

@@ -173,7 +173,7 @@ import org.desklink.mobile.ui.compose.components.EmptyTerminalTile
 import org.desklink.mobile.ui.compose.components.Hairline
 import org.desklink.mobile.ui.compose.components.LabelChip
 import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
+import org.desklink.mobile.ui.compose.PrimaryButton
 import org.desklink.mobile.ui.compose.components.PresenceDot
 import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.components.SessionPreview
@@ -591,26 +591,8 @@ class TerminalActivity : AppCompatActivity() {
                     Text(stringResource(R.string.terminal_new_runs_on, deskName()), fontSize = 14.sp, color = t.textDim)
                 }
                 Text(stringResource(R.string.terminal_new_start), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.textDim)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
-                    options.forEachIndexed { index, (label, _) ->
-                        val selected = index == choice
-                        Box(
-                            Modifier
-                                .heightIn(min = 48.dp)
-                                .selectable(selected = selected, role = Role.RadioButton) { choice = index },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                label,
-                                fontSize = 14.sp,
-                                color = if (selected) t.onAccentContainer else t.text,
-                                modifier = Modifier
-                                    .background(if (selected) t.accentContainer else Color.Transparent, RoundedCornerShape(18.dp))
-                                    .border(1.dp, if (selected) Color.Transparent else t.hairlineStrong, RoundedCornerShape(18.dp))
-                                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                            )
-                        }
-                    }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
+                    options.forEachIndexed { index, (label, _) -> org.desklink.mobile.ui.compose.components.DeskFilterChip(label, index == choice, { choice = index }) }
                 }
                 if (folders.isNotEmpty()) {
                     Text(stringResource(R.string.terminal_new_start_in), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.textDim)
@@ -640,7 +622,7 @@ class TerminalActivity : AppCompatActivity() {
                         }
                     }
                 }
-                PillButton(
+                PrimaryButton(
                     stringResource(R.string.terminal_new_start_button),
                     { onStart(options.getOrNull(choice)?.second, folders.getOrNull(folder)) },
                     Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -770,7 +752,7 @@ class TerminalActivity : AppCompatActivity() {
     private fun StatePanel(title: String, message: String, action: String, onAction: () -> Unit) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             EmptyState(icon = R.drawable.sym_lock, title = title, body = message) {
-                Button(onClick = onAction) { Text(action) }
+                PrimaryButton(action, onAction, height = 48.dp)
             }
         }
     }
@@ -904,24 +886,26 @@ class TerminalActivity : AppCompatActivity() {
 
         Box(Modifier.fillMaxSize().background(TermBg).safeDrawingPadding()) {
             Column(Modifier.fillMaxSize()) {
-                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                // The design's header: back, the ">_" badge, the name over "folder · computer", the size in mono, the menu.
+                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 4.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     IconButton(onClick = { leaveTerminal(client, id) }, modifier = Modifier.size(48.dp)) {
                         Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.terminal_back_to_sessions), tint = TermText)
                     }
-                    Column(Modifier.weight(1f).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(name, fontFamily = MonoFamily, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(deskName(), fontSize = 12.sp, color = TermIcon, maxLines = 1)
-                            val meta = subtitle ?: rttMs?.let { stringResource(R.string.home_meta_rtt, it.toInt()) }
-                            meta?.let {
-                                Text(" · ", fontSize = 12.sp, color = TermIcon)
-                                Text(it, fontFamily = if (subtitle == null) MonoFamily else null, fontSize = 12.sp, color = TermIcon, maxLines = 1)
-                            }
-                        }
+                    Text(">_", fontFamily = MonoFamily, fontSize = 11.sp, color = TermAccent, modifier = Modifier.background(TermBadge, RoundedCornerShape(7.dp)).padding(horizontal = 7.dp, vertical = 3.dp))
+                    Column(Modifier.weight(1f).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val meta = subtitle ?: rttMs?.let { stringResource(R.string.home_meta_rtt, it.toInt()) }
+                        Text(
+                            listOfNotNull(session?.cwd?.takeIf { it.isNotBlank() }, deskName(), meta).joinToString(" · "),
+                            fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 2, overflow = TextOverflow.MiddleEllipsis,
+                        )
+                    }
+                    if (session != null && session.cols > 0 && session.rows > 0) {
+                        Text(stringResource(R.string.terminal_session_size, session.cols, session.rows), fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1)
                     }
                     Box {
                         IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
-                            Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.terminal_session_options, name), tint = TermText)
+                            Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.terminal_session_options, name), tint = TermIcon)
                         }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             // Shown when the session is not receiving output and nothing is about to change that.
@@ -947,6 +931,7 @@ class TerminalActivity : AppCompatActivity() {
                         }
                     }
                 }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(TermEdge))
                 SessionChips(state, id, onPick = { other -> leaveTerminal(client, id); openId = other }, onNew = { newSheet = true })
                 if (state.notAllowed) {
                     Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
@@ -1129,7 +1114,8 @@ class TerminalActivity : AppCompatActivity() {
                 .fillMaxWidth()
                 .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
                 .heightIn(min = 48.dp)
-                .background(TermField, RoundedCornerShape(24.dp))
+                .background(TermBg, RoundedCornerShape(24.dp))
+                .border(1.dp, TermEdge, RoundedCornerShape(24.dp))
                 .padding(start = 14.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1292,7 +1278,7 @@ class TerminalActivity : AppCompatActivity() {
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.padding(horizontal = 2.dp).fillMaxWidth().height(40.dp).background(TermKey, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+            Box(Modifier.padding(horizontal = 2.dp).fillMaxWidth().height(40.dp).background(TermKey, RoundedCornerShape(8.dp)).border(1.dp, TermEdge, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                 Icon(painterResource(icon), contentDescription = null, tint = TermText, modifier = Modifier.size(18.dp))
             }
         }
@@ -1339,6 +1325,7 @@ class TerminalActivity : AppCompatActivity() {
                 (if (modifier == Modifier) Modifier.widthIn(min = 44.dp) else Modifier.padding(horizontal = 2.dp).fillMaxWidth())
                     .height(40.dp)
                     .background(if (latched) TermAccent else TermKey, RoundedCornerShape(8.dp))
+                    .border(1.dp, if (latched) TermAccent else TermEdge, RoundedCornerShape(8.dp))
                     .padding(horizontal = if (modifier == Modifier) 10.dp else 0.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1366,7 +1353,8 @@ class TerminalActivity : AppCompatActivity() {
                 .semantics { contentDescription = description; if (latched) selected = true },
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.size(44.dp, 40.dp).background(if (latched) TermAccent else TermKey, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(44.dp, 40.dp).background(if (latched) TermAccent else TermKey, RoundedCornerShape(8.dp))
+                    .border(1.dp, if (latched) TermAccent else TermEdge, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                 Icon(painterResource(icon), contentDescription = null, tint = if (latched) TermOnAccent else TermText, modifier = Modifier.size(18.dp))
             }
         }
@@ -1425,8 +1413,12 @@ internal object TerminalPalette {
 
 // The terminal screen and cards are dark in both themes (the design's terminal black).
 private val TermBg = Color(0xFF0E0F11)
-private val TermBar = Color(0xFF16171A)
-private val TermKey = Color(0xFF2A2B31)
+private val TermBar = Color(0xFF1A1A1D)
+private val TermKey = Color(0xFF1E1E21)
+
+/** The design's hairline on the terminal black, and the `>_` badge. */
+private val TermEdge = Color(0xFF38383D)
+private val TermBadge = Color(0xFF262D52)
 private val TermField = Color(0xFF1B1C1F)
 private val TermChip = Color(0x14FFFFFF)
 private val TermChipOn = Color(0xFFF2F2F3)

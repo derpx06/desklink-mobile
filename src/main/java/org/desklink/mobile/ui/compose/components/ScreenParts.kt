@@ -68,14 +68,21 @@ fun DarkSystemBars() {
     }
 }
 
-/** A pushed screen's top row: Back (48dp) and optional actions on the right. */
+/**
+ * A pushed screen's top row: Back (48 dp), then the [title] (22/600, wraps at a large font, a heading for TalkBack)
+ * or space, and optional actions on the right. With no title the screen draws its own [LargeTitle] below.
+ */
 @Composable
-fun ScreenHeader(onBack: () -> Unit, modifier: Modifier = Modifier, tint: Color = tokens.text, actions: @Composable RowScope.() -> Unit = {}) {
-    Row(modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+fun ScreenHeader(onBack: () -> Unit, modifier: Modifier = Modifier, tint: Color = tokens.text, title: String? = null, actions: @Composable RowScope.() -> Unit = {}) {
+    Row(modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
             Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.navigate_up), tint = tint)
         }
-        Spacer(Modifier.weight(1f))
+        if (title != null) {
+            Text(title, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, color = tint, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 6.dp).semantics { heading() })
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
         actions()
     }
 }

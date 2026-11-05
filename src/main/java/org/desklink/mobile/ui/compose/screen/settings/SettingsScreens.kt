@@ -198,9 +198,11 @@ internal fun SettingsColumn(title: String, onBack: (() -> Unit)?, subtitle: Stri
     val t = tokens
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
         // A tab's first page has no back arrow: the bar below is how you leave it.
-        if (onBack != null) ScreenHeader(onBack) else Spacer(Modifier.height(8.dp))
+        // A pushed page: back arrow and title on one row (the design's sub-page bar).
+        if (onBack != null) ScreenHeader(onBack, title = title) else Spacer(Modifier.height(8.dp))
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            LargeTitle(title, subtitle = subtitle)
+            if (onBack == null) LargeTitle(title, subtitle = subtitle)
+            else if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = t.textDim, modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp))
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 content()
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars).padding(bottom = 10.dp))

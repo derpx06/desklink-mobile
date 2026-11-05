@@ -604,7 +604,10 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         )
     }
 
-    /** Keys a phone keyboard lacks; over the picture while the keyboard is up. */
+    /**
+     * Keys a phone keyboard lacks; over the picture while the keyboard is up. The design's key row: rounded caps
+     * (40 dp to see, 48 dp to touch), mono labels, Ctrl and Alt latch.
+     */
     @Composable
     private fun KeyBar(controlEnabled: Boolean, modifier: Modifier = Modifier, onUsed: () -> Unit = {}) {
         val pad = { mousePadPlugin() }
@@ -615,20 +618,20 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             stickyModifiers.applyTo(np)
             pad()?.sendPacket(np)
         }
-        Pill(modifier) {
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PillText("ctrl", controlEnabled, selected = stickyModifiers.ctrl, mono = true) { onUsed(); stickyModifiers.ctrl = !stickyModifiers.ctrl }
-                PillText("alt", controlEnabled, selected = stickyModifiers.alt, mono = true) { onUsed(); stickyModifiers.alt = !stickyModifiers.alt }
-                PillText("esc", controlEnabled, mono = true) { special(SPECIAL_ESCAPE) }
-                PillText("tab", controlEnabled, mono = true) { special(SPECIAL_TAB) }
-                PillIcon(R.drawable.sym_arrow_back, stringResource(R.string.terminal_key_left), controlEnabled) { special(SPECIAL_LEFT) }
-                PillIcon(R.drawable.sym_arrow_upward, stringResource(R.string.terminal_key_up), controlEnabled) { special(SPECIAL_UP) }
-                PillIcon(R.drawable.sym_arrow_downward, stringResource(R.string.terminal_key_down), controlEnabled) { special(SPECIAL_DOWN) }
-                PillIcon(R.drawable.sym_arrow_forward, stringResource(R.string.terminal_key_right), controlEnabled) { special(SPECIAL_RIGHT) }
-            }
+        Row(
+            modifier = modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            KeyCap("esc", null, controlEnabled) { special(SPECIAL_ESCAPE) }
+            KeyCap("tab", null, controlEnabled) { special(SPECIAL_TAB) }
+            KeyCap("ctrl", null, controlEnabled, selected = stickyModifiers.ctrl) { onUsed(); stickyModifiers.ctrl = !stickyModifiers.ctrl }
+            KeyCap("alt", null, controlEnabled, selected = stickyModifiers.alt) { onUsed(); stickyModifiers.alt = !stickyModifiers.alt }
+            KeyCap("super", stringResource(R.string.remote_key_super), controlEnabled) { special(SPECIAL_SUPER) }
+            KeyCap(null, stringResource(R.string.terminal_key_left), controlEnabled, R.drawable.sym_arrow_back) { special(SPECIAL_LEFT) }
+            KeyCap(null, stringResource(R.string.terminal_key_up), controlEnabled, R.drawable.sym_arrow_upward) { special(SPECIAL_UP) }
+            KeyCap(null, stringResource(R.string.terminal_key_down), controlEnabled, R.drawable.sym_arrow_downward) { special(SPECIAL_DOWN) }
+            KeyCap(null, stringResource(R.string.terminal_key_right), controlEnabled, R.drawable.sym_arrow_forward) { special(SPECIAL_RIGHT) }
         }
     }
 
@@ -662,13 +665,16 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         var lastUse by remember { mutableStateOf(0L) }
         var more by remember { mutableStateOf(false) }
         val touch = { lastUse = SystemClock.uptimeMillis() }
+        // Never hidden while a screen reader is on: a control that vanishes cannot be found by touch exploring.
+        val screenReader = remember { getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isTouchExplorationEnabled == true }
         LaunchedEffect(controlsVisible, lastUse, autoHideControls, more) {
-            if (controlsVisible && autoHideControls && !more) {
+            if (controlsVisible && autoHideControls && !more && !screenReader) {
                 kotlinx.coroutines.delay(CONTROLS_HIDE_MS)
                 controlsVisible = false
             }
         }
         val deviceName = remember { deviceName() }
+        var soundOn by remember { mutableStateOf(org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this@MousePadActivity, deviceId.orEmpty())) }
         val input = controlInputEnabled(controlEnabled, controlMode)
         val keyboardUp = WindowInsets.isImeVisible
         // The strip is dismissed by the person or after a while, once per distinct state (a new refusal is a new
@@ -725,6 +731,17 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                     np["specialKey"] = SPECIAL_SUPER
                     mousePadPlugin()?.sendPacket(np)
                 },
+                fill = fillScreen,
+                onFill = { touch(); fillScreen = !fillScreen },
+                soundOn = soundOn,
+                onSound = {
+                    touch()
+                    // F1: the desk's sound here, the same switch as Settings → "Play <desk>'s sound here".
+                    val want = !soundOn
+                    soundOn = want
+                    org.desklink.mobile.plugins.audio.PhoneAudio.setPlayDeskSound(this@MousePadActivity, deviceId.orEmpty(), want)
+                    DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.let { if (want) it.requestDeskSound() else it.stopDeskSound() }
+                },
                 keys = { if (keyboardUp) KeyBar(input, onUsed = touch) },
                 onMore = { touch(); more = true },
                 reason = denial,
@@ -748,10 +765,6 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 },
                 moreMenu = {
                     androidx.compose.material3.DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(stringResource(if (fillScreen) R.string.remote_zoom_fit else R.string.remote_zoom_fill)) },
-                            onClick = { more = false; fillScreen = !fillScreen },
-                        )
                         if (zoomTransform.scale > 1f) {
                             androidx.compose.material3.DropdownMenuItem(
                                 text = { Text(stringResource(R.string.remote_zoom_reset)) },
@@ -764,16 +777,6 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                                 onClick = { more = false; DeskLinkApplication.getInstance().switchRemoteScreen(deviceId) },
                             )
                         }
-                        // F1: the desk's sound here, the same switch as Settings → "Play <desk>'s sound here".
-                        val sound = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this@MousePadActivity, deviceId.orEmpty())
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(stringResource(if (sound) R.string.remote_sound_off else R.string.remote_sound_on)) },
-                            onClick = {
-                                more = false
-                                org.desklink.mobile.plugins.audio.PhoneAudio.setPlayDeskSound(this@MousePadActivity, deviceId.orEmpty(), !sound)
-                                DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.let { if (sound) it.stopDeskSound() else it.requestDeskSound() }
-                            },
-                        )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(stringResource(if (screenControlPlugin()?.remoteControlRefused == true) R.string.remote_allow_control_action else R.string.remote_screen_retry)) },
                             // Both start the view again, which brings the computer's permission prompt back.
