@@ -217,8 +217,14 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     override fun onStop() {
         super.onStop()
         val interactive = getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
-        val live = screenControlPlugin()?.remoteLive == true
-        when (backgroundAction(interactive, isFinishing, isChangingConfigurations, live)) {
+        val plugin = screenControlPlugin()
+        val live = plugin?.remoteLive == true
+        // Asked and not answered yet (a prompt waiting at the computer): left running, a link bounce would ask
+        // again and put the computer's dialog up for a viewer nobody is looking at; coming back asks again.
+        val stage = ScreenControlPlugin.latestStatus
+        val pending = !live && plugin?.viewRequestedAt != null &&
+            (stage == getString(R.string.remote_screen_requesting) || stage == getString(R.string.remote_screen_waiting_frame))
+        when (backgroundAction(interactive, isFinishing, isChangingConfigurations, live, pending)) {
             BackgroundAction.END_NOW -> {
                 stoppedForScreenOff = true
                 sendStopScreen()
@@ -990,8 +996,15 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         /** A view of the desk left running behind another app ends after this long. */
         const val BACKGROUND_GRACE_MS = 60_000L
 
-        fun backgroundAction(interactive: Boolean, finishing: Boolean, changingConfiguration: Boolean, live: Boolean): BackgroundAction = when {
-            !live || finishing || changingConfiguration -> BackgroundAction.NONE
+        fun backgroundAction(
+            interactive: Boolean,
+            finishing: Boolean,
+            changingConfiguration: Boolean,
+            live: Boolean,
+            pending: Boolean = false,
+        ): BackgroundAction = when {
+            finishing || changingConfiguration -> BackgroundAction.NONE
+            !live -> if (pending) BackgroundAction.END_NOW else BackgroundAction.NONE
             !interactive -> BackgroundAction.END_NOW
             else -> BackgroundAction.END_AFTER_GRACE
         }
