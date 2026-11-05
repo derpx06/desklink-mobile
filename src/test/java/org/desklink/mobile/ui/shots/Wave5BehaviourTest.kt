@@ -6,6 +6,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -70,7 +73,7 @@ class Wave5BehaviourTest {
         val log = mutableListOf<String>()
         desk(granted = true, log = log)
         compose.onNodeWithContentDescription("Edge to edge").performClick()
-        compose.onNodeWithContentDescription("Play its sound here").performClick()
+        compose.onNodeWithContentDescription("Desk sound").performClick()
         compose.onNodeWithContentDescription("Close remote control").performClick()
         compose.onNodeWithText("End").performClick()
         assertEquals(listOf("fill", "sound", "back", "end"), log)
@@ -85,6 +88,12 @@ class Wave5BehaviourTest {
         val live = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)
         compose.onAllNodes(live).assertCountEquals(1)
         compose.onNode(live).assertTextEquals("Reconnecting")
+    }
+
+    @Test fun fitAndSoundAreSwitchesWithFixedNames() {
+        desk(granted = true)
+        compose.onNodeWithContentDescription("Edge to edge").assertIsOff().assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
+        compose.onNodeWithContentDescription("Desk sound").assertIsOff().assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
     }
 
     @Test fun superIsOnlyOnTheKeyRow() {

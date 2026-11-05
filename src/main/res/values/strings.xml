@@ -292,6 +292,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
   <string name="remote_close">Close remote control</string>
   <string name="remote_mode_touch">Touch</string>
   <string name="remote_zoom_fill">Edge to edge</string>
+  <string name="remote_desk_sound">Desk sound</string>
   <string name="remote_fullscreen">Full screen</string>
   <string name="remote_show_controls">Show controls</string>
   <string name="screen_share_prompt_title">%1$s wants to see your screen</string>

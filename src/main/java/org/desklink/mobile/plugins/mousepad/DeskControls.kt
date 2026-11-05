@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -248,8 +249,9 @@ fun DeskControls(
                             PillText(stringResource(R.string.remote_left_click), input, description = stringResource(R.string.remote_left_click_description), onClick = onLeft)
                             PillText(stringResource(R.string.remote_right_click), input, description = stringResource(R.string.remote_right_click_description), onClick = onRight)
                             ToolChip(R.drawable.sym_keyboard, stringResource(R.string.remote_key_keyboard), enabled = input, onClick = onKeyboard)
-                            ToolChip(R.drawable.sym_aspect_ratio, stringResource(if (fill) R.string.remote_zoom_fit else R.string.remote_zoom_fill), selected = fill, onClick = onFill)
-                            ToolChip(if (soundOn) R.drawable.sym_volume_up else R.drawable.sym_volume_mute, stringResource(if (soundOn) R.string.remote_sound_off else R.string.remote_sound_on), selected = soundOn, onClick = onSound)
+                            // Switches with fixed names: a screen reader says "Desk sound, on", not a label that flips with the state.
+                            ToolChip(R.drawable.sym_aspect_ratio, stringResource(R.string.remote_zoom_fill), selected = fill, toggle = true, onClick = onFill)
+                            ToolChip(if (soundOn) R.drawable.sym_volume_up else R.drawable.sym_volume_mute, stringResource(R.string.remote_desk_sound), selected = soundOn, toggle = true, onClick = onSound)
                             Box {
                                 PillIcon(R.drawable.sym_more_vert, stringResource(R.string.extra_options), onClick = onMore)
                                 moreMenu()
@@ -341,14 +343,14 @@ internal fun KeyCap(label: String?, description: String?, enabled: Boolean, @Dra
     }
 }
 
-/** An icon chip (a 36 dp round, 48 dp to touch): selected is the light fill, like the mode switch. */
+/** An icon chip (a 36 dp round, 48 dp to touch): selected is the light fill, like the mode switch. A [toggle] is a switch with a fixed [description]. */
 @Composable
-internal fun ToolChip(@DrawableRes icon: Int, description: String, enabled: Boolean = true, selected: Boolean = false, onClick: () -> Unit) {
+internal fun ToolChip(@DrawableRes icon: Int, description: String, enabled: Boolean = true, selected: Boolean = false, toggle: Boolean = false, onClick: () -> Unit) {
+    val base = Modifier.size(48.dp)
     Box(
-        Modifier
-            .size(48.dp)
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = description, onClick = onClick)
-            .semantics { this.selected = selected; contentDescription = description },
+        (if (toggle) base.toggleable(value = selected, enabled = enabled, role = Role.Switch) { onClick() }
+        else base.clickable(enabled = enabled, role = Role.Button, onClick = onClick).semantics { this.selected = selected })
+            .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.size(36.dp).background(if (selected) PillSelected else ChipBg, CircleShape), contentAlignment = Alignment.Center) {
