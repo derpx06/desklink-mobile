@@ -85,6 +85,7 @@ import org.desklink.mobile.R
 import org.desklink.mobile.plugins.screen.ScreenControlPlugin
 import org.desklink.mobile.plugins.screen.ScreenCoordinateMapper
 import org.desklink.mobile.plugins.screen.ScreenPoint
+import org.desklink.mobile.plugins.screen.ViewWait
 import org.desklink.mobile.ui.compose.DeskLinkDarkTheme
 import androidx.compose.material3.SegmentedButton
 import org.desklink.mobile.ui.compose.components.TabularNumbers
@@ -527,13 +528,30 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
      */
     @Composable
     private fun StatusOverlay(live: Boolean, modifier: Modifier) {
-        val stage = ScreenControlPlugin.latestStatus
-        val waiting = stage.isBlank() || stage in setOf(
+        val plugin = screenControlPlugin()
+        val requesting = ScreenControlPlugin.latestStatus == getString(R.string.remote_screen_requesting)
+        // No answer to the request: the computer may be waiting for someone to allow it there.
+        val requestedAt = plugin?.viewRequestedAt
+        var now by remember { mutableStateOf(ViewWait.clockMs()) }
+        LaunchedEffect(requesting, requestedAt) {
+            while (requesting && requestedAt != null) {
+                now = ViewWait.clockMs()
+                kotlinx.coroutines.delay(500)
+            }
+        }
+        val wait = if (requesting && requestedAt != null) ViewWait.of(requestedAt, now) else ViewWait.ASKING
+        val stage = when (wait) {
+            ViewWait.LOOK_AT_DESK -> getString(R.string.remote_screen_look_at_desk, deviceName())
+            ViewWait.NOTHING_HAPPENED -> getString(R.string.remote_screen_nothing_happened)
+            ViewWait.ASKING -> ScreenControlPlugin.latestStatus
+        }
+        val waiting = wait != ViewWait.NOTHING_HAPPENED && (stage.isBlank() || stage in setOf(
             getString(R.string.remote_screen_requesting),
+            getString(R.string.remote_screen_look_at_desk, deviceName()),
             getString(R.string.remote_screen_waiting_frame),
             getString(R.string.remote_control_requesting),
             getString(R.string.remote_screen_connected),
-        )
+        ))
         if (live) {
             if (stage.isBlank()) return
             Pill(modifier.padding(top = 80.dp, start = 24.dp, end = 24.dp).widthIn(max = 520.dp)) {
@@ -575,8 +593,13 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             }
             if (!waiting) {
                 Spacer(Modifier.height(16.dp))
-                androidx.compose.material3.FilledTonalButton(onClick = { requestDesktopScreen() }) {
-                    Text(stringResource(R.string.device_try_again))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    androidx.compose.material3.FilledTonalButton(onClick = { requestDesktopScreen() }) {
+                        Text(stringResource(R.string.device_try_again))
+                    }
+                    androidx.compose.material3.TextButton(onClick = { finish() }) {
+                        Text(stringResource(R.string.remote_screen_close))
+                    }
                 }
             }
         }

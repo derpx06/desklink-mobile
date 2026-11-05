@@ -114,6 +114,14 @@ class ScreenControlPluginRemoteViewTest {
     }
 
     @Test
+    fun `a refusal from the computer shows its own reason and ends the view`() {
+        plugin.onRemoteScreenRequesting()
+        plugin.onRemoteViewFailed("Screen sharing was declined on this computer")
+        assertEquals("Screen sharing was declined on this computer", ScreenControlPlugin.latestStatus)
+        assertFalse(plugin.remoteLive)
+    }
+
+    @Test
     fun `a view timeout ends the view`() {
         plugin.onRemoteScreenRequesting()
         plugin.onRemoteRequestTimedOut(control = false)

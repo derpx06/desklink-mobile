@@ -735,12 +735,11 @@ class WebRtcSessionCoordinator(
         } else {
             // These are `require` failures ("session is not active", "transport
             // is not ready"); the user needs to know to wait and retry.
+            val notReady = error is IllegalArgumentException || error is IllegalStateException
+            // The viewer stays open and asks again by itself when the link is back (a stop clears this).
+            if (notReady) resumeScreen.set(true)
             plugin.onRemoteViewFailed(
-                if (error is IllegalArgumentException || error is IllegalStateException) {
-                    context.getString(R.string.remote_screen_not_ready)
-                } else {
-                    error.message
-                },
+                if (notReady) context.getString(R.string.remote_screen_not_ready) else error.message,
             )
         }
     }
@@ -774,6 +773,8 @@ class WebRtcSessionCoordinator(
     fun stopRemoteSession() {
         resumeScreen.set(false)
         remoteActionExecutor.execute {
+            // A request that failed for want of a link, queued ahead of this stop, may have set it again.
+            resumeScreen.set(false)
             synchronized(lock) {
                 val binding = activeBinding ?: run {
                     releaseHeldInput(); remoteSession.stop()
@@ -2747,6 +2748,8 @@ class WebRtcSessionCoordinator(
         private const val AUDIO_SAMPLE_RATE = 48_000
         private const val AUDIO_CHANNELS = 1
         private val RESUMABLE_REMOTE_STATES = setOf(
+            // Asked and not answered when the link went: the request went with it.
+            WebRtcRemoteSessionState.REQUESTING_VIEW,
             WebRtcRemoteSessionState.VIEWING,
             WebRtcRemoteSessionState.REQUESTING_CONTROL,
             WebRtcRemoteSessionState.CONTROLLING,
