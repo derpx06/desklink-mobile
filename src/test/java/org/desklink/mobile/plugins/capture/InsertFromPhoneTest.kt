@@ -26,6 +26,24 @@ class InsertFromPhoneTest {
     }
 
     @Test
+    fun textIsOfferedOnlyInABuildWithARecogniser() {
+        // The default build (-Pdesklink.ocr=false) has the stub: a desk's "text" is answered `unsupported` (null here),
+        // never a crash; with -Pdesklink.ocr=true it is a normal request. The other kinds never depend on it.
+        assertEquals(DeviceTextRecogniser.available, "text" in CaptureRequest.KINDS)
+        assertEquals(DeviceTextRecogniser.available, CaptureRequest.of("d", "c", "text", "clipboard") != null)
+        assertEquals(setOf("photo", "scan", "qr"), CaptureRequest.KINDS - "text")
+        if (!DeviceTextRecogniser.available) {
+            var failed = false
+            DeviceTextRecogniser.recognise(
+                android.graphics.Bitmap.createBitmap(2, 2, android.graphics.Bitmap.Config.ARGB_8888),
+                onResult = { throw AssertionError("the stub recognised $it") },
+                onError = { failed = true },
+            )
+            assertTrue(failed)
+        }
+    }
+
+    @Test
     fun theCaptureKindTravelsAsCaptureKind() {
         val json = JSONObject()
             .put("remoteSessionVersion", 1).put("kind", "capture-request").put("sessionAttemptId", "a").put("deviceId", "desk")

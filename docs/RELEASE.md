@@ -163,6 +163,10 @@ or needs a decision. Written down so the choice is made knowingly:
 
 Decisions that are the owner's, with the facts:
 
+- **ML Kit is a build option, off by default** (2026-11-05): `-Pdesklink.ocr=true` (or `desklink.ocr=true` in
+  `gradle.properties`) adds the dependency and the `src/ocr` recogniser; the default build uses the `src/noocr` stub, has
+  no ML Kit (no ~18 MB, no telemetry, no licence entry) and does not offer "Copy Text". The table row above and the next
+  bullet describe the `-Pdesklink.ocr=true` build.
 - **GPL and ML Kit.** The app is GPL-3.0-or-later with KDE Connect code that cannot be re-licensed. Shipping a
   closed library in the same APK is a recognised GPL conflict, and F-Droid will not accept it (non-free
   dependency). Options: keep it (Play and GitHub only); move text recognition to a separate optional download;

@@ -17,6 +17,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val ocr = providers.gradleProperty("desklink.ocr").map(String::toBoolean).getOrElse(false)
 val licenseResDir = "$projectDir/build/dependency-license-res"
 
 fun releaseSigningValue(name: String): String? =
@@ -58,6 +59,9 @@ android {
 
     sourceSets.getByName("main") {
         res.directories += licenseResDir
+        // Text recognition (Insert -> Copy Text) is built but switched off: -Pdesklink.ocr=true brings back ML Kit
+        // (about +18 MB, Google's proprietary licence; F-Droid will not take it). Off, a stub answers "not available".
+        kotlin.directories += if (ocr) "src/ocr/java" else "src/noocr/java"
     }
 
     compileOptions {
@@ -185,8 +189,8 @@ dependencies {
     implementation(libs.zxing.android.embedded) { isTransitive = false }
     implementation(libs.zxing.core)
     implementation(libs.webrtc)
-    // F3: on-device OCR, model bundled (owner-approved for "Insert from phone").
-    implementation(libs.mlkit.text.recognition)
+    // F3: on-device OCR, model bundled. Only with -Pdesklink.ocr=true (see gradle.properties).
+    if (ocr) implementation(libs.mlkit.text.recognition)
 
     // Terminal emulation (Apache-2.0). Only the emulator core and TerminalRenderer are
     // used: there is no local PTY, output comes from the desktop over WebRTC.

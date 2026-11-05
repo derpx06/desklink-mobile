@@ -38,6 +38,8 @@ DeskLink; nothing to declare.
 
 ### Declared data types
 
+The two ML Kit rows apply only to a build made with `-Pdesklink.ocr=true`; the default build has no ML Kit and does not declare them.
+
 | Data type | Collected | Shared | Ephemeral | Required | Purpose |
 |---|---|---|---|---|---|
 | Device or other IDs (device certificate fingerprint, IP address) | Yes | No (Cloudflare acts as a service provider for TURN) | Yes | No: only when the relay is used; it can be turned off in Settings | App functionality |
