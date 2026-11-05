@@ -726,6 +726,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onBucket = { nav.select(AppTab.FILES) },
             onUnavailable = ::showMessage,
             openComputersRequest = computersRequest,
+            onComputersShown = { computersRequest = 0 },
         )
     }
 

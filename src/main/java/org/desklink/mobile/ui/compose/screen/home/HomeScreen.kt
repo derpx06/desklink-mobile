@@ -209,6 +209,8 @@ class HomeActions(
     val onBucket: () -> Unit = {},
     /** Opens the computers sheet from outside (a long-press on the Home tab). */
     val openComputersRequest: Int = 0,
+    /** The request was taken (the sheet is open): the owner resets it, so recreating Home does not open the sheet again. */
+    val onComputersShown: () -> Unit = {},
     val onSendClipboard: () -> Unit = {},
     val onCancelTransfer: () -> Unit = {},
     val onOpenRecent: (TransferRecord) -> Unit = {},
@@ -234,7 +236,12 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
     val notReady = notReadyMessage(state)
     val gate = { action: () -> Unit -> if (state.ready) action() else actions.onUnavailable(notReady) }
     // The Home tab's long-press asks for the computers sheet.
-    androidx.compose.runtime.LaunchedEffect(actions.openComputersRequest) { if (actions.openComputersRequest > 0) sheet = true }
+    androidx.compose.runtime.LaunchedEffect(actions.openComputersRequest) {
+        if (actions.openComputersRequest > 0) {
+            sheet = true
+            actions.onComputersShown()
+        }
+    }
 
     var playerOpen by rememberSaveable { mutableStateOf(false) }
     // Where the card's artwork is, for the player to grow from.
