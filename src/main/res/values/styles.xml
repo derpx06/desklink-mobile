@@ -40,6 +40,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
         <!-- https://github.com/material-components/material-components-android/issues/2732 -->
         <item name="alertDialogTheme">@style/DeskLinkDialogStyle</item>
+        <item name="materialAlertDialogTheme">@style/DeskLinkDialogStyle</item>
     </style>
 
     <style name="DeskLinkTheme" parent="DeskLinkThemeBase" />
@@ -69,6 +70,26 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <style name="DeskLinkDialogStyle" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:layout" tools:ignore="PrivateResource">@layout/m3_alert_dialog</item>
         <item name="dialogCornerRadius">@dimen/desk_dialog_radius</item>
+        <!-- The kit's look for the buttons of every view-based dialog: stadium, 48 dp tall, the
+             positive one filled like PrimaryButton. Logic stays in the dialogs. -->
+        <item name="buttonBarPositiveButtonStyle">@style/DeskLinkDialogButton.Positive</item>
+        <item name="buttonBarNegativeButtonStyle">@style/DeskLinkDialogButton</item>
+        <item name="buttonBarNeutralButtonStyle">@style/DeskLinkDialogButton</item>
+    </style>
+
+    <style name="DeskLinkDialogShape" parent="ShapeAppearance.Material3.Corner.Full" />
+
+    <style name="DeskLinkDialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="shapeAppearance">@style/DeskLinkDialogShape</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+    </style>
+
+    <style name="DeskLinkDialogButton.Positive" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="shapeAppearance">@style/DeskLinkDialogShape</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="backgroundTint">?attr/colorPrimary</item>
+        <item name="android:textColor">?attr/colorOnPrimary</item>
     </style>
 
     <style name="DeskLinkCardStyle" parent="@style/Widget.Material3.CardView.Elevated"/>
