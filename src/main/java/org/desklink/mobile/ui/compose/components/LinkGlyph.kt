@@ -165,6 +165,6 @@ fun deskSwitchColors(): SwitchColors {
         checkedBorderColor = Color.Transparent,
         uncheckedThumbColor = Color.White,
         uncheckedTrackColor = t.switchOff,
-        uncheckedBorderColor = Color.Transparent,
+        uncheckedBorderColor = t.switchOutline,
     )
 }

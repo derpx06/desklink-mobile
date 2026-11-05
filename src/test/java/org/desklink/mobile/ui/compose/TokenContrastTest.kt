@@ -97,8 +97,9 @@ class TokenContrastTest {
             Triple("check ring", t.onAccentContainer.copy(alpha = 0.7f), t.accentContainer),
             // The progress fill on its track.
             Triple("progress fill on track", t.accent, t.surface2),
-            // Not checked, on purpose: the design's off-switch track (`sw`, 18 % black / 20 % white) is 1.5:1 on the card, under
-            // WCAG 1.4.11's 3:1. The colour stays as designed; wave 6 decides on an outline (docs/UI-REDESIGN.md asks for #7A7A82).
+            // The off switch: the design's track is 1.5:1 on the card, so it is ringed (deskSwitchColors), and the ring is what is read.
+            Triple("off-switch outline on surface", t.switchOutline, t.surface),
+            Triple("off-switch outline on bg", t.switchOutline, t.bg),
         )
     }
 

@@ -79,6 +79,8 @@ data class DeskLinkColors(
     val fill: Color,
     /** `sw`: a switch track when off. */
     val switchOff: Color,
+    /** The off switch's outline: the design's track is 1.5:1 on a card, under the 3:1 of WCAG 1.4.11, so it is ringed. */
+    val switchOutline: Color,
     /** `inv`, `invt`: snackbars and other inverted surfaces. */
     val inverse: Color,
     val onInverse: Color,
@@ -112,6 +114,7 @@ val LightTokens = DeskLinkColors(
     coralContainer = Color(0xFFFBEBE7),
     fill = Color(0x0D000000),
     switchOff = Color(0x2E000000),
+    switchOutline = Color(0xFF7A7A82),
     inverse = Color(0xFF2F3036),
     onInverse = Color(0xFFF1F1F3),
     red = Color(0xFFC93030),
@@ -142,6 +145,7 @@ val DarkTokens = DeskLinkColors(
     coralContainer = Color(0xFF34201C),
     fill = Color(0x0FFFFFFF),
     switchOff = Color(0x33FFFFFF),
+    switchOutline = Color(0xFF8C8C94),
     inverse = Color(0xFFE6E6EA),
     onInverse = Color(0xFF18181B),
     red = Color(0xFFFF6B6B),
