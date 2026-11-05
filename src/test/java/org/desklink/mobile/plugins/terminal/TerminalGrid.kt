@@ -97,7 +97,6 @@ object TerminalGrid {
             var prevWidth = 1
             for (c in 0 until cols) {
                 val start = row.findStartOfColumn(c)
-                val end = if (c + 1 < cols) row.findStartOfColumn(c + 1) else row.spaceUsed
                 val continuation = prevWidth == 2
                 val ch = if (start < row.spaceUsed) row.mText[start] else ' '
                 val blank = ch == ' ' || ch == '\u0000' || start >= row.spaceUsed
@@ -108,8 +107,11 @@ object TerminalGrid {
                     if (blank) {
                         text.append(' ')
                     } else {
-                        text.append(String(row.mText, start, (end - start).coerceAtLeast(1)))
                         val cp = Character.codePointAt(row.mText, start)
+                        // The base character and the zero-width marks that follow it.
+                        var end = start + Character.charCount(cp)
+                        while (end < row.spaceUsed && WcWidth.width(row.mText, end) <= 0) end += if (Character.isHighSurrogate(row.mText[end])) 2 else 1
+                        text.append(String(row.mText, start, end - start))
                         width = WcWidth.width(cp).coerceAtLeast(1)
                     }
                     prevWidth = width

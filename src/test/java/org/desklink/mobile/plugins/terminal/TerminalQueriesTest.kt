@@ -130,4 +130,19 @@ class TerminalQueriesTest {
             assertEquals("cut at $cut", "frame after", s.show())
         }
     }
+
+    @Test
+    fun colonSeparatedColoursAreRewrittenNotPrinted() {
+        assertEquals("38;2;200;100;50", TerminalScreen.semicolonSgr("38:2::200:100:50"))
+        assertEquals("38;2;1;2;3", TerminalScreen.semicolonSgr("38:2:1:2:3"))
+        assertEquals("48;5;99", TerminalScreen.semicolonSgr("48:5:99"))
+        assertEquals("1;38;5;9;4", TerminalScreen.semicolonSgr("1;38:5:9;4:3"))
+        assertEquals("24", TerminalScreen.semicolonSgr("4:0"))
+        assertEquals("", TerminalScreen.semicolonSgr("58:2::1:2:3"))
+        val s = screen()
+        s.write("\u001b[38:2::200:100:50mX\u001b[48:5:99mY\u001b[58:2::1:2:3mZ".toByteArray())
+        assertEquals("XYZ", s.show())
+        assertEquals(0xffc86432.toInt(), com.termux.terminal.TextStyle.decodeForeColor(s.withEmulator { it.screen.getStyleAt(0, 0) }))
+        assertEquals(99, com.termux.terminal.TextStyle.decodeBackColor(s.withEmulator { it.screen.getStyleAt(0, 1) }))
+    }
 }

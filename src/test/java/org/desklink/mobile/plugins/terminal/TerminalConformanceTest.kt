@@ -17,19 +17,36 @@ import java.io.File
  * Writes `conformance.md` (case x width) next to the screenshots, see [ShotDir]-style path below.
  */
 class TerminalConformanceTest {
-    private val cases = TerminalGrid.cases()
+    private val cases = TerminalGrid.cases().onEach { check(it.grid.isNotEmpty() && it.snap.isNotEmpty()) { "$it has no reference grid/snapshot" } }
+
+    /**
+     * Cases whose reference screen is wrong, not the phone's: the `vt100` crate has no DEC special graphics
+     * charset (`ESC ( 0`), so a curses box comes out as `lqqk` where Termux draws the box. These are compared
+     * with the box characters turned back into the letters that select them.
+     */
+    private val dec = mapOf('┌' to 'l', '┐' to 'k', '└' to 'm', '┘' to 'j', '─' to 'q', '│' to 'x', '├' to 't', '┤' to 'u', '┬' to 'w', '┴' to 'v', '┼' to 'n')
+    private val referenceLacksLineDrawing = setOf("curses")
+
+    /** The vt100 crate ignores `38:2::r:g:b` (empty colour-space slot): only the text of that case is compared. */
+    private val referenceIgnoresColonColour = setOf("sgr-colon")
+
+    private fun normalised(case: TerminalGrid.Case, grid: String): String = when (case.name) {
+        in referenceLacksLineDrawing -> grid.map { dec[it] ?: it }.joinToString("")
+        in referenceIgnoresColonColour -> grid.lines().filter { it.startsWith("|") }.joinToString("\n")
+        else -> grid
+    }
 
     private fun replay(case: TerminalGrid.Case, piece: Int): String {
         val screen = TerminalScreen(TerminalGrid.ROWS, case.cols, reply = {})
         TerminalGrid.play(screen, case.bytes, case.resizes, piece)
-        return TerminalGrid.grid(screen)
+        return normalised(case, TerminalGrid.grid(screen))
     }
 
     private fun fromSnapshot(case: TerminalGrid.Case): String {
         val screen = TerminalScreen(TerminalGrid.ROWS, case.cols, reply = {})
         screen.beginSnapshot()
         screen.write(case.snap)
-        return TerminalGrid.grid(screen)
+        return normalised(case, TerminalGrid.grid(screen))
     }
 
     @Test
@@ -50,9 +67,9 @@ class TerminalConformanceTest {
                 modes["1-byte pieces"] = replay(case, 1)
                 var ok = true
                 for ((mode, got) in modes) {
-                    if (got != case.grid) {
+                    if (got != normalised(case, case.grid)) {
                         ok = false
-                        failures += "$case ($mode): ${TerminalGrid.diff(case.grid, got)}"
+                        failures += "$case ($mode): ${TerminalGrid.diff(normalised(case, case.grid), got)}"
                     }
                 }
                 if (!ok) "FAIL" else "pass"
@@ -70,10 +87,10 @@ class TerminalConformanceTest {
         for ((name, group) in cases.groupBy { it.name }) {
             val cells = group.sortedBy { it.cols }.map { case ->
                 val got = fromSnapshot(case)
-                if (got == case.grid) {
+                if (got == normalised(case, case.grid)) {
                     "pass"
                 } else {
-                    failures += "$case (snapshot): ${TerminalGrid.diff(case.grid, got)}"
+                    failures += "$case (snapshot): ${TerminalGrid.diff(normalised(case, case.grid), got)}"
                     "FAIL"
                 }
             }

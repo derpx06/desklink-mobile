@@ -174,6 +174,15 @@ class TerminalScreen(
                             c == 'h'.code && params == "?2026" -> { flushRun(); beginSyncLocked() }
                             c == 'l'.code && params == "?2026" -> { flushRun(); flushHeldLocked() }
                             c == 'u'.code && (params.startsWith("=") || params.startsWith("<")) -> Unit
+                            // Colon-separated SGR (`38:2::r:g:b`, `4:3`), which Termux prints as text.
+                            c == 'm'.code && ':' in params -> {
+                                val plain = semicolonSgr(params)
+                                if (plain.isNotEmpty()) {
+                                    put(ESC); put('['.code.toByte())
+                                    for (ch in plain) put(ch.code.toByte())
+                                    put(b)
+                                }
+                            }
                             else -> {
                                 put(ESC); put('['.code.toByte())
                                 for (i in 0 until stashLen) put(stash[i])
@@ -279,6 +288,29 @@ class TerminalScreen(
     }
 
     companion object {
+        /**
+         * SGR parameters with ISO 8613-6 colon sub-parameters, in the semicolon form Termux reads:
+         * `38:2::r:g:b` and `38:2:r:g:b` become `38;2;r;g;b`, `38:5:n` `38;5;n`, `4:0` `24`, any
+         * other underline style `4`. A colon form with no semicolon equivalent (underline colour,
+         * `58`) is dropped.
+         */
+        fun semicolonSgr(params: String): String = params.split(';').mapNotNull { group ->
+            if (':' !in group) return@mapNotNull group
+            val sub = group.split(':')
+            when (sub[0]) {
+                "38", "48" -> when (sub.getOrNull(1)) {
+                    "2" -> {
+                        val rgb = sub.drop(2).takeLast(3)
+                        if (rgb.size == 3) "${sub[0]};2;" + rgb.joinToString(";") { it.ifEmpty { "0" } } else null
+                    }
+                    "5" -> sub.getOrNull(2)?.takeIf { it.isNotEmpty() }?.let { "${sub[0]};5;$it" }
+                    else -> null
+                }
+                "4" -> if (sub.getOrNull(1) == "0") "24" else "4"
+                else -> null
+            }
+        }.joinToString(";")
+
         const val DEFAULT_TRANSCRIPT_ROWS = 5000
         private const val MIN_CELLS = 4
         private const val ESC: Byte = 0x1b
