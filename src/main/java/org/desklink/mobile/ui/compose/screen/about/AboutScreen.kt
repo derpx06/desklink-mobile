@@ -37,7 +37,9 @@ fun AboutScreen(
     onReportBugClicked: () -> Unit,
     onDonateClicked: () -> Unit,
     onSourceCodeClicked: () -> Unit,
-    onLicensesClicked: () -> Unit
+    onLicensesClicked: () -> Unit,
+    /** Plays the first-run tour again; null hides the button. */
+    onReplayTour: (() -> Unit)? = null,
 ) {
     val bottomPadding = safeDrawingBottomPadding()
 
@@ -66,6 +68,12 @@ fun AboutScreen(
                 onSourceCodeClicked = onSourceCodeClicked,
                 onLicensesClicked = onLicensesClicked
             )
+        }
+
+        onReplayTour?.let { replay ->
+            item {
+                org.desklink.mobile.ui.compose.SecondaryButton(stringResource(R.string.about_welcome_tour), replay, Modifier.fillMaxWidth())
+            }
         }
 
         item {
