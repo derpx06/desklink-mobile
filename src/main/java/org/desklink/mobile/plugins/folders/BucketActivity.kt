@@ -105,8 +105,6 @@ import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.components.IconCircle
 import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
 import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.components.shimmer
 import org.desklink.mobile.ui.compose.screen.transfers.iconFor

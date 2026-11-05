@@ -178,26 +178,3 @@ fun IconCircle(@DrawableRes icon: Int, size: Dp, iconSize: Dp, modifier: Modifie
         Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
     }
 }
-
-/** The old name of [DeskButtonStyle]. */
-enum class PillStyle { Filled, Tonal, Outlined }
-
-@Deprecated("Use PrimaryButton, SecondaryButton or StadiumButton")
-@Composable
-fun PillButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    style: PillStyle = PillStyle.Filled,
-    height: Dp = 56.dp,
-    @DrawableRes icon: Int? = null,
-    enabled: Boolean = true,
-) = StadiumButton(
-    text, onClick, modifier,
-    when (style) {
-        PillStyle.Filled -> DeskButtonStyle.Primary
-        PillStyle.Tonal -> DeskButtonStyle.Tonal
-        PillStyle.Outlined -> DeskButtonStyle.Outlined
-    },
-    height, icon, enabled,
-)

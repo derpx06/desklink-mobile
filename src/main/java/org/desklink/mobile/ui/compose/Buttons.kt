@@ -22,10 +22,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,7 +41,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow.Companion.Ellipsis
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -181,60 +176,4 @@ fun DeskExtendedFab(label: String, @DrawableRes icon: Int, onClick: () -> Unit, 
         Icon(painterResource(icon), contentDescription = null, tint = t.onAccent, modifier = Modifier.size(24.dp))
         Text(label, color = t.onAccent, fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium, modifier = Modifier.padding(vertical = 8.dp))
     }
-}
-
-// ---- old names, kept so existing call sites compile; deprecated, not delegating: removed with their last caller (wave 6) ----
-
-@Deprecated("Use DeskTextButton", ReplaceWith("DeskTextButton(text, onClick, modifier, enabled)"))
-@Composable
-fun KdeTextButton(
-    onClick: () -> Unit,
-    modifier: Modifier,
-    text: String,
-    enabled: Boolean = true,
-    contentPadding: PaddingValues = PaddingValues(16.dp),
-    iconLeft: ImageVector? = null,
-) {
-    TextButton(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        contentPadding = contentPadding,
-        content = {
-            iconLeft?.let {
-                Icon(imageVector = it, contentDescription = null)
-                Spacer(Modifier.width(16.dp))
-            }
-            Text(text = text)
-        }
-    )
-}
-
-@Deprecated("Use PrimaryButton or SecondaryButton")
-@Composable
-fun KdeButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    colors: ButtonColors = ButtonDefaults.buttonColors(),
-    text: String? = null,
-    contentDescription: String? = null,
-    icon: ImageVector? = null,
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        shape = DeskLinkShape.stadium,
-        colors = colors,
-        content = {
-            icon?.let { Icon(imageVector = it, contentDescription = contentDescription ?: text) }
-            text?.let { Text(it, maxLines = 1, overflow = Ellipsis) }
-        }
-    )
-}
-
-@Preview
-@Composable
-private fun IconButtonPreview() {
-    @Suppress("DEPRECATION")
-    KdeButton({}, Modifier.width(120.dp), ButtonDefaults.buttonColors(Color.Gray, Color.DarkGray), "Button Text", null, Icons.Default.Build)
 }
