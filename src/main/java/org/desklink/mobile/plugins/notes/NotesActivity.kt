@@ -212,7 +212,7 @@ class NotesActivity : AppCompatActivity() {
     private fun SnippetsList() = ui.SnippetsList()
 
     @Composable
-    private fun Editor(id: String, onClose: () -> Unit) = ui.Editor(id, onClose)
+    private fun Editor(id: String, onClose: () -> Unit) = ui.Editor(id, onDone = onClose)
 
     companion object {
         const val NEW = "\u0000new"
