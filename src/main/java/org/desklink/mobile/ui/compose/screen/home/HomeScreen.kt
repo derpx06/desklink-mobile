@@ -234,7 +234,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
     var linkDialog by rememberSaveable { mutableStateOf(false) }
     var palette by rememberSaveable { mutableStateOf(false) }
     val notReady = notReadyMessage(state)
-    val gate = { action: () -> Unit -> if (state.ready) action() else actions.onUnavailable(notReady) }
+    val gate = { action: () -> Unit -> if (HomeDerive.usable(state)) action() else actions.onUnavailable(notReady) }
     // The Home tab's long-press asks for the computers sheet.
     androidx.compose.runtime.LaunchedEffect(actions.openComputersRequest) {
         if (actions.openComputersRequest > 0) {
@@ -465,7 +465,7 @@ private fun Hero(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActi
             )
             if (LocalDensity.current.fontScale <= 1.4f) LaptopIllustration(Modifier.padding(top = 8.dp))
         }
-        if (state.ready && state.canUnlock) {
+        if (HomeDerive.usable(state) && state.canUnlock) {
             SecondaryButton(stringResource(R.string.home_unlock_desk, state.name), actions.onUnlockDesk, Modifier.fillMaxWidth(), icon = R.drawable.sym_lock_open, height = 48.dp)
         }
         // Three across; one column once the words would not fit. Terminals works with the computer away: it opens the tab, which keeps its own sessions.
@@ -628,7 +628,8 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
     val t = tokens
     val o = state.offers
     // Until the link is up nothing is known about the computer, so every action is listed (dimmed); then only what it has.
-    fun shown(offered: Boolean) = !state.ready || offered
+    val usable = HomeDerive.usable(state)
+    fun shown(offered: Boolean) = !usable || offered
     val sharing = state.live.phoneScreen
     class Q(val icon: Int, val label: String, val show: Boolean, val run: () -> Unit)
     val items = listOf(
@@ -638,10 +639,10 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
         Q(R.drawable.sym_lock, stringResource(R.string.home_lock_desk), shown(o.lock)) { gate(actions.onLock) },
         Q(R.drawable.sym_mobile_screen_share, stringResource(if (sharing) R.string.home_stop_sharing else R.string.home_share_screen), shown(o.screen)) { gate(actions.onShareScreen) },
         Q(R.drawable.sym_waving_hand, stringResource(R.string.home_ping_desk), shown(o.ping)) { gate(actions.onPing) },
-        Q(R.drawable.sym_lock_open, stringResource(R.string.home_unlock_desk, state.name), state.ready && state.canUnlock) { actions.onUnlockDesk() },
+        Q(R.drawable.sym_lock_open, stringResource(R.string.home_unlock_desk, state.name), usable && state.canUnlock) { actions.onUnlockDesk() },
     ).filter { it.show }
     val clipboardLine = when {
-        !state.ready || !o.clipboard -> null
+        !usable || !o.clipboard -> null
         !state.clipboardOn -> stringResource(R.string.home_tile_clipboard_off)
         else -> state.clipboardPreview?.let { stringResource(R.string.home_tile_clipboard_preview, it) }
     }
@@ -656,7 +657,7 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
             items.chunked(columns).forEach { row ->
                 Row(Modifier.fillMaxWidth()) {
                     row.forEach { q ->
-                        QuickActionTile(q.icon, q.label, q.run, Modifier.weight(1f), enabled = state.ready, onDisabledClick = { actions.onUnavailable(notReady) })
+                        QuickActionTile(q.icon, q.label, q.run, Modifier.weight(1f), enabled = usable, onDisabledClick = { actions.onUnavailable(notReady) })
                     }
                     repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }

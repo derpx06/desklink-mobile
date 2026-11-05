@@ -2,6 +2,7 @@
 package org.desklink.mobile.ui
 
 import org.desklink.mobile.ui.compose.model.device.DeviceConnection
+import org.desklink.mobile.ui.compose.screen.home.HomeDerive
 import org.desklink.mobile.ui.compose.screen.home.HomeOffers
 import org.desklink.mobile.ui.compose.screen.home.HomeState
 import org.desklink.mobile.ui.compose.screen.home.PaletteGroup
@@ -108,5 +109,15 @@ class PaletteModelTest {
         val ids = PaletteModel.offeredActions(state(DeviceConnection.LOCAL, HomeOffers(ring = false, lock = false, screen = false)))
         listOf(Action.RING, Action.LOCK, Action.DESK_SCREEN, Action.SHARE_SCREEN).forEach { assertFalse(it, it in ids) }
         assertTrue(Action.SEND_FILES in ids)
+    }
+
+    @Test
+    fun aComputerThatNeedsAnUpdateOffersOnlyWhatIsOnThePhone() {
+        // Connected, but its DeskLink is another version: nothing that sends a packet is offered (it would only queue).
+        val s = state(DeviceConnection.LOCAL).copy(updateNeeded = true)
+        assertFalse(HomeDerive.usable(s))
+        assertEquals(listOf(Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.PAIR_ANOTHER), PaletteModel.offeredActions(s))
+        assertTrue(HomeDerive.usable(state(DeviceConnection.LOCAL)))
+        assertFalse(HomeDerive.usable(state(DeviceConnection.CONNECTING)))
     }
 }

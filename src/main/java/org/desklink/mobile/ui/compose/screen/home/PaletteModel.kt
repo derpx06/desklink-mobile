@@ -102,7 +102,7 @@ object PaletteModel {
      */
     fun offeredActions(s: HomeState): List<String> = buildList {
         val o = s.offers
-        if (s.ready) {
+        if (HomeDerive.usable(s)) {
             if (o.files) add(Action.SEND_FILES)
             if (o.clipboard) add(Action.SEND_CLIPBOARD)
             if (o.link) add(Action.SEND_LINK)
@@ -112,7 +112,7 @@ object PaletteModel {
         add(Action.OPEN_TERMINALS)
         add(Action.NEW_NOTE)
         add(Action.OPEN_BUCKET)
-        if (s.ready) {
+        if (HomeDerive.usable(s)) {
             if (o.ring) add(Action.RING)
             if (o.ping) add(Action.PING)
             if (o.lock) add(Action.LOCK)
