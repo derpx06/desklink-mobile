@@ -5,16 +5,12 @@ package org.desklink.mobile.ui.compose
 
 import android.content.Context
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +24,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import org.desklink.mobile.R
+import org.desklink.mobile.ui.compose.components.DeskDialog
+import org.desklink.mobile.ui.compose.components.DeskTextField
+import org.desklink.mobile.ui.compose.components.DialogAction
 import org.desklink.mobile.webrtc.SessionPassword
 
 /**
@@ -39,43 +38,34 @@ fun SessionPasswordDialog(wrong: Boolean, onSubmit: (String) -> Unit, onDismiss:
     var text by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
     val valid = text.isNotEmpty() && SessionPassword.fits(text)
-    AlertDialog(
+    DeskDialog(
         onDismissRequest = onDismiss,
         // A typed password is not for a screenshot or a recording.
         properties = androidx.compose.ui.window.DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
-        title = { Text(stringResource(R.string.session_password_title)) },
+        title = stringResource(R.string.session_password_title),
         text = {
-            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+            Column {
                 Text(stringResource(R.string.session_password_message))
                 Spacer(Modifier.height(16.dp))
-                OutlinedTextField(
+                DeskTextField(
                     value = text,
                     onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text(stringResource(R.string.session_password_label)) },
+                    label = stringResource(R.string.session_password_label),
                     isError = wrong,
-                    supportingText = if (wrong) {
-                        { Text(stringResource(R.string.session_password_wrong), color = MaterialTheme.colorScheme.error) }
-                    } else {
-                        null
-                    },
+                    supportingText = if (wrong) stringResource(R.string.session_password_wrong) else null,
                     visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { if (valid) onSubmit(text) }),
                     trailingIcon = {
-                        TextButton(onClick = { visible = !visible }) {
-                            Text(stringResource(if (visible) R.string.session_password_hide else R.string.session_password_show))
-                        }
+                        DeskTextButton(stringResource(if (visible) R.string.session_password_hide else R.string.session_password_show), { visible = !visible })
                     },
                 )
             }
         },
-        confirmButton = {
-            TextButton(onClick = { onSubmit(text) }, enabled = valid) {
-                Text(stringResource(R.string.session_password_unlock))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
+        confirm = DialogAction(stringResource(R.string.session_password_unlock), enabled = valid) { onSubmit(text) },
+        dismiss = DialogAction(stringResource(android.R.string.cancel)) { onDismiss() },
     )
 }
 

@@ -3,6 +3,9 @@
  */
 package org.desklink.mobile.plugins.terminal
 
+import org.desklink.mobile.ui.compose.components.DeskTextField
+import org.desklink.mobile.ui.compose.components.DialogAction
+import org.desklink.mobile.ui.compose.components.DeskDialog
 import android.content.ActivityNotFoundException
 import org.desklink.mobile.helpers.DeskNames
 import android.content.ClipboardManager
@@ -446,12 +449,9 @@ class TerminalActivity : AppCompatActivity() {
                     }
                 }
                 if (searching) {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it.take(80) },
-                        singleLine = true,
-                        placeholder = { Text(stringResource(R.string.terminal_search_hint)) },
-                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                    org.desklink.mobile.ui.compose.components.DeskSearchField(
+                        query, { query = it.take(80) }, stringResource(R.string.terminal_search_hint), stringResource(R.string.palette_clear),
+                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
                     )
                 }
                 if (!connected && state.listLoaded) ReconnectingBanner()
@@ -534,21 +534,12 @@ class TerminalActivity : AppCompatActivity() {
             )
         }
         closing?.let { session ->
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { closing = null },
-                title = { Text(stringResource(R.string.terminal_close_title)) },
+                title = stringResource(R.string.terminal_close_title),
                 text = { Text(stringResource(R.string.terminal_close_message)) },
-                confirmButton = {
-                    TextButton(
-                        onClick = { client.close(session.id); closing = null },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    ) {
-                        Text(stringResource(R.string.terminal_close_confirm))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { closing = null }) { Text(stringResource(android.R.string.cancel)) }
-                },
+                confirm = DialogAction(stringResource(R.string.terminal_close_confirm), destructive = true) { client.close(session.id); closing = null },
+                dismiss = DialogAction(stringResource(android.R.string.cancel)) { closing = null },
             )
         }
     }
@@ -814,19 +805,20 @@ class TerminalActivity : AppCompatActivity() {
     @Composable
     private fun RenameDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
         var text by remember { mutableStateOf(initial) }
-        AlertDialog(
+        DeskDialog(
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.terminal_rename)) },
+            title = stringResource(R.string.terminal_rename),
             text = {
-                OutlinedTextField(
+                DeskTextField(
                     value = text,
                     onValueChange = { text = it.take(60) },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text(stringResource(R.string.terminal_rename_hint)) },
+                    label = stringResource(R.string.terminal_rename_hint),
                 )
             },
-            confirmButton = { TextButton(onClick = { onConfirm(text) }) { Text(stringResource(android.R.string.ok)) } },
-            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
+            confirm = DialogAction(stringResource(android.R.string.ok)) { onConfirm(text) },
+            dismiss = DialogAction(stringResource(android.R.string.cancel)) { onDismiss() },
         )
     }
 

@@ -56,14 +56,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -108,7 +106,10 @@ import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.DeskTextButton
 import org.desklink.mobile.ui.compose.PrimaryButton
 import org.desklink.mobile.ui.compose.SecondaryButton
+import org.desklink.mobile.ui.compose.components.DeskDialog
 import org.desklink.mobile.ui.compose.components.DeskProgressBar
+import org.desklink.mobile.ui.compose.components.DeskTextField
+import org.desklink.mobile.ui.compose.components.DialogAction
 import org.desklink.mobile.ui.compose.components.HeroCard
 import org.desklink.mobile.ui.compose.components.IconCircle
 import org.desklink.mobile.ui.compose.components.IconTile
@@ -221,54 +222,48 @@ class BucketUi(
         val shared = pendingUris.value
         val sharedText = pendingText.value
         if (on && (shared.isNotEmpty() || sharedText != null)) {
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { pendingUris.value = emptyList(); pendingText.value = null },
-                title = { Text(if (shared.isNotEmpty()) pluralStringResource(R.plurals.bucket_confirm_add_title, shared.size, shared.size) else stringResource(R.string.bucket_confirm_add_text_title)) },
+                title = if (shared.isNotEmpty()) pluralStringResource(R.plurals.bucket_confirm_add_title, shared.size, shared.size) else stringResource(R.string.bucket_confirm_add_text_title),
                 text = { Text(if (shared.isNotEmpty()) stringResource(R.string.bucket_confirm_add_body) else sharedText.orEmpty().take(200)) },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val uris = pendingUris.value
-                        val text = pendingText.value
-                        pendingUris.value = emptyList(); pendingText.value = null
-                        if (uris.isNotEmpty()) BucketEngine.add(deviceId, uris, path, ::report)
-                        if (text != null) BucketEngine.addText(deviceId, text, path) { ok -> runOnUiThread { toast(getString(if (ok) R.string.bucket_text_added else R.string.bucket_text_failed)) } }
-                    }) { Text(stringResource(R.string.bucket_confirm_add)) }
+                confirm = DialogAction(stringResource(R.string.bucket_confirm_add)) {
+                    val uris = pendingUris.value
+                    val text = pendingText.value
+                    pendingUris.value = emptyList(); pendingText.value = null
+                    if (uris.isNotEmpty()) BucketEngine.add(deviceId, uris, path, ::report)
+                    if (text != null) BucketEngine.addText(deviceId, text, path) { ok -> runOnUiThread { toast(getString(if (ok) R.string.bucket_text_added else R.string.bucket_text_failed)) } }
                 },
-                dismissButton = { TextButton(onClick = { pendingUris.value = emptyList(); pendingText.value = null }) { Text(stringResource(R.string.cancel)) } },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { pendingUris.value = emptyList(); pendingText.value = null },
             )
         }
 
         if (newFolder) {
             var name by remember { mutableStateOf("") }
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { newFolder = false },
-                title = { Text(stringResource(R.string.bucket_new_folder)) },
-                text = { OutlinedTextField(name, { name = it.replace("/", "").take(100) }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
-                confirmButton = {
-                    TextButton(enabled = name.isNotBlank(), onClick = {
-                        newFolder = false
-                        BucketEngine.newFolder(deviceId, path, name) { ok -> if (!ok) runOnUiThread { toast(getString(R.string.bucket_new_folder_failed)) } }
-                    }) { Text(stringResource(R.string.bucket_create)) }
+                title = stringResource(R.string.bucket_new_folder),
+                text = { DeskTextField(name, { name = it.replace("/", "").take(100) }, Modifier.fillMaxWidth(), label = stringResource(R.string.bucket_new_folder), singleLine = true) },
+                confirm = DialogAction(stringResource(R.string.bucket_create), enabled = name.isNotBlank()) {
+                    newFolder = false
+                    BucketEngine.newFolder(deviceId, path, name) { ok -> if (!ok) runOnUiThread { toast(getString(R.string.bucket_new_folder_failed)) } }
                 },
-                dismissButton = { TextButton(onClick = { newFolder = false }) { Text(stringResource(R.string.cancel)) } },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { newFolder = false },
             )
         }
         if (confirmRemove) {
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { confirmRemove = false },
-                title = { Text(resources.getQuantityString(R.plurals.bucket_remove_many_title, selected.size, selected.size)) },
+                title = resources.getQuantityString(R.plurals.bucket_remove_many_title, selected.size, selected.size),
                 text = { Text(stringResource(R.string.bucket_remove_body, desk)) },
-                confirmButton = {
-                    TextButton(onClick = { confirmRemove = false; BucketEngine.remove(deviceId, selected); selected = emptySet() }) { Text(stringResource(R.string.bucket_remove)) }
-                },
-                dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.cancel)) } },
+                confirm = DialogAction(stringResource(R.string.bucket_remove), destructive = true) { confirmRemove = false; BucketEngine.remove(deviceId, selected); selected = emptySet() },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { confirmRemove = false },
             )
         }
         if (moving) {
             val targets = BucketLevel.targets(view?.items.orEmpty(), selected)
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { moving = false },
-                title = { Text(stringResource(R.string.bucket_move_to)) },
+                title = stringResource(R.string.bucket_move_to),
                 text = {
                     Column {
                         if (targets.isEmpty()) Text(stringResource(R.string.bucket_move_nowhere), fontSize = 14.sp)
@@ -287,7 +282,7 @@ class BucketUi(
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { moving = false }) { Text(stringResource(R.string.cancel)) } },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { moving = false },
             )
         }
         val headerActions: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
@@ -585,32 +580,30 @@ class BucketUi(
         }
         renaming?.let { item ->
             var name by remember(item.name) { mutableStateOf(item.name) }
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { renaming = null },
-                title = { Text(stringResource(R.string.bucket_rename)) },
-                text = { OutlinedTextField(name, { name = it.replace("/", "").take(200) }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
-                confirmButton = {
-                    TextButton(onClick = {
-                        renaming = null
-                        BucketEngine.rename(deviceId, item.path, name) { ok -> if (!ok) runOnUiThread { toast(getString(R.string.bucket_rename_failed)) } }
-                    }) { Text(stringResource(R.string.bucket_rename)) }
+                title = stringResource(R.string.bucket_rename),
+                text = { DeskTextField(name, { name = it.replace("/", "").take(200) }, Modifier.fillMaxWidth(), label = stringResource(R.string.bucket_rename), singleLine = true) },
+                confirm = DialogAction(stringResource(R.string.bucket_rename)) {
+                    renaming = null
+                    BucketEngine.rename(deviceId, item.path, name) { ok -> if (!ok) runOnUiThread { toast(getString(R.string.bucket_rename_failed)) } }
                 },
-                dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(R.string.cancel)) } },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { renaming = null },
             )
         }
         removing?.let { item ->
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { removing = null },
-                title = { Text(stringResource(R.string.bucket_remove_title, item.name)) },
+                title = stringResource(R.string.bucket_remove_title, item.name),
                 text = { Text(stringResource(R.string.bucket_remove_body, desk)) },
-                confirmButton = { TextButton(onClick = { removing = null; BucketEngine.remove(deviceId, listOf(item.path)) }) { Text(stringResource(R.string.bucket_remove)) } },
-                dismissButton = { TextButton(onClick = { removing = null }) { Text(stringResource(R.string.cancel)) } },
+                confirm = DialogAction(stringResource(R.string.bucket_remove), destructive = true) { removing = null; BucketEngine.remove(deviceId, listOf(item.path)) },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { removing = null },
             )
         }
         resolving?.let { item ->
-            AlertDialog(
+            DeskDialog(
                 onDismissRequest = { resolving = null },
-                title = { Text(stringResource(R.string.bucket_conflict_title)) },
+                title = stringResource(R.string.bucket_conflict_title),
                 text = {
                     Column {
                         Text(stringResource(R.string.bucket_conflict_body, item.name, desk), fontSize = 14.sp)
@@ -619,13 +612,11 @@ class BucketUi(
                             BucketEngine.Resolve.PHONE to R.string.bucket_keep_phone,
                             BucketEngine.Resolve.DESK to R.string.bucket_keep_desk,
                         ).forEach { (how, label) ->
-                            TextButton(onClick = { resolving = null; BucketEngine.resolve(deviceId, item.path, how) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                                Text(stringResource(label, desk))
-                            }
+                            DeskTextButton(stringResource(label, desk), { resolving = null; BucketEngine.resolve(deviceId, item.path, how) }, Modifier.fillMaxWidth())
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { resolving = null }) { Text(stringResource(R.string.cancel)) } },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { resolving = null },
             )
         }
     }
@@ -920,9 +911,9 @@ class BucketUi(
 
     @Composable
     private fun ItemMenu(item: BucketItem, onDismiss: () -> Unit, onRename: () -> Unit, onRemove: () -> Unit) {
-        AlertDialog(
+        DeskDialog(
             onDismissRequest = onDismiss,
-            title = { Text(item.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            title = item.name,
             text = {
                 Column {
                     val uri = item.uri
@@ -945,7 +936,7 @@ class BucketUi(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+            dismiss = DialogAction(stringResource(R.string.cancel)) { onDismiss() },
         )
     }
 

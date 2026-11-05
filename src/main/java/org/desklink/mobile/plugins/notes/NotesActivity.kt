@@ -5,6 +5,8 @@
  */
 package org.desklink.mobile.plugins.notes
 
+import org.desklink.mobile.ui.compose.components.DialogAction
+import org.desklink.mobile.ui.compose.components.DeskDialog
 import org.desklink.mobile.extensions.isReadable
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -158,16 +160,12 @@ class NotesActivity : AppCompatActivity() {
     @Composable
     private fun Root() {
         pendingShare.value?.let { (subject, text) ->
-            androidx.compose.material3.AlertDialog(
+            DeskDialog(
                 onDismissRequest = { pendingShare.value = null },
-                title = { androidx.compose.material3.Text(stringResource(R.string.notes_confirm_save_title)) },
+                title = stringResource(R.string.notes_confirm_save_title),
                 text = { androidx.compose.material3.Text((subject.ifBlank { text }).take(200)) },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(onClick = { pendingShare.value = null; saveShared(subject, text) }) { androidx.compose.material3.Text(stringResource(R.string.notes_confirm_save)) }
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(onClick = { pendingShare.value = null }) { androidx.compose.material3.Text(stringResource(R.string.cancel)) }
-                },
+                confirm = DialogAction(stringResource(R.string.notes_confirm_save)) { pendingShare.value = null; saveShared(subject, text) },
+                dismiss = DialogAction(stringResource(R.string.cancel)) { pendingShare.value = null },
             )
         }
         val id = editing.value

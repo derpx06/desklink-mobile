@@ -5,6 +5,8 @@
  */
 package org.desklink.mobile.plugins.notes
 
+import org.desklink.mobile.ui.compose.components.DialogAction
+import org.desklink.mobile.ui.compose.components.DeskDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -153,20 +155,16 @@ class NotesUi(
                 )
             }
             if (confirmTidy) {
-                androidx.compose.material3.AlertDialog(
+                DeskDialog(
                     onDismissRequest = { confirmTidy = false },
-                    title = { Text(stringResource(R.string.notes_tidy_title)) },
+                    title = stringResource(R.string.notes_tidy_title),
                     text = { Text(stringResource(R.string.notes_tidy_body, removable, kept)) },
-                    confirmButton = {
-                        androidx.compose.material3.TextButton(onClick = {
-                            confirmTidy = false
-                            val removed = NotesStore.removeDuplicateCopies(host)
-                            Toast.makeText(host, host.getString(R.string.notes_tidy_done, removed), Toast.LENGTH_SHORT).show()
-                        }) { Text(stringResource(R.string.notes_tidy_confirm)) }
+                    confirm = DialogAction(stringResource(R.string.notes_tidy_confirm), destructive = true) {
+                        confirmTidy = false
+                        val removed = NotesStore.removeDuplicateCopies(host)
+                        Toast.makeText(host, host.getString(R.string.notes_tidy_done, removed), Toast.LENGTH_SHORT).show()
                     },
-                    dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { confirmTidy = false }) { Text(stringResource(android.R.string.cancel)) }
-                    },
+                    dismiss = DialogAction(stringResource(android.R.string.cancel)) { confirmTidy = false },
                 )
             }
             Box(Modifier.weight(1f)) {

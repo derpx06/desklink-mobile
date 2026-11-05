@@ -34,7 +34,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,8 +70,8 @@ import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
+import org.desklink.mobile.ui.compose.PrimaryButton
+import org.desklink.mobile.ui.compose.SecondaryButton
 import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.screen.pairing.QrCamera
 import org.desklink.mobile.ui.compose.tokens
@@ -424,11 +423,11 @@ class CaptureActivity : AppCompatActivity() {
         val t = tokens
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.capture_text_hint), fontSize = 13.sp, color = t.textDim)
-            OutlinedTextField(
+            org.desklink.mobile.ui.compose.components.DeskTextField(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                placeholder = { if (!busy) Text(stringResource(R.string.capture_text_none)) },
+                placeholder = if (!busy) stringResource(R.string.capture_text_none) else null,
             )
         }
     }
@@ -492,9 +491,9 @@ class CaptureActivity : AppCompatActivity() {
             }
         }
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            secondary?.let { (label, action) -> PillButton(label, action, Modifier.weight(1f), style = PillStyle.Outlined, enabled = !busy) }
+            secondary?.let { (label, action) -> SecondaryButton(label, action, Modifier.weight(1f), enabled = !busy) }
             primary?.let { (label, action) ->
-                PillButton(label, action, Modifier.weight(1f), enabled = !busy && (stage != Stage.TEXT || text.isNotBlank()))
+                PrimaryButton(label, action, Modifier.weight(1f), enabled = !busy && (stage != Stage.TEXT || text.isNotBlank()))
             }
         }
     }
