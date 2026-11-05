@@ -77,7 +77,7 @@ fun StatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp) {
 @Composable
 fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val t = tokens
-    CappedFontScale(1.3f) {
+    CappedFontScale(1.15f) {
         Row(
             modifier.fillMaxWidth().background(t.fill, RoundedCornerShape(30.dp)).padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -91,7 +91,7 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
                         .clip(RoundedCornerShape(22.dp))
                         .background(if (on) t.surface else Color.Transparent)
                         .selectable(selected = on, role = Role.Tab, onClick = { onSelect(i) })
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(label, fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal, color = if (on) t.text else t.textDim, textAlign = TextAlign.Center)
@@ -112,11 +112,11 @@ fun DeskFilterChip(label: String, selected: Boolean, onClick: () -> Unit, modifi
     ) {
         Box(
             Modifier
-                .height(36.dp)
+                .heightIn(min = 36.dp)
                 .clip(shape)
                 .background(if (selected) t.accentContainer else Color.Transparent)
                 .border(1.dp, if (selected) Color.Transparent else t.hairlineStrong, shape)
-                .padding(horizontal = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text(label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (selected) t.onAccentContainer else t.textDim, maxLines = 1)
@@ -131,7 +131,7 @@ fun AssistChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier
     val shape = RoundedCornerShape(18.dp)
     Box(modifier.minimumInteractiveComponentSize().clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
         Row(
-            Modifier.height(36.dp).clip(shape).background(t.surface).border(1.dp, t.hairlineStrong, shape).padding(start = if (icon != null) 10.dp else 14.dp, end = 14.dp),
+            Modifier.heightIn(min = 36.dp).clip(shape).background(t.surface).border(1.dp, t.hairlineStrong, shape).padding(start = if (icon != null) 10.dp else 14.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {

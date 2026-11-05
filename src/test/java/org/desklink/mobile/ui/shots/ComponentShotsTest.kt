@@ -54,7 +54,7 @@ abstract class ComponentShots : ShotTest() {
     @Composable
     private fun Sheet(content: @Composable () -> Unit) {
         Column(
-            Modifier.fillMaxSize().padding(horizontal = DeskLinkSpacing.page).padding(top = 8.dp).verticalScroll(rememberScrollState()),
+            Modifier.fillMaxSize().background(tokens.bg).padding(horizontal = DeskLinkSpacing.page).padding(top = 8.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(DeskLinkSpacing.md),
         ) { content() }
     }
