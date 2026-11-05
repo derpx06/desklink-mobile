@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.clip
@@ -236,7 +237,7 @@ fun ScanScreen(
             // Scrolls when large text or a short screen leaves no room; otherwise the nearby computers sit at the bottom.
             BoxWithConstraints(Modifier.weight(1f)) {
             Column(Modifier.verticalScroll(rememberScrollState()).heightIn(min = maxHeight)) {
-            Brackets(Modifier.align(Alignment.CenterHorizontally).padding(top = 48.dp).size(232.dp), camera, onAllowCamera, stopped, onRescan)
+            Brackets(Modifier.align(Alignment.CenterHorizontally).padding(top = 48.dp).width(232.dp).heightIn(min = 232.dp), camera, onAllowCamera, stopped, onRescan)
             // After a failure the reason replaces the hint, as a live region so a screen reader says it.
             val reason = stopped?.message?.takeIf { it.isNotBlank() }
             Text(

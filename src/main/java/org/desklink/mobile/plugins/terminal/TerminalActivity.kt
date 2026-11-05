@@ -1454,7 +1454,8 @@ internal fun TerminalHeader(name: String, detail: String, status: String?, size:
             // Reconnecting, ended, exited: a line of its own, so a long folder never pushes it out of sight, and the only live part.
             status?.let { Text(it, fontSize = 12.sp, color = TermCoralText, maxLines = 2, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         }
-        size?.let { Text(it, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1) }
+        // At the largest text sizes the grid size is dropped: it squeezed the name and the status into a word per line.
+        size?.takeIf { androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.5f }?.let { Text(it, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1) }
         menu()
     }
 }
