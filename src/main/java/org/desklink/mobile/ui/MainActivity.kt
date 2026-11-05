@@ -537,6 +537,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     onOpenSession = { sessionId -> startActivity(TerminalActivity.intent(this, id).putExtra(TerminalActivity.EXTRA_TERMINAL_ID, sessionId)) },
                     onOpenTerminals = { startActivity(TerminalActivity.intent(this, id)) },
                     onNew = { startActivity(TerminalActivity.intent(this, id, newTerminal = true)) },
+                    onNewLauncher = { launcher -> startActivity(TerminalActivity.intent(this, id, newTerminal = true, launcher = launcher)) },
                 )
                 AppTab.SETTINGS -> SettingsContent(device)
             }
@@ -1062,7 +1063,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         running ?: return null
         val speed = running.bytesPerSecond.takeIf { it > 0 }?.let { getString(R.string.transfers_speed, org.desklink.mobile.helpers.Sizes.iec(it)) }
         if (running.saving) return LiveTransfer(running.title, running.upload, null, getString(R.string.files_saving_label))
-        return LiveTransfer(running.title, running.upload, running.percent?.let { it / 100f }, listOfNotNull(running.percent?.let { "$it%" }, speed).joinToString(" · "))
+        // The lane in its words ("fast, over Wi-Fi", "over the secure link", "through the internet (slower)"), as Home and the notification say it.
+        val lane = org.desklink.mobile.plugins.share.TransferNotification.laneWord(this, running.deviceId, running.upload, running.title)
+        return LiveTransfer(running.title, running.upload, running.percent?.let { it / 100f }, listOfNotNull(running.percent?.let { "$it%" }, speed, lane).joinToString(" · "))
     }
 
     /** Read when used, so one object serves for as long as the computer does. */
@@ -1168,6 +1171,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onBack = { nav.pop(AppTab.SETTINGS) },
             waitingPermissions = waitingPermissions(this, device?.name ?: getString(R.string.settings_your_computer)),
             about = { AboutRoute { nav.pop(AppTab.SETTINGS) } },
+            onSwitchComputer = { nav.select(AppTab.HOME); computersRequest++ },
             actions = SettingsActions(
                 // One writer per setting: these are this phone's plugins, the desk's own
                 // switches go through onDeskSetting only.

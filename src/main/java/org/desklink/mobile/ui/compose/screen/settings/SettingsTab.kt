@@ -70,8 +70,20 @@ import org.desklink.mobile.ui.TrustedNetworksActivity
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.components.GroupRow
 import org.desklink.mobile.ui.compose.components.LaptopGlyph
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
+import org.desklink.mobile.ui.compose.SecondaryButton
+import org.desklink.mobile.ui.compose.components.DeskSearchField
+import org.desklink.mobile.ui.compose.components.HeroCard
+import org.desklink.mobile.ui.compose.components.IconTile
+import org.desklink.mobile.ui.compose.components.StatusDot
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import org.desklink.mobile.ui.compose.components.RowGroup
 import org.desklink.mobile.ui.compose.components.SectionLabel
 import org.desklink.mobile.ui.compose.tokens
@@ -119,52 +131,142 @@ fun SettingsTab(
     onBack: () -> Unit,
     waitingPermissions: Int,
     about: @Composable () -> Unit,
+    /** Opens the computers sheet; null hides the "Switch" button. */
+    onSwitchComputer: (() -> Unit)? = null,
 ) {
     val group = route?.let(SettingsPage::groupOf)
     when {
-        route == null -> SettingsList(desk, onOpen, waitingPermissions)
+        route == null -> SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer)
         route == SettingsPage.NETWORK -> NetworkScreen(onBack)
         route == SettingsPage.PERMISSIONS -> SettingsColumn(stringResource(R.string.settings_permissions), onBack) { PermissionsSection(desk) }
         route == SettingsPage.ABOUT -> about()
         group != null -> SettingsGroupPage(group, desk, actions, onOpen, onBack)
-        else -> SettingsList(desk, onOpen, waitingPermissions)
+        else -> SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer)
     }
 }
 
+/**
+ * The list: the computer card, a search over every setting, four quick switches, then the ten groups (Advanced carries a
+ * badge while permissions wait). Searching replaces the groups with matching rows, each under its page; a result opens
+ * that page. Nothing here is a new setting: every row is still on its page.
+ */
 @Composable
-private fun SettingsList(desk: DeskSettings?, onOpen: (String) -> Unit, waitingPermissions: Int) {
+private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: (String) -> Unit, waitingPermissions: Int, onSwitchComputer: (() -> Unit)?) {
     val context = LocalContext.current
     val t = tokens
     val pages = if (desk == null) SettingsPage.WITHOUT_COMPUTER else SettingsPage.entries
+    val name = desk?.name ?: stringResource(R.string.settings_your_computer)
+    var query by rememberSaveable { mutableStateOf("") }
+    val entries = remember(name, pages, desk != null) { SettingsIndex.entries(context, name, pages, hasDesk = desk != null) }
+    val results = remember(entries, query) { SettingsSearch.search(entries, query) }
     SettingsColumn(stringResource(R.string.settings), null) {
-        if (desk != null) {
-            RowGroup {
-                Row(
-                    Modifier.fillMaxWidth().background(t.surface).clickable { onOpen(SettingsPage.CONNECTION.route) }.heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    LaptopGlyph(t.textDim)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(desk.name, fontFamily = MonoFamily, fontSize = 15.sp)
-                        Text(stringResource(R.string.settings_paired_key, desk.key), fontSize = 13.sp, color = t.textDim)
+        if (desk != null) ComputerCard(desk, { onOpen(SettingsPage.CONNECTION.route) }, onSwitchComputer)
+        DeskSearchField(query, { query = it }, stringResource(R.string.settings_search), stringResource(R.string.palette_clear))
+        if (query.isNotBlank()) {
+            if (results.isEmpty()) {
+                Text(stringResource(R.string.settings_search_none, query.trim()), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp).semantics { liveRegion = LiveRegionMode.Polite })
+            }
+            results.groupBy { it.page }.forEach { (page, found) ->
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SectionLabel(stringResource(page.title))
+                    RowGroup {
+                        found.forEach { e -> GroupRow(e.title, icon = page.icon, subtitle = e.summary, onClick = { onOpen(page.route) }) { Chevron() } }
                     }
-                    Chevron()
+                }
+            }
+            return@SettingsColumn
+        }
+        if (desk != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                SectionLabel(stringResource(R.string.settings_quick_switches))
+                RowGroup {
+                    GroupRow(
+                        stringResource(R.string.settings_phone_clipboard), icon = R.drawable.sym_content_paste,
+                        subtitle = if (desk.clipboardOn) clipboardSummary(desk.name) else stringResource(R.string.home_clipboard_off),
+                        checked = desk.clipboardOn, onClick = { actions.onPhoneClipboard(!desk.clipboardOn) },
+                    )
+                    GroupRow(
+                        stringResource(R.string.settings_phone_notifications, desk.name), icon = R.drawable.sym_notifications,
+                        subtitle = stringResource(R.string.settings_desk_notifications_summary),
+                        checked = desk.notificationsOn, onClick = { actions.onPhoneNotifications(!desk.notificationsOn) },
+                    )
+                    GroupRow(
+                        stringResource(R.string.settings_calls_on, desk.name), icon = R.drawable.sym_call,
+                        subtitle = stringResource(R.string.settings_calls_on_summary, desk.name),
+                        checked = desk.callsOn, onClick = { actions.onCalls(!desk.callsOn) },
+                    )
+                    GroupRow(
+                        stringResource(R.string.settings_desk_sound, desk.name), icon = R.drawable.sym_volume_up,
+                        subtitle = stringResource(R.string.settings_desk_sound_summary, desk.name),
+                        checked = desk.deskSoundOn, onClick = { actions.onDeskSound(!desk.deskSoundOn) },
+                    )
                 }
             }
         }
-        RowGroup {
-            pages.forEach { page ->
-                val waiting = page == SettingsPage.ADVANCED && waitingPermissions > 0
-                GroupRow(
-                    stringResource(page.title),
-                    icon = page.icon,
-                    subtitle = if (waiting) androidx.compose.ui.res.pluralStringResource(R.plurals.settings_permissions_waiting, waitingPermissions, waitingPermissions) else stringResource(page.summary, desk?.name ?: stringResource(R.string.settings_your_computer)),
-                    onClick = { onOpen(page.route) },
-                ) { Chevron() }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            SectionLabel(stringResource(R.string.settings_all))
+            RowGroup {
+                pages.forEach { page ->
+                    val waiting = page == SettingsPage.ADVANCED && waitingPermissions > 0
+                    PageRow(
+                        page,
+                        if (waiting) androidx.compose.ui.res.pluralStringResource(R.plurals.settings_permissions_waiting, waitingPermissions, waitingPermissions) else stringResource(page.summary, name),
+                        badge = if (waiting) waitingPermissions else 0,
+                        onClick = { onOpen(page.route) },
+                    )
+                }
             }
         }
-        @Suppress("UNUSED_EXPRESSION") context
+        Text(
+            stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), fontSize = 12.sp, color = t.textDim,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
+
+/** The computer: a tile, its name and key, how it is reached right now, and Switch (the computers sheet on Home). Opens its page. */
+@Composable
+private fun ComputerCard(desk: DeskSettings, onOpen: () -> Unit, onSwitch: (() -> Unit)?) {
+    val t = tokens
+    val status = stringResource(if (desk.ready) R.string.connection_connected else R.string.connection_offline)
+    HeroCard {
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(role = Role.Button, onClick = onOpen).heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            IconTile(R.drawable.ic_device_desktop_32dp, size = 48.dp, radius = 16.dp, container = t.surface, content = t.accent)
+            Column(Modifier.weight(1f)) {
+                Text(desk.name, fontFamily = MonoFamily, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.settings_paired_key, desk.key), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    StatusDot(if (desk.ready) t.mintText else t.textFaint, size = 7.dp)
+                    Text(status, fontSize = 12.sp, lineHeight = 16.sp, color = if (desk.ready) t.mintText else t.textDim)
+                }
+            }
+            Chevron()
+        }
+        if (onSwitch != null) SecondaryButton(stringResource(R.string.settings_switch_computer), onSwitch, tonal = true, height = 48.dp, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/** A group row: a 40 dp tile, title, and a line (the value in words); [badge] > 0 shows how many things wait. */
+@Composable
+private fun PageRow(page: SettingsPage, summary: String, badge: Int, onClick: () -> Unit) {
+    val t = tokens
+    Row(
+        Modifier.fillMaxWidth().background(t.surface).clickable(role = Role.Button, onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        IconTile(page.icon, size = 40.dp, radius = 12.dp, container = if (badge > 0) t.coralContainer else t.accentContainer, content = if (badge > 0) t.coralText else t.onAccentContainer)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(page.title), fontSize = 16.sp, lineHeight = 21.sp, color = t.text)
+            Text(summary, fontSize = 13.sp, lineHeight = 17.sp, color = if (badge > 0) t.coralText else t.textDim)
+        }
+        if (badge > 0) Text(
+            badge.toString(), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = t.coralText,
+            modifier = Modifier.background(t.coralContainer, CircleShape).padding(horizontal = 8.dp, vertical = 2.dp).clearAndSetSemantics {},
+        )
+        Chevron()
     }
 }
 
@@ -219,7 +321,7 @@ private fun DeskSwitch(desk: DeskSettings, actions: SettingsActions, key: String
 @Composable
 private fun AllowRow(title: String, summary: String, onAllow: () -> Unit) {
     GroupRow(title, icon = R.drawable.sym_info, subtitle = summary) {
-        PillButton(stringResource(R.string.settings_allow), onAllow, style = PillStyle.Tonal, height = 34.dp, modifier = Modifier.padding(start = 4.dp))
+        SecondaryButton(stringResource(R.string.settings_allow), onAllow, tonal = true, height = 48.dp, modifier = Modifier.padding(start = 4.dp))
     }
 }
 

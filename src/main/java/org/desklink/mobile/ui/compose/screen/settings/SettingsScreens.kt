@@ -109,8 +109,6 @@ import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.components.GroupRow
 import org.desklink.mobile.ui.compose.components.LaptopGlyph
 import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
 import org.desklink.mobile.ui.compose.components.RowGroup
 import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.components.SectionLabel
@@ -403,7 +401,7 @@ internal fun PermissionsSection(desk: DeskSettings?) {
                         Text(stringResource(R.string.settings_allowed), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = t.mintText)
                     }
                 } else {
-                    PillButton(stringResource(if (row.unknown) R.string.settings_open else R.string.settings_allow), row.allow, style = PillStyle.Tonal, height = 34.dp, modifier = Modifier.padding(start = 4.dp))
+                    org.desklink.mobile.ui.compose.SecondaryButton(stringResource(if (row.unknown) R.string.settings_open else R.string.settings_allow), row.allow, tonal = true, height = 48.dp, modifier = Modifier.padding(start = 4.dp))
                 }
             }
         }

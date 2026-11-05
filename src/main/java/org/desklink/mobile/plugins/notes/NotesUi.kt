@@ -24,12 +24,27 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import org.desklink.mobile.ui.compose.DeskLinkShape
+import org.desklink.mobile.ui.compose.DeskExtendedFab
+import org.desklink.mobile.ui.compose.SecondaryButton
+import org.desklink.mobile.ui.compose.components.CheckItem
+import org.desklink.mobile.ui.compose.components.DeskSearchField
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -66,7 +81,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -82,8 +96,6 @@ import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.components.DeskCard
 import org.desklink.mobile.ui.compose.components.EmptyState
 import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
 import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.tokens
 import androidx.activity.ComponentActivity
@@ -106,31 +118,30 @@ class NotesUi(
     private val host: ComponentActivity,
     val editing: androidx.compose.runtime.MutableState<String?>,
 ) {
+    /**
+     * The notes. [externalQuery] is the Notes tab's own search field (it searches notes and snippets together); without one the
+     * list shows a field of its own (the Notes screen).
+     */
     @Composable
-    fun NotesList() {
+    fun NotesList(externalQuery: String? = null) {
         val t = tokens
         val revision by NotesStore.revision.collectAsState()
-        var query by rememberSaveable { mutableStateOf("") }
-        val notes = remember(revision, query) {
-            NotesStore.notes(host).filter { query.isBlank() || it.title.contains(query, true) || it.body.contains(query, true) }
-        }
+        var ownQuery by rememberSaveable { mutableStateOf("") }
+        val query = externalQuery ?: ownQuery
+        val notes = remember(revision, query) { NotesStore.notes(host).filter { NotesModel.matches(it, query) } }
+        val narrow = LocalConfiguration.current.screenWidthDp < 340 || LocalDensity.current.fontScale > 1.3f
+        val blocks = remember(notes, narrow) { NotesModel.blocks(notes, if (narrow) 1 else 2) }
         Column(Modifier.fillMaxSize()) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                leadingIcon = { Icon(painterResource(R.drawable.sym_search), contentDescription = null) },
-                placeholder = { Text(stringResource(R.string.notes_search)) },
-                shape = RoundedCornerShape(28.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            )
+            if (externalQuery == null) {
+                DeskSearchField(ownQuery, { ownQuery = it }, stringResource(R.string.notes_search), stringResource(R.string.palette_clear), Modifier.padding(horizontal = 16.dp))
+            }
             // Counted off the main thread: a big shelf of copies is real work.
             var preview by remember { mutableStateOf(0 to 0) }
             LaunchedEffect(revision) { preview = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { NotesStore.duplicateCopiesPreview(host) } }
             val (removable, kept) = preview
             var confirmTidy by remember { mutableStateOf(false) }
             if (removable + kept > 0) {
-                PillButton(
+                SecondaryButton(
                     stringResource(R.string.notes_tidy),
                     {
                         if (removable == 0) {
@@ -139,7 +150,7 @@ class NotesUi(
                             confirmTidy = true
                         }
                     },
-                    style = PillStyle.Tonal,
+                    tonal = true,
                     height = 48.dp,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
@@ -171,74 +182,117 @@ class NotesUi(
                         Modifier.verticalScroll(rememberScrollState()).padding(bottom = 88.dp),
                     )
                 } else {
-                    LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(notes, key = { it.id }) { note -> NoteCard(note) { editing.value = note.id } }
+                    LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(blocks, key = { b -> when (b) { is NotesModel.Block.Checklist -> b.note.id; is NotesModel.Block.Row -> "row-" + b.notes.first().id } }) { block ->
+                            when (block) {
+                                is NotesModel.Block.Checklist -> ChecklistCard(block.note) { editing.value = block.note.id }
+                                is NotesModel.Block.Row -> Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    block.notes.forEach { note -> NoteCard(note, Modifier.weight(1f).fillMaxHeight()) { editing.value = note.id } }
+                                    if (!narrow && block.notes.size == 1) Spacer(Modifier.weight(1f))
+                                }
+                            }
+                        }
                     }
                 }
-                PillButton(
-                    stringResource(R.string.notes_new),
-                    { editing.value = NEW },
-                    icon = R.drawable.sym_add,
-                    modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp),
+                DeskExtendedFab(
+                    stringResource(R.string.notes_new), R.drawable.sym_add, { editing.value = NEW },
+                    Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp),
                 )
             }
         }
     }
 
     @Composable
-    private fun NoteCard(note: Note, onOpen: () -> Unit) {
+    private fun NoteCard(note: Note, modifier: Modifier, onOpen: () -> Unit) {
         val t = tokens
         val pinned = stringResource(R.string.notes_pinned)
-        DeskCard(Modifier.fillMaxWidth().semantics(mergeDescendants = true) { if (note.pinned) contentDescription = "${note.label}, $pinned" }, onClick = onOpen) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(note.label, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        DeskCard(modifier.semantics(mergeDescendants = true) { if (note.pinned) contentDescription = "${note.label}, $pinned" }, onClick = onOpen) {
+            Column(Modifier.padding(14.dp).heightIn(min = 92.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(note.label, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     if (note.pinned) Icon(painterResource(R.drawable.sym_keep_filled), contentDescription = null, tint = t.accentText, modifier = Modifier.size(18.dp))
                 }
                 val preview = note.body.lineSequence().map(String::trim).filter(String::isNotEmpty).drop(if (note.title.isBlank()) 1 else 0).joinToString("  ")
-                if (preview.isNotEmpty()) Text(preview, fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(DateUtils.getRelativeTimeSpanString(note.modified).toString(), fontSize = 12.sp, color = t.textDim)
+                if (preview.isNotEmpty()) Text(preview, fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(DateUtils.getRelativeTimeSpanString(note.modified).toString(), fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
             }
         }
     }
 
+    /** A note of tick boxes: the first four on the accent card, "2 of 4"; a tick is saved as an edit of the note (the desk sees it). */
     @Composable
-    fun SnippetsList() {
+    private fun ChecklistCard(note: Note, onOpen: () -> Unit) {
+        val t = tokens
+        val items = remember(note.body) { NotesModel.checklist(note.body) }
+        val ticked = items.count { it.done }
+        val pinned = stringResource(R.string.notes_pinned)
+        val ink = t.onAccentContainer
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(t.accentContainer).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 12.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClickLabel = stringResource(R.string.notes_edit), onClick = onOpen)
+                    .semantics(mergeDescendants = true) { if (note.pinned) contentDescription = "${note.label}, $pinned" },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (note.pinned) Icon(painterResource(R.drawable.sym_keep_filled), contentDescription = null, tint = ink, modifier = Modifier.size(18.dp))
+                Text(note.label, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium, color = ink, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.notes_checklist_progress, ticked, items.size), fontSize = 12.sp, color = ink, modifier = Modifier.padding(end = 8.dp))
+            }
+            items.take(4).forEach { item ->
+                CheckItem(item.label, item.done, { done ->
+                    NotesStore.editNote(host, note.id, loaded = note.modified) { it.copy(body = NotesModel.setChecked(it.body, item.line, done)) }
+                })
+            }
+            if (items.size > 4) Text(stringResource(R.string.notes_checklist_more, items.size - 4), fontSize = 12.sp, color = ink, modifier = Modifier.padding(top = 2.dp))
+            Text(DateUtils.getRelativeTimeSpanString(note.modified).toString(), fontSize = 12.sp, color = ink.copy(alpha = 0.8f), modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+
+    @Composable
+    fun SnippetsList(externalQuery: String = "") {
         val t = tokens
         val revision by NotesStore.revision.collectAsState()
-        val snippets = remember(revision) { NotesStore.snippets(host) }
+        val snippets = remember(revision, externalQuery) { NotesStore.snippets(host).filter { NotesModel.matches(it, externalQuery) } }
         Column(Modifier.fillMaxSize()) {
-            PillButton(
+            SecondaryButton(
                 stringResource(R.string.snippets_pin_clipboard),
                 { pinClipboard(host) },
-                style = PillStyle.Tonal,
+                tonal = true,
                 icon = R.drawable.sym_keep,
                 height = 48.dp,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             if (snippets.isEmpty()) {
-                EmptyState(R.drawable.sym_content_paste, stringResource(R.string.snippets_empty_title), stringResource(R.string.snippets_empty_body))
+                EmptyState(R.drawable.sym_content_paste, stringResource(if (externalQuery.isBlank()) R.string.snippets_empty_title else R.string.notes_no_match), stringResource(R.string.snippets_empty_body))
             } else {
-                LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(snippets, key = { it.id }) { snippet ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(t.surface)
-                                .clickable(onClickLabel = stringResource(R.string.snippets_copy)) { copy(host, snippet.text) }
-                                .heightIn(min = 56.dp)
-                                .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(snippet.label, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                if (snippet.text.trim() != snippet.label) {
-                                    Text(snippet.text.trim(), fontFamily = MonoFamily, fontSize = 12.sp, color = t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        DeskCard(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(start = 14.dp, top = 6.dp, end = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(snippet.label, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                    // Copy is the snippet's one tap; the label names the snippet for TalkBack.
+                                    val copyLabel = stringResource(R.string.snippets_copy_named, snippet.label)
+                                    Box(
+                                        Modifier.heightIn(min = 48.dp).clip(DeskLinkShape.stadium).clickable(role = Role.Button, onClickLabel = copyLabel) { copy(host, snippet.text) }.semantics { contentDescription = copyLabel },
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.snippets_copy), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer,
+                                            modifier = Modifier.background(t.accentContainer, DeskLinkShape.stadium).heightIn(min = 32.dp).padding(horizontal = 14.dp, vertical = 6.dp),
+                                        )
+                                    }
+                                    IconButton(onClick = { NotesStore.deleteSnippet(host, snippet.id) }, modifier = Modifier.size(48.dp)) {
+                                        Icon(painterResource(R.drawable.sym_delete), contentDescription = stringResource(R.string.snippets_delete, snippet.label), tint = t.textDim)
+                                    }
                                 }
-                            }
-                            IconButton(onClick = { NotesStore.deleteSnippet(host, snippet.id) }, modifier = Modifier.size(48.dp)) {
-                                Icon(painterResource(R.drawable.sym_delete), contentDescription = stringResource(R.string.snippets_delete, snippet.label), tint = t.textDim)
+                                if (snippet.text.trim() != snippet.label) {
+                                    Text(
+                                        snippet.text.trim(), fontFamily = MonoFamily, fontSize = 12.sp, lineHeight = 18.sp, color = Color(0xFFD9DBE0), maxLines = 4, overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(end = 10.dp).fillMaxWidth().background(t.terminalBg, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+                                    )
+                                }
                             }
                         }
                     }
@@ -250,7 +304,7 @@ class NotesUi(
     // ---- editor ---------------------------------------------------------------------------------------------
 
     @Composable
-    fun Editor(start: String, onDone: () -> Unit) {
+    fun Editor(start: String, barInset: Dp = 0.dp, onDone: () -> Unit) {
         val t = tokens
         val context = LocalContext.current
         var id by rememberSaveable { mutableStateOf(start.takeIf { it != NEW }) }
@@ -316,7 +370,7 @@ class NotesUi(
             }
         }
 
-        Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().imePadding()) {
+        Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().windowInsetsPadding(WindowInsets.ime.exclude(WindowInsets(bottom = barInset)))) {
             val tooLong = !Shelf.syncable(body)
             BackHandler(tooLong) { Toast.makeText(context, R.string.notes_too_long, Toast.LENGTH_SHORT).show() }
             ScreenHeader({ if (tooLong) Toast.makeText(context, R.string.notes_too_long, Toast.LENGTH_SHORT).show() else { save(); onDone() } }) {

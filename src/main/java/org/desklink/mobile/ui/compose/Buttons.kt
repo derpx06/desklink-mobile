@@ -37,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -154,6 +156,29 @@ fun DeskIconButton(
 ) {
     IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(48.dp)) {
         Icon(painterResource(icon), contentDescription = contentDescription, tint = if (enabled) tint else tint.copy(alpha = 0.38f), modifier = Modifier.size(24.dp))
+    }
+}
+
+/** The extended floating action button ("New note"): 56 dp, radius 18, the accent, an icon and its label. */
+@Composable
+fun DeskExtendedFab(label: String, @DrawableRes icon: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val t = tokens
+    val source = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
+    Row(
+        modifier
+            .pressScale(source)
+            .shadow(6.dp, shape)
+            .heightIn(min = 56.dp)
+            .clip(shape)
+            .background(t.accent)
+            .clickable(interactionSource = source, indication = androidx.compose.material3.ripple(), role = Role.Button, onClick = onClick)
+            .padding(start = 16.dp, end = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(painterResource(icon), contentDescription = null, tint = t.onAccent, modifier = Modifier.size(24.dp))
+        Text(label, color = t.onAccent, fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium, modifier = Modifier.padding(vertical = 8.dp))
     }
 }
 
