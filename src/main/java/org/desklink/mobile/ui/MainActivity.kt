@@ -718,6 +718,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             },
             onOpenRecent = { record -> transferActions(device).onOpen(record) },
             onTerminals = { nav.select(AppTab.TERMINALS) },
+            onNewTerminal = { startActivity(TerminalActivity.intent(this, id, newTerminal = true)) },
+            onOpenSettings = { route -> nav.reset(AppTab.SETTINGS); nav.push(AppTab.SETTINGS, route); nav.select(AppTab.SETTINGS) },
             onNotes = { nav.select(AppTab.NOTES) },
             onNote = { noteId -> nav.select(AppTab.NOTES); notesEditing.value = noteId },
             onNewNote = { nav.select(AppTab.NOTES); notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW },

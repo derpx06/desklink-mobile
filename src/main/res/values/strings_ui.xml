@@ -915,4 +915,53 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="welcome_qr_1">On your computer, open DeskLink.</string>
     <string name="welcome_qr_2">Choose Pair a phone.</string>
     <string name="welcome_qr_3">Scan the code it shows with this phone.</string>
+    <!-- Home, wave 2 -->
+    <string name="home_greeting_morning">Good morning</string>
+    <string name="home_greeting_afternoon">Good afternoon</string>
+    <string name="home_greeting_evening">Good evening</string>
+    <string name="home_search">Find anything</string>
+    <string name="home_quick_actions">Quick actions</string>
+    <string name="home_all_actions">All actions</string>
+    <string name="home_terminal_needs">A terminal needs you</string>
+    <string name="home_terminal_needs_detail">A command finished or is waiting</string>
+    <string name="home_live_also">Also live: %1$s</string>
+    <string name="home_open">Open</string>
+    <string name="home_notes_open">Open</string>
+    <string name="home_end_to_end">end-to-end encrypted</string>
+    <string name="home_unlock_short">Unlock desk</string>
+    <!-- Find anything -->
+    <string name="palette_hint">Send, ring, lock, terminal…</string>
+    <string name="palette_close">Close search</string>
+    <string name="palette_clear">Clear</string>
+    <string name="palette_nothing">Nothing matches “%1$s”.</string>
+    <string name="palette_group_actions">Actions</string>
+    <string name="palette_group_files">Recent files</string>
+    <string name="palette_group_notes">Notes</string>
+    <string name="palette_group_snippets">Snippets</string>
+    <string name="palette_group_settings">Settings</string>
+    <string name="palette_group_computers">Your computers</string>
+    <string name="palette_open_bucket">Open the Bucket</string>
+    <string name="palette_open_terminals">Open the terminals</string>
+    <string name="palette_copy_snippet">Copies it</string>
+    <string name="palette_computer_here">This one</string>
+    <string name="palette_keywords_clipboard">copy paste</string>
+    <string name="palette_keywords_files">upload share send</string>
+    <string name="palette_keywords_screen">remote mouse keyboard touchpad control</string>
+    <string name="palette_keywords_ring">find phone alarm</string>
+    <string name="palette_keywords_terminal">shell command console ssh</string>
+    <string name="palette_keywords_pair">add new computer</string>
+    <!-- Offline -->
+    <string name="home_things_to_check">Things to check</string>
+    <string name="home_still_works">Still works offline</string>
+    <string name="home_check_awake">Is %1$s awake?</string>
+    <string name="home_check_awake_body">DeskLink needs to be running on it.</string>
+    <string name="home_check_wifi">On the same Wi‑Fi?</string>
+    <string name="home_check_wifi_body">This phone and %1$s need to be on the same network.</string>
+    <string name="home_check_away">Away from home?</string>
+    <string name="home_check_away_relay_on">The relay is on. DeskLink tries it as well.</string>
+    <string name="home_check_away_relay_off">Turn on the relay to reach %1$s from anywhere.</string>
+    <string name="home_check_update">%1$s runs another DeskLink version</string>
+    <string name="home_check_update_body">Update DeskLink on %1$s, or on this phone, so both match.</string>
+    <string name="home_offline_cant_reach">Can\'t reach it</string>
+    <string name="home_offline_works">Works offline</string>
 </resources>

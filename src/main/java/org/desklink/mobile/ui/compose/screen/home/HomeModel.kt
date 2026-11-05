@@ -77,8 +77,29 @@ object HomeModel {
                 device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby == true &&
                 device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java) != null &&
                 device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST),
+            offers = offers(context, device),
+            history = history.take(HISTORY_SEARCHED),
+            terminalAttention = org.desklink.mobile.plugins.terminal.TerminalAttentionBadge.has(id),
             relayAvailable = org.desklink.mobile.backends.relay.RelaySettings.enabled(context) &&
                 org.desklink.mobile.backends.relay.RelayLinkProvider.statusLive.value == org.desklink.mobile.backends.relay.RelayLinkProvider.Status.ONLINE,
+        )
+    }
+
+    /** How many files the palette can search. */
+    const val HISTORY_SEARCHED = 50
+
+    private fun offers(context: Context, device: Device): HomeOffers {
+        fun menu(name: Int) = device.loadedPlugins.values.any { p -> p.getUiMenuEntries().any { it.name == context.getString(name) } }
+        val share = device.getPlugin(org.desklink.mobile.plugins.share.SharePlugin::class.java) != null
+        return HomeOffers(
+            files = share,
+            clipboard = device.getPlugin(ClipboardPlugin::class.java) != null,
+            link = share,
+            screen = device.getPlugin(ScreenControlPlugin::class.java) != null,
+            terminal = true,
+            ring = menu(R.string.ring),
+            ping = menu(R.string.send_ping),
+            lock = menu(R.string.lock_remote_device),
         )
     }
 
