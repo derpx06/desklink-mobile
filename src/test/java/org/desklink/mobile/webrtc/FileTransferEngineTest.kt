@@ -24,8 +24,10 @@ import java.util.UUID
  * files, a fake clock), so every row of the W3 edge-case table is exercised without a device.
  */
 class FileTransferEngineTest {
+    // On disk (build/), not the JVM's tmpdir: /tmp is RAM on some machines, and the 64 MiB test failed there with a write error
+    // ("expected 67108864 but was -1": the receiver ended FAILED, nothing delivered) when memory ran short.
     @get:Rule
-    val tmp = TemporaryFolder()
+    val tmp = TemporaryFolder(File("build/tmp/file-engine-test").apply { mkdirs() })
 
     // ------------------------------------------------------------ sources
 
@@ -299,7 +301,7 @@ class FileTransferEngineTest {
         val source = GeneratedSource(size)
         val h = Harness(source, size)
         h.run()
-        assertEquals(size, h.deliveredSize)
+        assertEquals("receiver: ${h.receiverOutcomes}", size, h.deliveredSize)
         val expected = MessageDigest.getInstance("SHA-256").also { digest ->
             val s = source.open(0)
             val buffer = ByteArray(1 shl 16)
