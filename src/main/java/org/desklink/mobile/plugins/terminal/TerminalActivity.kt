@@ -886,23 +886,14 @@ class TerminalActivity : AppCompatActivity() {
 
         Box(Modifier.fillMaxSize().background(TermBg).safeDrawingPadding()) {
             Column(Modifier.fillMaxSize()) {
-                // The design's header: back, the ">_" badge, the name over "folder · computer", the size in mono, the menu.
-                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 4.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = { leaveTerminal(client, id) }, modifier = Modifier.size(48.dp)) {
-                        Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = stringResource(R.string.terminal_back_to_sessions), tint = TermText)
-                    }
-                    Text(">_", fontFamily = MonoFamily, fontSize = 11.sp, color = TermAccent, modifier = Modifier.background(TermBadge, RoundedCornerShape(7.dp)).padding(horizontal = 7.dp, vertical = 3.dp))
-                    Column(Modifier.weight(1f).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        val meta = subtitle ?: rttMs?.let { stringResource(R.string.home_meta_rtt, it.toInt()) }
-                        Text(
-                            listOfNotNull(session?.cwd?.takeIf { it.isNotBlank() }, deskName(), meta).joinToString(" · "),
-                            fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 2, overflow = TextOverflow.MiddleEllipsis,
-                        )
-                    }
-                    if (session != null && session.cols > 0 && session.rows > 0) {
-                        Text(stringResource(R.string.terminal_session_size, session.cols, session.rows), fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1)
-                    }
+                TerminalHeader(
+                    name = name,
+                    detail = listOfNotNull(session?.cwd?.takeIf { it.isNotBlank() }, deskName(), rttMs?.takeIf { subtitle == null }?.let { stringResource(R.string.home_meta_rtt, it.toInt()) }).joinToString(" · "),
+                    status = subtitle,
+                    size = session?.takeIf { it.cols > 0 && it.rows > 0 }?.let { stringResource(R.string.terminal_session_size, it.cols, it.rows) },
+                    backLabel = stringResource(R.string.terminal_back_to_sessions),
+                    onBack = { leaveTerminal(client, id) },
+                ) {
                     Box {
                         IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
                             Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.terminal_session_options, name), tint = TermIcon)
@@ -1442,3 +1433,25 @@ private const val PREVIEW_REFRESH_MS = 1_500L
 
 /** How often the session list asks for sessions started elsewhere. */
 private const val LIST_REFRESH_MS = 5_000L
+
+/**
+ * The session header of the design: back, the `>_` badge, the name over "folder · computer · status", the size in mono and the menu
+ * ([menu] draws the button and its dropdown). A live region, so a reconnect or an exit is announced.
+ */
+@Composable
+internal fun TerminalHeader(name: String, detail: String, status: String?, size: String?, backLabel: String, onBack: () -> Unit, menu: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 4.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+            Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = backLabel, tint = TermText)
+        }
+        Text(">_", fontFamily = MonoFamily, fontSize = 11.sp, color = TermAccent, modifier = Modifier.background(TermBadge, RoundedCornerShape(7.dp)).padding(horizontal = 7.dp, vertical = 3.dp))
+        Column(Modifier.weight(1f).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(detail, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+            // Reconnecting, ended, exited: a line of its own, so a long folder never pushes it out of sight.
+            status?.let { Text(it, fontSize = 12.sp, color = TermCoralText, maxLines = 2) }
+        }
+        size?.let { Text(it, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1) }
+        menu()
+    }
+}

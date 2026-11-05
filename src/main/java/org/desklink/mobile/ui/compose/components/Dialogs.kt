@@ -47,7 +47,6 @@ class DialogAction(val label: String, val enabled: Boolean = true, val destructi
  * Both wrap onto a second line at a large font instead of being cut. A dialog that only informs passes [confirm] alone; one
  * that waits for something passes neither.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DeskDialog(
     onDismissRequest: () -> Unit,
@@ -57,23 +56,28 @@ fun DeskDialog(
     properties: DialogProperties = DialogProperties(),
     text: (@Composable () -> Unit)? = null,
 ) {
+    Dialog(onDismissRequest = onDismissRequest, properties = properties) { DeskDialogCard(title, confirm, dismiss, text) }
+}
+
+/** The dialog's card on its own (the window around it is the system's), so a screenshot test can draw it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun DeskDialogCard(title: String?, confirm: DialogAction?, dismiss: DialogAction?, text: (@Composable () -> Unit)?) {
     val t = tokens
-    Dialog(onDismissRequest = onDismissRequest, properties = properties) {
-        Surface(shape = DeskLinkShape.group, color = t.surface2, contentColor = t.text, tonalElevation = 0.dp, shadowElevation = 8.dp, modifier = Modifier.widthIn(max = 560.dp)) {
-            Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                title?.let { Text(it, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold, maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) }
-                text?.let {
-                    // Scrolls here, so the buttons below always stay on screen.
-                    Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                        androidx.compose.material3.ProvideTextStyle(TextStyle(fontSize = 15.sp, lineHeight = 21.sp)) { it() }
-                    }
+    Surface(shape = DeskLinkShape.group, color = t.surface2, contentColor = t.text, tonalElevation = 0.dp, shadowElevation = 8.dp, modifier = Modifier.widthIn(max = 560.dp)) {
+        Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            title?.let { Text(it, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold, maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) }
+            text?.let {
+                // Scrolls here, so the buttons below always stay on screen.
+                Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    androidx.compose.material3.ProvideTextStyle(TextStyle(fontSize = 15.sp, lineHeight = 21.sp)) { it() }
                 }
-                if (confirm != null || dismiss != null) {
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, androidx.compose.ui.Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        dismiss?.let { StadiumButton(it.label, it.onClick, style = DeskButtonStyle.Outlined, height = 48.dp, enabled = it.enabled) }
-                        confirm?.let {
-                            StadiumButton(it.label, it.onClick, style = if (it.destructive) DeskButtonStyle.Danger else DeskButtonStyle.Primary, height = 48.dp, enabled = it.enabled)
-                        }
+            }
+            if (confirm != null || dismiss != null) {
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, androidx.compose.ui.Alignment.End), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    dismiss?.let { StadiumButton(it.label, it.onClick, style = DeskButtonStyle.Outlined, height = 48.dp, enabled = it.enabled) }
+                    confirm?.let {
+                        StadiumButton(it.label, it.onClick, style = if (it.destructive) DeskButtonStyle.Danger else DeskButtonStyle.Primary, height = 48.dp, enabled = it.enabled)
                     }
                 }
             }

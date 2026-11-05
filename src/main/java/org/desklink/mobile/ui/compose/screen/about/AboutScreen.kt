@@ -26,7 +26,17 @@ import androidx.compose.ui.unit.dp
 import org.desklink.mobile.extensions.safeDrawingBottomPadding
 import org.desklink.mobile.ui.about.AboutData
 import org.desklink.mobile.ui.about.AboutPerson
+import org.desklink.mobile.ui.compose.DeskLinkShape
 import org.desklink.mobile.ui.compose.DeskLinkTheme
+import org.desklink.mobile.ui.compose.DeskLinkType
+import org.desklink.mobile.ui.compose.MonoFamily
+import org.desklink.mobile.ui.compose.components.DeskCard
+import org.desklink.mobile.ui.compose.components.GroupRow
+import org.desklink.mobile.ui.compose.components.RowGroup
+import org.desklink.mobile.ui.compose.tokens
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.sp
 import org.desklink.mobile.ui.compose.components.DeskLinkThemePreviews
 import org.desklink.mobile.R
 
@@ -89,9 +99,11 @@ private fun AppInfoCard(
 ) {
     var tapCount by remember { mutableIntStateOf(0) }
     var firstTapMillis by remember { mutableStateOf<Long?>(null) }
+    val t = tokens
 
-    ElevatedCard(
+    DeskCard(
         modifier = Modifier.fillMaxWidth(),
+        shape = DeskLinkShape.group,
         onClick = {
             val currentMillis = System.currentTimeMillis()
             if (firstTapMillis == null) {
@@ -115,33 +127,35 @@ private fun AppInfoCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.Top
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Image(
                 painter = painterResource(id = aboutData.icon),
                 contentDescription = null,
-                modifier = Modifier.size(52.dp)
+                modifier = Modifier.size(56.dp)
             )
 
-            Column(
-                modifier = Modifier.align(Alignment.CenterVertically)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = aboutData.name,
-                    style = MaterialTheme.typography.titleLarge
+                    style = DeskLinkType.screenTitle,
+                    color = t.text,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(
                     text = stringResource(id = R.string.version, aboutData.versionName),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 14.sp,
+                    fontFamily = MonoFamily,
+                    color = t.textDim,
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+/** Report a bug, Donate, Source code, Licenses: rows on one rounded group, like Settings. */
 @Composable
 private fun ActionButtons(
     aboutData: AboutData,
@@ -150,113 +164,36 @@ private fun ActionButtons(
     onSourceCodeClicked: () -> Unit,
     onLicensesClicked: () -> Unit
 ) {
-    val buttons = remember(aboutData) {
-        val list = mutableListOf<@Composable () -> Unit>()
+    RowGroup {
         if (aboutData.bugURL != null) {
-            list.add {
-                ActionIconTextButton(
-                    textRes = R.string.report_bug,
-                    iconRes = R.drawable.ic_baseline_bug_report_24,
-                    onClick = onReportBugClicked
-                )
-            }
+            GroupRow(stringResource(R.string.report_bug), icon = R.drawable.ic_baseline_bug_report_24, onClick = onReportBugClicked, chevron = true)
         }
         if (aboutData.donateURL != null) {
-            list.add {
-                ActionIconTextButton(
-                    textRes = R.string.donate,
-                    iconRes = R.drawable.ic_baseline_attach_money_24,
-                    onClick = onDonateClicked
-                )
-            }
+            GroupRow(stringResource(R.string.donate), icon = R.drawable.ic_baseline_attach_money_24, onClick = onDonateClicked, chevron = true)
         }
         if (aboutData.sourceCodeURL != null) {
-            list.add {
-                ActionIconTextButton(
-                    textRes = R.string.source_code,
-                    iconRes = R.drawable.ic_baseline_code_24,
-                    onClick = onSourceCodeClicked
-                )
-            }
+            GroupRow(stringResource(R.string.source_code), icon = R.drawable.ic_baseline_code_24, onClick = onSourceCodeClicked, chevron = true)
         }
-
-        list.add {
-            ActionIconTextButton(
-                textRes = R.string.licenses,
-                iconRes = R.drawable.ic_baseline_gavel_24,
-                onClick = onLicensesClicked
-            )
-        }
-        list
-    }
-
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val buttonWidth = 84.dp
-        val totalNeededWidth = buttonWidth.times(buttons.size)
-
-        val maxItemsInRow = if (totalNeededWidth <= this.maxWidth) buttons.size else 3
-
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            maxItemsInEachRow = maxItemsInRow
-        ) {
-            buttons.forEach { button -> button() }
-        }
-    }
-}
-
-@Composable
-private fun ActionIconTextButton(
-    @StringRes textRes: Int,
-    @DrawableRes iconRes: Int,
-    onClick: () -> Unit
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-
-    Column(
-        modifier = Modifier
-            .size(84.dp)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = ripple(
-                    color = MaterialTheme.colorScheme.onBackground,
-                    bounded = false
-                ),
-                onClick = onClick
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            painter = painterResource(id = iconRes),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(id = textRes),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center
-        )
+        GroupRow(stringResource(R.string.licenses), icon = R.drawable.ic_baseline_gavel_24, onClick = onLicensesClicked, chevron = true)
     }
 }
 
 @Composable
 private fun AuthorsCard(aboutData: AboutData) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    val t = tokens
+    DeskCard(modifier = Modifier.fillMaxWidth(), shape = DeskLinkShape.group) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
             Text(
                 text = stringResource(id = R.string.authors),
-                style = MaterialTheme.typography.titleLarge
+                style = DeskLinkType.cardTitle,
+                color = t.text,
+                modifier = Modifier.semantics { heading() },
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             aboutData.authors.forEach { author ->
                 AuthorItemRow(author = author)
@@ -266,8 +203,8 @@ private fun AuthorsCard(aboutData: AboutData) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = stringResource(id = footerResId),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(start = 4.dp)
+                    fontSize = 14.sp,
+                    color = t.textDim,
                 )
             }
         }
@@ -276,6 +213,7 @@ private fun AuthorsCard(aboutData: AboutData) {
 
 @Composable
 private fun AuthorItemRow(author: AboutPerson) {
+    val t = tokens
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -283,13 +221,14 @@ private fun AuthorItemRow(author: AboutPerson) {
     ) {
         Text(
             text = author.name,
-            style = MaterialTheme.typography.bodyLarge
+            fontSize = 16.sp,
+            color = t.text,
         )
         if (author.task != null) {
             Text(
                 text = stringResource(id = author.task),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontSize = 14.sp,
+                color = t.textDim,
             )
         }
     }
