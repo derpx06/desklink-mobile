@@ -718,6 +718,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             },
             onOpenRecent = { record -> transferActions(device).onOpen(record) },
             onTerminals = { nav.select(AppTab.TERMINALS) },
+            onMessage = ::showMessage,
             onNewTerminal = { startActivity(TerminalActivity.intent(this, id, newTerminal = true)) },
             onOpenSettings = { route -> nav.reset(AppTab.SETTINGS); nav.push(AppTab.SETTINGS, route); nav.select(AppTab.SETTINGS) },
             onNotes = { nav.select(AppTab.NOTES) },
