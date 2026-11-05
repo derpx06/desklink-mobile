@@ -713,6 +713,19 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         }
         val deviceName = remember { deviceName() }
         var soundOn by remember { mutableStateOf(org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this@MousePadActivity, deviceId.orEmpty())) }
+        // Settings is another screen: read the switch again on return, so the chip is not stale.
+        androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+            soundOn = org.desklink.mobile.plugins.audio.PhoneAudio.playDeskSound(this@MousePadActivity, deviceId.orEmpty())
+            onPauseOrDispose {}
+        }
+        val onSoundToggle: () -> Unit = {
+            touch()
+            // F1: the desk's sound here, the same switch as Settings → "Play <desk>'s sound here".
+            val want = !soundOn
+            soundOn = want
+            org.desklink.mobile.plugins.audio.PhoneAudio.setPlayDeskSound(this@MousePadActivity, deviceId.orEmpty(), want)
+            DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.let { if (want) it.requestDeskSound() else it.stopDeskSound() }
+        }
         val input = controlInputEnabled(controlEnabled, controlMode)
         val keyboardUp = WindowInsets.isImeVisible
         // The strip is dismissed by the person or after a while, once per distinct state (a new refusal is a new
@@ -766,14 +779,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 fill = fillScreen,
                 onFill = { touch(); fillScreen = !fillScreen },
                 soundOn = soundOn,
-                onSound = {
-                    touch()
-                    // F1: the desk's sound here, the same switch as Settings → "Play <desk>'s sound here".
-                    val want = !soundOn
-                    soundOn = want
-                    org.desklink.mobile.plugins.audio.PhoneAudio.setPlayDeskSound(this@MousePadActivity, deviceId.orEmpty(), want)
-                    DeskLinkApplication.getInstance().webRtcCoordinator(deviceId)?.let { if (want) it.requestDeskSound() else it.stopDeskSound() }
-                },
+                onSound = onSoundToggle,
                 keys = { if (keyboardUp) KeyBar(input, onUsed = touch) },
                 onMore = { touch(); more = true },
                 reason = denial,
