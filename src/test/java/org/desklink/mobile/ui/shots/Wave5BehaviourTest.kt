@@ -2,6 +2,10 @@
 package org.desklink.mobile.ui.shots
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -70,6 +74,17 @@ class Wave5BehaviourTest {
         compose.onNodeWithContentDescription("Close remote control").performClick()
         compose.onNodeWithText("End").performClick()
         assertEquals(listOf("fill", "sound", "back", "end"), log)
+    }
+
+    @Test fun terminalHeaderAnnouncesOnlyItsStatus() {
+        compose.setContent {
+            DeskLinkFixedTheme(compose.activity, true) {
+                org.desklink.mobile.plugins.terminal.TerminalHeader("build", "src · arch-desk · 12 ms", "Reconnecting", "80x24", "Back", {}, {})
+            }
+        }
+        val live = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)
+        compose.onAllNodes(live).assertCountEquals(1)
+        compose.onNode(live).assertTextEquals("Reconnecting")
     }
 
     @Test fun dialogButtonsCallTheirActions() {
