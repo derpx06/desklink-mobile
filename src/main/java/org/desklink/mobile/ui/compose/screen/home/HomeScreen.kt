@@ -263,7 +263,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
             }
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Greeting(onSearch = { palette = true })
                 if (two) {
@@ -392,9 +392,10 @@ private fun NameBlock(state: HomeState, onSwitch: () -> Unit, modifier: Modifier
     val big = LocalDensity.current.fontScale > 1.4f
     Column(
         modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .semantics(mergeDescendants = true) { contentDescription = switchDescription }
-            .clickable(role = Role.Button, onClick = onSwitch),
+            .clickable(role = Role.Button, onClick = onSwitch)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
     ) {
         header()
         Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -912,8 +913,14 @@ private fun MirroredLine(state: HomeState) {
 
 @Composable
 private fun ComputersSheet(state: HomeState, onDismiss: () -> Unit, actions: HomeActions) {
+    DeskBottomSheet(onDismiss) { ComputersContent(state, onDismiss, actions) }
+}
+
+/** The sheet's rows; a screenshot test draws them without the window a real sheet lives in. */
+@Composable
+internal fun ComputersContent(state: HomeState, onDismiss: () -> Unit, actions: HomeActions) {
     val t = tokens
-    DeskBottomSheet(onDismiss) {
+    run {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 24.dp, top = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 stringResource(R.string.home_your_computers),

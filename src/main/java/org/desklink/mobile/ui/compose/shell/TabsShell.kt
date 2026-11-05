@@ -12,6 +12,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +51,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -82,7 +84,11 @@ const val WIDE_DP = 600
 /** The widest a screen's content gets on a tablet. */
 val MaxContentWidth = 840.dp
 
-val TabBarHeight = 64.dp
+/** The bar itself, a floating pill of this height. */
+val TabBarPillHeight = 68.dp
+
+/** What the bar takes from the bottom of the screen: the pill and the 8 dp above and below it (the navigation bar is extra). */
+val TabBarHeight = TabBarPillHeight + 16.dp
 
 @Suppress("ConfigurationScreenWidthHeight") // the one question asked: tab bar or rail
 @Composable
@@ -140,10 +146,19 @@ fun TabsShell(
         Column(modifier.fillMaxSize().background(tokens.bg)) {
             // The bar owns the navigation-bar inset, so the screens above it must not pad for it twice.
             pages(Modifier.weight(1f).fillMaxWidth().consumeWindowInsets(WindowInsets.navigationBars))
-            Box(Modifier.fillMaxWidth().background(tokens.surface)) {
-                Box(Modifier.fillMaxWidth().height(1.dp).background(tokens.hairline))
+            // The design's bar: a pill floating 12 dp from the sides on the window, with a hairline and a soft shadow.
+            Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)) {
+                val shape = RoundedCornerShape(30.dp)
                 // Five equal slots: a tab is never pushed off the edge by a long label or a large font size.
-                BoxWithConstraints(Modifier.fillMaxWidth().navigationBarsPadding().height(TabBarHeight)) {
+                BoxWithConstraints(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(TabBarPillHeight)
+                        .shadow(if (tokens.isDark) 0.dp else 8.dp, shape, ambientColor = Color.Black.copy(alpha = 0.08f), spotColor = Color.Black.copy(alpha = 0.12f))
+                        .clip(shape)
+                        .background(tokens.surface)
+                        .border(1.dp, tokens.hairline, shape),
+                ) {
                     val slot = maxWidth / tabs.size
                     Row(Modifier.fillMaxSize().selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
                         CappedFontScale(if (slot < 72.dp) 1f else 1.2f) { bar(Modifier.width(slot)) }
@@ -211,7 +226,7 @@ private fun TabItem(
             Text(
                 label,
                 fontSize = 12.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
                 color = if (selected) t.text else t.textDim,
                 maxLines = 1,
                 textAlign = TextAlign.Center,

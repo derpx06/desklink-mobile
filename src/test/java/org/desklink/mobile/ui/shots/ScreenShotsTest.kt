@@ -11,6 +11,13 @@ import org.desklink.mobile.ui.compose.screen.home.HomeActions
 import org.desklink.mobile.ui.compose.screen.home.HomeScreen
 import org.desklink.mobile.ui.compose.screen.home.HomeState
 import org.desklink.mobile.ui.compose.screen.home.HomeTransfer
+import org.desklink.mobile.ui.compose.screen.home.PaletteScreen
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import org.desklink.mobile.ui.compose.screen.home.LiveSessions
 import org.desklink.mobile.ui.compose.screen.settings.DeskSettings
 import org.desklink.mobile.ui.compose.screen.settings.SettingsActions
@@ -65,12 +72,23 @@ abstract class ScreenShots : ShotTest() {
             home(DeviceConnection.AWAY) {
                 copy(
                     live = LiveSessions(screen = true, terminals = 2), transfer = HomeTransfer("holiday-photos.zip", "42%", 0.42f, upload = true),
-                    historyCount = 3, recent = sampleFiles.take(2), clipboardOn = true,
+                    historyCount = 3, recent = sampleFiles.take(2), clipboardOn = true, terminalAttention = true,
                 )
             },
             noopHome,
         )
     }
+
+    @Test fun homeTransferOnly() = shoot("home-transfer") {
+        HomeScreen(
+            home(DeviceConnection.LOCAL) {
+                copy(rttMs = 9, transfer = HomeTransfer("holiday-photos.zip", "42% · fast lane", 0.42f, upload = false), historyCount = 7, recent = sampleFiles, clipboardOn = true)
+            },
+            noopHome,
+        )
+    }
+
+    @Test fun homeNoFilesYet() = shoot("home-no-files") { HomeScreen(home(DeviceConnection.LOCAL) { copy(rttMs = 12) }, noopHome) }
 
     @Test fun homeNotPaired() = shoot("home-not-paired") {
         org.desklink.mobile.ui.compose.screen.pairing.WelcomeScreen(onPair = {}, onSettings = {})
@@ -78,7 +96,48 @@ abstract class ScreenShots : ShotTest() {
 
     @Test fun homeConnecting() = shoot("home-connecting") { HomeScreen(home(DeviceConnection.CONNECTING), noopHome) }
 
-    @Test fun homeCannotConnect() = shoot("home-cannot-connect") { HomeScreen(home(DeviceConnection.OFFLINE), noopHome) }
+    @Test fun homeCannotConnect() = shoot("home-cannot-connect") { HomeScreen(home(DeviceConnection.OFFLINE) { copy(recent = sampleFiles.take(2), historyCount = 2) }, noopHome) }
+
+    @Test fun homeCannotConnectRelayOn() = shoot("home-offline-relay") {
+        HomeScreen(home(DeviceConnection.UNAVAILABLE) { copy(relayAvailable = true, updateNeeded = true) }, noopHome)
+    }
+
+    // ---- Find anything, the computers sheet
+
+    private fun palette(query: String) = @androidx.compose.runtime.Composable {
+        PaletteScreen(
+            home(DeviceConnection.LOCAL) { copy(history = sampleFiles, recent = sampleFiles, canUnlock = true) },
+            noopHome, onClose = {}, onSendLink = {}, initialQuery = query,
+        )
+    }
+
+    @Test fun paletteIdle() = shoot("palette", palette(""))
+    @Test fun paletteQuery() = shoot("palette-query", palette("o"))
+    @Test fun paletteNothing() = shoot("palette-nothing", palette("zzzq"))
+
+    @Test fun paletteWhileOffline() = shoot("palette-offline") {
+        PaletteScreen(home(DeviceConnection.OFFLINE), noopHome, onClose = {}, onSendLink = {})
+    }
+
+    @Test fun computersSheet() = shoot("sheet-computers") {
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+            HomeScreen(home(DeviceConnection.LOCAL) { copy(rttMs = 12) }, noopHome)
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.32f)))
+            androidx.compose.foundation.layout.Column(
+                androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth()
+                    .background(org.desklink.mobile.ui.compose.tokens.surface2, org.desklink.mobile.ui.compose.DeskLinkShape.sheet),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    androidx.compose.ui.Modifier.padding(top = 16.dp, bottom = 12.dp).size(width = 32.dp, height = 4.dp)
+                        .background(org.desklink.mobile.ui.compose.tokens.hairlineStrong, androidx.compose.foundation.shape.RoundedCornerShape(2.dp)),
+                )
+                org.desklink.mobile.ui.compose.screen.home.ComputersContent(
+                    home(DeviceConnection.LOCAL), {}, noopHome,
+                )
+            }
+        }
+    }
 
     // ---- settings
 

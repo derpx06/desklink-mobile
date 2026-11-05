@@ -7,6 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import org.desklink.mobile.ui.compose.model.device.DeviceConnection
+import org.desklink.mobile.ui.compose.screen.home.ComputerRow
+import org.desklink.mobile.ui.compose.screen.home.HomeActions
+import org.desklink.mobile.ui.compose.screen.home.HomeScreen
+import org.desklink.mobile.ui.compose.screen.home.HomeState
 import org.desklink.mobile.ui.compose.shell.AppTab
 import org.desklink.mobile.ui.compose.shell.TabBadges
 import org.desklink.mobile.ui.compose.shell.TabNav
@@ -31,6 +35,18 @@ import org.robolectric.annotation.GraphicsMode
 class PhoneShellShots : ShotTest() {
     override val form = "phone"
 
+    private fun homeShell() = @androidx.compose.runtime.Composable {
+        val computers = listOf(ComputerRow("d1", "arch-desk", DeviceConnection.LOCAL))
+        val state = HomeState("d1", "arch-desk", DeviceConnection.LOCAL, computers, rttMs = 12, clipboardOn = true)
+        TabsShell(TabNav(AppTab.HOME), TabBadges(DeviceConnection.LOCAL, terminalsAttention = true, settingsAttention = true), onQuickAction = {}) { tab ->
+            if (tab == AppTab.HOME) HomeScreen(state, HomeActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}))
+            else Box(Modifier.fillMaxSize(), Alignment.Center) { Text(tab.name) }
+        }
+    }
+
+    @Test
+    fun shellAroundHome() = shoot("shell-home", homeShell())
+
     @Test
     fun tabsWithEveryBadge() = shoot("shell-badges") {
         TabsShell(
@@ -45,6 +61,18 @@ class PhoneShellShots : ShotTest() {
 @Config(sdk = [34], qualifiers = "w900dp-h700dp-xhdpi")
 class TabletShellShots : ShotTest() {
     override val form = "tablet"
+
+    private fun homeShell() = @androidx.compose.runtime.Composable {
+        val computers = listOf(ComputerRow("d1", "arch-desk", DeviceConnection.LOCAL))
+        val state = HomeState("d1", "arch-desk", DeviceConnection.LOCAL, computers, rttMs = 12, clipboardOn = true)
+        TabsShell(TabNav(AppTab.HOME), TabBadges(DeviceConnection.LOCAL, terminalsAttention = true, settingsAttention = true), onQuickAction = {}) { tab ->
+            if (tab == AppTab.HOME) HomeScreen(state, HomeActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}))
+            else Box(Modifier.fillMaxSize(), Alignment.Center) { Text(tab.name) }
+        }
+    }
+
+    @Test
+    fun shellAroundHome() = shoot("shell-home", homeShell())
 
     @Test
     fun railWithBadges() = shoot("shell-badges") {
