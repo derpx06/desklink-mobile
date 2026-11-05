@@ -50,8 +50,14 @@ import org.desklink.mobile.ui.compose.tokens
 /** The rows this screen lists: what the app really asks for, from the same list as Settings, minus what nothing the person turned on uses. */
 internal fun checklistRows(rows: List<PermissionRow>): List<PermissionRow> = rows.filter { it.relevant }
 
-/** Whether the screen has anything to offer after pairing: a listed permission that is not granted yet. */
-internal fun hasChecklistWork(rows: List<PermissionRow>): Boolean = checklistRows(rows).any { !it.granted }
+/**
+ * Rows that count towards done: a row whose state Android cannot tell (the OEM background setting) is shown with "Open" but is never
+ * "not done", so it neither brings the screen up after every pairing nor keeps its button on "Skip for now".
+ */
+internal fun checklistCounted(rows: List<PermissionRow>): List<PermissionRow> = checklistRows(rows).filter { !it.unknown }
+
+/** Whether the screen has anything to offer after pairing: a listed permission whose state is known and that is not granted yet. */
+internal fun hasChecklistWork(rows: List<PermissionRow>): Boolean = checklistCounted(rows).any { !it.granted }
 
 /** Read once when a pairing completes, to decide whether to show the checklist at all. */
 internal fun needsPermissionsChecklist(context: Context, deskName: String): Boolean =
@@ -74,7 +80,7 @@ fun PermissionsChecklistRoute(deskName: String, onDone: () -> Unit) {
 internal fun PermissionsChecklistScreen(deskName: String, rows: List<PermissionRow>, onDone: () -> Unit) {
     val t = tokens
     val shown = checklistRows(rows)
-    val allDone = shown.all { it.granted }
+    val allDone = checklistCounted(rows).all { it.granted }
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().navigationBarsPadding()) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp)) {

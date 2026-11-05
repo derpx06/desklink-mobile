@@ -191,17 +191,17 @@ fun OnboardingScreen(page: Int, onPage: (Int) -> Unit, paired: Boolean, onFinish
     }
 }
 
-/** One of the five bars: 4 dp to look at, 24 dp tall to touch (the row has no room for 48), filled up to the current page. */
+/** One of the five bars: 4 dp to look at, 48 dp tall to touch, filled up to the current page. */
 @Composable
 private fun SegmentBar(index: Int, filled: Boolean, selected: Boolean, reduced: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val t = tokens
     val fill by animateFloatAsState(if (filled) 1f else 0f, if (reduced) snap() else tween(300), label = "fill")
     val go = stringResource(R.string.ob_go_to_page, index + 1)
     Box(
-        modifier.heightIn(min = 24.dp).clickable(role = Role.Button, onClick = onClick).semantics { contentDescription = go; this.selected = selected },
-        contentAlignment = Alignment.Center,
+        modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onClick).semantics { contentDescription = go; this.selected = selected },
+        contentAlignment = Alignment.TopCenter,
     ) {
-        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(t.hairlineStrong)) {
+        Box(Modifier.padding(top = 16.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(t.hairlineStrong)) {
             Box(Modifier.fillMaxHeight().fillMaxWidth(fill).background(t.accent))
         }
     }

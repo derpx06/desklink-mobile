@@ -15,6 +15,7 @@ import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -69,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.stringResource
@@ -130,6 +132,8 @@ import org.desklink.mobile.ui.compose.screen.pairing.PairStage
 import org.desklink.mobile.ui.compose.screen.pairing.ScanScreen
 import org.desklink.mobile.ui.compose.screen.pairing.WelcomeScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.FirstRun
+import org.desklink.mobile.ui.compose.screen.onboarding.ForgetLeftRoutes
+import org.desklink.mobile.ui.compose.screen.onboarding.PairingStack
 import org.desklink.mobile.ui.compose.screen.onboarding.OnboardingRoute
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsChecklistRoute
 import org.desklink.mobile.ui.compose.screen.onboarding.SplashScreen
@@ -218,6 +222,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         notesEditing.value = savedInstanceState?.getString(STATE_NOTE)
         if (savedInstanceState == null) handleIntent(intent)
 
+        if (splashStartedAt < 0) splashStartedAt = SystemClock.elapsedRealtime()
         setContent { DeskLinkTheme(this) { Root() } }
         if (BuildConfig.DEBUG && savedInstanceState == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) logFirstFrame()
 
@@ -343,6 +348,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         stack.add(route)
     }
 
+    /** A pairing completed: the scan and pair screens go, anything else stays (the checklist may already be up, whichever finished first). */
+    private fun settleAfterPairing() {
+        val next = PairingStack.settle(stack.toList(), HOME) { it == SCAN || it.startsWith(PAIR_PREFIX) }
+        stack.clear()
+        stack.addAll(next)
+    }
+
     private fun select(id: String?) {
         selectedId = id
         selection.edit { putString(STATE_SELECTED_DEVICE, id) }
@@ -365,11 +377,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             val id = fresh.first()
             select(id)
             qrFlow.succeeded(id) // a QR pairing that completed: leaving the scan screen must not take it back
-            if (stack.any { it == SCAN || it.startsWith(PAIR_PREFIX) }) resetTo(HOME)
+            if (stack.any { it == SCAN || it.startsWith(PAIR_PREFIX) }) settleAfterPairing()
             val name = paired.first { it.deviceId == id }.name
             showMessage(getString(R.string.pair_paired_with, name))
             // Only when something can still be turned on, and only on top of Home: never over a screen the person is in.
-            if (stack.size == 1 && stack.last() == HOME && needsPermissionsChecklist(this, name)) push(PERMISSIONS)
+            if (PairingStack.canOfferChecklist(stack, HOME) && needsPermissionsChecklist(this, name)) push(PERMISSIONS)
         } else if (selectedId !in ids) {
             select(paired.firstOrNull { it.isReachable }?.deviceId ?: paired.firstOrNull()?.deviceId)
         }
@@ -384,6 +396,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val paired = HomeModel.pairedDevices()
         LaunchedEffect(tick) { reconcile(paired) }
         val holder = rememberSaveableStateHolder()
+        val splash = splashShowing(paired)
+        ForgetLeftRoutes(stack.last(), holder, setOf(ONBOARDING))
         // A paired person never sees the tour, now or if they unpair later.
         LaunchedEffect(paired.isNotEmpty()) { if (paired.isNotEmpty()) FirstRun.markSeen(defaultPrefs).also { onboardingSeen = true } }
         val onTabs = stack.last() == HOME && paired.isNotEmpty()
@@ -396,10 +410,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 targetState = stack.last(),
                 transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
                 label = "screen",
+                // Under the splash the screen is not read out: TalkBack would walk a screen nobody can see yet.
+                modifier = if (splash) Modifier.clearAndSetSemantics { } else Modifier,
             ) { route ->
                 holder.SaveableStateProvider(route) { Screen(route, paired) }
             }
-            Splash(paired)
+            AnimatedVisibility(splash, enter = fadeIn(tween(0)), exit = fadeOut(tween(160))) {
+                SplashScreen(paired.firstOrNull { it.deviceId == selectedId }?.name ?: paired.firstOrNull()?.name.orEmpty())
+            }
             // Above the tab bar when it is showing.
             SnackbarHost(
                 snackbar,
@@ -411,24 +429,23 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     }
 
     /**
-     * The first thing on a cold start, while the paired computer is looked for ([FirstRun.showSplash]). Once gone it stays gone, and a
-     * start that already has the computer (or none to look for) never shows it.
+     * Whether the splash is up: the first thing on a cold start, while the paired computer is looked for ([FirstRun.showSplash]).
+     * Once gone it stays gone. The second counts from the process's first frame, so a rotation does not start it again.
      */
     @Composable
-    private fun Splash(paired: List<Device>) {
+    private fun splashShowing(paired: List<Device>): Boolean {
+        val remaining = remember { FirstRun.splashRemainingMs(splashStartedAt, SystemClock.elapsedRealtime()) }
         var finished by rememberSaveable { mutableStateOf(!coldStart) }
-        var expired by remember { mutableStateOf(false) }
+        var expired by remember { mutableStateOf(remaining <= 0L) }
         LaunchedEffect(Unit) {
             coldStart = false // consumed by this first composition: a recreated activity is not a cold start
-            delay(FirstRun.SPLASH_MAX_MS)
+            delay(remaining)
             expired = true
         }
         val device = paired.firstOrNull { it.deviceId == selectedId } ?: paired.firstOrNull()
         val showing = !finished && FirstRun.showSplash(true, device?.name, device?.isReachable == true, expired)
         LaunchedEffect(showing) { if (!showing) finished = true }
-        AnimatedVisibility(showing, enter = fadeIn(tween(0)), exit = fadeOut(tween(160))) {
-            SplashScreen(device?.name.orEmpty())
-        }
+        return showing
     }
 
     /** Back from the pairing screen is Cancel: it answers the computer that asked. */
@@ -775,6 +792,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onMessage = ::showMessage,
             onNewTerminal = { startActivity(TerminalActivity.intent(this, id, newTerminal = true)) },
             onOpenSettings = { route -> nav.reset(AppTab.SETTINGS); nav.push(AppTab.SETTINGS, route); nav.select(AppTab.SETTINGS) },
+            onTurnOnNotifications = {
+                org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS)) { asking ->
+                    ActivityCompat.requestPermissions(this, asking, RESULT_NOTIFICATIONS_ENABLED)
+                }
+            },
             onNotes = { nav.select(AppTab.NOTES) },
             onNote = { noteId -> nav.select(AppTab.NOTES); notesEditing.value = noteId },
             onNewNote = { nav.select(AppTab.NOTES); notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW },
@@ -904,7 +926,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 if (qrFlow.state is QrScanFlow.State.Pairing) {
                     qrFlow.reset()
                     select(id)
-                    resetTo(HOME)
+                    settleAfterPairing()
                 }
             }
         }
@@ -962,7 +984,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     if (!qrFlow.cancel { DeskLinkApplication.getInstance().getDevice(it)?.isPaired == true } && qrFlow.state is QrScanFlow.State.Pairing) {
                         qrFlow.reset()
                         select(id)
-                        resetTo(HOME)
+                        settleAfterPairing()
                     }
                 }) { Text(stringResource(R.string.cancel)) }
             },
@@ -1012,7 +1034,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             if (device?.isPaired == true) {
                 accepted = null
                 select(id)
-                resetTo(HOME)
+                settleAfterPairing()
             }
         }
         device ?: return
@@ -1400,5 +1422,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
         /** True until the first screen of this process has been composed: only then can the splash show. */
         @Volatile private var coldStart = true
+
+        /** When the process's first screen was composed ([SystemClock.elapsedRealtime]); -1 before. */
+        @Volatile private var splashStartedAt = -1L
     }
 }

@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.preference.PreferenceManager
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.screen.onboarding.FirstRun
+import org.desklink.mobile.ui.compose.screen.onboarding.PairingStack
+import org.desklink.mobile.ui.compose.screen.onboarding.checklistCounted
 import org.desklink.mobile.ui.compose.screen.onboarding.TourPages
 import org.desklink.mobile.ui.compose.screen.onboarding.cursorAt
 import org.desklink.mobile.ui.compose.screen.onboarding.checklistRows
@@ -71,5 +73,46 @@ class FirstRunTest {
         assertFalse("an unused permission that is missing is not work", hasChecklistWork(rows))
         assertTrue(hasChecklistWork(rows + row(granted = false)))
         assertFalse(hasChecklistWork(emptyList()))
+    }
+
+    @Test
+    fun anOemRowOfUnknownStateNeitherRaisesTheChecklistNorBlocksContinue() {
+        val oem = PermissionRow(R.drawable.sym_info, "oem", "s", false, unknown = true) { }
+        val rows = listOf(row(granted = true), oem)
+        assertFalse("ColorOS must not get the screen after every pairing", hasChecklistWork(rows))
+        assertEquals(1, checklistCounted(rows).size)
+        assertEquals("it is still listed", 2, checklistRows(rows).size)
+        assertTrue(hasChecklistWork(rows + row(granted = false)))
+    }
+
+    private fun isPairing(r: String) = r == "scan" || r.startsWith("pair/")
+
+    @Test
+    fun theChecklistPushedByOnePairingPathSurvivesTheOtherFinishingSecond() {
+        // reconcile first: [home, pair/x] -> settled, checklist on top; then PairRoute settles again.
+        var stack = PairingStack.settle(listOf("home", "pair/x"), "home", ::isPairing)
+        assertEquals(listOf("home"), stack)
+        assertTrue(PairingStack.canOfferChecklist(stack, "home"))
+        stack = PairingStack.withChecklist(stack, "permissions")
+        assertEquals(listOf("home", "permissions"), PairingStack.settle(stack, "home", ::isPairing))
+        // the other order: PairRoute settles first, reconcile pushes after
+        val first = PairingStack.settle(listOf("home", "scan"), "home", ::isPairing)
+        assertEquals(listOf("home", "permissions"), PairingStack.withChecklist(first, "permissions"))
+        assertEquals("pushed once", listOf("home", "permissions"), PairingStack.withChecklist(listOf("home", "permissions"), "permissions"))
+    }
+
+    @Test
+    fun theChecklistIsOfferedOnlyStraightOnTopOfHome() {
+        assertFalse(PairingStack.canOfferChecklist(listOf("home", "settings"), "home"))
+        assertFalse(PairingStack.canOfferChecklist(listOf("home", "permissions"), "home"))
+        assertEquals(listOf("home"), PairingStack.settle(emptyList(), "home", ::isPairing))
+    }
+
+    @Test
+    fun theSplashSecondCountsFromTheFirstFrameNotFromEachComposition() {
+        assertEquals(FirstRun.SPLASH_MAX_MS, FirstRun.splashRemainingMs(1_000, 1_000))
+        assertEquals(400L, FirstRun.splashRemainingMs(1_000, 1_600))
+        assertEquals("a rotation after the second: nothing left", 0L, FirstRun.splashRemainingMs(1_000, 5_000))
+        assertEquals("a clock that went backwards never extends it", FirstRun.SPLASH_MAX_MS, FirstRun.splashRemainingMs(1_000, 500))
     }
 }

@@ -19,6 +19,11 @@ import org.desklink.mobile.ui.compose.screen.pairing.PairStage
 import org.desklink.mobile.ui.compose.screen.pairing.ScanScreen
 import org.desklink.mobile.ui.compose.screen.pairing.WelcomeScreen
 import org.desklink.mobile.ui.compose.screen.settings.PermissionRow
+import org.desklink.mobile.ui.compose.model.device.DeviceConnection
+import org.desklink.mobile.ui.compose.screen.home.ComputerRow
+import org.desklink.mobile.ui.compose.screen.home.HomeActions
+import org.desklink.mobile.ui.compose.screen.home.HomeScreen
+import org.desklink.mobile.ui.compose.screen.home.HomeState
 import org.desklink.mobile.ui.compose.tokens
 import org.junit.Before
 import org.junit.Test
@@ -42,6 +47,11 @@ abstract class FirstRunShots : ShotTest() {
     @Test fun tour4() = shoot("fr-tour-4", tour(3))
     @Test fun tour5() = shoot("fr-tour-5", tour(4))
     @Test fun tourReplayPaired() = shoot("fr-tour-5-replay") { OnboardingScreen(4, {}, paired = true, onFinish = {}, onSkip = {}) }
+
+    @Test fun homeNotificationsNudge() = shoot("fr-home-nudge") {
+        val state = HomeState("d1", "arch-desk", DeviceConnection.LOCAL, listOf(ComputerRow("d1", "arch-desk", DeviceConnection.LOCAL)), rttMs = 12, notificationsOff = true)
+        HomeScreen(state, HomeActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}))
+    }
 
     @Test fun welcome() = shoot("fr-welcome") { WelcomeScreen(onPair = {}, onSettings = {}) }
 
