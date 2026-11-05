@@ -62,6 +62,13 @@ class TokenContrastTest {
             Triple("mintText on surface", t.mintText, t.surface),
             // CheckItem: a done line is drawn at 75 % of the container's text colour.
             Triple("done check item", t.onAccentContainer.copy(alpha = 0.75f), t.accentContainer),
+            // StatusPill: its word in the status colour on that colour's 12 % tint, over the card.
+            *listOf("mintText" to t.mintText, "accent" to t.accent, "amber" to t.amber, "textDim" to t.textDim).flatMap { (name, c) ->
+                // Over the card only: on the bare window mintText is 4.2:1 in light, so the pill is always placed on a card.
+                listOf(Triple("$name on its pill over surface", c, c.copy(alpha = 0.12f).compositeOver(t.surface)))
+            }.toTypedArray(),
+            // SegmentedControl, selected: dark draws onAccentContainer on the accent container.
+            Triple("onAccentContainer on selected segment", t.onAccentContainer, t.accentContainer),
             // Snackbar.
             Triple("onInverse on inverse", t.onInverse, t.inverse),
             Triple("snackbar action on inverse", if (t.isDark) LightTokens.accentText else DarkTokens.accentText, t.inverse),
@@ -92,5 +99,15 @@ class TokenContrastTest {
             // Not checked, on purpose: the design's off-switch track (`sw`, 18 % black / 20 % white) is 1.5:1 on the card, under
             // WCAG 1.4.11's 3:1. The colour stays as designed; wave 6 decides on an outline (docs/UI-REDESIGN.md asks for #7A7A82).
         )
+    }
+
+    /** In dark the card colour is 1.1:1 against the track; the selected segment is the accent container with an accent edge. */
+    @Test
+    fun theSelectedSegmentShowsAgainstTheTrackInDark() {
+        val t = DarkTokens
+        val track = t.fill.compositeOver(t.bg)
+        val edge = ratio(t.accentText, track)
+        assertTrue("selected segment edge is ${"%.2f".format(edge)}:1 against the track, needs 3", edge >= 3.0)
+        assertTrue("the old card-coloured segment was ${"%.2f".format(ratio(t.surface, track))}:1", ratio(t.surface, track) < 1.5)
     }
 }

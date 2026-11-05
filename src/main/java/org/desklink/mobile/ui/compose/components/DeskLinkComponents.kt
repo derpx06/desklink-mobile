@@ -65,7 +65,7 @@ import org.desklink.mobile.ui.compose.tokens
 // ---- surfaces -------------------------------------------------------------------------------------
 
 /**
- * The DeskLink card: the surface token, a 1px hairline, radius 16; a soft shadow in light only
+ * The DeskLink card: the surface token, a 1px hairline, radius 20 (Material's `medium`); a soft shadow in light only
  * (dark separates by surface steps). Pressed, the hairline turns accent over 120 ms.
  */
 @Composable
@@ -151,10 +151,10 @@ fun statusOf(connection: DeviceConnection, wantsToPair: Boolean = false): Pair<S
     val t = tokens
     return when {
         wantsToPair -> stringResource(R.string.connection_wants_to_pair) to t.amber
-        connection.isConnected() -> stringResource(R.string.connection_connected) to t.mint
+        connection.isConnected() -> stringResource(R.string.connection_connected) to t.mintText
         connection == DeviceConnection.CONNECTING -> stringResource(R.string.connection_connecting) to t.accent
         connection == DeviceConnection.UNAVAILABLE -> stringResource(R.string.connection_unavailable) to t.amber
-        else -> stringResource(R.string.connection_offline) to t.textFaint
+        else -> stringResource(R.string.connection_offline) to t.textDim
     }
 }
 

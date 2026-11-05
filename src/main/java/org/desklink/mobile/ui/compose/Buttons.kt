@@ -36,9 +36,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -57,8 +56,9 @@ enum class DeskButtonStyle { Primary, Tonal, Outlined }
 @Composable
 fun Modifier.pressScale(source: MutableInteractionSource): Modifier {
     val pressed by source.collectIsPressedAsState()
-    val s by animateFloatAsState(if (pressed) 0.97f else 1f, tween(120), label = "press")
-    return scale(s)
+    val s = animateFloatAsState(if (pressed) 0.97f else 1f, tween(120), label = "press")
+    // Read inside the layer: a press redraws the layer, it does not recompose the button.
+    return graphicsLayer { scaleX = s.value; scaleY = s.value }
 }
 
 /**
@@ -76,10 +76,12 @@ fun StadiumButton(
     enabled: Boolean = true,
 ) {
     val t = tokens
-    val (bg, fg) = when (style) {
-        DeskButtonStyle.Primary -> t.accent to t.onAccent
-        DeskButtonStyle.Tonal -> t.accentContainer to t.onAccentContainer
-        DeskButtonStyle.Outlined -> Color.Transparent to t.accentText
+    val (bg, fg) = when {
+        // Disabled: the content at 38 % on a faint fill, as Material does; never the whole button faded.
+        !enabled -> (if (style == DeskButtonStyle.Outlined) Color.Transparent else t.text.copy(alpha = 0.12f)) to t.text.copy(alpha = 0.38f)
+        style == DeskButtonStyle.Primary -> t.accent to t.onAccent
+        style == DeskButtonStyle.Tonal -> t.accentContainer to t.onAccentContainer
+        else -> Color.Transparent to t.accentText
     }
     val shape = DeskLinkShape.stadium
     val source = remember { MutableInteractionSource() }
@@ -87,7 +89,6 @@ fun StadiumButton(
         modifier
             .pressScale(source)
             .heightIn(min = maxOf(height, 48.dp))
-            .alpha(if (enabled) 1f else 0.38f)
             .clip(shape)
             .background(bg)
             .then(if (style == DeskButtonStyle.Outlined) Modifier.border(1.dp, t.hairlineStrong, shape) else Modifier)
@@ -156,7 +157,7 @@ fun DeskIconButton(
     }
 }
 
-// ---- old names, kept so existing call sites compile; they delegate to the above -------------------
+// ---- old names, kept so existing call sites compile; deprecated, not delegating: removed with their last caller (wave 6) ----
 
 @Deprecated("Use DeskTextButton", ReplaceWith("DeskTextButton(text, onClick, modifier, enabled)"))
 @Composable

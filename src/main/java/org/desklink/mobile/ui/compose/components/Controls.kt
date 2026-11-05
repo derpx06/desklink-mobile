@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,13 +38,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.ui.semantics.semantics
@@ -71,15 +72,17 @@ fun StatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp) {
 }
 
 /**
- * Three-way switch between views of one screen (Notes / Snippets / Clipboard): a 44 dp track on the faint fill,
- * the selected segment raised on the card colour. The label scales with the system font up to 1.3 and wraps past it.
+ * Three-way switch between views of one screen (Notes / Snippets / Clipboard): a 56 dp track on the faint fill (48 dp
+ * segments, 4 dp padding), the selected segment on the card colour in light and on the accent container with an accent
+ * edge in dark (the card is only 1.1:1 against the dark track). The label scales with the system font up to 1.3, then
+ * stays at that size on one line, ellipsized.
  */
 @Composable
 fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val t = tokens
-    CappedFontScale(1.15f) {
+    CappedFontScale(1.3f) {
         Row(
-            modifier.fillMaxWidth().background(t.fill, RoundedCornerShape(30.dp)).padding(4.dp),
+            modifier.fillMaxWidth().selectableGroup().background(t.fill, RoundedCornerShape(30.dp)).padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             options.forEachIndexed { i, label ->
@@ -87,14 +90,19 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
                 Box(
                     Modifier
                         .weight(1f)
-                        .heightIn(min = 44.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(if (on) t.surface else Color.Transparent)
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(if (on) (if (t.isDark) t.accentContainer else t.surface) else Color.Transparent)
+                        .then(if (on) Modifier.border(1.dp, if (t.isDark) t.accentText else t.hairlineStrong, RoundedCornerShape(24.dp)) else Modifier)
                         .selectable(selected = on, role = Role.Tab, onClick = { onSelect(i) })
                         .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(label, fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal, color = if (on) t.text else t.textDim, textAlign = TextAlign.Center)
+                    Text(
+                        label, fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal,
+                        color = if (on) (if (t.isDark) t.onAccentContainer else t.text) else t.textDim,
+                        textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -160,31 +168,48 @@ fun IconTile(
 
 /**
  * Home's quick action: a 52 dp tonal square with a 24 dp glyph and a 12 sp label below, four to a row.
- * The label wraps (2-3 lines at a large font) so it is never cut.
+ * The label wraps (2-3 lines at a large font, which stops growing at 1.3 so a word is never split) and is never cut.
+ * Disabled: the glyph at 38 % on the faint fill, the label in the dim text colour (never the whole tile faded).
+ * [onDisabledClick] keeps a disabled tile tappable so it can say why.
  */
 @Composable
-fun QuickActionTile(@DrawableRes icon: Int, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun QuickActionTile(
+    @DrawableRes icon: Int,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onDisabledClick: (() -> Unit)? = null,
+) {
     val t = tokens
     val source = remember { MutableInteractionSource() }
     Column(
         modifier
             .pressScale(source)
-            .alpha(if (enabled) 1f else 0.38f)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(interactionSource = source, indication = ripple(), enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = source, indication = ripple(), enabled = enabled || onDisabledClick != null, role = Role.Button) {
+                if (enabled) onClick() else onDisabledClick?.invoke()
+            }
             .heightIn(min = 48.dp)
             .padding(horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        IconTile(icon, size = 52.dp, container = t.accentContainer, content = t.onAccentContainer, radius = 18.dp)
-        Text(label, fontSize = 12.sp, lineHeight = 15.sp, textAlign = TextAlign.Center, color = t.text)
+        IconTile(
+            icon, size = 52.dp, radius = 18.dp,
+            container = if (enabled) t.accentContainer else t.fill,
+            content = if (enabled) t.onAccentContainer else t.text.copy(alpha = 0.38f),
+        )
+        CappedFontScale(1.3f) {
+            Text(label, fontSize = 12.sp, lineHeight = 15.sp, textAlign = TextAlign.Center, color = if (enabled) t.text else t.textDim)
+        }
     }
 }
 
 /**
  * The big tile of the hero card (three across): a 22 dp glyph at the top, the label at the bottom, 84 dp tall at least.
- * [primary] fills it with the accent; one per screen. A disabled tile says why in [hint].
+ * [primary] fills it with the accent; one per screen. A disabled tile says why in [hint], which stays at full strength
+ * (only the glyph and the label go dim); [onDisabledClick] keeps it tappable so it can say it aloud too.
  */
 @Composable
 fun ActionTile(
@@ -195,27 +220,44 @@ fun ActionTile(
     primary: Boolean = false,
     enabled: Boolean = true,
     hint: String? = null,
+    onDisabledClick: (() -> Unit)? = null,
 ) {
     val t = tokens
     val shape = DeskLinkShape.card
     val source = remember { MutableInteractionSource() }
-    val fg = if (primary) t.onAccent else t.text
+    val filled = primary && enabled
+    val fg = when {
+        filled -> t.onAccent
+        enabled -> t.text
+        else -> t.textDim
+    }
     Column(
         modifier
             .pressScale(source)
             .heightIn(min = 84.dp)
-            .alpha(if (enabled) 1f else 0.38f)
             .clip(shape)
-            .background(if (primary) t.accent else t.surface)
-            .then(if (primary) Modifier else Modifier.border(1.dp, t.hairline, shape))
-            .clickable(interactionSource = source, indication = ripple(), enabled = enabled, role = Role.Button, onClick = onClick)
+            .background(if (filled) t.accent else t.surface)
+            .then(if (filled) Modifier else Modifier.border(1.dp, t.hairline, shape))
+            .clickable(interactionSource = source, indication = ripple(), enabled = enabled || onDisabledClick != null, role = Role.Button) {
+                if (enabled) onClick() else onDisabledClick?.invoke()
+            }
             .padding(12.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Icon(painterResource(icon), contentDescription = null, tint = if (primary) t.onAccent else t.accent, modifier = Modifier.size(22.dp))
-        Column {
-            Text(label, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, color = fg)
-            if (hint != null) Text(hint, fontSize = 12.sp, lineHeight = 16.sp, color = if (primary) t.onAccent else t.textDim)
+        Icon(
+            painterResource(icon), contentDescription = null,
+            tint = when {
+                filled -> t.onAccent
+                enabled -> t.accent
+                else -> t.text.copy(alpha = 0.38f)
+            },
+            modifier = Modifier.size(22.dp),
+        )
+        CappedFontScale(1.3f) {
+            Column {
+                Text(label, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, color = fg)
+                if (hint != null) Text(hint, fontSize = 12.sp, lineHeight = 16.sp, color = if (filled) t.onAccent else t.textDim)
+            }
         }
     }
 }
@@ -250,22 +292,16 @@ fun ChecklistRow(
 ) {
     val t = tokens
     val done = state == ChecklistState.Done
-    Row(
-        modifier.fillMaxWidth().background(t.surface).heightIn(min = 56.dp).padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Icon(painterResource(icon), contentDescription = null, tint = t.textDim, modifier = Modifier.size(22.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, fontSize = 16.sp, lineHeight = 21.sp, color = t.text)
-            Text(description, fontSize = 13.sp, lineHeight = 17.sp, color = t.textDim)
-        }
-        // 48 dp to touch, 34 dp to look at.
+    val stacked = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
+    val buttonLabel = if (done) doneLabel else actionLabel
+    // 48 dp to touch, 34 dp to look at. TalkBack hears "Allow Camera, button", not "Allow" once per row.
+    val button: @Composable () -> Unit = {
         Box(
             Modifier
                 .heightIn(min = 48.dp)
                 .widthIn(min = 64.dp)
-                .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
+                .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+                .semantics(mergeDescendants = true) { contentDescription = "$buttonLabel $title" },
             contentAlignment = Alignment.Center,
         ) {
             val shape = RoundedCornerShape(17.dp)
@@ -284,9 +320,27 @@ fun ChecklistRow(
                     Icon(painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = t.mintText, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                 }
-                Text(if (done) doneLabel else actionLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (done) t.mintText else t.onAccentContainer)
+                Text(buttonLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (done) t.mintText else t.onAccentContainer)
             }
         }
+    }
+    val text: @Composable (Modifier) -> Unit = { m ->
+        Column(m, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, fontSize = 16.sp, lineHeight = 21.sp, color = t.text)
+            Text(description, fontSize = 13.sp, lineHeight = 17.sp, color = t.textDim)
+        }
+    }
+    // At a large font the button goes under the words, so a title keeps the whole row's width and is not split mid-word.
+    Column(
+        modifier.fillMaxWidth().background(t.surface).heightIn(min = 56.dp).padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Icon(painterResource(icon), contentDescription = null, tint = t.textDim, modifier = Modifier.size(22.dp))
+            text(Modifier.weight(1f))
+            if (!stacked) button()
+        }
+        if (stacked) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { button() }
     }
 }
 
