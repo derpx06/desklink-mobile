@@ -53,6 +53,7 @@ import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.terminal.TerminalScreen
 import org.desklink.mobile.ui.compose.DeskLinkType
+import org.desklink.mobile.ui.compose.components.rememberReducedMotion
 import org.desklink.mobile.ui.compose.tokens
 import org.desklink.mobile.webrtc.terminal.TerminalLinkState
 import org.desklink.mobile.webrtc.terminal.TerminalProtocol
@@ -208,9 +209,11 @@ fun TerminalTile(
 @Composable
 fun EmptyTerminalTile(launchers: List<Pair<String, () -> Unit>>, enabled: Boolean, modifier: Modifier = Modifier) {
     val t = tokens
-    val blink by rememberInfiniteTransition(label = "cursor").animateFloat(
+    // A steady cursor when the person asked for less motion.
+    val still = rememberReducedMotion()
+    val blink = if (still) 1f else rememberInfiniteTransition(label = "cursor").animateFloat(
         1f, 0f, infiniteRepeatable(tween(530), RepeatMode.Reverse), label = "blink",
-    )
+    ).value
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = t.terminalBg,

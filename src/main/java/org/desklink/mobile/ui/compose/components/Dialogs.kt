@@ -24,6 +24,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -107,12 +108,17 @@ fun DeskTextField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailingIcon: (@Composable () -> Unit)? = null,
+    /** What a screen reader calls a field that has no [label] (a placeholder is not a name); defaults to the placeholder. */
+    name: String? = null,
 ) {
     val t = tokens
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier.heightIn(min = 56.dp),
+        modifier = modifier.heightIn(min = 56.dp).let { m ->
+            val spoken = name ?: placeholder
+            if (label == null && spoken != null) m.semantics { contentDescription = spoken } else m
+        },
         shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
         singleLine = singleLine,
         minLines = minLines,

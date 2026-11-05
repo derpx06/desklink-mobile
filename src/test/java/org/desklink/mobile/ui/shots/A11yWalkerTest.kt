@@ -48,6 +48,12 @@ class A11yWalkerTest {
         assertEquals(emptyList<String>(), A11y.violations(compose))
     }
 
+    @Test fun aPlaceholderOnlyFieldHasAName() {
+        compose.setContent { DeskLinkFixedTheme(compose.activity, false) { org.desklink.mobile.ui.compose.components.DeskTextField("", {}, placeholder = "https://", name = "Link to send") } }
+        compose.onNodeWithContentDescription("Link to send").assertExists()
+        assertEquals(emptyList<String>(), A11y.violations(compose))
+    }
+
     private fun desk() = compose.setContent {
         DeskLinkFixedTheme(compose.activity, true) {
             DeskControls(

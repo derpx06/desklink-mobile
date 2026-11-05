@@ -1021,6 +1021,7 @@ private fun SendLinkDialog(onDismiss: () -> Unit, onSend: (String) -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 placeholder = "https://",
+                name = stringResource(R.string.home_send_link_title),
                 textStyle = androidx.compose.ui.text.TextStyle(fontFamily = MonoFamily, fontSize = 14.sp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
             )

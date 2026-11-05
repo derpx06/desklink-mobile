@@ -428,6 +428,7 @@ class CaptureActivity : AppCompatActivity() {
                 onValueChange = { text = it },
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 placeholder = if (!busy) stringResource(R.string.capture_text_none) else null,
+                name = stringResource(R.string.capture_text_hint),
             )
         }
     }
