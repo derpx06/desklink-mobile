@@ -520,6 +520,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     onOpenSession = { sessionId -> startActivity(TerminalActivity.intent(this, id).putExtra(TerminalActivity.EXTRA_TERMINAL_ID, sessionId)) },
                     onOpenTerminals = { startActivity(TerminalActivity.intent(this, id)) },
                     onNew = { startActivity(TerminalActivity.intent(this, id, newTerminal = true)) },
+                    onNewLauncher = { launcher -> startActivity(TerminalActivity.intent(this, id, newTerminal = true, launcher = launcher)) },
                 )
                 AppTab.SETTINGS -> SettingsContent(device)
             }

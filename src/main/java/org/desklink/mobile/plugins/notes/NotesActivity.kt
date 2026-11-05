@@ -83,8 +83,6 @@ import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.components.DeskCard
 import org.desklink.mobile.ui.compose.components.EmptyState
 import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
 import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.tokens
 
@@ -199,26 +197,10 @@ class NotesActivity : AppCompatActivity() {
 
     @Composable
     private fun Tabs(selected: Int, onSelect: (Int) -> Unit) {
-        val t = tokens
-        Row(
-            Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(t.fill).padding(4.dp).selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            listOf(R.string.notes_tab_notes, R.string.notes_tab_snippets).forEachIndexed { index, label ->
-                val on = index == selected
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(if (on) t.surface else t.fill)
-                        .selectable(selected = on, role = Role.Tab) { onSelect(index) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(stringResource(label), fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal, color = if (on) t.text else t.textDim)
-                }
-            }
-        }
+        org.desklink.mobile.ui.compose.components.SegmentedControl(
+            listOf(stringResource(R.string.notes_tab_notes), stringResource(R.string.notes_tab_snippets)), selected, onSelect,
+            Modifier.padding(horizontal = 16.dp),
+        )
     }
 
     private val ui by lazy { NotesUi(this, editing) }

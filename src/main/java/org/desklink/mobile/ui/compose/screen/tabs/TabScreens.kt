@@ -5,6 +5,9 @@ import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -55,11 +58,13 @@ import org.desklink.mobile.R
 import org.desklink.mobile.plugins.folders.BucketUi
 import org.desklink.mobile.plugins.notes.NotesActivity
 import org.desklink.mobile.plugins.notes.NotesUi
+import org.desklink.mobile.ui.compose.components.DeskSearchField
 import org.desklink.mobile.ui.compose.components.EmptyState
+import org.desklink.mobile.ui.compose.components.SegmentedControl
 import org.desklink.mobile.ui.compose.components.GroupRow
 import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
+import org.desklink.mobile.ui.compose.components.SectionHeader
+import org.desklink.mobile.ui.compose.components.StatusDot
 import org.desklink.mobile.ui.compose.components.RowGroup
 import org.desklink.mobile.ui.compose.components.SessionPreview
 import org.desklink.mobile.ui.compose.components.SessionPreviews
@@ -187,7 +192,10 @@ private fun NoticeCard(title: String, body: String, primary: String, onPrimary: 
 
 // ---- Notes ----------------------------------------------------------------------------------------------------
 
-/** Notes | Snippets | Clipboard, with the clipboard sync switch in the header. */
+/**
+ * Notes | Snippets | Clipboard. The clipboard sync switch stays in the header (it is the same setting as the first row of the
+ * Clipboard page); the search field above the segments searches notes and snippets.
+ */
 @Composable
 fun NotesTab(
     notes: NotesUi,
@@ -207,15 +215,22 @@ fun NotesTab(
         return
     }
     var segment by rememberSaveable { mutableIntStateOf(0) }
+    var query by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
         LargeTitle(stringResource(R.string.notes_title), Modifier.padding(top = 12.dp), subtitle = stringResource(R.string.notes_subtitle)) {
             ClipboardSwitch(clipboardOn, onClipboard)
         }
-        Segments(segment) { segment = it }
-        Box(Modifier.weight(1f).padding(top = 12.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (segment < 2) DeskSearchField(query, { query = it }, stringResource(R.string.notes_search_all), stringResource(R.string.palette_clear))
+            SegmentedControl(
+                listOf(stringResource(R.string.notes_tab_notes), stringResource(R.string.notes_tab_snippets), stringResource(R.string.notes_tab_clipboard)),
+                segment, { segment = it },
+            )
+        }
+        Box(Modifier.weight(1f)) {
             when (segment) {
-                0 -> notes.NotesList()
-                1 -> notes.SnippetsList()
+                0 -> notes.NotesList(query)
+                1 -> notes.SnippetsList(query)
                 else -> ClipboardPanel(host, deskName, clipboardOn, onClipboard, onSendClipboard, onMessage)
             }
         }
@@ -236,41 +251,6 @@ private fun ClipboardSwitch(on: Boolean, onChange: (Boolean) -> Unit) {
     ) {
         Icon(painterResource(R.drawable.sym_content_paste), contentDescription = null, tint = tokens.textDim, modifier = Modifier.size(20.dp))
         androidx.compose.material3.Switch(checked = on, onCheckedChange = null, colors = deskSwitchColors())
-    }
-}
-
-@Composable
-private fun Segments(selected: Int, onSelect: (Int) -> Unit) {
-    val t = tokens
-    // Three equal slots: the labels grow with the font size up to 120 %, then wrap.
-    org.desklink.mobile.ui.compose.components.CappedFontScale(1.2f) {
-    Row(
-        Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(t.fill).padding(4.dp).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-
-        listOf(R.string.notes_tab_notes, R.string.notes_tab_snippets, R.string.notes_tab_clipboard).forEachIndexed { index, label ->
-            val on = index == selected
-            Box(
-                Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(if (on) t.surface else t.fill)
-                    .selectable(selected = on, role = Role.Tab) { onSelect(index) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    stringResource(label),
-                    fontSize = 15.sp,
-                    fontWeight = if (on) FontWeight.Medium else FontWeight.Normal,
-                    color = if (on) t.text else t.textDim,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
-                )
-            }
-        }
-    }
     }
 }
 
@@ -301,7 +281,7 @@ private fun ClipboardPanel(
             if (on) GroupRow(stringResource(R.string.home_send_clipboard, deskName), icon = R.drawable.sym_upload, onClick = onSendClipboard)
         }
         EmptyState(R.drawable.sym_content_paste, stringResource(R.string.notes_clipboard_history_title), stringResource(R.string.notes_clipboard_history_body)) {
-            PillButton(stringResource(R.string.notes_clipboard_pin), { NotesActivity.pinClipboard(host) }, style = PillStyle.Tonal, height = 48.dp, icon = R.drawable.sym_keep)
+            SecondaryButton(stringResource(R.string.notes_clipboard_pin), { NotesActivity.pinClipboard(host) }, tonal = true, height = 48.dp, icon = R.drawable.sym_keep)
         }
     }
 }
@@ -309,9 +289,9 @@ private fun ClipboardPanel(
 // ---- Terminals --------------------------------------------------------------------------------------------------
 
 /**
- * The sessions on the computer: a tile each (opened in the full-screen terminal), "New terminal", and an
- * honest state when they are locked, not allowed or the link is down. Sessions are not attached here: only a
- * tap opens one.
+ * The sessions on the computer: launcher tiles (a shell, Claude Code, Codex) that start one, a dark card each for the open
+ * sessions (opened in the full-screen terminal), and an honest state when they are locked, not allowed or the link is down.
+ * Sessions are not attached here: only a tap opens one.
  */
 @Composable
 fun TerminalsTab(
@@ -320,6 +300,8 @@ fun TerminalsTab(
     onOpenSession: (String) -> Unit,
     onOpenTerminals: () -> Unit,
     onNew: () -> Unit,
+    /** A launcher tile: "claude", "codex", or null for a shell. */
+    onNewLauncher: (String?) -> Unit = { onNew() },
 ) {
     org.desklink.mobile.ui.compose.SecureWindow()
     val t = tokens
@@ -344,31 +326,36 @@ fun TerminalsTab(
     }
     val live = state.sessions.filter { !it.gone }
     val previews = remember(state, tick) { SessionPreviews.of(context, deviceId, lineCount = 2) }.associateBy { it.id }
-    Box(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-        Column(Modifier.fillMaxSize()) {
-            LargeTitle(
-                stringResource(R.string.terminal_section),
-                Modifier.padding(top = 12.dp),
-                subtitle = when {
-                    client == null || !connected -> stringResource(R.string.terminal_status_reconnecting)
-                    live.isEmpty() -> stringResource(R.string.terminals_subtitle_none, deskName)
-                    else -> androidx.compose.ui.res.pluralStringResource(R.plurals.terminal_count_on, live.size, live.size, deskName)
-                },
-            )
-            when {
-                client == null || state.notAllowed || locked -> EmptyState(
-                    R.drawable.sym_terminal,
-                    stringResource(if (state.notAllowed) R.string.terminal_not_allowed_title else R.string.terminal_section),
-                    stringResource(if (state.notAllowed) R.string.terminal_not_allowed_message else R.string.terminals_unavailable),
-                ) { PillButton(stringResource(R.string.terminals_open), onOpenTerminals, style = PillStyle.Tonal, height = 48.dp) }
-                live.isEmpty() -> EmptyState(R.drawable.sym_terminal, stringResource(R.string.terminal_section), stringResource(R.string.terminal_empty_hint)) {
-                    PillButton(stringResource(R.string.terminal_new_terminal), onNew, height = 48.dp, icon = R.drawable.sym_add, enabled = connected)
-                }
-                else -> LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
+    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
+        LargeTitle(
+            stringResource(R.string.terminal_section),
+            Modifier.padding(top = 12.dp),
+            subtitle = when {
+                client == null || !connected -> stringResource(R.string.terminal_status_reconnecting)
+                live.isEmpty() -> stringResource(R.string.terminals_subtitle_none, deskName)
+                else -> androidx.compose.ui.res.pluralStringResource(R.plurals.terminal_count_on, live.size, live.size, deskName)
+            },
+        ) {
+            if (client != null && !state.notAllowed && !locked) LinkChip(connected)
+        }
+        when {
+            client == null || state.notAllowed || locked -> EmptyState(
+                R.drawable.sym_terminal,
+                stringResource(if (state.notAllowed) R.string.terminal_not_allowed_title else R.string.terminal_section),
+                stringResource(if (state.notAllowed) R.string.terminal_not_allowed_message else R.string.terminals_unavailable),
+            ) { SecondaryButton(stringResource(R.string.terminals_open), onOpenTerminals, tonal = true, height = 48.dp) }
+            else -> LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(key = "launchers") { Launchers(state.launchers, connected, onNewLauncher) }
+                if (live.isEmpty()) {
+                    item(key = "none") {
+                        Text(stringResource(R.string.terminal_empty_hint), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp))
+                    }
+                } else {
+                    item(key = "open") { SectionHeader(stringResource(R.string.terminals_open_sessions)) }
                     items(live, key = { it.id }) { session ->
                         val preview = previews[session.id] ?: SessionPreview(
                             id = session.id,
@@ -380,27 +367,72 @@ fun TerminalsTab(
                         )
                         TerminalTile(preview, Modifier.fillMaxWidth()) { onOpenSession(session.id) }
                     }
+                    item(key = "footnote") {
+                        Row(Modifier.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(painterResource(R.drawable.sym_terminal), contentDescription = null, tint = t.textDim, modifier = Modifier.size(18.dp))
+                            Text(stringResource(R.string.terminals_keep_running, deskName), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
+                        }
+                    }
                 }
             }
         }
-        if (client != null && !state.notAllowed && !locked && live.isNotEmpty()) {
-            Row(
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .heightIn(min = 56.dp)
-                    .alpha(if (connected) 1f else 0.38f)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(t.accentContainer)
-                    .selectable(selected = false, enabled = connected, role = Role.Button) { onNew() }
-                    .padding(start = 16.dp, end = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(painterResource(R.drawable.sym_add), contentDescription = null, tint = t.onAccentContainer)
-                Text(stringResource(R.string.terminal_new_terminal), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer)
-            }
+    }
+}
+
+/** "Connected" with its dot, or "Reconnecting…": the link the sessions ride on. */
+@Composable
+private fun LinkChip(connected: Boolean) {
+    val t = tokens
+    val color = if (connected) t.mintText else t.amber
+    Row(
+        Modifier.padding(end = 8.dp, bottom = 6.dp).heightIn(min = 28.dp).background(t.surface, RoundedCornerShape(14.dp)).padding(start = 8.dp, end = 10.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        StatusDot(color)
+        Text(
+            stringResource(if (connected) R.string.connection_connected else R.string.terminal_status_reconnecting),
+            fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (connected) t.mintText else t.text,
+        )
+    }
+}
+
+/** Shell, then the agent CLIs the computer has: three dark tiles to a row (one each at a large font). Each starts that terminal. */
+@Composable
+private fun Launchers(offered: List<String>, enabled: Boolean, onStart: (String?) -> Unit) {
+    val context = LocalContext.current
+    val agents = offered.mapNotNull { id -> SessionPreviews.agentName(context, id)?.let { id to it } }
+    val options = listOf<Pair<String?, String>>(null to stringResource(R.string.terminal_launch_shell)) + agents
+    val wide = androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.3f
+    @OptIn(ExperimentalLayoutApi::class)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), maxItemsInEachRow = if (wide) 3 else 1) {
+        options.forEach { (id, name) ->
+            LauncherTile(SessionPreviews.badgeOf(id.orEmpty()), name, enabled, Modifier.weight(1f)) { onStart(id) }
         }
+    }
+}
+
+@Composable
+private fun LauncherTile(badge: String, name: String, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val t = tokens
+    val label = stringResource(R.string.terminals_new_launcher, name)
+    Column(
+        modifier
+            .heightIn(min = 96.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(t.terminalBg)
+            .border(1.dp, Color(0xFF262931), RoundedCornerShape(20.dp))
+            .alpha(if (enabled) 1f else 0.5f)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = label }
+            .padding(12.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            org.desklink.mobile.ui.compose.components.LabelChip(badge)
+            Icon(painterResource(R.drawable.sym_add), contentDescription = null, tint = Color(0xFFA1A5AE), modifier = Modifier.size(18.dp))
+        }
+        Text(name, fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE6E6E6))
     }
 }
 

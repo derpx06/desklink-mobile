@@ -46,6 +46,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.heightIn
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.terminal.TerminalScreen
@@ -66,6 +69,8 @@ data class SessionPreview(
     /** The last lines on its screen; empty when this phone has not opened the session. */
     val lines: List<String>,
     val size: String,
+    /** The last lines ask the person something (a y/n, an approval menu, a password): the card says so. */
+    val waiting: Boolean = false,
 )
 
 object SessionPreviews {
@@ -85,6 +90,8 @@ object SessionPreviews {
         return state.sessions.filter { !it.gone }.map { session ->
             val screen = client.screenIfOpen(session.id) as? TerminalScreen
             val lines = screen?.tailLines(lineCount).orEmpty()
+            val waiting = screen != null && session.exitStatus == null &&
+                org.desklink.mobile.plugins.terminal.classifyAttention(screen.tailLines(14).joinToString("\n")) == org.desklink.mobile.plugins.terminal.TerminalAttention.WAITING
             SessionPreview(
                 id = session.id,
                 name = labels.getString(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, session.id), null)
@@ -94,6 +101,7 @@ object SessionPreviews {
                 live = session.exitStatus == null && state.link == TerminalLinkState.CONNECTED,
                 lines = lines,
                 size = context.getString(R.string.terminal_session_size, session.cols, session.rows),
+                waiting = waiting,
             )
         }
     }
@@ -126,12 +134,13 @@ fun TerminalTile(
     val t = tokens
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(20.dp),
         color = t.terminalBg,
         contentColor = TileText,
         border = BorderStroke(1.dp, TileHairline),
         modifier = modifier,
     ) {
+        Column {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 LabelChip(preview.badge)
@@ -171,6 +180,16 @@ fun TerminalTile(
                     }
                 }
             }
+        }
+        if (preview.waiting) {
+            Row(
+                Modifier.fillMaxWidth().background(Color(0xFF34201C)).heightIn(min = 44.dp).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.terminal_waiting_input), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFFFF9A88), modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.terminal_notification_open), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFFFF9A88))
+            }
+        }
         }
     }
 }

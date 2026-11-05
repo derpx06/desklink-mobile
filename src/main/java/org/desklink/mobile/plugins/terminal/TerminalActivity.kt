@@ -336,7 +336,9 @@ class TerminalActivity : AppCompatActivity() {
         LaunchedEffect(newRequested, state.link, state.listLoaded, state.notAllowed, state.passwordNeeded) {
             if (newRequested && state.link == TerminalLinkState.CONNECTED && state.listLoaded && !state.notAllowed && state.passwordNeeded == null) {
                 newRequested = false
-                client.create(remembered.first, remembered.second, null)
+                // The tab's launcher tiles ask for Claude Code or Codex; anything else is a shell.
+                val launcher = intent.getStringExtra(EXTRA_LAUNCHER)?.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }
+                client.create(remembered.first, remembered.second, launcher?.let { listOf(it) })
             }
         }
         LaunchedEffect(current, resumed) { TerminalForeground.terminalId = if (resumed) current else null }
@@ -1384,6 +1386,7 @@ class TerminalActivity : AppCompatActivity() {
 
         /** Start one shell as soon as the list is up (the Terminals tab's "New terminal"). */
         const val EXTRA_NEW = "newTerminal"
+        const val EXTRA_LAUNCHER = "launcher"
 
         private const val STATE_OPEN_ID = "openTerminalId"
         private const val LABEL_PREFS = org.desklink.mobile.helpers.PerPeerState.LABELS
@@ -1394,8 +1397,11 @@ class TerminalActivity : AppCompatActivity() {
         /** Bigger than any reasonable paste; keeps one tap from queueing megabytes onto the channel. */
         private const val MAX_PASTE_CHARS = 100_000
 
-        fun intent(context: Context, deviceId: String, newTerminal: Boolean = false): Intent =
-            Intent(context, TerminalActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId).apply { if (newTerminal) putExtra(EXTRA_NEW, true) }
+        fun intent(context: Context, deviceId: String, newTerminal: Boolean = false, launcher: String? = null): Intent =
+            Intent(context, TerminalActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId).apply {
+                if (newTerminal) putExtra(EXTRA_NEW, true)
+                launcher?.let { putExtra(EXTRA_LAUNCHER, it) }
+            }
     }
 }
 
