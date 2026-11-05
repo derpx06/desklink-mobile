@@ -206,9 +206,15 @@ abstract class ScreenShots : ShotTest() {
     }
 
     @Test fun notesTabFilled() {
-        org.desklink.mobile.plugins.notes.NotesStore.newNote(compose.activity, "Release 1.4 checklist", "- [x] Tag the build\n- [x] Update the changelog\n- [ ] Ship to the beta\n- [ ] Tell the team")
-        org.desklink.mobile.plugins.notes.NotesStore.newNote(compose.activity, "Wi-Fi at the flat", "Network DeskLink-5G, the password is on the fridge, router in the hall cupboard.")
-        org.desklink.mobile.plugins.notes.NotesStore.newNote(compose.activity, "Ideas", "Mirror the phone screen to the desk when charging.")
+        // The store lives for the whole test JVM: add each sample once, however many classes run this.
+        fun seed(title: String, body: String) {
+            if (org.desklink.mobile.plugins.notes.NotesStore.notes(compose.activity).none { it.title == title }) {
+                org.desklink.mobile.plugins.notes.NotesStore.newNote(compose.activity, title, body)
+            }
+        }
+        seed("Release 1.4 checklist", "- [x] Tag the build\n- [x] Update the changelog\n- [ ] Ship to the beta\n- [ ] Tell the team")
+        seed("Wi-Fi at the flat", "Network DeskLink-5G, the password is on the fridge, router in the hall cupboard.")
+        seed("Ideas", "Mirror the phone screen to the desk when charging.")
         org.desklink.mobile.plugins.notes.NotesStore.pin(compose.activity, "git push origin main")
         shoot("notes-filled") {
             NotesTab(androidx.compose.runtime.remember { NotesUi(compose.activity, mutableStateOf(null)) }, compose.activity, desk, clipboardOn = true, onClipboard = {}, onSendClipboard = {}, onMessage = {})
@@ -217,6 +223,20 @@ abstract class ScreenShots : ShotTest() {
 
     @Test fun notesTab() = shoot("notes") {
         NotesTab(androidx.compose.runtime.remember { NotesUi(compose.activity, mutableStateOf(null)) }, compose.activity, desk, clipboardOn = true, onClipboard = {}, onSendClipboard = {}, onMessage = {})
+    }
+
+    @Test fun terminalCards() = shoot("terminal-cards") {
+        androidx.compose.foundation.layout.Column(
+            androidx.compose.ui.Modifier.fillMaxSize().background(org.desklink.mobile.ui.compose.tokens.bg).padding(16.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+        ) {
+            org.desklink.mobile.ui.compose.components.TerminalTile(
+                org.desklink.mobile.ui.compose.components.SessionPreview("s1", "Claude Code", "CC", true, listOf("Do you want to proceed?", "❯ 1. Yes"), "80×38", waiting = true), androidx.compose.ui.Modifier.fillMaxWidth(),
+            ) {}
+            org.desklink.mobile.ui.compose.components.TerminalTile(
+                org.desklink.mobile.ui.compose.components.SessionPreview("s2", "Shell", ">_", true, listOf("BUILD SUCCESSFUL in 42s", "$ "), "80×24"), androidx.compose.ui.Modifier.fillMaxWidth(),
+            ) {}
+        }
     }
 
     @Test fun terminalsTab() = shoot("terminals") { TerminalsTab("d1", desk, onOpenSession = {}, onOpenTerminals = {}, onNew = {}) }
