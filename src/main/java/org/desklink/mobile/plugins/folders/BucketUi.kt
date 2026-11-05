@@ -105,10 +105,18 @@ import org.desklink.mobile.plugins.share.hasPicture
 import org.desklink.mobile.plugins.share.previewKind
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.MonoFamily
+import org.desklink.mobile.ui.compose.DeskTextButton
+import org.desklink.mobile.ui.compose.PrimaryButton
+import org.desklink.mobile.ui.compose.SecondaryButton
+import org.desklink.mobile.ui.compose.components.DeskProgressBar
+import org.desklink.mobile.ui.compose.components.HeroCard
 import org.desklink.mobile.ui.compose.components.IconCircle
+import org.desklink.mobile.ui.compose.components.IconTile
+import org.desklink.mobile.ui.compose.components.StatusDot
+import org.desklink.mobile.ui.compose.screen.transfers.BucketBreakdown
+import androidx.compose.ui.semantics.heading
+import androidx.compose.foundation.layout.widthIn
 import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
 import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.components.shimmer
 import org.desklink.mobile.ui.compose.screen.transfers.iconFor
@@ -146,8 +154,10 @@ class BucketUi(
         deviceId: String,
         onBack: () -> Unit,
         embedded: Boolean = false,
-        /** More grid items after the Bucket's own (the Files tab's "Recent transfers"). */
-        below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null,
+        /** More list items after the Bucket's card (the Files tab's filter chips and file rows). Used with [embedded] only. */
+        below: (androidx.compose.foundation.lazy.LazyListScope.() -> Unit)? = null,
+        /** The Files tab's "Send files" (to the computer). */
+        onSendFiles: () -> Unit = {},
     ) {
         val t = tokens
         val context = LocalContext.current
@@ -299,6 +309,14 @@ class BucketUi(
         }
         // In the Files tab the tab supplies the window's bars and the title; here only the Bucket's own controls.
         Column(Modifier.fillMaxSize().background(t.bg).then(if (embedded) Modifier else Modifier.statusBarsPadding())) {
+            if (embedded) {
+                EmbeddedBody(
+                    view, desk, deviceId, on, headerActions, below, onSendFiles,
+                    onTurnOn = { pickFolder.launch(documentsUri()) },
+                    onFix = { fresh -> fixFresh = fresh; pickFix.launch(BucketActivity.fixUri()) },
+                )
+                return@Column
+            }
             if (selecting) SelectionBar(
                 count = selected.size,
                 onClose = { selected = emptySet() },
@@ -313,23 +331,22 @@ class BucketUi(
             // Only inside a folder: at the top it would be an empty 48 dp band under the header.
             if (on && !selecting && path.isNotEmpty()) Breadcrumb(path) { path = it }
             if (!embedded && (!on || path.isEmpty())) LargeTitle(stringResource(R.string.bucket_title), subtitle = if (on && view!!.summary == null) status(view, desk) else if (!on) stringResource(R.string.bucket_subtitle, desk) else null)
-            view?.summary?.takeIf { on }?.let { SyncHeader(it, view.userPaused, desk) }
+            view?.summary?.takeIf { on }?.let { Box(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp)) { SyncHeader(it, view.userPaused, desk) } }
             Box(Modifier.weight(1f)) {
                 when {
-                    view?.phase == Phase.ASKING -> Hero(desk, waiting = true, offered = false, onTurnOn = {}, onDecline = {}, below = below)
-                    !on -> Hero(
+                    view?.phase == Phase.ASKING -> HeroBody(desk, waiting = true, offered = false, onTurnOn = {}, onDecline = {})
+                    !on -> HeroBody(
                         desk,
                         waiting = false,
                         offered = view?.offered == true,
                         onTurnOn = { pickFolder.launch(documentsUri()) },
                         onDecline = { BucketEngine.decline(deviceId) },
-                        below = below,
                     )
-                    else -> Content(view!!, desk, deviceId, path, selected, onFix = { fresh -> fixFresh = fresh; pickFix.launch(BucketActivity.fixUri()) }, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p }, below = below)
+                    else -> Content(view!!, desk, deviceId, path, selected, onFix = { fresh -> fixFresh = fresh; pickFix.launch(BucketActivity.fixUri()) }, onOpen = { path = it; selected = emptySet() }, onSelect = { p -> selected = if (p in selected) selected - p else selected + p })
                 }
                 if (on && !selecting) {
                     Box(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp)) {
-                        PillButton(stringResource(R.string.bucket_add), { plusMenu = true }, icon = R.drawable.sym_add)
+                        PrimaryButton(stringResource(R.string.bucket_add), { plusMenu = true }, icon = R.drawable.sym_add)
                         DropdownMenu(expanded = plusMenu, onDismissRequest = { plusMenu = false }) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.bucket_add_files)) },
@@ -462,11 +479,11 @@ class BucketUi(
         val t = tokens
         val line = summaryLine(summary, userPaused, desk)
         Column(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 14.dp).semantics(mergeDescendants = true) { contentDescription = line },
+            Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = line },
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(line, fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
-            LinearProgressIndicator({ summary.fraction }, Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp)
+            DeskProgressBar(summary.fraction)
             if (summary.bytesPerSecond > 0 && !summary.paused) {
                 Text(
                     BucketSyncNotification.words(host).perSecond.format(org.desklink.mobile.helpers.Sizes.iec(summary.bytesPerSecond)),
@@ -476,31 +493,11 @@ class BucketUi(
         }
     }
 
-    /** Off: what the Bucket is, and one button (a single folder pick is all Android needs). */
     @Composable
-    private fun Hero(desk: String, waiting: Boolean, offered: Boolean, onTurnOn: () -> Unit, onDecline: () -> Unit, below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null) {
-        if (below != null) {
-            // In the Files tab the Bucket's invitation is the first item of a scrolling grid, with the recent transfers after it.
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(156.dp),
-                contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                item(span = { GridItemSpan(maxLineSpan) }) { HeroBody(desk, waiting, offered, onTurnOn, onDecline, scrolling = true) }
-                below()
-            }
-        } else {
-            HeroBody(desk, waiting, offered, onTurnOn, onDecline, scrolling = false)
-        }
-    }
-
-    @Composable
-    private fun HeroBody(desk: String, waiting: Boolean, offered: Boolean, onTurnOn: () -> Unit, onDecline: () -> Unit, scrolling: Boolean) {
+    private fun HeroBody(desk: String, waiting: Boolean, offered: Boolean, onTurnOn: () -> Unit, onDecline: () -> Unit) {
         val t = tokens
-        Column(if (scrolling) Modifier.fillMaxWidth() else Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            DropZone(Modifier.fillMaxWidth().then(if (scrolling) Modifier else Modifier.weight(1f, fill = false)).heightIn(min = 260.dp)) {
+        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            DropZone(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 260.dp)) {
                 IconCircle(R.drawable.sym_inventory, 72.dp, 36.dp, background = t.accentContainer, tint = t.onAccentContainer)
                 Spacer(Modifier.height(18.dp))
                 Text(
@@ -514,10 +511,10 @@ class BucketUi(
                 Text(stringResource(R.string.bucket_asking, desk), fontSize = 14.sp, color = t.textDim)
             } else {
                 Text(stringResource(R.string.bucket_pick_hint), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
-                PillButton(stringResource(R.string.bucket_turn_on), onTurnOn, icon = R.drawable.sym_inventory, modifier = Modifier.fillMaxWidth())
-                if (offered) PillButton(stringResource(R.string.bucket_not_now), onDecline, style = PillStyle.Outlined, height = 48.dp, modifier = Modifier.fillMaxWidth())
+                PrimaryButton(stringResource(R.string.bucket_turn_on), onTurnOn, icon = R.drawable.sym_inventory, modifier = Modifier.fillMaxWidth())
+                if (offered) SecondaryButton(stringResource(R.string.bucket_not_now), onDecline, height = 48.dp, modifier = Modifier.fillMaxWidth())
             }
-            if (!scrolling) Spacer(Modifier.navigationBarsPadding())
+            Spacer(Modifier.navigationBarsPadding())
         }
     }
 
@@ -546,7 +543,7 @@ class BucketUi(
     }
 
     @Composable
-    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onFix: (Boolean) -> Unit, onOpen: (String) -> Unit, onSelect: (String) -> Unit, below: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null) {
+    private fun Content(view: BucketView, desk: String, deviceId: String, path: String, selected: Set<String>, onFix: (Boolean) -> Unit, onOpen: (String) -> Unit, onSelect: (String) -> Unit) {
         val t = tokens
         var menuFor by remember { mutableStateOf<BucketItem?>(null) }
         var renaming by remember { mutableStateOf<BucketItem?>(null) }
@@ -559,34 +556,7 @@ class BucketUi(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            view.adding?.let { (done, total) ->
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Banner(stringResource(R.string.bucket_adding, done + 1, total), action = stringResource(R.string.cancel), progress = (done.toFloat() / total), onAction = BucketEngine::cancelAdd)
-                }
-            }
-            if (view.phase == Phase.HELD_EMPTY) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Banner(stringResource(R.string.bucket_held_empty, desk), action = stringResource(R.string.bucket_held_confirm), warn = true, action2 = stringResource(R.string.bucket_fix), onAction2 = { onFix(BucketFix.startsFresh(Phase.HELD_EMPTY)) }) { BucketEngine.confirmEmpty(deviceId) }
-                }
-            }
-            if (view.phase == Phase.NO_ACCESS) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_no_access, desk), action = stringResource(R.string.bucket_fix), warn = true, onAction = { onFix(BucketFix.startsFresh(Phase.NO_ACCESS)) }) }
-            }
-            if (view.phase == Phase.LISTING_FAILED) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_listing_failed), warn = true) }
-            }
-            if (view.phase == Phase.NOT_ON_DESK) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_not_on_desk, desk), warn = true) }
-            }
-            if (view.storageFull) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_storage_full), warn = true) }
-            }
-            if (view.phase == Phase.TOO_MANY) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(R.string.bucket_too_many), warn = true) }
-            }
-            if (view.bytes > FolderSync.WARN_BUCKET_BYTES) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Banner(stringResource(if (view.bytes >= FolderSync.MAX_BUCKET_BYTES) R.string.bucket_full else R.string.bucket_large, org.desklink.mobile.helpers.Sizes.iec(view.bytes)), warn = view.bytes >= FolderSync.MAX_BUCKET_BYTES) }
-            }
+            item(span = { GridItemSpan(maxLineSpan) }) { Banners(view, desk, deviceId, onFix) }
             val tiles = BucketLevel.tiles(view.items, path)
             if (tiles.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -608,23 +578,7 @@ class BucketUi(
                     onOpenFolder = { onOpen(tile.item.path) }, onToggle = { onSelect(tile.item.path) },
                 )
             }
-            if (view.notSynced.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    val reasons = view.notSynced.groupBy { it.second }.map { (why, list) ->
-                        stringResource(skipText(why), list.size) + ": " + list.take(3).joinToString(", ") { it.first.substringAfterLast('/') } + if (list.size > 3) "…" else ""
-                    }
-                    Column {
-                        Text(
-                            stringResource(R.string.bucket_not_synced, view.notSynced.size) + "\n" + reasons.joinToString("\n"),
-                            fontSize = 12.sp, lineHeight = 17.sp, color = t.textDim, modifier = Modifier.padding(top = 8.dp),
-                        )
-                        if (view.notSynced.any { it.second == Skip.COULDNT_FETCH }) {
-                            TextButton(onClick = { BucketEngine.retryGaveUp(deviceId) }) { Text(stringResource(R.string.bucket_retry_fetch)) }
-                        }
-                    }
-                }
-            }
-            below?.invoke(this)
+            if (view.notSynced.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) { NotSynced(view, deviceId) }
         }
         menuFor?.let { item ->
             ItemMenu(item, onDismiss = { menuFor = null }, onRename = { renaming = item }, onRemove = { removing = item })
@@ -676,6 +630,161 @@ class BucketUi(
         }
     }
 
+    /** Everything that needs a word above the files: adding, the phase's warnings, a full phone or Bucket. Nothing when all is well. */
+    @Composable
+    private fun Banners(view: BucketView, desk: String, deviceId: String, onFix: (Boolean) -> Unit) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            view.adding?.let { (done, total) ->
+                Banner(stringResource(R.string.bucket_adding, done + 1, total), action = stringResource(R.string.cancel), progress = (done.toFloat() / total), onAction = BucketEngine::cancelAdd)
+            }
+            if (view.phase == Phase.HELD_EMPTY) {
+                Banner(stringResource(R.string.bucket_held_empty, desk), action = stringResource(R.string.bucket_held_confirm), warn = true, action2 = stringResource(R.string.bucket_fix), onAction2 = { onFix(BucketFix.startsFresh(Phase.HELD_EMPTY)) }) { BucketEngine.confirmEmpty(deviceId) }
+            }
+            if (view.phase == Phase.NO_ACCESS) Banner(stringResource(R.string.bucket_no_access, desk), action = stringResource(R.string.bucket_fix), warn = true, onAction = { onFix(BucketFix.startsFresh(Phase.NO_ACCESS)) })
+            if (view.phase == Phase.LISTING_FAILED) Banner(stringResource(R.string.bucket_listing_failed), warn = true)
+            if (view.phase == Phase.NOT_ON_DESK) Banner(stringResource(R.string.bucket_not_on_desk, desk), warn = true)
+            if (view.storageFull) Banner(stringResource(R.string.bucket_storage_full), warn = true)
+            if (view.phase == Phase.TOO_MANY) Banner(stringResource(R.string.bucket_too_many), warn = true)
+            if (view.bytes > FolderSync.WARN_BUCKET_BYTES) {
+                Banner(stringResource(if (view.bytes >= FolderSync.MAX_BUCKET_BYTES) R.string.bucket_full else R.string.bucket_large, org.desklink.mobile.helpers.Sizes.iec(view.bytes)), warn = view.bytes >= FolderSync.MAX_BUCKET_BYTES)
+            }
+        }
+    }
+
+    /** "Not synced (N)" with a reason each, and the retry for files that could not be fetched. */
+    @Composable
+    private fun NotSynced(view: BucketView, deviceId: String) {
+        val t = tokens
+        val reasons = view.notSynced.groupBy { it.second }.map { (why, list) ->
+            stringResource(skipText(why), list.size) + ": " + list.take(3).joinToString(", ") { it.first.substringAfterLast('/') } + if (list.size > 3) "…" else ""
+        }
+        Column {
+            Text(
+                stringResource(R.string.bucket_not_synced, view.notSynced.size) + "\n" + reasons.joinToString("\n"),
+                fontSize = 12.sp, lineHeight = 17.sp, color = t.textDim, modifier = Modifier.padding(top = 8.dp),
+            )
+            if (view.notSynced.any { it.second == Skip.COULDNT_FETCH }) {
+                DeskTextButton(stringResource(R.string.bucket_retry_fetch), { BucketEngine.retryGaveUp(deviceId) })
+            }
+        }
+    }
+
+    /**
+     * The Files tab's whole Bucket part: warnings, the Bucket card, then [below] (the transfers). The folder browser is one tap
+     * away ("Open"): it is its own screen, where adding, selecting and moving live.
+     */
+    @Composable
+    private fun EmbeddedBody(
+        view: BucketView?,
+        desk: String,
+        deviceId: String,
+        on: Boolean,
+        menu: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+        below: (androidx.compose.foundation.lazy.LazyListScope.() -> Unit)?,
+        onSendFiles: () -> Unit,
+        onTurnOn: () -> Unit,
+        onFix: (Boolean) -> Unit,
+    ) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier.fillMaxSize().widthIn(max = 840.dp),
+                contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(key = "bucket") {
+                    if (view != null && on) BucketCard(view, desk, deviceId, menu, onSendFiles, onFix)
+                    else BucketInvite(desk, waiting = view?.phase == Phase.ASKING, offered = view?.offered == true, onTurnOn, onDecline = { BucketEngine.decline(deviceId) })
+                }
+                if (view != null && on && view.notSynced.isNotEmpty()) item(key = "not-synced") { NotSynced(view, deviceId) }
+                below?.invoke(this)
+            }
+        }
+    }
+
+    /** Off: what the Bucket is, and one button (a single folder pick is all Android needs). */
+    @Composable
+    private fun BucketInvite(desk: String, waiting: Boolean, offered: Boolean, onTurnOn: () -> Unit, onDecline: () -> Unit) {
+        val t = tokens
+        HeroCard {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                IconTile(R.drawable.sym_inventory, size = 48.dp, radius = 16.dp)
+                Text(
+                    stringResource(if (offered) R.string.bucket_offered_title else R.string.bucket_hero_title, desk),
+                    fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f).semantics { heading() },
+                )
+            }
+            Text(stringResource(R.string.bucket_hero_body, desk), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim)
+            if (waiting) {
+                Text(stringResource(R.string.bucket_asking, desk), fontSize = 14.sp, color = t.textDim)
+            } else {
+                Text(stringResource(R.string.bucket_pick_hint), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
+                PrimaryButton(stringResource(R.string.bucket_turn_on), onTurnOn, icon = R.drawable.sym_inventory, height = 48.dp, modifier = Modifier.fillMaxWidth())
+                if (offered) SecondaryButton(stringResource(R.string.bucket_not_now), onDecline, height = 48.dp, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+
+    /** On: the state in a word, how much is in it, a bar of what kind, "Send files" and "Open". */
+    @Composable
+    private fun BucketCard(view: BucketView, desk: String, deviceId: String, menu: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit, onSendFiles: () -> Unit, onFix: (Boolean) -> Unit) {
+        val t = tokens
+        val context = LocalContext.current
+        val connected = DeskLinkApplication.getInstance().getDevice(view.deviceId)?.hasActiveWebRtcFeatureTransport == true
+        val (state, stateColor) = when {
+            !connected -> stringResource(R.string.bucket_waiting_for, desk) to t.amber
+            view.phase == Phase.SYNCING || view.phase == Phase.SCANNING -> stringResource(R.string.bucket_syncing) to t.accentText
+            view.userPaused -> stringResource(R.string.bucket_paused_by_you) to t.textDim
+            else -> stringResource(R.string.files_bucket_in_step) to t.mintText
+        }
+        val files = view.items.filter { !it.dir }
+        val breakdown = remember(view.items) { BucketBreakdown.of(files.map { it.name to it.size }) }
+        val count = stringResource(R.string.files_bucket_count, files.size, org.desklink.mobile.helpers.Sizes.iec(view.bytes))
+        val synced = view.lastSync?.let { stringResource(R.string.bucket_up_to_date, DateUtils.getRelativeTimeSpanString(it, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString()) }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Banners(view, desk, deviceId, onFix)
+            HeroCard {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    IconTile(R.drawable.sym_folder, size = 48.dp, radius = 16.dp, container = t.surface, content = t.accent)
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.bucket_title), fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium, modifier = Modifier.semantics { heading() })
+                        Text("↔ $desk", fontFamily = MonoFamily, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    menu()
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    StatusDot(stateColor)
+                    Text(state, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (stateColor == t.amber) t.text else stateColor)
+                }
+                val summary = view.summary
+                if (summary != null) {
+                    SyncHeader(summary, view.userPaused, desk)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(count, fontSize = 13.sp, lineHeight = 18.sp, color = t.text)
+                        if (synced != null) Text(synced, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
+                        if (breakdown.total > 0) {
+                            Row(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(t.surface), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                listOf(breakdown.images to 1f, breakdown.documents to 0.55f, breakdown.other to 0.3f).filter { it.first > 0 }.forEach { (bytes, alpha) ->
+                                    Box(Modifier.weight(bytes.toFloat()).height(6.dp).background(t.accent.copy(alpha = alpha)))
+                                }
+                            }
+                            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                listOf(R.string.files_bucket_images to breakdown.images, R.string.files_bucket_documents to breakdown.documents, R.string.files_bucket_other to breakdown.other)
+                                    .filter { it.second > 0 }
+                                    .forEach { (label, bytes) -> Text(stringResource(label, org.desklink.mobile.helpers.Sizes.iec(bytes)), fontSize = 11.sp, lineHeight = 15.sp, color = t.textDim) }
+                            }
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PrimaryButton(stringResource(R.string.home_send_files), onSendFiles, Modifier.weight(1.2f), icon = R.drawable.sym_upload, height = 48.dp)
+                    SecondaryButton(stringResource(R.string.files_bucket_open), { startActivity(BucketActivity.intent(context, deviceId)) }, Modifier.weight(1f), icon = R.drawable.sym_folder, height = 48.dp)
+                }
+            }
+        }
+    }
+
     @Composable
     private fun Banner(text: String, action: String? = null, warn: Boolean = false, progress: Float? = null, action2: String? = null, onAction2: () -> Unit = {}, onAction: () -> Unit = {}) {
         val t = tokens
@@ -685,8 +794,8 @@ class BucketUi(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(text, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.weight(1f).padding(vertical = 6.dp))
-                action?.let { TextButton(onClick = onAction, modifier = Modifier.heightIn(min = 48.dp)) { Text(it) } }
-                action2?.let { TextButton(onClick = onAction2, modifier = Modifier.heightIn(min = 48.dp)) { Text(it) } }
+                action?.let { DeskTextButton(it, onAction) }
+                action2?.let { DeskTextButton(it, onAction2) }
             }
             progress?.let { LinearProgressIndicator({ it }, Modifier.fillMaxWidth().padding(end = 8.dp, bottom = 4.dp).height(4.dp), color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp) }
         }

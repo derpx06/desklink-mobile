@@ -23,6 +23,10 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,10 +97,14 @@ import org.desklink.mobile.plugins.share.TransferRecord
 import org.desklink.mobile.plugins.share.hasPicture
 import org.desklink.mobile.plugins.share.previewKind
 import org.desklink.mobile.ui.compose.MonoFamily
-import org.desklink.mobile.ui.compose.components.IconCircle
-import org.desklink.mobile.ui.compose.components.LargeTitle
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
+import org.desklink.mobile.ui.compose.DeskTextButton
+import org.desklink.mobile.ui.compose.PrimaryButton
+import org.desklink.mobile.ui.compose.components.DeskCard
+import org.desklink.mobile.ui.compose.components.DeskFilterChip
+import org.desklink.mobile.ui.compose.components.DeskProgressBar
+import org.desklink.mobile.ui.compose.components.EmptyState
+import org.desklink.mobile.ui.compose.components.IconTile
+import org.desklink.mobile.ui.compose.components.SectionHeader
 import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.components.shimmer
 import org.desklink.mobile.ui.compose.tokens
@@ -123,50 +131,47 @@ class TransferActions(
 fun speedLabel(bytesPerSecond: Long): String = stringResource(R.string.transfers_speed, org.desklink.mobile.helpers.Sizes.iec(bytesPerSecond))
 
 /**
- * "Recent transfers", as items of the Files tab's grid: the running transfer first, then everything sent and
- * received in the last 30 days, newest first, by day. At most [limit] are shown until [onShowAll].
+ * The file list, as items of the Files tab's column: the running transfer first, the filter chips, then everything sent
+ * and received in the last 30 days, newest first, by day (each day's rows one rounded group). At most [limit] are shown
+ * until [onShowAll].
  */
-fun androidx.compose.foundation.lazy.grid.LazyGridScope.recentTransfers(
+fun androidx.compose.foundation.lazy.LazyListScope.recentTransfers(
     deskName: String,
     live: LiveTransfer?,
     records: List<TransferRecord>,
     revision: Int,
     actions: TransferActions,
+    filter: FileFilter = FileFilter.ALL,
+    onFilter: (FileFilter) -> Unit = {},
     limit: Int = RECENT_LIMIT,
     onShowAll: (() -> Unit)? = null,
 ) {
-    val shown = records.take(limit)
-    val groups = shown.groupBy { dayStart(it.time) }.toList()
-    item(span = { GridItemSpan(maxLineSpan) }, key = "recent-title") {
-        val t = tokens
-        Text(
-            stringResource(R.string.files_recent_transfers),
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = t.text,
-            modifier = Modifier.padding(start = 4.dp, top = 12.dp).semantics { heading() },
-        )
+    live?.let { item(key = "recent-live") { LiveCard(it, actions.onCancelLive) } }
+    if (records.isEmpty()) {
+        if (live == null) item(key = "recent-empty") { Empty(actions.onSendFiles) }
+        return
     }
-    live?.let { item(span = { GridItemSpan(maxLineSpan) }, key = "recent-live") { LiveCard(it, actions.onCancelLive) } }
-    if (records.isEmpty() && live == null) {
-        item(span = { GridItemSpan(maxLineSpan) }, key = "recent-empty") { Empty(actions.onSendFiles) }
-    }
-    groups.forEach { (day, items) ->
-        item(span = { GridItemSpan(maxLineSpan) }, key = "day$day") {
-            val context = LocalContext.current
-            Text(
-                dayLabel(context, day),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = tokens.textDim,
-                modifier = Modifier.padding(start = 6.dp, top = 8.dp).semantics { heading() },
-            )
+    item(key = "recent-chips") { FilterChips(filter, onFilter) }
+    val matching = records.filter(filter::matches)
+    if (matching.isEmpty()) {
+        item(key = "recent-none") {
+            Text(stringResource(R.string.files_filter_none), fontSize = 14.sp, color = tokens.textDim, modifier = Modifier.padding(horizontal = 6.dp, vertical = 12.dp))
         }
-        items(items, key = { it.id }) { record -> FileCard(record, deskName, revision, actions) }
+        return
     }
-    if (records.size > limit && onShowAll != null) {
-        item(span = { GridItemSpan(maxLineSpan) }, key = "recent-more") {
-            TextButton(onClick = onShowAll, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.files_show_all, records.size)) }
+    val groups = groupByDay(matching.take(limit))
+    groups.forEach { (day, items) ->
+        item(key = "day$day") {
+            val context = LocalContext.current
+            SectionHeader(dayLabel(context, day), Modifier.padding(top = 8.dp))
+        }
+        itemsIndexed(items, key = { _, r -> r.id }) { i, record ->
+            FileRow(record, deskName, revision, actions, first = i == 0, last = i == items.lastIndex)
+        }
+    }
+    if (matching.size > limit && onShowAll != null) {
+        item(key = "recent-more") {
+            DeskTextButton(stringResource(R.string.files_show_all, matching.size), onShowAll)
         }
     }
 }
@@ -174,50 +179,57 @@ fun androidx.compose.foundation.lazy.grid.LazyGridScope.recentTransfers(
 /** How many recent transfers the Files tab lists before "Show all". */
 const val RECENT_LIMIT = 12
 
+/** All / Images / Documents / Archives: one row that scrolls sideways at a large font, each chip 48 dp to touch. */
+@Composable
+private fun FilterChips(selected: FileFilter, onSelect: (FileFilter) -> Unit) {
+    val label = stringResource(R.string.files_filters)
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup().semantics { contentDescription = label },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        FileFilter.entries.forEach { f -> DeskFilterChip(stringResource(f.label), f == selected, { onSelect(f) }) }
+    }
+}
+
 @Composable
 private fun LiveCard(live: LiveTransfer, onCancel: () -> Unit) {
     val t = tokens
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(t.surface, RoundedCornerShape(24.dp))
-            .border(1.dp, t.hairline, RoundedCornerShape(24.dp))
-            .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
-            .semantics(mergeDescendants = true) {},
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        IconCircle(if (live.upload) R.drawable.sym_upload else R.drawable.sym_download, 36.dp, 20.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(live.name, fontFamily = MonoFamily, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-            if (live.progress == null) {
-                LinearProgressIndicator(Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, gapSize = 0.dp)
-            } else {
-                LinearProgressIndicator({ live.progress }, Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp)
+    DeskCard(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(
+            Modifier.padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp).semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            IconTile(if (live.upload) R.drawable.sym_upload else R.drawable.sym_download, size = 44.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(live.name, fontFamily = MonoFamily, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                if (live.progress == null) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)), color = t.accent, trackColor = t.surface2, gapSize = 0.dp)
+                } else {
+                    DeskProgressBar(live.progress)
+                }
+                // The words are the transfer's own: percent, speed and the lane ("fast, over Wi-Fi", "over the secure link", ...), never cut.
+                Text(live.label, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
             }
-            Text(live.label, fontSize = 12.sp, color = t.textDim)
+            DeskTextButton(stringResource(R.string.cancel), onCancel)
         }
-        PillButton(stringResource(R.string.cancel), onCancel, style = PillStyle.Outlined, height = 40.dp)
     }
 }
 
 @Composable
 private fun Empty(onSendFiles: () -> Unit) {
-    val t = tokens
-    Column(Modifier.fillMaxWidth().padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        IconCircle(R.drawable.sym_swap_vert, 56.dp, 26.dp, background = t.accentContainer, tint = t.onAccentContainer)
-        Text(stringResource(R.string.transfers_empty_title), fontSize = 16.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
-        Text(stringResource(R.string.transfers_empty_body), fontSize = 14.sp, color = t.textDim, textAlign = TextAlign.Center)
-        PillButton(stringResource(R.string.home_send_files), onSendFiles, height = 48.dp, icon = R.drawable.sym_upload_file)
+    EmptyState(R.drawable.sym_swap_vert, stringResource(R.string.transfers_empty_title), stringResource(R.string.transfers_empty_body)) {
+        PrimaryButton(stringResource(R.string.home_send_files), onSendFiles, icon = R.drawable.sym_upload_file)
     }
 }
 
+/** One file: a 44 dp thumbnail (a picture once decoded, a typed glyph before), its name, "Sent . 2 min ago . 3.2 MB", and the menu. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FileCard(record: TransferRecord, deskName: String, revision: Int, actions: TransferActions) {
+private fun FileRow(record: TransferRecord, deskName: String, revision: Int, actions: TransferActions, first: Boolean, last: Boolean) {
     val t = tokens
     val context = LocalContext.current
-    val sizePx = with(LocalDensity.current) { 180.dp.roundToPx() }
+    val sizePx = with(LocalDensity.current) { 88.dp.roundToPx() }
     val preview by rememberFilePreview(record, sizePx, revision)
     var menu by remember { mutableStateOf(false) }
     val size = org.desklink.mobile.helpers.Sizes.iec(record.size)
@@ -226,87 +238,60 @@ private fun FileCard(record: TransferRecord, deskName: String, revision: Int, ac
     val description = stringResource(if (record.sent) R.string.transfers_item_sent else R.string.transfers_item_received, record.name, size, desk, time) +
         if (preview.missing) ". " + stringResource(R.string.transfers_missing) else ""
     val moreLabel = stringResource(R.string.transfers_more, record.name)
-    Column(
+    val round = 24.dp
+    val shape = RoundedCornerShape(topStart = if (first) round else 0.dp, topEnd = if (first) round else 0.dp, bottomStart = if (last) round else 0.dp, bottomEnd = if (last) round else 0.dp)
+    val kind = previewKind(record.mime, record.name)
+    Row(
         Modifier
-            .clip(RoundedCornerShape(20.dp))
+            .fillMaxWidth()
+            .clip(shape)
             .background(t.surface)
-            .border(1.dp, t.hairline, RoundedCornerShape(20.dp))
-            .combinedClickable(
-                role = Role.Button,
-                onLongClick = { menu = true },
-                onLongClickLabel = moreLabel,
-            ) { if (preview.missing) menu = true else actions.onOpen(record) }
-            .semantics(mergeDescendants = true) { contentDescription = description },
+            .border(1.dp, t.hairline, shape)
+            .combinedClickable(role = Role.Button, onLongClick = { menu = true }, onLongClickLabel = moreLabel) { if (preview.missing) menu = true else actions.onOpen(record) }
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .heightIn(min = 64.dp)
+            .padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            Modifier
-                .padding(6.dp)
-                .fillMaxWidth()
-                .height(120.dp)
-                .clip(RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            val kind = previewKind(record.mime, record.name)
+        Box(Modifier.size(44.dp)) {
             val bitmap = preview.bitmap
             when {
-                preview.loading && kind.hasPicture -> Box(Modifier.fillMaxSize().shimmer())
-                preview.missing -> TypedIcon(R.drawable.sym_broken_image, t.fill, t.textDim)
-                bitmap != null -> Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                else -> TypedIcon(iconFor(kind), t.accentContainer, t.onAccentContainer)
-            }
-            if (kind == PreviewKind.VIDEO && !preview.missing && !preview.loading) {
-                Box(Modifier.size(40.dp).background(Color.Black.copy(alpha = 0.55f), CircleShape), contentAlignment = Alignment.Center) {
-                    Icon(painterResource(R.drawable.sym_play_arrow), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                }
-                preview.durationMs?.let {
-                    Text(
-                        DateUtils.formatElapsedTime(it / 1000),
-                        fontFamily = MonoFamily,
-                        fontSize = 11.sp,
-                        color = Color.White,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
+                preview.loading && kind.hasPicture -> Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).shimmer())
+                preview.missing -> IconTile(R.drawable.sym_broken_image, container = t.fill, content = t.textDim)
+                bitmap != null -> Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)))
+                else -> IconTile(iconFor(kind))
             }
             // Which way it went, at a glance.
             Box(
-                Modifier.align(Alignment.TopStart).padding(6.dp).size(24.dp).background(t.surface.copy(alpha = 0.9f), CircleShape),
+                Modifier.align(Alignment.BottomEnd).offset(3.dp, 3.dp).size(20.dp).background(t.surface, CircleShape).border(1.dp, t.hairline, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(painterResource(if (record.sent) R.drawable.sym_upload else R.drawable.sym_download), contentDescription = null, tint = t.text, modifier = Modifier.size(15.dp))
+                Icon(painterResource(if (record.sent) R.drawable.sym_upload else R.drawable.sym_download), contentDescription = null, tint = t.textDim, modifier = Modifier.size(12.dp))
             }
         }
-        Row(Modifier.padding(start = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
-                // The middle goes: a name's start and its extension are what tell files apart.
-                Text(record.name, fontFamily = MonoFamily, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-                Text(
-                    if (preview.missing) stringResource(R.string.transfers_missing) else "$size · $time",
-                    fontSize = 12.sp,
-                    color = if (preview.missing) t.red else t.textDim,
-                    maxLines = if (preview.missing) 2 else 1,
-                )
+        Column(Modifier.weight(1f)) {
+            // The middle goes: a name's start and its extension are what tell files apart.
+            Text(record.name, fontFamily = MonoFamily, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis)
+            Text(
+                if (preview.missing) stringResource(R.string.transfers_missing)
+                else stringResource(if (record.sent) R.string.files_sent_meta else R.string.files_received_meta, DateUtils.getRelativeTimeSpanString(record.time, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(), size),
+                fontSize = 12.sp, lineHeight = 16.sp,
+                color = if (preview.missing) t.red else t.textDim,
+            )
+        }
+        Box {
+            IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
+                Icon(painterResource(R.drawable.sym_more_vert), contentDescription = moreLabel, tint = t.textDim)
             }
-            Box {
-                IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
-                    Icon(painterResource(R.drawable.sym_more_vert), contentDescription = moreLabel, tint = t.textDim)
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                if (!preview.missing) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.transfers_share)) }, onClick = { menu = false; actions.onShare(record) })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.transfers_open_with)) }, onClick = { menu = false; actions.onOpenWith(record) })
                 }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    if (!preview.missing) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.transfers_share)) }, onClick = { menu = false; actions.onShare(record) })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.transfers_open_with)) }, onClick = { menu = false; actions.onOpenWith(record) })
-                    }
-                    DropdownMenuItem(text = { Text(stringResource(R.string.transfers_remove)) }, onClick = { menu = false; actions.onRemove(record) })
-                }
+                DropdownMenuItem(text = { Text(stringResource(R.string.transfers_remove)) }, onClick = { menu = false; actions.onRemove(record) })
             }
         }
-    }
-}
-
-@Composable
-private fun TypedIcon(@DrawableRes icon: Int, background: Color, tint: Color) {
-    Box(Modifier.fillMaxSize().background(background), contentAlignment = Alignment.Center) {
-        Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(36.dp))
     }
 }
 
@@ -320,11 +305,6 @@ fun iconFor(kind: PreviewKind): Int = when (kind) {
     PreviewKind.ARCHIVE -> R.drawable.sym_folder_zip
     PreviewKind.OTHER -> R.drawable.sym_draft
 }
-
-private fun dayStart(time: Long): Long = Calendar.getInstance().apply {
-    timeInMillis = time
-    set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-}.timeInMillis
 
 private fun dayLabel(context: android.content.Context, day: Long): String {
     val today = dayStart(System.currentTimeMillis())

@@ -1040,7 +1040,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         running ?: return null
         val speed = running.bytesPerSecond.takeIf { it > 0 }?.let { getString(R.string.transfers_speed, org.desklink.mobile.helpers.Sizes.iec(it)) }
         if (running.saving) return LiveTransfer(running.title, running.upload, null, getString(R.string.files_saving_label))
-        return LiveTransfer(running.title, running.upload, running.percent?.let { it / 100f }, listOfNotNull(running.percent?.let { "$it%" }, speed).joinToString(" · "))
+        // The lane in its words ("fast, over Wi-Fi", "over the secure link", "through the internet (slower)"), as Home and the notification say it.
+        val lane = org.desklink.mobile.plugins.share.TransferNotification.laneWord(this, running.deviceId, running.upload, running.title)
+        return LiveTransfer(running.title, running.upload, running.percent?.let { it / 100f }, listOfNotNull(running.percent?.let { "$it%" }, speed, lane).joinToString(" · "))
     }
 
     /** Read when used, so one object serves for as long as the computer does. */

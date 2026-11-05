@@ -66,6 +66,10 @@ import org.desklink.mobile.ui.compose.components.SessionPreviews
 import org.desklink.mobile.ui.compose.components.TerminalTile
 import org.desklink.mobile.ui.compose.screen.settings.ClipboardAutoSyncRows
 import org.desklink.mobile.ui.compose.screen.settings.clipboardSummary
+import org.desklink.mobile.ui.compose.DeskIconButton
+import org.desklink.mobile.ui.compose.PrimaryButton
+import org.desklink.mobile.ui.compose.SecondaryButton
+import org.desklink.mobile.ui.compose.screen.transfers.FileFilter
 import org.desklink.mobile.ui.compose.screen.transfers.LiveTransfer
 import org.desklink.mobile.ui.compose.screen.transfers.RECENT_LIMIT
 import org.desklink.mobile.ui.compose.screen.transfers.TransferActions
@@ -101,94 +105,82 @@ fun FilesTab(
 ) {
     val t = tokens
     var showAll by rememberSaveable { mutableStateOf(false) }
+    var filter by rememberSaveable { mutableIntStateOf(0) }
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
         LargeTitle(
             stringResource(R.string.files_title),
             Modifier.padding(top = 12.dp),
             subtitle = if (savedIn.isNotEmpty()) stringResource(R.string.files_saved_in, savedIn) else stringResource(R.string.files_subtitle),
         ) {
-            IconButton(onClick = actions.onSendFiles, modifier = Modifier.size(48.dp)) {
-                Icon(painterResource(R.drawable.sym_upload_file), contentDescription = stringResource(R.string.home_send_files), tint = t.text)
-            }
+            // Also in the Bucket card: this one stays so that sending is one tap away with the Bucket off, too.
+            DeskIconButton(R.drawable.sym_upload_file, stringResource(R.string.home_send_files), actions.onSendFiles)
         }
         if (sendAgain.isNotEmpty() || unsaved.isNotEmpty()) {
             // Notices scroll inside a share of the screen: several of them, or a large font, must not push the files off it.
             val share = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * 0.45f).dp
-            Column(Modifier.heightIn(max = share).verticalScroll(rememberScrollState())) {
+            Column(Modifier.heightIn(max = share).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 sendAgain.forEach { item -> SendAgainCard(item, onSendAgain, onDismissSendAgain) }
                 unsaved.forEach { item -> UnsavedCard(item, item.id in retrying, onRetryUnsaved, onDiscardUnsaved) }
             }
         }
         Box(Modifier.weight(1f)) {
-            bucket.Screen(deviceId, onBack = {}, embedded = true) {
-                recentTransfers(deskName, live, records, revision, actions, limit = if (showAll) Int.MAX_VALUE else RECENT_LIMIT, onShowAll = { showAll = true })
-            }
+            bucket.Screen(deviceId, onBack = {}, embedded = true, onSendFiles = actions.onSendFiles, below = {
+                recentTransfers(
+                    deskName, live, records, revision, actions,
+                    filter = FileFilter.entries[filter], onFilter = { filter = it.ordinal; showAll = false },
+                    limit = if (showAll) Int.MAX_VALUE else RECENT_LIMIT, onShowAll = { showAll = true },
+                )
+            })
         }
     }
 }
 
-/** A file that arrived whole but could not be saved: plain words, and the two things that can be done. */
+/** A send that cannot go on: plain words, and the two things that can be done. */
 @Composable
 private fun SendAgainCard(
     item: org.desklink.mobile.plugins.share.SendAgain.Item,
     onSendAgain: (String) -> Unit,
     onDismiss: (String) -> Unit,
-) {
-    val t = tokens
-    Column(
-        Modifier
-            .padding(horizontal = 16.dp, vertical = 6.dp)
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(t.coralContainer)
-            .padding(16.dp)
-            .semantics(mergeDescendants = true) {},
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(stringResource(R.string.send_again_title, item.name), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.coralText)
-        Text(
-            stringResource(if (item.unreadable) R.string.send_again_body_unreadable else R.string.send_again_body_changed),
-            fontSize = 13.sp, color = t.text,
-        )
-        @OptIn(ExperimentalLayoutApi::class)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            PillButton(stringResource(R.string.send_again_button), { onSendAgain(item.id) }, height = 48.dp)
-            PillButton(stringResource(R.string.send_again_dismiss), { onDismiss(item.id) }, style = PillStyle.Outlined, height = 48.dp)
-        }
-    }
-}
+) = NoticeCard(
+    stringResource(R.string.send_again_title, item.name),
+    stringResource(if (item.unreadable) R.string.send_again_body_unreadable else R.string.send_again_body_changed),
+    stringResource(R.string.send_again_button), { onSendAgain(item.id) },
+    stringResource(R.string.send_again_dismiss), { onDismiss(item.id) },
+)
 
+/** A file that arrived whole but could not be saved. */
 @Composable
 private fun UnsavedCard(
     item: org.desklink.mobile.plugins.share.UnpublishedFiles.Item,
     busy: Boolean,
     onRetry: (String) -> Unit,
     onDiscard: (String) -> Unit,
-) {
+) = NoticeCard(
+    stringResource(R.string.files_unsaved_title, item.name),
+    if (item.storageFull) stringResource(R.string.files_unsaved_body_full) else stringResource(R.string.files_unsaved_body),
+    // While it runs a second tap would start a second copy: the buttons do nothing until it has an answer.
+    stringResource(if (busy) R.string.files_saving_label else R.string.files_unsaved_retry), { if (!busy) onRetry(item.id) },
+    stringResource(R.string.files_unsaved_discard), { if (!busy) onDiscard(item.id) },
+)
+
+/** The coral card of a file that needs a decision: what happened, and two buttons (48 dp). */
+@Composable
+private fun NoticeCard(title: String, body: String, primary: String, onPrimary: () -> Unit, secondary: String, onSecondary: () -> Unit) {
     val t = tokens
     Column(
         Modifier
-            .padding(horizontal = 16.dp, vertical = 6.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(t.coralContainer)
+            .background(t.coralContainer, RoundedCornerShape(22.dp))
             .padding(16.dp)
             .semantics(mergeDescendants = true) {},
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(R.string.files_unsaved_title, item.name), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.coralText)
-        Text(
-            if (item.storageFull) stringResource(R.string.files_unsaved_body_full) else stringResource(R.string.files_unsaved_body),
-            fontSize = 13.sp, color = t.text,
-        )
+        Text(title, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = t.coralText)
+        Text(body, fontSize = 13.sp, lineHeight = 18.sp, color = t.text)
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // While it runs a second tap would start a second copy: the buttons do nothing until it has an answer.
-            PillButton(
-                stringResource(if (busy) R.string.files_saving_label else R.string.files_unsaved_retry),
-                { if (!busy) onRetry(item.id) }, height = 48.dp,
-            )
-            PillButton(stringResource(R.string.files_unsaved_discard), { if (!busy) onDiscard(item.id) }, style = PillStyle.Outlined, height = 48.dp)
+            PrimaryButton(primary, onPrimary, height = 48.dp)
+            SecondaryButton(secondary, onSecondary, height = 48.dp)
         }
     }
 }
