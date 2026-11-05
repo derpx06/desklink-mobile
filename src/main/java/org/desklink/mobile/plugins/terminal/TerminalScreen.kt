@@ -88,7 +88,24 @@ class TerminalScreen(
     /** Runs [block] with the emulator, under the lock the writer thread also takes. */
     fun <T> withEmulator(block: (TerminalEmulator) -> T): T = synchronized(lock) { block(emulator) }
 
+    // Synchronized output (DEC mode 2026, which Termux ignores): between `CSI ? 2026 h` and `l` the
+    // program is drawing one frame; showing it half done is the tearing Codex and Claude Code avoid
+    // by asking for it. Guarded by `lock`.
+    private var syncing = false
+    private var syncGeneration = 0
+    private val held = java.io.ByteArrayOutputStream()
+    private var scan = SCAN_TEXT
+    private val stash = ByteArray(STASH_MAX)
+    private var stashLen = 0
+    private var stringBytes = 0
+
     override fun beginSnapshot() {
+        synchronized(lock) {
+            syncing = false
+            syncGeneration++
+            held.reset()
+            scan = SCAN_TEXT
+        }
         // A fresh emulator rather than the `ESC c` the snapshot starts with: RIS does not leave the
         // alternate buffer (a shell painted onto vim's buffer stays there after vim exits) and does
         // not clear the per-row wrap flags, so copied text would still join rows that are not one line.
@@ -98,9 +115,98 @@ class TerminalScreen(
 
     override fun write(data: ByteArray) {
         if (data.isEmpty()) return
-        synchronized(lock) { appendLocked(data) }
+        synchronized(lock) { filterLocked(data) }
         listener?.onScreenChanged()
         observer?.onOutput(this)
+    }
+
+    /**
+     * Cleans [data] on its way to the emulator, with state kept across chunks (a sequence may be cut
+     * anywhere):
+     *
+     *  * synchronized output (`CSI ? 2026 h` / `l`) holds a frame until it is complete;
+     *  * APC, PM and SOS strings (`ESC _`, `ESC ^`, `ESC X` ... ST) are dropped: Claude Code asks the kitty
+     *    graphics protocol if it is there with one at start-up, and Termux prints its payload as text;
+     *  * kitty keyboard protocol sequences with a `=` or `<` marker (`CSI = 5 ; 1 u`) are dropped for the
+     *    same reason.
+     */
+    private fun filterLocked(data: ByteArray) {
+        val out = ByteArray(data.size + STASH_MAX + 2)
+        var n = 0
+        fun put(b: Byte) { out[n++] = b }
+        fun flushRun() {
+            if (n == 0) return
+            if (syncing) held.write(out, 0, n) else emulator.append(out.copyOf(n), n)
+            n = 0
+        }
+        for (b in data) {
+            when (scan) {
+                SCAN_TEXT -> if (b == ESC) scan = SCAN_ESC else put(b)
+                SCAN_ESC -> when (b) {
+                    '_'.code.toByte(), '^'.code.toByte(), 'X'.code.toByte() -> { scan = SCAN_STRING; stringBytes = 0 }
+                    '['.code.toByte() -> { scan = SCAN_CSI; stashLen = 0 }
+                    ESC -> put(ESC) // the first ESC was a literal one; this one may start something
+                    else -> { put(ESC); put(b); scan = SCAN_TEXT }
+                }
+                SCAN_CSI -> {
+                    val c = b.toInt() and 0xff
+                    if (c in 0x20..0x3f && stashLen < STASH_MAX) {
+                        stash[stashLen++] = b
+                    } else if (c in 0x40..0x7e && stashLen < STASH_MAX) {
+                        scan = SCAN_TEXT
+                        val params = String(stash, 0, stashLen, Charsets.ISO_8859_1)
+                        when {
+                            c == 'h'.code && params == "?2026" -> { flushRun(); beginSyncLocked() }
+                            c == 'l'.code && params == "?2026" -> { flushRun(); flushHeldLocked() }
+                            c == 'u'.code && (params.startsWith("=") || params.startsWith("<")) -> Unit
+                            else -> {
+                                put(ESC); put('['.code.toByte())
+                                for (i in 0 until stashLen) put(stash[i])
+                                put(b)
+                            }
+                        }
+                    } else {
+                        // Not a sequence we know the end of: give it to the emulator as it came.
+                        scan = SCAN_TEXT
+                        put(ESC); put('['.code.toByte())
+                        for (i in 0 until stashLen) put(stash[i])
+                        if (b == ESC) scan = SCAN_ESC else put(b)
+                    }
+                }
+                SCAN_STRING -> when {
+                    b == ESC -> scan = SCAN_STRING_ESC
+                    b == ST8 -> scan = SCAN_TEXT
+                    ++stringBytes > MAX_STRING_BYTES -> scan = SCAN_TEXT
+                }
+                else -> { // SCAN_STRING_ESC
+                    scan = if (b == '\\'.code.toByte()) SCAN_TEXT else if (b == ESC) SCAN_STRING_ESC else SCAN_STRING
+                }
+            }
+        }
+        flushRun()
+        if (syncing && held.size() > MAX_HELD_BYTES) flushHeldLocked()
+    }
+
+    private fun beginSyncLocked() {
+        if (syncing) return
+        syncing = true
+        val generation = ++syncGeneration
+        // A program that dies mid-frame must not freeze the screen: show what there is after a moment.
+        FLUSHER.schedule({
+            val flushed = synchronized(lock) { if (syncing && syncGeneration == generation) { flushHeldLocked(); true } else false }
+            if (flushed) listener?.onScreenChanged()
+        }, SYNC_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+    }
+
+    private fun flushHeldLocked() {
+        if (!syncing) return
+        syncing = false
+        syncGeneration++
+        if (held.size() > 0) {
+            val bytes = held.toByteArray()
+            held.reset()
+            emulator.append(bytes, bytes.size)
+        }
     }
 
     override fun setReplaying(replaying: Boolean) {
@@ -134,10 +240,6 @@ class TerminalScreen(
         emulator.screen.getSelectedText(0, (screenRows - lastRows).coerceAtLeast(0), emulator.mColumns, screenRows - 1)
     }
 
-    private fun appendLocked(data: ByteArray) {
-        emulator.append(data, data.size)
-    }
-
     /**
      * The emulator wants a client for logging and the cursor style; there is no local session.
      * Every method is a no-op, so no android.util.Log call can be reached from a JVM test.
@@ -164,5 +266,18 @@ class TerminalScreen(
     companion object {
         const val DEFAULT_TRANSCRIPT_ROWS = 5000
         private const val MIN_CELLS = 4
+        private const val ESC: Byte = 0x1b
+        private const val ST8: Byte = 0x9c.toByte()
+        private const val SCAN_TEXT = 0
+        private const val SCAN_ESC = 1
+        private const val SCAN_CSI = 2
+        private const val SCAN_STRING = 3
+        private const val SCAN_STRING_ESC = 4
+        private const val STASH_MAX = 48
+        private const val MAX_STRING_BYTES = 1 shl 16
+        private const val SYNC_TIMEOUT_MS = 150L
+        private const val MAX_HELD_BYTES = 1 shl 20
+        private val FLUSHER: java.util.concurrent.ScheduledExecutorService =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "DeskLink-TerminalSync").apply { isDaemon = true } }
     }
 }

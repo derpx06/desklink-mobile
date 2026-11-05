@@ -77,6 +77,10 @@ data class TerminalSessionState(
     val startedAt: Long? = null,
     /** "zsh". */
     val shell: String? = null,
+    /** A window at the desk shows it too. */
+    val deskWindow: Boolean = false,
+    /** This phone sets the size even though a desk window is open. */
+    val phoneSize: Boolean = false,
 )
 
 data class TerminalClientState(
@@ -141,6 +145,12 @@ class TerminalClient(
         var viewRows = 0
         var viewCols = 0
         var gone = false
+
+        /** The phone sets the size: asked again after a reattach, which gives it up on the desk. */
+        var wantsClaim = false
+
+        /** The host last said the phone holds the size, so a "no" after it is the desk taking it back. */
+        var claimHeld = false
 
         /** A terminal screen is showing it, so its screen must outlive the session's end. */
         var displayed = false
@@ -298,10 +308,21 @@ class TerminalClient(
             if (linkUp) sendAttach(session) else sinks[id]?.resize(r, c)
             publish()
         } else if (!session.awaitingAttach) {
-            // While an attach is in flight the screen keeps the desktop's geometry, see sendAttach.
-            sinks[id]?.resize(r, c)
-            if (changed && session.attached) sendResize(session)
+            // Only a request: the screen takes the size the host reports (the program is drawn for
+            // that one), never the view's. Resizing it here used to crop and re-wrap the alternate
+            // screen while the program still drew for the desk's size.
+            if (changed && session.attached) sendResize(session, claim = null)
         }
+    }
+
+    /**
+     * The person chose the phone's size (true) or the desk's (false) for a session a desk window shows.
+     * The host answers with the session list, which resizes the screen.
+     */
+    fun claimSize(id: String, phone: Boolean) = post {
+        val session = sessions[id] ?: return@post
+        session.wantsClaim = phone
+        if (session.attached && session.viewRows > 0) sendResize(session, claim = phone)
     }
 
     /** Attaches again after a failed attach or a refusal that has since been lifted. */
@@ -396,6 +417,9 @@ class TerminalClient(
                     session(info.terminalId).apply {
                         this.info = info
                         gone = false
+                        // The desk took the size back (it was resized or typed in): stop asking for it.
+                        if (claimHeld && !info.phoneSize && attached) wantsClaim = false
+                        claimHeld = info.phoneSize
                     }
                 }
                 // The host's own order is the list's order.
@@ -409,7 +433,10 @@ class TerminalClient(
                 // The desk window took the size (it typed or resized last): draw at the size the
                 // program now draws for. Typing here takes it back; the desktop does that.
                 listed.forEach { info ->
-                    if (sessions[info.terminalId]?.attached == true) sinks[info.terminalId]?.resize(info.rows, info.cols)
+                    val shown = sessions[info.terminalId]
+                    // Also while an attach is in flight: the host sends the list first, so the screen the
+                    // snapshot is drawn for is the size the program has now, not the one last listed.
+                    if (shown != null && (shown.attached || shown.awaitingAttach)) sinks[info.terminalId]?.resize(info.rows, info.cols)
                 }
                 // Access was refused and is allowed again (the person retried or gave the password):
                 // pick the open sessions back up from where they left off. One attempt per retry,
@@ -427,6 +454,8 @@ class TerminalClient(
                 session(id).apply {
                     info = info ?: TerminalSessionInfo(id, "", control.rows ?: MIN_ROWS, control.cols ?: MIN_COLS)
                     gone = false
+                    // The host gave the size to the phone that made the session.
+                    wantsClaim = true
                 }
                 createdId = id
             }
@@ -443,12 +472,11 @@ class TerminalClient(
                     session.info = (session.info ?: TerminalSessionInfo(session.id, "", rows, cols))
                         .copy(rows = rows, cols = cols)
                 }
-                // Now the phone's geometry takes over. The resize is sent after the attach, which is
-                // what claims the write lease: only the writer may resize.
-                if (session.viewRows > 0) {
-                    sinks[session.id]?.resize(session.viewRows, session.viewCols)
-                    sendResize(session)
-                }
+                // Ask for the phone's size now: the resize follows the attach, which is what claims the
+                // write lease (only the writer may resize). The screen stays at the host's size until
+                // the host says otherwise, in the list that goes ahead of the output drawn for it.
+                if (rows != null && cols != null) sinks[session.id]?.resize(rows, cols)
+                if (session.viewRows > 0) sendResize(session, claim = if (session.wantsClaim) true else null)
             }
             TerminalAction.CLOSED -> {
                 val session = sessions[control.terminalId!!] ?: return
@@ -609,15 +637,13 @@ class TerminalClient(
         sendControl(control(TerminalAction.ATTACH).copy(terminalId = session.id, offset = session.nextOffset))
     }
 
-    private fun sendResize(session: Session) {
-        // The desktop's geometry is now the phone's (this device holds the lease when it attaches),
-        // which is what the next reconnect must lay its replay out for.
-        session.info = session.info?.copy(rows = session.viewRows, cols = session.viewCols)
+    private fun sendResize(session: Session, claim: Boolean?) {
         sendControl(
             control(TerminalAction.RESIZE).copy(
                 terminalId = session.id,
                 rows = session.viewRows,
                 cols = session.viewCols,
+                claimSize = claim,
             ),
         )
     }
@@ -735,6 +761,8 @@ class TerminalClient(
                     cwd = info.cwd,
                     startedAt = info.startedAt,
                     shell = info.shell,
+                    deskWindow = info.deskWindow,
+                    phoneSize = info.phoneSize,
                 )
             },
             listLoaded = listLoaded,

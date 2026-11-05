@@ -283,6 +283,28 @@ class TerminalProtocolTest {
     }
 
     @Test
+    fun phoneSizeAndClaimSizeAreOptionalAndWrittenInTheDesktopsOrder() {
+        fun parse(extra: String) = TerminalControl.fromJson(
+            host(",\"sessions\":[{\"terminalId\":\"t1\",\"title\":\"x\",\"rows\":24,\"cols\":80$extra}]").toByteArray(),
+        ).also { it.validateFromHost(wire) }.sessions!!.single()
+        assertFalse(parse("").phoneSize)
+        assertTrue(parse(",\"deskWindow\":true,\"phoneSize\":true").phoneSize)
+        rejected { parse(",\"phoneSize\":1") }
+        // Same field order as serde: deskWindow, phoneSize, attached.
+        val info = TerminalSessionInfo("t1", "x", 24, 80, deskWindow = true, phoneSize = true, attached = true)
+        val json = String(TerminalControl.create(TerminalAction.SESSIONS, wire).copy(sessions = listOf(info)).toJson())
+        assertTrue(json, json.contains("\"deskWindow\":true,\"phoneSize\":true,\"attached\":true"))
+
+        val claim = TerminalControl.create(TerminalAction.RESIZE, wire).copy(terminalId = "t1", rows = 30, cols = 50, claimSize = true)
+        val sent = String(claim.toJson())
+        assertTrue(sent, sent.contains("\"cols\":50,\"claimSize\":true"))
+        assertEquals(true, TerminalControl.fromJson(sent.toByteArray()).claimSize)
+        // A plain resize carries no claimSize at all.
+        assertFalse(String(claim.copy(claimSize = null).toJson()).contains("claimSize"))
+        assertEquals(false, TerminalControl.fromJson(String(claim.copy(claimSize = false).toJson()).toByteArray()).claimSize)
+    }
+
+    @Test
     fun aTitleIsClippedNotTrusted() {
         val control = TerminalControl.fromJson(
             host(",\"sessions\":[{\"terminalId\":\"t1\",\"title\":\"${"x".repeat(5000)}\",\"rows\":24,\"cols\":80}]").toByteArray(),

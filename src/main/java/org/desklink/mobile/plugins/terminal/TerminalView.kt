@@ -30,7 +30,6 @@ import android.widget.Scroller
 import androidx.core.content.edit
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TextStyle
-import com.termux.view.TerminalRenderer
 import org.desklink.mobile.R
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
@@ -54,7 +53,10 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
         /** The key bar's Ctrl/Alt for the key being typed; one-shots are disarmed by this call. */
         fun takeModifiers(): Modifiers
 
-        /** The cell grid changed (first layout, rotation, keyboard, font size). Called on the UI thread. */
+        /**
+         * The grid this view could show changed (first layout, rotation, keyboard, font size), debounced.
+         * A request: the screen has the size the desktop reports, which may be another. UI thread.
+         */
         fun onGridChanged(rows: Int, cols: Int)
 
         /** The person tapped the terminal and probably wants the keyboard. */
@@ -65,16 +67,35 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
 
     private var screen: TerminalScreen? = null
     private var textSizePx = 0
-    private var renderer: TerminalRenderer
-    private val metricsPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     /** JetBrains Mono (bundled, OFL-1.1); the system monospace if it cannot be loaded. */
-    private val terminalTypeface: Typeface =
-        androidx.core.content.res.ResourcesCompat.getFont(context, org.desklink.mobile.R.font.jetbrains_mono_regular) ?: Typeface.MONOSPACE
-    private var fontWidth = 1f
-    private var lineSpacing = 1
-    private var spacingAndAscent = 0
+    private val painter = TerminalPainter(
+        androidx.core.content.res.ResourcesCompat.getFont(context, R.font.jetbrains_mono_regular) ?: Typeface.MONOSPACE,
+        androidx.core.content.res.ResourcesCompat.getFont(context, R.font.jetbrains_mono_bold) ?: Typeface.create(Typeface.MONOSPACE, Typeface.BOLD),
+    )
 
+    // Cell size in whole pixels (the painter's), and the viewport onto the screen's grid.
+    private var fontWidth = 1
+    private var lineSpacing = 1
+    private var panX = 0
+    private var panY = 0
+
+    /**
+     * Draw a grid wider than the view in a smaller font (the largest whole-pixel size that fits its
+     * columns) instead of panning over it. A smaller real font, never a scaled bitmap.
+     */
+    var fitWidth = false
+        set(value) {
+            if (field == value) return
+            field = value
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_FIT, value) }
+            applyMetrics()
+            invalidate()
+        }
+
+    private val gridRunnable = Runnable { host.onGridChanged(lastRows, lastCols) }
+
+    /** The grid this view's size and font could show, and so what it asks the desktop for. */
     private var lastRows = 0
     private var lastCols = 0
 
@@ -145,6 +166,17 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
 
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
                 if (screen == null || scaling.isInProgress) return true
+                // A screen bigger than the view is panned over; only a vertical drag over one that
+                // fits in height scrolls (history, wheel, arrows).
+                if (maxPanX() > 0) {
+                    panX = (panX + distanceX.toInt()).coerceIn(0, maxPanX())
+                    invalidate()
+                }
+                if (maxPanY() > 0) {
+                    panY = (panY + distanceY.toInt()).coerceIn(0, maxPanY())
+                    invalidate()
+                    return true
+                }
                 val distance = distanceY + scrollRemainder
                 val rows = (distance / lineSpacing).toInt()
                 scrollRemainder = distance - rows * lineSpacing
@@ -206,7 +238,7 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
         } else {
             TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, DEFAULT_FONT_SP, resources.displayMetrics).toInt()
         }
-        renderer = TerminalRenderer(textSizePx, terminalTypeface)
+        fitWidth = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_FIT, false)
         applyMetrics()
     }
 
@@ -219,9 +251,13 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
         lastCols = 0
         topRow = 0
         stopSelection()
-        updateGrid()
+        applyMetrics()
+        updateGrid(immediately = true)
         invalidate()
     }
+
+    /** Whether the screen is bigger than the view, so dragging pans over it. */
+    fun isPannable(): Boolean = maxPanX() > 0 || maxPanY() > 0
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
@@ -229,6 +265,7 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(gridRunnable)
         stopSelection()
         screen?.takeIf { it.listener === this }?.listener = null
         super.onDetachedFromWindow()
@@ -267,20 +304,31 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
             cursorY -= shift
         } else {
             topRow = 0
+            followCursor()
         }
+        applyMetricsIfFit()
         invalidate()
     }
 
     // ---- metrics and layout ------------------------------------------------------------------------
 
+    private fun gridSize(): Pair<Int, Int> = screen?.withEmulator { it.mColumns to it.mRows } ?: (lastCols to lastRows)
+
+    /** Sets the painter's font: the chosen size, or the largest that fits the screen's columns in [fitWidth]. */
     private fun applyMetrics() {
-        renderer = TerminalRenderer(textSizePx, terminalTypeface)
-        metricsPaint.typeface = terminalTypeface
-        metricsPaint.textSize = textSizePx.toFloat()
-        // The renderer computes these the same way; its own copies are package-private.
-        fontWidth = renderer.fontWidth
-        lineSpacing = renderer.fontLineSpacing
-        spacingAndAscent = lineSpacing + ceil(metricsPaint.ascent()).toInt()
+        var px = textSizePx
+        val (cols, _) = gridSize()
+        if (fitWidth && width > 0 && cols > 0 && painter.metrics(px).first * cols > width) {
+            px = painter.fontSizeForColumns(cols, width, MIN_FIT_PX, px)
+        }
+        painter.setTextSize(px)
+        fontWidth = painter.cellWidth
+        lineSpacing = painter.cellHeight
+        clampPan()
+    }
+
+    private fun applyMetricsIfFit() {
+        if (fitWidth) applyMetrics() else clampPan()
     }
 
     private fun setTextSizePx(size: Int) {
@@ -296,31 +344,51 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        applyMetrics()
         updateGrid()
     }
 
     private fun rows(): Int = lastRows
 
-    private fun updateGrid() {
-        val s = screen ?: return
-        if (width == 0 || height == 0) return
-        val cols = max(MIN_CELLS, (width / fontWidth).toInt())
-        val rows = max(MIN_CELLS, (height - spacingAndAscent) / lineSpacing)
+    /**
+     * Works out what the view could show at the chosen font and asks for it, a moment after the last
+     * change (the keyboard animating in is one change per frame). The screen itself keeps the size
+     * the desktop reports; see [TerminalScreen].
+     */
+    private fun updateGrid(immediately: Boolean = false) {
+        if (screen == null || width == 0 || height == 0) return
+        val (cellW, cellH) = painter.metrics(textSizePx)
+        val cols = max(MIN_COLS, width / cellW)
+        val rows = max(MIN_CELLS, height / cellH)
         if (cols == lastCols && rows == lastRows) return
+        val first = lastCols == 0
         lastCols = cols
         lastRows = rows
-        s.resize(rows, cols)
-        topRow = 0
-        host.onGridChanged(rows, cols)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_ROWS, rows).putInt(KEY_COLS, cols) }
+        removeCallbacks(gridRunnable)
+        if (immediately || first) gridRunnable.run() else postDelayed(gridRunnable, GRID_DEBOUNCE_MS)
     }
 
-    /**
-     * How much the screen is scaled to fill this view. 1 while the session has this view's grid;
-     * when the desk window set the size (it typed last), its whole screen is fitted in instead.
-     */
-    private fun fit(cols: Int, rows: Int): Float {
-        if ((cols == lastCols && rows == lastRows) || width == 0 || height == 0) return 1f
-        return min(width / (cols * fontWidth), height / (rows * lineSpacing.toFloat()))
+    // ---- viewport ----------------------------------------------------------------------------------
+
+    private fun maxPanX(): Int = max(0, gridSize().first * fontWidth - width)
+
+    private fun maxPanY(): Int = max(0, gridSize().second * lineSpacing - height)
+
+    private fun clampPan() {
+        panX = panX.coerceIn(0, maxPanX())
+        panY = panY.coerceIn(0, maxPanY())
+    }
+
+    /** Keeps the cursor inside the view when the screen is bigger than it. */
+    private fun followCursor() {
+        if (maxPanX() == 0 && maxPanY() == 0) return
+        val (cx, cy) = screen?.withEmulator { it.cursorCol to it.cursorRow } ?: return
+        val left = cx * fontWidth
+        val top = cy * lineSpacing
+        if (left < panX) panX = left else if (left + fontWidth > panX + width) panX = left + fontWidth - width
+        if (top < panY) panY = top else if (top + lineSpacing > panY + height) panY = top + lineSpacing - height
+        clampPan()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -329,13 +397,12 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
             canvas.drawColor(0xFF000000.toInt())
             return
         }
-        val (y1, y2, x1, x2) = selectionBounds()
+        val selection = if (selecting) selectionBounds().let { (y1, y2, x1, x2) -> TerminalPainter.Selection(y1, y2, x1, x2) } else null
         s.withEmulator { emulator ->
             canvas.drawColor(emulator.mColors.mCurrentColors[TextStyle.COLOR_INDEX_BACKGROUND])
-            val scale = fit(emulator.mColumns, emulator.mRows)
             canvas.save()
-            canvas.scale(scale, scale)
-            renderer.render(emulator, canvas, topRow, y1, y2, x1, x2)
+            canvas.translate(-panX.toFloat(), -panY.toFloat())
+            painter.render(canvas, emulator, topRow, selection, cursorOn = true)
             canvas.restore()
         }
     }
@@ -351,10 +418,9 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
     private fun screenCell(e: MotionEvent): Pair<Int, Int> = screenCell(e.x, e.y)
 
     private fun screenCell(x: Float, y: Float): Pair<Int, Int> {
-        val (cols, rows) = screen?.withEmulator { it.mColumns to it.mRows } ?: (lastCols to lastRows)
-        val scale = fit(cols, rows)
-        val col = (x / scale / fontWidth).toInt().coerceIn(0, max(0, cols - 1))
-        val row = ((y / scale - spacingAndAscent) / lineSpacing).toInt().coerceIn(0, max(0, rows - 1))
+        val (cols, rows) = gridSize()
+        val col = ((x + panX) / fontWidth).toInt().coerceIn(0, max(0, cols - 1))
+        val row = ((y + panY) / lineSpacing).toInt().coerceIn(0, max(0, rows - 1))
         return col to row
     }
 
@@ -447,8 +513,9 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
 
                 override fun onGetContentRect(mode: ActionMode, view: View, outRect: Rect) {
                     val (y1, _, x1, _) = selectionBounds()
-                    val top = ((y1 - topRow) * lineSpacing + spacingAndAscent).coerceIn(0, height)
-                    outRect.set((x1 * fontWidth).toInt(), top, (x1 * fontWidth).toInt() + 1, top + lineSpacing)
+                    val top = ((y1 - topRow) * lineSpacing - panY).coerceIn(0, height)
+                    val left = (x1 * fontWidth - panX).coerceIn(0, width)
+                    outRect.set(left, top, left + 1, top + lineSpacing)
                 }
             },
             ActionMode.TYPE_FLOATING,
@@ -460,8 +527,9 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
         val history = s.withEmulator { it.screen.activeTranscriptRows }
         anchorX = 0
         anchorY = -history
-        cursorX = lastCols - 1
-        cursorY = lastRows - 1
+        val (cols, rows) = gridSize()
+        cursorX = cols - 1
+        cursorY = rows - 1
         invalidate()
     }
 
@@ -582,18 +650,32 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
         return sendKey(keyCode, event) || super.onKeyDown(keyCode, event)
     }
 
-    private companion object {
-        const val PREFS = "desklink_terminal_view"
-        const val KEY_FONT_PX = "font_px"
-        const val DEFAULT_FONT_SP = 13f
-        const val MIN_FONT_PX = 14
-        const val MAX_FONT_PX = 120
-        const val MIN_CELLS = 4
-        const val FLING_SCALE = 0.25f
-        const val MENU_COPY = 1
-        const val MENU_SELECT_ALL = 2
+    companion object {
+        /** The (rows, columns) the terminal screen last asked for, else the fallbacks. */
+        fun rememberedGrid(context: Context, fallbackRows: Int, fallbackCols: Int): Pair<Int, Int> {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            return prefs.getInt(KEY_ROWS, fallbackRows) to prefs.getInt(KEY_COLS, fallbackCols)
+        }
+
+        private const val PREFS = "desklink_terminal_view"
+        private const val KEY_FONT_PX = "font_px"
+        private const val DEFAULT_FONT_SP = 13f
+        private const val MIN_FONT_PX = 14
+        private const val MAX_FONT_PX = 120
+        private const val MIN_CELLS = 4
+
+        /** The fewest columns the view asks for: Claude Code and Codex lay out sensibly from here. */
+        private const val MIN_COLS = 40
+        private const val MIN_FIT_PX = 6
+        private const val KEY_FIT = "fit_width"
+        private const val KEY_ROWS = "grid_rows"
+        private const val KEY_COLS = "grid_cols"
+        private const val GRID_DEBOUNCE_MS = 150L
+        private const val FLING_SCALE = 0.25f
+        private const val MENU_COPY = 1
+        private const val MENU_SELECT_ALL = 2
 
         /** Strips the dead-key flag from `getUnicodeChar`; combining accents are not composed here. */
-        const val CODE_POINT_MASK = 0x7FFFFFFF
+        private const val CODE_POINT_MASK = 0x7FFFFFFF
     }
 }

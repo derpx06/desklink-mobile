@@ -95,6 +95,8 @@ data class TerminalSessionInfo(
     val exitStatus: Long? = null,
     /** A terminal window at the desk shows this session and answers its terminal queries; the phone must not. */
     val deskWindow: Boolean = false,
+    /** This phone holds the size: the program is drawn for its screen even with a desk window open. */
+    val phoneSize: Boolean = false,
     /** Another phone (not this one) is attached to it. Omitted when false. */
     val attached: Boolean = false,
     /** The foreground process's directory, `$HOME` shown as `~`. */
@@ -121,6 +123,8 @@ data class TerminalControl(
     val terminalId: String? = null,
     val rows: Int? = null,
     val cols: Int? = null,
+    /** With [TerminalAction.RESIZE]: true claims the size for the phone over a desk window, false gives it back. */
+    val claimSize: Boolean? = null,
     val offset: Long? = null,
     val command: List<String>? = null,
     val sessions: List<TerminalSessionInfo>? = null,
@@ -149,6 +153,7 @@ data class TerminalControl(
         terminalId?.let { out.append(",\"terminalId\":").append(quote(it)) }
         rows?.let { out.append(",\"rows\":").append(it) }
         cols?.let { out.append(",\"cols\":").append(it) }
+        claimSize?.let { out.append(",\"claimSize\":").append(it) }
         offset?.let { out.append(",\"offset\":").append(it) }
         command?.let { argv ->
             out.append(",\"command\":[").append(argv.joinToString(",") { quote(it) }).append(']')
@@ -164,6 +169,7 @@ data class TerminalControl(
                         append(",\"cols\":").append(info.cols)
                         info.exitStatus?.let { append(",\"exitStatus\":").append(it) }
                         if (info.deskWindow) append(",\"deskWindow\":true")
+                        if (info.phoneSize) append(",\"phoneSize\":true")
                         if (info.attached) append(",\"attached\":true")
                         info.cwd?.let { append(",\"cwd\":").append(quote(it)) }
                         info.startedAt?.let { append(",\"startedAt\":").append(it) }
@@ -266,6 +272,7 @@ data class TerminalControl(
                 terminalId = json.optionalString("terminalId"),
                 rows = json.optionalInteger("rows")?.let(::narrow),
                 cols = json.optionalInteger("cols")?.let(::narrow),
+                claimSize = json.present("claimSize")?.let { it as? Boolean ?: bad("claimSize") },
                 offset = json.optionalInteger("offset"),
                 command = json.optionalArray("command")?.let { array ->
                     (0 until array.length()).map { index ->
@@ -287,6 +294,7 @@ data class TerminalControl(
                             cols = narrow(item.requiredInteger("cols")),
                             exitStatus = item.optionalInteger("exitStatus"),
                             deskWindow = item.present("deskWindow")?.let { it as? Boolean ?: bad("deskWindow") } ?: false,
+                            phoneSize = item.present("phoneSize")?.let { it as? Boolean ?: bad("phoneSize") } ?: false,
                             attached = item.present("attached")?.let { it as? Boolean ?: bad("attached") } ?: false,
                             cwd = item.optionalString("cwd")?.takeIf(::validCwd),
                             startedAt = item.optionalInteger("startedAt"),

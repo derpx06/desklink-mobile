@@ -198,6 +198,9 @@ class TerminalActivity : AppCompatActivity() {
     /** Looked up each time: the application owns the client, per device. */
     private val client: TerminalClient? get() = DeskLinkApplication.getInstance().terminalClient(deviceId)
     private var openId by mutableStateOf<String?>(null)
+
+    /** The grid the terminal screen last had (rows, columns): a new session is made for it, not for 80x24. */
+    private val remembered: Pair<Int, Int> get() = TerminalView.rememberedGrid(this, FALLBACK_ROWS, FALLBACK_COLS)
     private var resumed by mutableStateOf(false)
 
     /** The session screen without the app bar or the phone's status and navigation bars. */
@@ -333,7 +336,7 @@ class TerminalActivity : AppCompatActivity() {
         LaunchedEffect(newRequested, state.link, state.listLoaded, state.notAllowed, state.passwordNeeded) {
             if (newRequested && state.link == TerminalLinkState.CONNECTED && state.listLoaded && !state.notAllowed && state.passwordNeeded == null) {
                 newRequested = false
-                client.create(DEFAULT_ROWS, DEFAULT_COLS, null)
+                client.create(remembered.first, remembered.second, null)
             }
         }
         LaunchedEffect(current, resumed) { TerminalForeground.terminalId = if (resumed) current else null }
@@ -461,8 +464,8 @@ class TerminalActivity : AppCompatActivity() {
                     !state.listLoaded -> CenteredProgress()
                     state.sessions.isEmpty() -> Column(Modifier.padding(16.dp)) {
                         EmptyTerminalTile(
-                            launchers = listOf(stringResource(R.string.terminal_launch_shell) to { client.create(DEFAULT_ROWS, DEFAULT_COLS, null) }) +
-                                state.launchers.mapNotNull { launcher -> agentName(launcher)?.let { it to { client.create(DEFAULT_ROWS, DEFAULT_COLS, listOf(launcher)) } } },
+                            launchers = listOf(stringResource(R.string.terminal_launch_shell) to { client.create(remembered.first, remembered.second, null) }) +
+                                state.launchers.mapNotNull { launcher -> agentName(launcher)?.let { it to { client.create(remembered.first, remembered.second, listOf(launcher)) } } },
                             enabled = connected,
                         )
                     }
@@ -503,7 +506,7 @@ class TerminalActivity : AppCompatActivity() {
                                     onClose = { closing = session },
                                     onRestart = {
                                         client.close(session.id)
-                                        client.create(DEFAULT_ROWS, DEFAULT_COLS, session.title.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }?.let(::listOf))
+                                        client.create(remembered.first, remembered.second, session.title.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }?.let(::listOf))
                                     },
                                 )
                             }
@@ -520,7 +523,7 @@ class TerminalActivity : AppCompatActivity() {
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
         }
 
-        if (newSheet) NewTerminalSheet(state.launchers, state.folders, onDismiss = { newSheet = false }) { command, cwd -> newSheet = false; client.create(DEFAULT_ROWS, DEFAULT_COLS, command, cwd) }
+        if (newSheet) NewTerminalSheet(state.launchers, state.folders, onDismiss = { newSheet = false }) { command, cwd -> newSheet = false; client.create(remembered.first, remembered.second, command, cwd) }
         renaming?.let { session ->
             RenameDialog(
                 initial = labels[session.id].orEmpty(),
@@ -834,7 +837,7 @@ class TerminalActivity : AppCompatActivity() {
         val session = state.sessions.firstOrNull { it.id == id }
         val connected = state.link == TerminalLinkState.CONNECTED
         val screen = remember(id) {
-            (client.sink(id, DEFAULT_ROWS, DEFAULT_COLS) as TerminalScreen).also { s ->
+            (client.sink(id, remembered.first, remembered.second) as TerminalScreen).also { s ->
                 // A screen made before the palette was set keeps the stock one until reset.
                 s.withEmulator { it.mColors.reset() }
             }
@@ -842,6 +845,7 @@ class TerminalActivity : AppCompatActivity() {
         var ctrl by remember { mutableStateOf(Sticky.OFF) }
         var alt by remember { mutableStateOf(Sticky.OFF) }
         var viewRef by remember { mutableStateOf<TerminalView?>(null) }
+        var fitWidth by remember { mutableStateOf(context.getSharedPreferences("desklink_terminal_view", Context.MODE_PRIVATE).getBoolean("fit_width", false)) }
         var menu by remember { mutableStateOf(false) }
         var newSheet by rememberSaveable { mutableStateOf(false) }
         var composing by rememberSaveable { mutableStateOf(false) }
@@ -934,6 +938,16 @@ class TerminalActivity : AppCompatActivity() {
                                 text = { Text(stringResource(if (fullscreen) R.string.terminal_show_system_bars else R.string.remote_fullscreen)) },
                                 onClick = { menu = false; rememberFullscreen(!fullscreen) },
                             )
+                            if (session?.deskWindow == true) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(if (session.phoneSize) R.string.terminal_use_desk_size else R.string.terminal_use_phone_size)) },
+                                    onClick = { menu = false; client.claimSize(id, !session.phoneSize) },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(if (fitWidth) R.string.terminal_actual_size else R.string.terminal_fit_width)) },
+                                onClick = { menu = false; fitWidth = !fitWidth; viewRef?.fitWidth = fitWidth },
+                            )
                             DropdownMenuItem(text = { Text(stringResource(R.string.terminal_paste)) }, onClick = { menu = false; paste(context, screen, snackbar) })
                             DropdownMenuItem(text = { Text(stringResource(R.string.terminal_rename)) }, onClick = { menu = false; renamingOpen = id })
                         }
@@ -1008,7 +1022,7 @@ class TerminalActivity : AppCompatActivity() {
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp))
         }
-        if (newSheet) NewTerminalSheet(state.launchers, state.folders, onDismiss = { newSheet = false }) { command, cwd -> newSheet = false; client.create(DEFAULT_ROWS, DEFAULT_COLS, command, cwd) }
+        if (newSheet) NewTerminalSheet(state.launchers, state.folders, onDismiss = { newSheet = false }) { command, cwd -> newSheet = false; client.create(remembered.first, remembered.second, command, cwd) }
         renamingOpen?.let { renameId ->
             RenameDialog(
                 initial = labels[renameId].orEmpty(),
@@ -1220,6 +1234,8 @@ class TerminalActivity : AppCompatActivity() {
                             Key("esc", stringResource(R.string.terminal_key_escape)) { onKey(KeyEvent.KEYCODE_ESCAPE) }
                             Key("tab", stringResource(R.string.terminal_key_tab)) { onKey(KeyEvent.KEYCODE_TAB) }
                         }
+                        // Shift+Tab: Claude Code cycles its mode with it, shells and menus go backwards.
+                        Key("⇧Tab", stringResource(R.string.terminal_key_shift_tab)) { onText("\u001b[Z", ) }
                         for (symbol in listOf("|", "~", "/", "-", "_", "\\", "`")) Key(symbol, null) { onText(symbol) }
                         Key("Home", stringResource(R.string.terminal_key_home)) { onKey(KeyEvent.KEYCODE_MOVE_HOME) }
                         Key("End", stringResource(R.string.terminal_key_end)) { onKey(KeyEvent.KEYCODE_MOVE_END) }
@@ -1369,8 +1385,8 @@ class TerminalActivity : AppCompatActivity() {
         private const val STATE_OPEN_ID = "openTerminalId"
         private const val LABEL_PREFS = org.desklink.mobile.helpers.PerPeerState.LABELS
         private const val KEY_FULLSCREEN = "/fullscreen"
-        private const val DEFAULT_ROWS = 24
-        private const val DEFAULT_COLS = 80
+        private const val FALLBACK_ROWS = 24
+        private const val FALLBACK_COLS = 80
 
         /** Bigger than any reasonable paste; keeps one tap from queueing megabytes onto the channel. */
         private const val MAX_PASTE_CHARS = 100_000
