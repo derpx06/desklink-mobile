@@ -25,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -178,16 +179,22 @@ val MonoFamily = FontFamily(
     Font(R.font.jetbrains_mono_bold, FontWeight.Bold),
 )
 
-/** The few styles the system type scale lacks. */
+/** The few styles the system type scale lacks. Sizes are the design's: 32 / 30 / 26 / 22 / 18 / 17 / 16 / 15 / 14 / 13 / 12 / 11. */
 object DeskLinkType {
     /** The device name in the hero: 32/700, tight. */
     val hero = TextStyle(fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
 
+    /** A tab's big title ("Files", "Notes"): 30/36 with the design's -0.8 tracking. */
+    val screenTitle = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.8).sp)
+
+    /** The greeting on Home and the splash: 26/32. */
+    val splash = TextStyle(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.6).sp)
+
     /** Section titles: 13/600 in the dim text color, sentence case. */
     val section = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
 
-    /** A card's title: 15/600. */
-    val cardTitle = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+    /** A card's or a group's title ("Quick actions"): 16/600. */
+    val cardTitle = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.1).sp)
 
     /** Empty and error states: 17/600. */
     val stateTitle = TextStyle(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
@@ -199,16 +206,82 @@ object DeskLinkType {
     val monoSmall = TextStyle(fontFamily = MonoFamily, fontSize = 11.sp, lineHeight = 15.sp)
 }
 
+/** The 4-point spacing scale and the few fixed layout numbers every screen shares. */
+object DeskLinkSpacing {
+    val xs = 4.dp
+    val sm = 8.dp
+    val md = 12.dp
+    val lg = 16.dp
+    val xl = 24.dp
+    val xxl = 32.dp
+    val huge = 48.dp
+
+    /** Left and right margin of a screen. */
+    val page = 16.dp
+
+    /** Gap between cards and between the rows of a group (the window shows through 2 dp). */
+    val cardGap = 12.dp
+    val rowGap = 2.dp
+
+    /** Smallest touch target. */
+    val touch = 48.dp
+}
+
+/** The design's corner radii by use. Material's own slots are mapped from the same numbers in [DeskLinkShapes]. */
+object DeskLinkShape {
+    /** Buttons: the stadium. */
+    val stadium: Shape = RoundedCornerShape(50)
+
+    /** Icon squares, fields, snackbars. */
+    val small: Shape = RoundedCornerShape(12.dp)
+
+    /** Action tiles on a hero card. */
+    val tile: Shape = RoundedCornerShape(18.dp)
+
+    /** Action tiles on the page, cards of a grid. */
+    val card: Shape = RoundedCornerShape(20.dp)
+
+    /** Banners and live strips. */
+    val banner: Shape = RoundedCornerShape(22.dp)
+
+    /** Row groups and big cards. */
+    val group: Shape = RoundedCornerShape(24.dp)
+
+    /** The hero card. */
+    val hero: Shape = RoundedCornerShape(28.dp)
+
+    /** A bottom sheet's top corners. */
+    val sheet: Shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+}
+
 private val DeskLinkShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(20.dp),
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(24.dp),
     extraLarge = RoundedCornerShape(28.dp),
 )
 
-/** Body text at 15sp, as the spec has it; the rest is the stock Material 3 scale. */
-private val DeskLinkTypography = Typography().run { copy(bodyLarge = bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp)) }
+/** The Material 3 scale on the design's sizes, so a plain `Text` with a style looks like the design. */
+private val DeskLinkTypography = Typography().run {
+    copy(
+        displayLarge = DeskLinkType.hero,
+        displayMedium = DeskLinkType.screenTitle,
+        displaySmall = DeskLinkType.splash,
+        headlineLarge = DeskLinkType.screenTitle,
+        headlineMedium = DeskLinkType.splash,
+        headlineSmall = headlineSmall.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+        titleLarge = titleLarge.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+        titleMedium = titleMedium.copy(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
+        titleSmall = titleSmall.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
+        bodyLarge = bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp),
+        bodyMedium = bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
+        bodySmall = bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+        labelLarge = labelLarge.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
+        labelMedium = labelMedium.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
+        labelSmall = labelSmall.copy(fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
+    )
+}
 
 /** DeskLink's own palette unless the person turned on wallpaper colors (Android 12+). */
 fun deskLinkColorScheme(context: Context, dark: Boolean): ColorScheme {

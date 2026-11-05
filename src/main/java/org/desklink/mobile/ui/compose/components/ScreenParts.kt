@@ -48,7 +48,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.desklink.mobile.R
+import org.desklink.mobile.ui.compose.DeskButtonStyle
+import org.desklink.mobile.ui.compose.DeskLinkShape
+import org.desklink.mobile.ui.compose.DeskLinkSpacing
 import org.desklink.mobile.ui.compose.MonoFamily
+import org.desklink.mobile.ui.compose.StadiumButton
 import org.desklink.mobile.ui.compose.tokens
 
 /** Light status-bar icons while a dark screen (scanner, terminal) is up, in either theme. */
@@ -100,7 +104,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier, trailing: @Composa
 /** Rows on one rounded group, 2dp apart so the window shows between them. */
 @Composable
 fun RowGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)), verticalArrangement = Arrangement.spacedBy(2.dp), content = content)
+    Column(modifier.fillMaxWidth().clip(DeskLinkShape.group), verticalArrangement = Arrangement.spacedBy(DeskLinkSpacing.rowGap), content = content)
 }
 
 /**
@@ -119,6 +123,8 @@ fun GroupRow(
     checked: Boolean? = null,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
+    /** A trailing chevron: the row opens something. */
+    chevron: Boolean = false,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val t = tokens
@@ -153,6 +159,7 @@ fun GroupRow(
             }
         }
         trailing()
+        if (chevron) Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = t.textDim, modifier = Modifier.size(22.dp))
         if (checked != null) Switch(checked = checked, onCheckedChange = null, enabled = enabled, colors = deskSwitchColors())
     }
 }
@@ -165,9 +172,10 @@ fun IconCircle(@DrawableRes icon: Int, size: Dp, iconSize: Dp, modifier: Modifie
     }
 }
 
-/** The design's pill buttons: filled accent, tonal accent, or outlined. 48dp tall at least. */
+/** The old name of [DeskButtonStyle]. */
 enum class PillStyle { Filled, Tonal, Outlined }
 
+@Deprecated("Use PrimaryButton, SecondaryButton or StadiumButton")
 @Composable
 fun PillButton(
     text: String,
@@ -177,38 +185,12 @@ fun PillButton(
     height: Dp = 56.dp,
     @DrawableRes icon: Int? = null,
     enabled: Boolean = true,
-) {
-    val t = tokens
-    val (bg, fg) = when (style) {
-        PillStyle.Filled -> t.accent to t.onAccent
-        PillStyle.Tonal -> t.accentContainer to t.onAccentContainer
-        PillStyle.Outlined -> Color.Transparent to t.accentText
-    }
-    val shape = RoundedCornerShape(50)
-    Row(
-        modifier
-            .heightIn(min = maxOf(height, 48.dp))
-            .alpha(if (enabled) 1f else 0.38f)
-            .clip(shape)
-            .background(bg)
-            .then(if (style == PillStyle.Outlined) Modifier.border(1.dp, t.hairlineStrong, shape) else Modifier)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        if (icon != null) {
-            Icon(painterResource(icon), contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
-        }
-        // Wraps at a large font size instead of being cut: the label is the button.
-        Text(
-            text,
-            color = fg,
-            fontSize = if (height >= 52.dp) 16.sp else 14.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 0.dp),
-        )
-    }
-}
+) = StadiumButton(
+    text, onClick, modifier,
+    when (style) {
+        PillStyle.Filled -> DeskButtonStyle.Primary
+        PillStyle.Tonal -> DeskButtonStyle.Tonal
+        PillStyle.Outlined -> DeskButtonStyle.Outlined
+    },
+    height, icon, enabled,
+)

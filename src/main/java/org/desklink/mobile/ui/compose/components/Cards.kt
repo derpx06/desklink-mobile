@@ -21,6 +21,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 
+@Deprecated("Use DeskCard", ReplaceWith("DeskCard(modifier, onClick, content = content)"))
 @Composable
 fun KdeCard(
     modifier: Modifier = Modifier,

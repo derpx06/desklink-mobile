@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -168,7 +169,7 @@ fun StatusPill(connection: DeviceConnection, modifier: Modifier = Modifier, want
             .padding(start = 10.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(7.dp).background(tint, CircleShape))
+        StatusDot(tint, size = 7.dp)
         Spacer(Modifier.width(6.dp))
         Text(label, style = MaterialTheme.typography.labelMedium, color = tint)
     }
@@ -184,7 +185,7 @@ fun MonoStatusLine(
 ) {
     val (label, color) = statusOf(connection, wantsToPair)
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(7.dp).background(color, CircleShape))
+        StatusDot(color, size = 7.dp)
         Spacer(Modifier.width(7.dp))
         Text(
             (listOf(label) + meta).joinToString(" · "),
@@ -201,19 +202,20 @@ fun batteryText(percent: Int?, charging: Boolean): String? =
 
 // ---- structure ------------------------------------------------------------------------------------
 
-/** A section's title (13/600, dim, sentence case) with an optional action on the right. */
+/** A group's title ("Quick actions", "Things to check"): 16/600 with an optional text action at the end. A heading for TalkBack. */
 @Composable
 fun SectionHeader(title: String, modifier: Modifier = Modifier, action: @Composable RowScope.() -> Unit = {}) {
     Row(
         modifier
             .fillMaxWidth()
-            .padding(start = 4.dp, top = 28.dp, bottom = 10.dp),
+            .padding(start = 6.dp, top = 12.dp, bottom = 4.dp)
+            .heightIn(min = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             title,
-            style = DeskLinkType.section,
-            color = tokens.textDim,
+            style = DeskLinkType.cardTitle,
+            color = tokens.text,
             modifier = Modifier
                 .weight(1f)
                 .semantics { heading() },
