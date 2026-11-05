@@ -72,10 +72,11 @@ object SettingsIndex {
 
     /** Rows and pages with their words in [deskName]'s terms (a string with no "%s" simply ignores the name). */
     fun entries(context: Context, deskName: String, pages: List<SettingsPage>): List<SettingsEntry> {
-        fun text(id: Int) = context.getString(id, deskName)
+        // A line that wants a number ("%d devices added manually") has no words to search yet: it is left out.
+        fun text(id: Int) = runCatching { context.getString(id, deskName) }.getOrDefault("")
         return pages.flatMap { page ->
             listOf(SettingsEntry(page, text(page.title), text(page.summary))) +
-                rows.filter { it.page == page }.map { SettingsEntry(page, text(it.title), it.summary?.let(::text)) }
+                rows.filter { it.page == page }.map { SettingsEntry(page, text(it.title), it.summary?.let(::text)?.takeIf(String::isNotEmpty)) }
         }
     }
 }
