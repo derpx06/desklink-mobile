@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -73,9 +75,17 @@ import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.components.DarkSystemBars
 import org.desklink.mobile.ui.compose.components.LaptopGlyph
-import androidx.compose.foundation.layout.offset
-import org.desklink.mobile.ui.compose.components.PillButton
-import org.desklink.mobile.ui.compose.components.PillStyle
+import org.desklink.mobile.ui.compose.DeskLinkShape
+import org.desklink.mobile.ui.compose.DeskLinkType
+import org.desklink.mobile.ui.compose.DeskTextButton
+import org.desklink.mobile.ui.compose.PrimaryButton
+import org.desklink.mobile.ui.compose.SecondaryButton
+import org.desklink.mobile.ui.compose.components.DeskBottomSheet
+import org.desklink.mobile.ui.compose.screen.onboarding.LogoTile
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import org.desklink.mobile.ui.compose.tokens
 
 /** Where to get DeskLink for the computer. */
@@ -86,114 +96,96 @@ const val DESKTOP_APP_URL = "https://github.com/derpx06/DeskLink/releases"
 @Composable
 fun WelcomeScreen(onPair: () -> Unit, onSettings: () -> Unit) {
     val t = tokens
-    // Scrolls when the text is large; otherwise the button sits at the bottom.
-    BoxWithConstraints(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().navigationBarsPadding()) {
-    Column(
-        Modifier
-            .verticalScroll(rememberScrollState())
-            .heightIn(min = maxHeight)
-            .padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-        Box(
-            Modifier
-                .size(60.dp)
-                .background(Color(0xFF14213D), RoundedCornerShape(18.dp))
-                .border(1.dp, t.hairline, RoundedCornerShape(18.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Image(painterResource(R.drawable.desklink_mark), contentDescription = null, modifier = Modifier.size(36.dp))
-        }
-        Spacer(Modifier.weight(1f))
-        // Name, appearance and network options before any computer is paired.
-        IconButton(onClick = onSettings, modifier = Modifier.offset(x = 12.dp, y = (-12).dp).size(48.dp)) {
-            Icon(painterResource(R.drawable.sym_settings), contentDescription = stringResource(R.string.settings), tint = t.textDim)
-        }
-        }
-        Spacer(Modifier.height(26.dp))
-        Text(
-            stringResource(R.string.welcome_title),
-            fontSize = 34.sp,
-            lineHeight = 40.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = (-0.6).sp,
-            modifier = Modifier.semantics { heading() },
-        )
-        Spacer(Modifier.height(14.dp))
-        Text(stringResource(R.string.welcome_body), fontSize = 16.sp, lineHeight = 24.sp, color = t.textDim)
-        Spacer(Modifier.height(20.dp))
-        // Where the code is: the step people get stuck on.
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(t.accentContainer, RoundedCornerShape(20.dp))
-                .padding(16.dp)
-                .semantics(mergeDescendants = true) {},
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(painterResource(R.drawable.sym_qr_code_scanner), contentDescription = null, tint = t.onAccentContainer, modifier = Modifier.size(24.dp))
-                Text(stringResource(R.string.welcome_qr_title), fontSize = 16.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer, modifier = Modifier.semantics { heading() })
+    var installSheet by rememberSaveable { mutableStateOf(false) }
+    // The button is pinned; what is above it scrolls (large text, short screens).
+    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().navigationBarsPadding()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, top = 28.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                LogoTile(60.dp, corner = 18.dp, mark = 36.dp)
+                Spacer(Modifier.weight(1f))
+                // Name, appearance and network options before any computer is paired.
+                IconButton(onClick = onSettings, modifier = Modifier.offset(x = 12.dp, y = (-12).dp).size(48.dp)) {
+                    Icon(painterResource(R.drawable.sym_settings), contentDescription = stringResource(R.string.settings), tint = t.textDim)
+                }
             }
-            listOf(R.string.welcome_qr_1, R.string.welcome_qr_2, R.string.welcome_qr_3).forEachIndexed { i, text ->
-                Text("${i + 1}.  " + stringResource(text), fontSize = 15.sp, lineHeight = 21.sp, color = t.onAccentContainer)
+            Spacer(Modifier.height(26.dp))
+            Text(
+                stringResource(R.string.welcome_title),
+                fontSize = 34.sp,
+                lineHeight = 40.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = (-0.6).sp,
+                modifier = Modifier.semantics { heading() },
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(stringResource(R.string.welcome_body), fontSize = 16.sp, lineHeight = 24.sp, color = t.textDim)
+            Spacer(Modifier.height(22.dp))
+            // Where the code is: the step people get stuck on.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(t.accentContainer, DeskLinkShape.card)
+                    .padding(16.dp)
+                    .semantics(mergeDescendants = true) {},
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(painterResource(R.drawable.sym_qr_code_scanner), contentDescription = null, tint = t.onAccentContainer, modifier = Modifier.size(24.dp))
+                    Text(stringResource(R.string.welcome_qr_title), fontSize = 16.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer, modifier = Modifier.semantics { heading() })
+                }
+                listOf(R.string.welcome_qr_1, R.string.welcome_qr_2, R.string.welcome_qr_3).forEachIndexed { i, text ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.size(22.dp).background(t.surface, CircleShape), contentAlignment = Alignment.Center) {
+                            Text("${i + 1}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = t.text)
+                        }
+                        Text(stringResource(text), fontSize = 15.sp, lineHeight = 21.sp, color = t.onAccentContainer, modifier = Modifier.weight(1f))
+                    }
+                }
             }
-        }
-        Spacer(Modifier.height(20.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            WelcomeRow(R.drawable.sym_terminal, stringResource(R.string.welcome_terminals))
-            WelcomeRow(R.drawable.sym_devices, stringResource(R.string.welcome_screens))
-            WelcomeRow(R.drawable.sym_encrypted, stringResource(R.string.welcome_encrypted))
-        }
-        Spacer(Modifier.height(20.dp))
-        // Someone who installed only this app stalls here: where the computer's app comes from, with a way to send it to the computer.
-        val context = androidx.compose.ui.platform.LocalContext.current
-        val installMessage = stringResource(R.string.welcome_install_message, DESKTOP_APP_URL)
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(t.surface, RoundedCornerShape(20.dp))
-                .border(1.dp, t.hairline, RoundedCornerShape(20.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(stringResource(R.string.welcome_install_title), fontSize = 15.sp, fontWeight = FontWeight.Medium)
-            Text(stringResource(R.string.welcome_install_text, DESKTOP_APP_URL), fontSize = 14.sp, color = t.textDim)
+            // Someone who installed only this app stalls here: where the computer's app comes from.
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                PillButton(stringResource(R.string.welcome_install_copy), {
-                    context.getSystemService(android.content.ClipboardManager::class.java)
-                        ?.setPrimaryClip(android.content.ClipData.newPlainText("DeskLink", DESKTOP_APP_URL))
-                    android.widget.Toast.makeText(context, R.string.welcome_install_copied, android.widget.Toast.LENGTH_SHORT).show()
-                }, style = PillStyle.Outlined, height = 44.dp)
-                PillButton(stringResource(R.string.welcome_install_share), {
-                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
-                        .putExtra(android.content.Intent.EXTRA_TEXT, installMessage)
-                    runCatching { context.startActivity(android.content.Intent.createChooser(send, null)) }
-                }, style = PillStyle.Outlined, height = 44.dp)
+            androidx.compose.foundation.layout.FlowRow(
+                Modifier.padding(top = 8.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(stringResource(R.string.welcome_no_desklink), fontSize = 13.sp, lineHeight = 19.sp, color = t.textDim, modifier = Modifier.padding(start = 4.dp, end = 4.dp))
+                DeskTextButton(stringResource(R.string.welcome_send_install_link), { installSheet = true }, Modifier.offset(x = (-12).dp))
             }
+            Spacer(Modifier.height(16.dp))
         }
-        Spacer(Modifier.weight(1f).heightIn(min = 26.dp))
-        PillButton(stringResource(R.string.welcome_pair), onPair, Modifier.fillMaxWidth(), icon = R.drawable.sym_qr_code_scanner)
-        Spacer(Modifier.height(18.dp))
+        PrimaryButton(
+            stringResource(R.string.welcome_pair),
+            onPair,
+            Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 18.dp, top = 8.dp),
+            icon = R.drawable.sym_qr_code_scanner,
+        )
     }
-    }
+    if (installSheet) DeskBottomSheet(onDismiss = { installSheet = false }) { InstallLinkContent() }
 }
 
+/** Where to get DeskLink for the computer, with the two ways to hand the address over. */
 @Composable
-private fun WelcomeRow(@DrawableRes icon: Int, text: String) {
+internal fun InstallLinkContent() {
     val t = tokens
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(t.surface, RoundedCornerShape(20.dp))
-            .border(1.dp, t.hairline, RoundedCornerShape(20.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Icon(painterResource(icon), contentDescription = null, tint = t.accent, modifier = Modifier.size(22.dp))
-        Text(text, fontSize = 15.sp)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val installMessage = stringResource(R.string.welcome_install_message, DESKTOP_APP_URL)
+    Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 24.dp, end = 24.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(stringResource(R.string.welcome_install_sheet_title), style = DeskLinkType.cardTitle.copy(fontSize = 20.sp, lineHeight = 26.sp), color = t.text, modifier = Modifier.semantics { heading() })
+        Text(stringResource(R.string.welcome_install_text, DESKTOP_APP_URL), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim)
+        Spacer(Modifier.height(6.dp))
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SecondaryButton(stringResource(R.string.welcome_install_copy), {
+                context.getSystemService(android.content.ClipboardManager::class.java)
+                    ?.setPrimaryClip(android.content.ClipData.newPlainText("DeskLink", DESKTOP_APP_URL))
+                android.widget.Toast.makeText(context, R.string.welcome_install_copied, android.widget.Toast.LENGTH_SHORT).show()
+            }, height = 48.dp)
+            SecondaryButton(stringResource(R.string.welcome_install_share), {
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(android.content.Intent.EXTRA_TEXT, installMessage)
+                runCatching { context.startActivity(android.content.Intent.createChooser(send, null)) }
+            }, height = 48.dp)
+        }
     }
 }
 
@@ -205,6 +197,7 @@ data class NearbyComputer(val id: String, val name: String)
 
 private val ScanText = Color(0xFFFFFFFF)
 private val ScanDim = Color(0xFFA1A1AA)
+private val ScanLink = Color(0xFFA9B8FF)
 
 /**
  * The camera behind brackets, and the computers found on this network to pair by code instead.
@@ -227,6 +220,8 @@ fun ScanScreen(
     onClose: () -> Unit,
     /** The camera could not start (another app holds it, or none): said, not a black square. */
     onCameraError: (() -> Unit)? = null,
+    /** Pair without a code: add the computer by its address. */
+    onTypeAddress: () -> Unit = {},
 ) {
     DarkSystemBars()
     Box(Modifier.fillMaxSize().background(Brush.radialGradient(listOf(Color(0xFF2A2C31), Color(0xFF0B0B0C))))) {
@@ -254,6 +249,7 @@ fun ScanScreen(
             Spacer(Modifier.weight(1f))
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 nearby.forEach { computer -> NearbyRow(computer) { onPairNearby(computer.id) } }
+                TypeAddressRow(onTypeAddress)
             }
         }
     }
@@ -285,14 +281,27 @@ private fun Brackets(
         if (stopped != null) {
             // Camera off on purpose: said why, and scanning resumes only when asked.
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(20.dp)) {
-                PillButton(stringResource(R.string.scan_again), onRescan, style = PillStyle.Tonal, height = 40.dp)
+                SecondaryButton(stringResource(R.string.scan_again), onRescan, tonal = true, height = 40.dp)
             }
         } else if (!camera) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(24.dp)) {
                 Text(stringResource(R.string.scan_camera_needed), fontSize = 13.sp, color = ScanText.copy(alpha = 0.8f), textAlign = TextAlign.Center)
-                PillButton(stringResource(R.string.scan_allow_camera), onAllowCamera, style = PillStyle.Tonal, height = 40.dp)
+                SecondaryButton(stringResource(R.string.scan_allow_camera), onAllowCamera, tonal = true, height = 40.dp)
             }
         }
+    }
+}
+
+/** "Type the computer's address instead": for a network that does not show computers to each other. */
+@Composable
+private fun TypeAddressRow(onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(DeskLinkShape.stadium).clickable(role = Role.Button, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+    ) {
+        Icon(painterResource(R.drawable.sym_keyboard), contentDescription = null, tint = ScanLink, modifier = Modifier.size(18.dp))
+        Text(stringResource(R.string.scan_type_address), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = ScanLink, modifier = Modifier.padding(vertical = 8.dp))
     }
 }
 
@@ -430,10 +439,7 @@ fun PairCodeScreen(state: PairCodeState, onCancel: () -> Unit, onMatch: () -> Un
                         PairStage.IDLE -> R.string.pair_code_idle_title
                     },
                 ),
-                fontSize = 26.sp,
-                lineHeight = 32.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = (-0.3).sp,
+                style = DeskLinkType.screenTitle.copy(fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.6).sp),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite },
             )
@@ -447,8 +453,8 @@ fun PairCodeScreen(state: PairCodeState, onCancel: () -> Unit, onMatch: () -> Un
                     Modifier
                         .padding(vertical = 24.dp)
                         .fillMaxWidth()
-                        .background(t.surface, RoundedCornerShape(28.dp))
-                        .border(1.dp, t.hairline, RoundedCornerShape(28.dp))
+                        .background(t.surface, DeskLinkShape.hero)
+                        .border(1.dp, t.hairline, DeskLinkShape.hero)
                         .padding(vertical = 30.dp)
                         .clearAndSetSemantics { contentDescription = description },
                     contentAlignment = Alignment.Center,
@@ -468,10 +474,10 @@ fun PairCodeScreen(state: PairCodeState, onCancel: () -> Unit, onMatch: () -> Un
             Spacer(Modifier.height(24.dp))
         }
         Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PillButton(stringResource(R.string.cancel), onCancel, Modifier.weight(1f), style = PillStyle.Outlined)
+            SecondaryButton(stringResource(R.string.cancel), onCancel, Modifier.weight(1f))
             when (state.stage) {
-                PairStage.ASKED -> PillButton(stringResource(R.string.pair_codes_match), onMatch, Modifier.weight(1.3f))
-                PairStage.IDLE -> PillButton(stringResource(R.string.request_pairing), onRequest, Modifier.weight(1.3f))
+                PairStage.ASKED -> PrimaryButton(stringResource(R.string.pair_codes_match), onMatch, Modifier.weight(1.3f))
+                PairStage.IDLE -> PrimaryButton(stringResource(R.string.request_pairing), onRequest, Modifier.weight(1.3f))
                 PairStage.WAITING -> Unit
             }
         }

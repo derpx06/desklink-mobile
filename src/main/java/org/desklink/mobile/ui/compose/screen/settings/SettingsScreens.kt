@@ -343,6 +343,8 @@ internal class PermissionRow(
     val granted: Boolean,
     /** Android cannot tell whether it is done (OEM settings): an "Open" button, never counted as waiting. */
     val unknown: Boolean = false,
+    /** False when nothing the person turned on uses it and it is not granted: the post-pairing checklist leaves it out. */
+    val relevant: Boolean = true,
     val allow: () -> Unit,
 )
 
@@ -350,11 +352,13 @@ internal class PermissionRow(
 fun needsOemBackgroundSetting(manufacturer: String): Boolean =
     manufacturer.lowercase() in setOf("oppo", "realme", "oneplus", "xiaomi", "redmi", "poco", "vivo", "iqoo", "huawei", "honor", "meizu", "asus", "tecno", "infinix")
 
+/** What a permission button does: asks (or explains first) and, once answered, refreshes [asked] so rows read the new state. */
+internal class PermissionAsker(val ask: (Array<String>) -> Unit, val asked: Int)
+
+/** The launchers behind every "Allow" button. Nothing is asked until [PermissionAsker.ask] is called from a tap. */
 @Composable
-internal fun PermissionsSection(desk: DeskSettings?) {
+internal fun rememberPermissionAsker(): PermissionAsker {
     val context = LocalContext.current
-    val t = tokens
-    val tick = rememberResumeTick()
     var asked by remember { mutableIntStateOf(0) }
     // Android 10 also wants a folder chosen by hand before received files can be written.
     val folder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -371,9 +375,19 @@ internal fun PermissionsSection(desk: DeskSettings?) {
         }
         if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && result[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true) folder.launch(null)
     }
+    return PermissionAsker({ permissions -> org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(context, permissions, request::launch) }, asked)
+}
+
+@Composable
+internal fun PermissionsSection(desk: DeskSettings?) {
+    val context = LocalContext.current
+    val t = tokens
+    val tick = rememberResumeTick()
+    val asker = rememberPermissionAsker()
+    val asked = asker.asked
     val deskName = desk?.name ?: stringResource(R.string.settings_your_computer)
     val tapToGrant = stringResource(R.string.device_tap_permission)
-    val ask: (Array<String>) -> Unit = { permissions -> org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(context, permissions, request::launch) }
+    val ask = asker.ask
     val rows = remember(tick, asked, desk) { permissionRows(context, deskName, ask) } +
         desk?.pluginPermissions.orEmpty().map { (name, open) -> PermissionRow(R.drawable.sym_info, name, tapToGrant, false, allow = open) }
     val waiting = rows.count { !it.granted && !it.unknown }
@@ -425,6 +439,7 @@ internal fun permissionRows(context: Context, desk: String, request: (Array<Stri
             // Not counted as waiting while nothing the person turned on needs it.
             unknown = !needs.notificationAccess && !NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName),
             allow = open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
+            relevant = needs.notificationAccess || NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName),
         ))
         if (needs.calls) {
             val calls = buildList {
@@ -470,6 +485,7 @@ internal fun permissionRows(context: Context, desk: String, request: (Array<Stri
             AccessibilitySetupActivity.running(),
             unknown = !needs.accessibility && !AccessibilitySetupActivity.running(),
             allow = { AccessibilitySetupActivity.open(context) },
+            relevant = needs.accessibility || AccessibilitySetupActivity.running(),
         ))
     }
 }

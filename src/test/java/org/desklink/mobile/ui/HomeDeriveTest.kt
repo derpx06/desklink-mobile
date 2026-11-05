@@ -73,4 +73,11 @@ class HomeDeriveTest {
         assertFalse(HomeDerive.showRecentFiles(state()))
         assertTrue(HomeDerive.showRecentFiles(state { copy(recent = listOf(record(1))) }))
     }
+
+    @Test fun theNotificationsNudgeIsForAndroid13AndUpUntilGranted() {
+        assertTrue(HomeDerive.notificationsOff(sdk = 33, granted = false))
+        assertTrue(HomeDerive.notificationsOff(sdk = 36, granted = false))
+        assertFalse(HomeDerive.notificationsOff(sdk = 33, granted = true))
+        assertFalse("before 13 there is nothing to ask", HomeDerive.notificationsOff(sdk = 32, granted = false))
+    }
 }

@@ -39,6 +39,9 @@ object HomeDerive {
     /** Cancel is offered only for a transfer that is still going. */
     fun canCancel(t: HomeTransfer?): Boolean = t != null && t.active
 
+    /** Android 13+ asks for notifications; until it is granted Home says so, once, with a button (never an automatic prompt). */
+    fun notificationsOff(sdk: Int, granted: Boolean): Boolean = sdk >= 33 && !granted
+
     /** The Recent area: files, then notes (always, they are local), then the mirrored-notifications line. */
     fun showRecentFiles(s: HomeState): Boolean = s.recent.isNotEmpty()
 

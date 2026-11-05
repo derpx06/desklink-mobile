@@ -80,6 +80,8 @@ android {
         unitTests {
             // The app's own resources, so a Robolectric test (and the screenshot harness) can read its strings and drawables.
             isIncludeAndroidResources = true
+            // Robolectric and the screenshot harness keep the default 512 MB test JVM near its limit; the whole suite ran it out of memory.
+            all { it.maxHeapSize = "2g" }
         }
     }
 
