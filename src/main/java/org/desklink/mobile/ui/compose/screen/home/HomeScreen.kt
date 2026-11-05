@@ -174,6 +174,8 @@ data class HomeState(
     val history: List<TransferRecord> = emptyList(),
     /** A terminal command finished or needs the person: the coral strip says so. */
     val terminalAttention: Boolean = false,
+    /** Notifications are not allowed on this phone (Android 13+): a one-line nudge with a button. */
+    val notificationsOff: Boolean = false,
 ) {
     val ready get() = connection == DeviceConnection.LOCAL || connection == DeviceConnection.AWAY || connection == DeviceConnection.CONNECTED
 }
@@ -221,6 +223,8 @@ class HomeActions(
     val onOpenSettings: (String) -> Unit = {},
     /** A short message at the bottom ("Copied"). */
     val onMessage: (String) -> Unit = {},
+    /** The nudge's button: asks Android for notifications (the person tapped it). */
+    val onTurnOnNotifications: () -> Unit = {},
 )
 
 /** From this width the screen has two columns: what you can do on the left, what is going on on the right. */
@@ -273,6 +277,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Greeting(onSearch = { palette = true })
+                if (state.notificationsOff) NotificationsNudge(actions.onTurnOnNotifications)
                 if (two) {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { doing() }
@@ -667,6 +672,21 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
                 Text(it, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 10.dp))
             }
         }
+    }
+}
+
+/** "Notifications are off. Turn on": amber, one line, shown until Android has them. */
+@Composable
+private fun NotificationsNudge(onTurnOn: () -> Unit) {
+    val t = tokens
+    Row(
+        Modifier.fillMaxWidth().background(t.surface, DeskLinkShape.banner).border(1.dp, t.amber.copy(alpha = 0.5f), DeskLinkShape.banner).padding(start = 16.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(painterResource(R.drawable.sym_notifications), contentDescription = null, tint = t.amber, modifier = Modifier.size(22.dp))
+        Text(stringResource(R.string.home_notifications_off), fontSize = 14.sp, lineHeight = 19.sp, color = t.text, modifier = Modifier.weight(1f).padding(vertical = 8.dp))
+        org.desklink.mobile.ui.compose.DeskTextButton(stringResource(R.string.home_notifications_turn_on), onTurnOn)
     }
 }
 

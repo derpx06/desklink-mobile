@@ -791,6 +791,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onMessage = ::showMessage,
             onNewTerminal = { startActivity(TerminalActivity.intent(this, id, newTerminal = true)) },
             onOpenSettings = { route -> nav.reset(AppTab.SETTINGS); nav.push(AppTab.SETTINGS, route); nav.select(AppTab.SETTINGS) },
+            onTurnOnNotifications = {
+                org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS)) { asking ->
+                    ActivityCompat.requestPermissions(this, asking, RESULT_NOTIFICATIONS_ENABLED)
+                }
+            },
             onNotes = { nav.select(AppTab.NOTES) },
             onNote = { noteId -> nav.select(AppTab.NOTES); notesEditing.value = noteId },
             onNewNote = { nav.select(AppTab.NOTES); notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW },
