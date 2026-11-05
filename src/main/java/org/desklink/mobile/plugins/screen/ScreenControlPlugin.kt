@@ -154,9 +154,14 @@ class ScreenControlPlugin : Plugin() {
         }
     }
 
+    /** When the current view request went out ([ViewWait.clockMs]), for [ViewWait]; null before one. */
+    var viewRequestedAt by mutableStateOf<Long?>(null)
+        private set
+
     fun onRemoteScreenRequesting() {
         remoteControlEnabled = false
         resetView()
+        viewRequestedAt = ViewWait.clockMs()
         latestStatus = context.getString(R.string.remote_screen_requesting)
     }
 
