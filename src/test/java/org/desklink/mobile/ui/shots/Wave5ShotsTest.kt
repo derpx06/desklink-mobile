@@ -2,6 +2,8 @@
 package org.desklink.mobile.ui.shots
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -138,7 +140,7 @@ abstract class Wave5Shots : ShotTest() {
 
     @Test fun keyCaps() = shoot("w5-keycaps") {
         Column(Modifier.fillMaxSize().background(Color(0xFF111113)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 KeyCap("esc", null, true) {}
                 KeyCap("tab", null, true) {}
                 KeyCap("ctrl", null, true, selected = true) {}
@@ -161,7 +163,7 @@ abstract class Wave5Shots : ShotTest() {
                 onMode = {}, onBack = {}, onEnd = {}, onLeft = {}, onRight = {}, onKeyboard = {}, onMore = {},
                 reason = reason, onAllowControl = if (!granted) ({}) else null, display = "mirror",
                 fill = fill, soundOn = soundOn,
-                keys = { if (keys) androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                keys = { if (keys) androidx.compose.foundation.layout.Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     KeyCap("esc", null, granted) {}; KeyCap("tab", null, granted) {}; KeyCap("ctrl", null, granted, selected = true) {}; KeyCap("alt", null, granted) {}
                     KeyCap("super", "Super key", granted) {}; KeyCap(null, "Left", granted, R.drawable.sym_arrow_back) {}; KeyCap(null, "Right", granted, R.drawable.sym_arrow_forward) {}
                 } },

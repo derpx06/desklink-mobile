@@ -115,7 +115,8 @@ fun DeskFilterChip(label: String, selected: Boolean, onClick: () -> Unit, modifi
     val t = tokens
     val shape = RoundedCornerShape(18.dp)
     Box(
-        modifier.minimumInteractiveComponentSize().selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        // The touch target is the node's own size, so the minimum goes inside the selectable, not around it.
+        modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick).minimumInteractiveComponentSize(),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -137,7 +138,7 @@ fun DeskFilterChip(label: String, selected: Boolean, onClick: () -> Unit, modifi
 fun AssistChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, @DrawableRes icon: Int? = null) {
     val t = tokens
     val shape = RoundedCornerShape(18.dp)
-    Box(modifier.minimumInteractiveComponentSize().clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(modifier.clickable(role = Role.Button, onClick = onClick).minimumInteractiveComponentSize(), contentAlignment = Alignment.Center) {
         Row(
             Modifier.heightIn(min = 36.dp).clip(shape).background(t.surface).border(1.dp, t.hairlineStrong, shape).padding(start = if (icon != null) 10.dp else 14.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,

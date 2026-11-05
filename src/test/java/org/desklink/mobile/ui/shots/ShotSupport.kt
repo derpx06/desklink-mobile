@@ -21,6 +21,43 @@ object ShotDir {
 val BLANK_NAME = Regex("""\s[,.;:!?]|,\s*,|%\d?\$?[sd]""")
 
 /**
+ * What a screen reader or a thumb cannot use: a clickable (or switch, or tab) under 48 dp either way, or without a name
+ * (its text or content description, merged from its children), and a text field with no label at all. Walks the merged tree.
+ */
+object A11y {
+    const val MIN_DP = 48f
+
+    fun violations(compose: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>, minDp: Float = MIN_DP): List<String> {
+        val density = compose.activity.resources.displayMetrics.density
+        val out = mutableListOf<String>()
+        fun name(n: androidx.compose.ui.semantics.SemanticsNode): String {
+            val c = n.config
+            val texts = c.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text).orEmpty().map { it.text }
+            val desc = c.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription).orEmpty()
+            return (desc + texts).joinToString(" ").trim()
+        }
+        fun walk(n: androidx.compose.ui.semantics.SemanticsNode) {
+            val c = n.config
+            val clickable = c.getOrNull(androidx.compose.ui.semantics.SemanticsActions.OnClick) != null
+            val editable = c.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.EditableText) != null
+            val shown = !c.contains(androidx.compose.ui.semantics.SemanticsProperties.InvisibleToUser) && n.layoutInfo.isPlaced && n.boundsInRoot.width > 0f
+            if ((clickable || editable) && shown) {
+                // The laid-out size, not the visible part: a row scrolled half out of view is still a full-size target.
+                val w = n.size.width / density
+                val h = n.size.height / density
+                val label = name(n)
+                val what = "\"$label\" ${"%.0f".format(w)}x${"%.0f".format(h)} dp at ${n.boundsInRoot.left.toInt()},${n.boundsInRoot.top.toInt()}"
+                if (w < minDp - 0.5f || h < minDp - 0.5f) out += "touch target under $minDp dp: $what"
+                if (label.isEmpty()) out += "no name: $what"
+            }
+            n.children.forEach(::walk)
+        }
+        compose.onAllNodes(androidx.compose.ui.test.isRoot()).fetchSemanticsNodes().forEach(::walk)
+        return out
+    }
+}
+
+/**
  * Renders a screen to `<name>-light.png` and `<name>-dark.png`, at the size of the test class's Robolectric
  * qualifiers (a phone class and a tablet class extend this). Debug and test builds only; no device needed.
  */
@@ -43,6 +80,8 @@ abstract class ShotTest {
                     n.children.flatMap(::walk)
             walk(root)
         }
+        val bad = A11y.violations(compose)
+        check(bad.isEmpty()) { "$form $name is not accessible:\n" + bad.joinToString("\n") }
         texts.forEach { t -> check(!BLANK_NAME.containsMatchIn(t)) { "$form $name shows a blank where a name should be: \"$t\"" } }
         for (isDark in listOf(false, true)) {
             dark.value = isDark

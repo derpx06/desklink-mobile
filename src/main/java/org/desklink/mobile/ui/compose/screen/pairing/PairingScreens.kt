@@ -233,6 +233,9 @@ fun ScanScreen(
                 }
                 Text(stringResource(R.string.scan_title), fontSize = 18.sp, fontWeight = FontWeight.Medium, color = ScanText, modifier = Modifier.semantics { heading() })
             }
+            // Scrolls when large text or a short screen leaves no room; otherwise the nearby computers sit at the bottom.
+            BoxWithConstraints(Modifier.weight(1f)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).heightIn(min = maxHeight)) {
             Brackets(Modifier.align(Alignment.CenterHorizontally).padding(top = 48.dp).size(232.dp), camera, onAllowCamera, stopped, onRescan)
             // After a failure the reason replaces the hint, as a live region so a screen reader says it.
             val reason = stopped?.message?.takeIf { it.isNotBlank() }
@@ -250,6 +253,8 @@ fun ScanScreen(
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 nearby.forEach { computer -> NearbyRow(computer) { onPairNearby(computer.id) } }
                 TypeAddressRow(onTypeAddress)
+            }
+            }
             }
         }
     }

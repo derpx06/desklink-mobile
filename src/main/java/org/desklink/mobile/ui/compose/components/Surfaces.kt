@@ -180,7 +180,7 @@ fun DeskSearchField(
         modifier.fillMaxWidth().heightIn(min = 52.dp).background(t.surface2, DeskLinkShape.stadium).padding(start = 18.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.weight(1f).padding(vertical = 8.dp), contentAlignment = Alignment.CenterStart) {
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             if (value.isEmpty()) Text(placeholder, fontSize = 16.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
             BasicTextField(
                 value = value,
@@ -190,6 +190,8 @@ fun DeskSearchField(
                 cursorBrush = SolidColor(t.accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                // 48 dp tall with the text centred: the node a screen reader or a finger finds is the whole field, not one line.
+                decorationBox = { inner -> Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) { inner() } },
                 modifier = Modifier.fillMaxWidth()
                     .semantics { contentDescription = label }
                     .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),

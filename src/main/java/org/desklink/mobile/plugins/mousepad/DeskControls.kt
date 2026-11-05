@@ -167,7 +167,7 @@ fun DeskControls(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(painterResource(R.drawable.sym_front_hand), contentDescription = null, tint = OnAmber, modifier = Modifier.size(16.dp))
-                Column(Modifier.widthIn(max = 380.dp)) {
+                Column(Modifier.weight(1f, fill = false).widthIn(max = 380.dp)) {
                     if (!controlEnabled) {
                         Text(stringResource(R.string.remote_allow_control_first, deviceName), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
                         reason?.takeIf(String::isNotBlank)?.let {
@@ -222,11 +222,12 @@ fun DeskControls(
                 Box(
                     Modifier
                         .heightIn(min = 48.dp)
-                        .clickable(role = Role.Button, onClick = onEnd),
+                        .clickable(role = Role.Button, onClick = onEnd)
+                        .semantics { contentDescription = endLabel },
                     contentAlignment = Alignment.Center,
                 ) {
                     Row(
-                        Modifier.heightIn(min = 44.dp).background(EndBg, CircleShape).padding(horizontal = 16.dp).semantics(mergeDescendants = true) { contentDescription = endLabel },
+                        Modifier.heightIn(min = 44.dp).background(EndBg, CircleShape).padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {

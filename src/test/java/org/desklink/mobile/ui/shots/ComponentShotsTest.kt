@@ -66,7 +66,7 @@ abstract class ComponentShots : ShotTest() {
             SecondaryButton("Not now", {}, Modifier.fillMaxWidth(), tonal = true)
             PrimaryButton("Send files", {}, Modifier.fillMaxWidth(), height = 48.dp)
             PrimaryButton("Waiting for arch-desk to answer", {}, Modifier.fillMaxWidth(), enabled = false)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DeskTextButton("Skip", {})
                 DeskTextButton("All actions", {}, icon = R.drawable.sym_arrow_forward)
                 DeskIconButton(R.drawable.sym_search, "Search", {})
