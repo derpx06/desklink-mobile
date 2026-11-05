@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.desklink.mobile.R
+import org.desklink.mobile.plugins.screen.ScreenDisplay
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.components.rememberReducedMotion
 
@@ -139,7 +140,7 @@ fun DeskControls(
     /** One-time line above the bottom pill saying what it is for. */
     hint: String? = null,
     /** F2: "mirror" or "extend", and switching between them (re-asks the desk). */
-    display: String = "mirror",
+    display: String = ScreenDisplay.MIRROR,
     onDisplay: (String) -> Unit = {},
     /** Edge to edge (true) or the whole desktop (false), and flipping it. */
     fill: Boolean = false,
@@ -160,7 +161,7 @@ fun DeskControls(
     val endLabel = stringResource(R.string.active_session_end)
     val bigText = LocalDensity.current.fontScale >= 1.5f
     // Extend is a monitor of its own: touch where you mean, 1:1, no crop; so no trackpad or watch-only switch and no Fit.
-    val extend = display == "extend"
+    val extend = display == ScreenDisplay.EXTEND
     Box(Modifier.fillMaxSize().windowInsetsPadding(safeInsets)) {
         // One compact strip, only while something is missing: control not yet granted (or watch-only).
         // Granted, dismissed or timed out, it is gone; it never repeats for the same state.
@@ -249,7 +250,7 @@ fun DeskControls(
                 // F2: Mirror | Extend, under the name (the top centre is the amber notice's).
                 Pill {
                     Row(Modifier.padding(3.dp).selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
-                        listOf("mirror" to R.string.remote_display_mirror, "extend" to R.string.remote_display_extend).forEach { (value, label) ->
+                        listOf(ScreenDisplay.MIRROR to R.string.remote_display_mirror, ScreenDisplay.EXTEND to R.string.remote_display_extend).forEach { (value, label) ->
                             val selected = display == value
                             Box(
                                 Modifier

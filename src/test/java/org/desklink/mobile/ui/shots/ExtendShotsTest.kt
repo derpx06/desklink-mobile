@@ -50,14 +50,14 @@ abstract class ExtendShots : ShotTest() {
         Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) { content() }
     }
 
-    private fun status(stage: String, waiting: Boolean) = @Composable {
-        Stage { ViewerStatus(extend = true, deviceName = desk, stage = stage, waiting = waiting, onRetry = {}, onClose = {}) }
+    private fun status(stage: String, waiting: Boolean, timedOut: Boolean = false) = @Composable {
+        Stage { ViewerStatus(extend = true, deviceName = desk, stage = stage, waiting = waiting, onRetry = {}, onClose = {}, timedOut = timedOut) }
     }
 
     @Test fun asking() = shoot("ext-asking", status("Requesting live screen", waiting = true))
     @Test fun lookAtDesk() = shoot("ext-allow-on-desk", status("Waiting for you to allow it on $desk. Look at its screen.", waiting = true))
-    @Test fun nothingHappened() = shoot("ext-nothing-happened", status("Nothing happened yet", waiting = false))
-    @Test fun refused() = shoot("ext-refused", status("$desk can't add a display: its screen sharing is switched off.", waiting = false))
+    @Test fun nothingHappened() = shoot("ext-nothing-happened", status("Nothing happened yet", waiting = false, timedOut = true))
+    @Test fun refused() = shoot("ext-refused", status("The link to $desk dropped.", waiting = false))
 
     @Composable
     private fun FakeDesktop() {

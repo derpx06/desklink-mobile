@@ -183,7 +183,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                     forceLandscape()
                     gateOpen = true
                     if (displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND) {
-                        // The area from an earlier session may be another window; the new one is measured once landscape.
+                        // The area from an earlier session may be another window; the new one is measured once it has settled.
                         org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea = null
                         extendAskPending = true
                     } else {
@@ -204,9 +204,13 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         }
     }
 
-    /** A desktop is landscape: the view is always full screen, like a video, and never turns to portrait mid-session. */
+    /**
+     * A desktop is landscape: asked for either landscape side, full screen like a video. Android 16 ignores this on
+     * screens of 600 dp and more (tablets, unfolded foldables, multi-window); Extend then sizes the desk's monitor to
+     * the view as it is (see [ExtendLayout]).
+     */
     private fun forceLandscape() {
-        requestedOrientation = ExtendLayout.orientation(gateOpen = true)
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
 
     /**
@@ -215,8 +219,17 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
      */
     private var gateOpen by mutableStateOf(false)
 
-    /** Extend: the request waits for the landscape view area, because the desk's new monitor is that size. */
+    /** Extend: the request waits for a settled view size, because the desk's new monitor is that size. */
     private var extendAskPending by mutableStateOf(false)
+
+    /** The Extend view's size as last laid out, and when it last changed (uptime ms). */
+    private var viewMeasured by mutableStateOf<ExtendLayout.Measured?>(null)
+
+    /** The system bars have been asked to hide: until then the first measurements may still include them. */
+    private var barsHidden by mutableStateOf(false)
+
+    /** The area the computer was last asked for (null: none sent, or asked without a size). */
+    private var sentArea: Pair<Int, Int>? = null
 
     override fun onResume() {
         super.onResume()
@@ -309,7 +322,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 kotlinx.coroutines.delay(CONTROL_RETRY_MS)
             }
         }
-        LaunchedEffect(Unit) { setSystemBarsHidden(true) }
+        LaunchedEffect(Unit) { setSystemBarsHidden(true); barsHidden = true }
         HiddenKeyboard()
         // A text input on the desktop took focus: up comes the keyboard, the
         // way it does for the phone's own fields — and down when it leaves.
@@ -336,24 +349,27 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 plugin.extendNotice = null
             }
         }
-        // F2: an extended display follows this view's size (a fold, multi-window): ask again.
-        val area = org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea
-        var askedArea by remember { mutableStateOf(area) }
-        LaunchedEffect(area, displayMode, live) {
-            if (displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND && live && area != null && askedArea != null && area != askedArea) {
-                kotlinx.coroutines.delay(500)
+        // F2: an extended display follows this view's size (a fold, multi-window, a late inset): compared with what the
+        // computer was actually asked for, so a request sent without a size is corrected too. Debounced.
+        val measured = viewMeasured?.area
+        LaunchedEffect(measured, displayMode, live, extendAskPending) {
+            if (displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND && live && !extendAskPending &&
+                ExtendLayout.needsReask(measured, sentArea)
+            ) {
+                kotlinx.coroutines.delay(REASK_DEBOUNCE_MS)
                 requestDesktopScreen()
             }
-            if (live) askedArea = area
         }
-        // Extend: ask once the landscape view is measured (or after a short wait), so the computer adds a monitor that fits.
+        // Extend: ask once the view's size has settled (or after a short wait), so the computer adds a monitor that fits.
         LaunchedEffect(extendAskPending) {
             if (!extendAskPending) return@LaunchedEffect
-            var waited = 0L
-            while (!ExtendLayout.readyToAsk(org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea, waited)) {
-                kotlinx.coroutines.delay(50)
-                waited += 50
-            }
+            ExtendLayout.awaitAsk(
+                startMs = SystemClock.uptimeMillis(),
+                now = SystemClock::uptimeMillis,
+                measured = { viewMeasured },
+                barsHidden = { barsHidden },
+                pause = { kotlinx.coroutines.delay(it) },
+            )
             extendAskPending = false
             requestDesktopScreen()
         }
@@ -510,9 +526,9 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 .clipToBounds()
                 .onSizeChanged {
                     size = it
-                    // F2: Extend sizes the desk's virtual monitor to this view (landscape only: a portrait size is a turn in progress).
-                    ExtendLayout.publishable(it.width, it.height)?.let { area ->
-                        org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea = area
+                    // F2: Extend sizes the desk's virtual monitor to this view; only a change restarts the settling clock.
+                    if (it.width > 0 && it.height > 0 && viewMeasured?.area != (it.width to it.height)) {
+                        viewMeasured = ExtendLayout.Measured(it.width to it.height, SystemClock.uptimeMillis())
                     }
                 }
                 .pointerInput(controlEnabled, desktopWidth, desktopHeight, size) {
@@ -614,6 +630,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             deviceName = deviceName(),
             stage = stage,
             waiting = waiting,
+            timedOut = wait == ViewWait.NOTHING_HAPPENED,
             onRetry = { requestDesktopScreen() },
             onClose = { finish() },
             modifier = modifier,
@@ -814,11 +831,14 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                         displayMode = mode
                         org.desklink.mobile.plugins.screen.ScreenDisplay.choose(this@MousePadActivity, deviceId.orEmpty(), mode)
                         if (mode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND) {
-                            // A monitor of its own: touch where you mean, 1:1, no crop.
+                            // A monitor of its own: touch where you mean, 1:1, no crop. Its size is what is visible once the
+                            // picture box has changed to match, so the request goes out through the measured-area path.
                             controlMode = ControlMode.Touch
                             fillScreen = false
+                            extendAskPending = true
+                        } else {
+                            requestDesktopScreen()
                         }
-                        requestDesktopScreen()
                     }
                 },
                 moreMenu = { compact ->
@@ -948,6 +968,11 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
     private fun requestDesktopScreen() {
         controlPasswordDeclined = false
+        // Extend: the view as it is now is what the computer is asked for (the coordinator reads it, now and on later re-asks).
+        if (displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND) {
+            sentArea = viewMeasured?.area
+            org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea = sentArea
+        }
         if (screenControlPlugin() == null) {
             statusText = getString(R.string.remote_screen_plugin_missing)
             return
@@ -1041,6 +1066,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         }
 
         private const val STANDARD_DPI = 240.0f
+        private const val REASK_DEBOUNCE_MS = 500L
         /** Well inside the desktop's per-packet limit even at four bytes a character. */
         private const val TEXT_CHUNK_CHARS = 200
         private const val CONTROL_RETRY_MS = 3_000L

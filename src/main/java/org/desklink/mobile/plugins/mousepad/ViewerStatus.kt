@@ -54,6 +54,8 @@ fun ViewerStatus(
     onRetry: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The computer never answered (the only stage that is about adding the display); any other stage is its own reason. */
+    timedOut: Boolean = false,
 ) {
     if (!extend) {
         MirrorStatus(deviceName, stage, waiting, onRetry, onClose, modifier)
@@ -80,7 +82,14 @@ fun ViewerStatus(
             }
             Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                 Text(
-                    stringResource(if (waiting) R.string.remote_extend_connecting_to else R.string.remote_extend_failed, deviceName),
+                    stringResource(
+                        when {
+                            waiting -> R.string.remote_extend_connecting_to
+                            timedOut -> R.string.remote_extend_failed
+                            else -> R.string.remote_extend_stopped
+                        },
+                        deviceName,
+                    ),
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = PillText,
