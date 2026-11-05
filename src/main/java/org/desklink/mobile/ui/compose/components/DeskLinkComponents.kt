@@ -43,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -265,20 +266,15 @@ fun EmptyState(
     }
 }
 
-/** A soft moving sheen for loading placeholders; still when the system turns animations off. */
+/** A soft moving sheen for loading placeholders; still when the system turns animations off. Moves in the draw phase only. */
 fun Modifier.shimmer(): Modifier = composed {
     val t = tokens
-    val context = LocalContext.current
     // Still when "Remove animations" (animator duration scale 0) is on.
-    val enabled = remember(context) { Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f }
-    if (!enabled) return@composed background(t.surface2)
+    if (rememberReducedMotion()) return@composed background(t.surface2)
     val transition = rememberInfiniteTransition(label = "shimmer")
-    val x by transition.animateFloat(-1f, 2f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "x")
-    background(
-        Brush.linearGradient(
-            listOf(t.surface2, t.hairline, t.surface2),
-            start = Offset(x * 900f - 300f, 0f),
-            end = Offset(x * 900f, 300f),
-        ),
-    )
+    val x = transition.animateFloat(-1f, 2f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "x")
+    drawBehind {
+        val p = x.value
+        drawRect(Brush.linearGradient(listOf(t.surface2, t.hairline, t.surface2), start = Offset(p * 900f - 300f, 0f), end = Offset(p * 900f, 300f)))
+    }
 }

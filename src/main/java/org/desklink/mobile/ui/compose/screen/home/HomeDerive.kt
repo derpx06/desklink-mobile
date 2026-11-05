@@ -22,6 +22,9 @@ object HomeDerive {
         return if (line.length <= max) line else line.take(max - 1).trimEnd() + "…"
     }
 
+    /** The computer's actions can be used: connected and not waiting for an update. Everything that sends something asks this, never `ready`. */
+    fun usable(s: HomeState): Boolean = whyNot(s) == null
+
     fun whyNot(s: HomeState): NotReady? = when {
         s.updateNeeded -> NotReady.UPDATE
         s.ready -> null
