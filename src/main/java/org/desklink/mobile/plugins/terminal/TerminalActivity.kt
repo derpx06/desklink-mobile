@@ -1436,7 +1436,7 @@ private const val LIST_REFRESH_MS = 5_000L
 
 /**
  * The session header of the design: back, the `>_` badge, the name over "folder · computer · status", the size in mono and the menu
- * ([menu] draws the button and its dropdown). A live region, so a reconnect or an exit is announced.
+ * ([menu] draws the button and its dropdown). The status line is a live region, so a reconnect or an exit is announced; the round trip in the detail is not.
  */
 @Composable
 internal fun TerminalHeader(name: String, detail: String, status: String?, size: String?, backLabel: String, onBack: () -> Unit, menu: @Composable () -> Unit) {
@@ -1445,11 +1445,14 @@ internal fun TerminalHeader(name: String, detail: String, status: String?, size:
             Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = backLabel, tint = TermText)
         }
         Text(">_", fontFamily = MonoFamily, fontSize = 11.sp, color = TermAccent, modifier = Modifier.background(TermBadge, RoundedCornerShape(7.dp)).padding(horizontal = 7.dp, vertical = 3.dp))
-        Column(Modifier.weight(1f).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(detail, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-            // Reconnecting, ended, exited: a line of its own, so a long folder never pushes it out of sight.
-            status?.let { Text(it, fontSize = 12.sp, color = TermCoralText, maxLines = 2) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            // Name and detail read as one item and are not live: the detail carries the round trip, refreshed every 2 s.
+            Column(Modifier.semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(detail, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+            }
+            // Reconnecting, ended, exited: a line of its own, so a long folder never pushes it out of sight, and the only live part.
+            status?.let { Text(it, fontSize = 12.sp, color = TermCoralText, maxLines = 2, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         }
         size?.let { Text(it, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1) }
         menu()
