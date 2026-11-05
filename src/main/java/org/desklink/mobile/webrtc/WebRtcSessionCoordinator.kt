@@ -736,8 +736,10 @@ class WebRtcSessionCoordinator(
             // These are `require` failures ("session is not active", "transport
             // is not ready"); the user needs to know to wait and retry.
             val notReady = error is IllegalArgumentException || error is IllegalStateException
-            // The viewer stays open and asks again by itself when the link is back (a stop clears this).
-            if (notReady) resumeScreen.set(true)
+            // The viewer stays open and asks again by itself when the link is back (a stop clears this);
+            // not for an error on a link that is up.
+            val linkReady = synchronized(lock) { activeBinding != null && transport?.isReadyForPackets() == true }
+            if (resumesAfterViewFailure(notReady, linkReady)) resumeScreen.set(true)
             plugin.onRemoteViewFailed(
                 if (notReady) context.getString(R.string.remote_screen_not_ready) else error.message,
             )
@@ -773,9 +775,8 @@ class WebRtcSessionCoordinator(
     fun stopRemoteSession() {
         resumeScreen.set(false)
         remoteActionExecutor.execute {
-            // A request that failed for want of a link, queued ahead of this stop, may have set it again.
-            resumeScreen.set(false)
             synchronized(lock) {
+              try {
                 val binding = activeBinding ?: run {
                     releaseHeldInput(); remoteSession.stop()
                     cancelRemoteHeartbeatLocked()
@@ -804,6 +805,11 @@ class WebRtcSessionCoordinator(
                 // The video track stays: libwebrtc delivers it once per peer, so
                 // dropping it here left every later view black.
                 stopPhoneScreenCapture()
+              } finally {
+                // Under the lock, after the session is stopped: a link loss or a failed request
+                // that ran just before cannot leave the viewer's re-ask armed once it is closed.
+                resumeScreen.set(false)
+              }
             }
         }
     }
@@ -2565,7 +2571,7 @@ class WebRtcSessionCoordinator(
         // controller would leave the UI "enabled" and every gesture failing.
         val remote = remoteSession.snapshot()
         val hadRemoteSession = remote.remoteSessionId != null
-        if (remote.direction == WebRtcScreenDirection.DESKTOP_TO_PHONE && remote.state in RESUMABLE_REMOTE_STATES) {
+        if (resumesAfterLinkLoss(remote.direction, remote.state)) {
             resumeScreen.set(true)
         }
         releaseHeldInput(); remoteSession.stop()
@@ -2747,6 +2753,13 @@ class WebRtcSessionCoordinator(
         /** A1/A2: what this phone's audio track carries (the module's input: 48 kHz mono). */
         private const val AUDIO_SAMPLE_RATE = 48_000
         private const val AUDIO_CHANNELS = 1
+        /** The view of the desk is asked for again on the next feature-ready when the link was lost in this state. */
+        internal fun resumesAfterLinkLoss(direction: WebRtcScreenDirection?, state: WebRtcRemoteSessionState): Boolean =
+            direction == WebRtcScreenDirection.DESKTOP_TO_PHONE && state in RESUMABLE_REMOTE_STATES
+
+        /** A view request that failed is asked for again when the link returns only if there was no usable link to send it on. */
+        internal fun resumesAfterViewFailure(notReadyError: Boolean, linkReady: Boolean): Boolean = notReadyError && !linkReady
+
         private val RESUMABLE_REMOTE_STATES = setOf(
             // Asked and not answered when the link went: the request went with it.
             WebRtcRemoteSessionState.REQUESTING_VIEW,
