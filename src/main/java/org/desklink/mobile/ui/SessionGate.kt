@@ -108,19 +108,19 @@ object SessionGate {
             stored = stored,
             strongEnrolled = Biometrics.strongEnrolled(activity),
             phoneGate = phoneGateOn(activity),
-            anyAuth = Biometrics.available(activity, Biometrics.STRONG_OR_CREDENTIAL),
+            anyAuth = Biometrics.available(activity, Biometrics.WEAK_OR_CREDENTIAL),
         )
         fun pass() {
             connection?.let { markPassed(deviceId, it) }
             onOpen()
         }
         val desk = DeskNames.of(deviceId)
-        fun phoneCheck() = Biometrics.prompt(activity, activity.getString(R.string.gate_title, desk), null, Biometrics.STRONG_OR_CREDENTIAL, null) { result ->
+        fun phoneCheck() = Biometrics.prompt(activity, activity.getString(R.string.gate_title, desk), null, Biometrics.WEAK_OR_CREDENTIAL, null) { result ->
             if (result is BiometricResult.Succeeded) pass() else onDenied()
         }
         // The remembered password could not be used (cancelled, failed, key gone): the phone-only check the person asked
         // for still stands, so it is asked instead of opening, never skipped.
-        fun withoutStored() = when (afterStoredFails(phoneGate = phoneGateOn(activity), anyAuth = Biometrics.available(activity, Biometrics.STRONG_OR_CREDENTIAL))) {
+        fun withoutStored() = when (afterStoredFails(phoneGate = phoneGateOn(activity), anyAuth = Biometrics.available(activity, Biometrics.WEAK_OR_CREDENTIAL))) {
             Step.PHONE_CHECK -> phoneCheck()
             else -> onOpen()
         }

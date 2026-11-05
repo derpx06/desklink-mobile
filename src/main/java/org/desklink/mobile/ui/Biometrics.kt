@@ -32,6 +32,13 @@ object Biometrics {
     val STRONG_OR_CREDENTIAL: Int =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) BIOMETRIC_STRONG or DEVICE_CREDENTIAL else BIOMETRIC_WEAK or DEVICE_CREDENTIAL
 
+    /**
+     * The phone-only "is the owner there" check: any biometric the phone itself unlocks with (a face counts, many phones
+     * rate it weak) or the screen lock. Never used to open a Keystore key, so STRONG is not needed; asking for STRONG
+     * hid face unlock and, on in-display sensors, often left only the PIN.
+     */
+    val WEAK_OR_CREDENTIAL: Int = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
+
     fun available(context: Context, authenticators: Int): Boolean =
         BiometricManager.from(context).canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
 

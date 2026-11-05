@@ -170,16 +170,31 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         if (savedInstanceState == null || screenControlPlugin()?.remoteLive != true) {
             // The phone-side gate first (fingerprint for a remembered password, or the optional
             // phone-only check); the request then carries the password when it is known.
-            org.desklink.mobile.ui.SessionGate.check(this, deviceId.orEmpty(), onOpen = ::requestDesktopScreen, onDenied = ::finish)
+            // The check is asked in the phone's own (portrait) orientation: an in-display fingerprint sensor and face
+            // unlock are not offered reliably over a forced-landscape secure window.
+            org.desklink.mobile.ui.SessionGate.check(
+                this,
+                deviceId.orEmpty(),
+                onOpen = {
+                    forceLandscape()
+                    requestDesktopScreen()
+                },
+                onDenied = ::finish,
+            )
+        } else {
+            forceLandscape()
         }
-        // A desktop is landscape: the view is always full screen, like a video.
-        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
         setContent {
             DeskLinkDarkTheme(this) {
                 RemoteControlScreen()
             }
         }
+    }
+
+    /** A desktop is landscape: the view is always full screen, like a video. */
+    private fun forceLandscape() {
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
 
     override fun onResume() {

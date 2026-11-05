@@ -719,7 +719,7 @@ private fun PrivacyGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
             }
         }
         // Phone-only: a fingerprint or screen-lock check before Terminals and the desk screen.
-        val canCheck = org.desklink.mobile.ui.Biometrics.available(context, org.desklink.mobile.ui.Biometrics.STRONG_OR_CREDENTIAL)
+        val canCheck = org.desklink.mobile.ui.Biometrics.available(context, org.desklink.mobile.ui.Biometrics.WEAK_OR_CREDENTIAL)
         GroupRow(
             stringResource(R.string.settings_session_gate),
             icon = R.drawable.sym_fingerprint,
