@@ -81,7 +81,11 @@ android {
             // The app's own resources, so a Robolectric test (and the screenshot harness) can read its strings and drawables.
             isIncludeAndroidResources = true
             // Robolectric and the screenshot harness keep the default 512 MB test JVM near its limit; the whole suite ran it out of memory.
-            all { it.maxHeapSize = "2g" }
+            all {
+                it.maxHeapSize = "2g"
+                // -Ddesklink.shots=<dir>: where the screenshot harness writes (it reads the property in the test JVM).
+                System.getProperty("desklink.shots")?.let { dir -> it.systemProperty("desklink.shots", dir) }
+            }
         }
     }
 

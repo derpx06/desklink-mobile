@@ -109,6 +109,9 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.windowInsetsPadding
+import org.desklink.mobile.plugins.screen.ExtendLayout
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.sp
@@ -178,12 +181,20 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 deviceId.orEmpty(),
                 onOpen = {
                     forceLandscape()
-                    requestDesktopScreen()
+                    gateOpen = true
+                    if (displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND) {
+                        // The area from an earlier session may be another window; the new one is measured once landscape.
+                        org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea = null
+                        extendAskPending = true
+                    } else {
+                        requestDesktopScreen()
+                    }
                 },
                 onDenied = ::finish,
             )
         } else {
             forceLandscape()
+            gateOpen = true
         }
 
         setContent {
@@ -193,10 +204,19 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         }
     }
 
-    /** A desktop is landscape: the view is always full screen, like a video. */
+    /** A desktop is landscape: the view is always full screen, like a video, and never turns to portrait mid-session. */
     private fun forceLandscape() {
-        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        requestedOrientation = ExtendLayout.orientation(gateOpen = true)
     }
+
+    /**
+     * The phone-side gate (fingerprint, phone-only check) has passed. Until then the screen stays black and the
+     * activity in the phone's own orientation: nothing of the desk is drawn, and no portrait size is mistaken for the view.
+     */
+    private var gateOpen by mutableStateOf(false)
+
+    /** Extend: the request waits for the landscape view area, because the desk's new monitor is that size. */
+    private var extendAskPending by mutableStateOf(false)
 
     override fun onResume() {
         super.onResume()
@@ -262,6 +282,10 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
 
     @Composable
     private fun RemoteControlScreen() {
+        if (!gateOpen) {
+            Box(Modifier.fillMaxSize().background(Color.Black))
+            return
+        }
         val plugin = screenControlPlugin()
         val controlEnabled = plugin?.remoteControlEnabled == true
         val live = plugin?.remoteLive == true
@@ -321,6 +345,17 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 requestDesktopScreen()
             }
             if (live) askedArea = area
+        }
+        // Extend: ask once the landscape view is measured (or after a short wait), so the computer adds a monitor that fits.
+        LaunchedEffect(extendAskPending) {
+            if (!extendAskPending) return@LaunchedEffect
+            var waited = 0L
+            while (!ExtendLayout.readyToAsk(org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea, waited)) {
+                kotlinx.coroutines.delay(50)
+                waited += 50
+            }
+            extendAskPending = false
+            requestDesktopScreen()
         }
         ImmersiveDesktop(controlEnabled, live)
         if (plugin != null && prompt != null) {
@@ -475,8 +510,10 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 .clipToBounds()
                 .onSizeChanged {
                     size = it
-                    // F2: Extend sizes the desk's virtual monitor to this view.
-                    org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea = it.width to it.height
+                    // F2: Extend sizes the desk's virtual monitor to this view (landscape only: a portrait size is a turn in progress).
+                    ExtendLayout.publishable(it.width, it.height)?.let { area ->
+                        org.desklink.mobile.plugins.screen.ScreenDisplay.viewArea = area
+                    }
                 }
                 .pointerInput(controlEnabled, desktopWidth, desktopHeight, size) {
                     detectDesktopGestures(sink)
@@ -546,7 +583,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             }
         }
         val wait = if (requesting && requestedAt != null) ViewWait.of(requestedAt, now) else ViewWait.ASKING
-        val stage = when (wait) {
+        val stage = if (extendAskPending) getString(R.string.remote_screen_requesting) else when (wait) {
             ViewWait.LOOK_AT_DESK -> getString(R.string.remote_screen_look_at_desk, deviceName())
             ViewWait.NOTHING_HAPPENED -> getString(R.string.remote_screen_nothing_happened)
             ViewWait.ASKING -> ScreenControlPlugin.latestStatus
@@ -572,43 +609,15 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
             }
             return
         }
-        Column(
-            modifier.padding(32.dp).widthIn(max = 520.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (waiting) {
-                androidx.compose.material3.CircularProgressIndicator(Modifier.size(32.dp))
-                Spacer(Modifier.height(16.dp))
-            }
-            Text(
-                stringResource(R.string.remote_connecting_to, deviceName()),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-            )
-            if (stage.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 4,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                )
-            }
-            if (!waiting) {
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    androidx.compose.material3.FilledTonalButton(onClick = { requestDesktopScreen() }) {
-                        Text(stringResource(R.string.device_try_again))
-                    }
-                    androidx.compose.material3.TextButton(onClick = { finish() }) {
-                        Text(stringResource(R.string.remote_screen_close))
-                    }
-                }
-            }
-        }
+        ViewerStatus(
+            extend = displayMode == org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND,
+            deviceName = deviceName(),
+            stage = stage,
+            waiting = waiting,
+            onRetry = { requestDesktopScreen() },
+            onClose = { finish() },
+            modifier = modifier,
+        )
     }
 
     private fun deviceName(): String = DeskNames.of(deviceId)
@@ -761,7 +770,11 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         }
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             DesktopScreen(
-                modifier = Modifier.fillMaxSize(),
+                // The picture keeps out of the camera cutout (black beside it) unless "edge to edge" asks to fill; Extend
+                // measures this box, so the computer's new monitor is exactly what can be seen.
+                modifier = Modifier.fillMaxSize().then(
+                    if (fillScreen) Modifier else Modifier.windowInsetsPadding(WindowInsets.displayCutout),
+                ),
                 controlEnabled = input,
                 rounded = false,
                 fill = fillScreen,
@@ -811,8 +824,8 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 moreMenu = { compact ->
                     androidx.compose.material3.DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
                         if (compact) {
-                            // The bottom pill is too narrow for these two: same switches, same names.
-                            androidx.compose.material3.DropdownMenuItem(
+                            // The bottom pill is too narrow for these two: same switches, same names (Extend never crops, so no Fit).
+                            if (displayMode != org.desklink.mobile.plugins.screen.ScreenDisplay.EXTEND) androidx.compose.material3.DropdownMenuItem(
                                 text = { Text(stringResource(R.string.remote_zoom_fill)) },
                                 trailingIcon = { androidx.compose.material3.Switch(checked = fillScreen, onCheckedChange = null) },
                                 onClick = { more = false; touch(); fillScreen = !fillScreen },
@@ -851,6 +864,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 Pill(
                     Modifier
                         .align(Alignment.BottomEnd)
+                        .windowInsetsPadding(WindowInsets.displayCutout)
                         .padding(16.dp),
                 ) {
                     PillIcon(R.drawable.sym_expand_less, stringResource(R.string.remote_show_controls)) {

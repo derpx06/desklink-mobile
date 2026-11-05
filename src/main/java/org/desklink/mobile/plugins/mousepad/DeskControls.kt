@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -90,8 +93,8 @@ enum class ControlMode {
 fun controlInputEnabled(controlGranted: Boolean, mode: ControlMode): Boolean =
     controlGranted && mode != ControlMode.View
 
-private val PillBg = Color(0xD1141416)
-private val PillText = Color(0xFFF2F2F3)
+internal val PillBg = Color(0xD1141416)
+internal val PillText = Color(0xFFF2F2F3)
 private val PillSelected = Color(0xFFF2F2F3)
 private val PillOnSelected = Color(0xFF18181B)
 private val AmberNotice = Color(0xEBF5B84A)
@@ -100,7 +103,9 @@ private val OnAmber = Color(0xFF2A1D00)
 private val EndBg = Color(0xFF34201C)
 private val EndText = Color(0xFFFF9A88)
 private val ChipBg = Color.White.copy(alpha = 0.08f)
-private val LiveDot = Color(0xFF3FD1A2)
+internal val LiveDot = Color(0xFF3FD1A2)
+/** The Extend indicator's tint: the live green at low strength, so it reads as "on" without a second colour. */
+internal val ExtendTint = Color(0x293FD1A2)
 private val KeyBg = Color(0xEB1E1E21)
 private val KeyEdge = Color(0xFF38383D)
 
@@ -145,6 +150,8 @@ fun DeskControls(
     keys: @Composable () -> Unit = {},
     /** Gets whether the bottom pill is too narrow for Fit and Sound: they then belong in the menu. */
     moreMenu: @Composable (compact: Boolean) -> Unit = {},
+    /** Keep the chrome out of the camera cutout (landscape: the notch is a side edge); shots pass a notch. */
+    safeInsets: WindowInsets = WindowInsets.displayCutout,
 ) {
     val input = controlInputEnabled(controlEnabled, mode)
     // Narrower than the full tool row (about 600 dp): Fit and Sound move into More, and what is left scrolls with a fading edge.
@@ -152,7 +159,9 @@ fun DeskControls(
     // Large text: the top row has no room for the round trip or End's word, so the name keeps the space.
     val endLabel = stringResource(R.string.active_session_end)
     val bigText = LocalDensity.current.fontScale >= 1.5f
-    Box(Modifier.fillMaxSize()) {
+    // Extend is a monitor of its own: touch where you mean, 1:1, no crop; so no trackpad or watch-only switch and no Fit.
+    val extend = display == "extend"
+    Box(Modifier.fillMaxSize().windowInsetsPadding(safeInsets)) {
         // One compact strip, only while something is missing: control not yet granted (or watch-only).
         // Granted, dismissed or timed out, it is gone; it never repeats for the same state.
         if (live && noticeVisible && (!controlEnabled || mode == ControlMode.View)) {
@@ -211,6 +220,7 @@ fun DeskControls(
                             modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 14.dp),
                         ) {
                             Box(Modifier.size(8.dp).background(if (live) LiveDot else PillText.copy(alpha = 0.45f), CircleShape))
+                            if (extend) ExtendTag()
                             Text(deviceName, fontFamily = MonoFamily, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 220.dp).weight(1f, fill = false))
                             rttMs?.takeIf { !bigText }?.let {
                                 Text(stringResource(R.string.home_meta_rtt, it.toInt()), fontFamily = MonoFamily, fontSize = 11.sp, color = PillText.copy(alpha = 0.7f), maxLines = 1, softWrap = false)
@@ -270,14 +280,16 @@ fun DeskControls(
                         val toolbarLabel = stringResource(R.string.remote_toolbar_label, deviceName)
                         val scroll = rememberScrollState()
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.edgeFade(scroll).horizontalScroll(scroll).padding(horizontal = 3.dp).semantics { contentDescription = toolbarLabel }) {
-                            ModeSwitch(mode, onMode)
-                            Box(Modifier.padding(horizontal = 4.dp).size(1.dp, 22.dp).background(Color.White.copy(alpha = 0.14f)))
+                            if (!extend) {
+                                ModeSwitch(mode, onMode)
+                                Box(Modifier.padding(horizontal = 4.dp).size(1.dp, 22.dp).background(Color.White.copy(alpha = 0.14f)))
+                            }
                             PillText(stringResource(R.string.remote_left_click), input, description = stringResource(R.string.remote_left_click_description), onClick = onLeft)
                             PillText(stringResource(R.string.remote_right_click), input, description = stringResource(R.string.remote_right_click_description), onClick = onRight)
                             ToolChip(R.drawable.sym_keyboard, stringResource(R.string.remote_key_keyboard), enabled = input, onClick = onKeyboard)
                             if (!compact) {
                                 // Switches with fixed names: a screen reader says "Desk sound, on", not a label that flips with the state.
-                                ToolChip(R.drawable.sym_aspect_ratio, stringResource(R.string.remote_zoom_fill), selected = fill, toggle = true, onClick = onFill)
+                                if (!extend) ToolChip(R.drawable.sym_aspect_ratio, stringResource(R.string.remote_zoom_fill), selected = fill, toggle = true, onClick = onFill)
                                 ToolChip(if (soundOn) R.drawable.sym_volume_up else R.drawable.sym_volume_mute, stringResource(R.string.remote_desk_sound), selected = soundOn, toggle = true, onClick = onSound)
                             }
                             Box {
@@ -289,6 +301,19 @@ fun DeskControls(
                 }
             }
         }
+    }
+}
+
+/** "Extend" in the name capsule: the second display is on. A label, not a control. */
+@Composable
+private fun ExtendTag() {
+    Row(
+        Modifier.background(ExtendTint, CircleShape).padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(painterResource(R.drawable.sym_desktop_windows), contentDescription = null, tint = LiveDot, modifier = Modifier.size(14.dp))
+        Text(stringResource(R.string.remote_display_extend), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = LiveDot, maxLines = 1, softWrap = false)
     }
 }
 
