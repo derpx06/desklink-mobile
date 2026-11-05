@@ -181,6 +181,40 @@ abstract class ScreenShots : ShotTest() {
         )
     }
 
+    private val busyFiles = sampleFiles + listOf(
+        record(4, "dataset-2026.zip", sent = true, minutesAgo = 60 * 27, size = 812_000_000),
+        record(5, "budget.xlsx", sent = false, minutesAgo = 60 * 28, size = 52_000),
+    )
+
+    @Test fun filesTabBusy() = shoot("files-busy") {
+        FilesTab(
+            BucketUi(compose.activity), "d1", desk,
+            live = org.desklink.mobile.ui.compose.screen.transfers.LiveTransfer("dataset-2026.zip", true, 0.64f, "64% · 38 MiB/s · fast, over Wi-Fi"),
+            records = busyFiles, revision = 0, actions = TransferActions({}, {}, {}, {}, {}, {}, {}),
+            savedIn = "the Downloads folder",
+            unsaved = listOf(org.desklink.mobile.plugins.share.UnpublishedFiles.Item("u1", "report.pdf", 1_000_000, null, null, "d1", java.io.File("report.pdf"), storageFull = true)),
+            sendAgain = listOf(org.desklink.mobile.plugins.share.SendAgain.Item("s1", "d1", "holiday.mov", unreadable = false, at = 0L)),
+        )
+    }
+
+    @Test fun filesTabInternet() = shoot("files-internet") {
+        FilesTab(
+            BucketUi(compose.activity), "d1", desk,
+            live = org.desklink.mobile.ui.compose.screen.transfers.LiveTransfer("holiday-photos.zip", false, null, "Saving…"),
+            records = busyFiles.take(2), revision = 0, actions = TransferActions({}, {}, {}, {}, {}, {}, {}),
+        )
+    }
+
+    @Test fun notesTabFilled() {
+        org.desklink.mobile.plugins.notes.NotesStore.newNote(compose.activity, "Release 1.4 checklist", "- [x] Tag the build\n- [x] Update the changelog\n- [ ] Ship to the beta\n- [ ] Tell the team")
+        org.desklink.mobile.plugins.notes.NotesStore.newNote(compose.activity, "Wi-Fi at the flat", "Network DeskLink-5G, the password is on the fridge, router in the hall cupboard.")
+        org.desklink.mobile.plugins.notes.NotesStore.newNote(compose.activity, "Ideas", "Mirror the phone screen to the desk when charging.")
+        org.desklink.mobile.plugins.notes.NotesStore.pin(compose.activity, "git push origin main")
+        shoot("notes-filled") {
+            NotesTab(androidx.compose.runtime.remember { NotesUi(compose.activity, mutableStateOf(null)) }, compose.activity, desk, clipboardOn = true, onClipboard = {}, onSendClipboard = {}, onMessage = {})
+        }
+    }
+
     @Test fun notesTab() = shoot("notes") {
         NotesTab(androidx.compose.runtime.remember { NotesUi(compose.activity, mutableStateOf(null)) }, compose.activity, desk, clipboardOn = true, onClipboard = {}, onSendClipboard = {}, onMessage = {})
     }

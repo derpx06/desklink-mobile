@@ -1149,6 +1149,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onBack = { nav.pop(AppTab.SETTINGS) },
             waitingPermissions = waitingPermissions(this, device?.name ?: getString(R.string.settings_your_computer)),
             about = { AboutRoute { nav.pop(AppTab.SETTINGS) } },
+            onSwitchComputer = { nav.select(AppTab.HOME); computersRequest++ },
             actions = SettingsActions(
                 // One writer per setting: these are this phone's plugins, the desk's own
                 // switches go through onDeskSetting only.
