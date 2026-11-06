@@ -10,4 +10,9 @@
     <color name="widget_faint">#FF8F8F97</color>
     <color name="widget_coral">#FFE5533D</color>
     <color name="widget_on_coral">#FFFFFFFF</color>
+    <!-- The widget family: tonal buttons and the filled "New" button, from the app's accentContainer / accent tokens. -->
+    <color name="widget_tonal">#FFE2E8FB</color>
+    <color name="widget_on_tonal">#FF1B2F7A</color>
+    <color name="widget_accent">#FF3256D6</color>
+    <color name="widget_on_accent">#FFFFFFFF</color>
 </resources>

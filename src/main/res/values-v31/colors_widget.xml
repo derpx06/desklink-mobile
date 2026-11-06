@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: the widgets take the wallpaper's colours (Material You); the DeskLink tokens stay the fallback below. -->
+<resources>
+    <color name="widget_bg">@android:color/system_neutral1_10</color>
+    <color name="widget_button_bg">#140B0B0F</color>
+    <color name="widget_text">@android:color/system_neutral1_900</color>
+    <color name="widget_text_dim">@android:color/system_neutral2_700</color>
+    <color name="widget_faint">@android:color/system_neutral2_500</color>
+    <color name="widget_tonal">@android:color/system_accent1_100</color>
+    <color name="widget_on_tonal">@android:color/system_accent1_900</color>
+    <color name="widget_accent">@android:color/system_accent1_600</color>
+    <color name="widget_on_accent">@android:color/system_accent1_0</color>
+</resources>

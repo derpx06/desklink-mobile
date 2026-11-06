@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notes, 2x2 to 4x3: the newest titles (none while the phone is locked) and New note. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@android:id/background"
+    tools:ignore="UseAppTint"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_desk_background"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/n_title"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="center_vertical"
+            android:maxLines="1"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="@string/notes_title"
+            android:textColor="@color/widget_text"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/n_new"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/widget_new_button"
+            android:contentDescription="@string/notes_new"
+            android:padding="12dp"
+            android:src="@drawable/sym_add"
+            android:tint="@color/widget_on_accent" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/n_row1"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/widget_row_ripple"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:text="@string/widget_notes_preview_1"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/n_row2"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/widget_row_ripple"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:text="@string/widget_notes_preview_2"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/n_row3"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/widget_row_ripple"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:text="@string/widget_notes_preview_3"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/n_row4"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/widget_row_ripple"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:text="@string/widget_notes_preview_4"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/n_row5"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/widget_row_ripple"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:text="@string/widget_notes_preview_5"
+        android:textColor="@color/widget_text"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/n_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="3"
+        android:minHeight="48dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:textColor="@color/widget_text_dim"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/n_more"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:textColor="@color/widget_text_dim"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

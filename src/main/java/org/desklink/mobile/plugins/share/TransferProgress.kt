@@ -57,22 +57,28 @@ object TransferProgress {
         // Percent moves in whole steps: keep the last measurement until it moves again.
         if (previous != null && percent == previous.percent && title == previous.title) return
         current = Transfer(deviceId, jobId, upload, title ?: previous?.title.orEmpty(), percent ?: previous?.percent, updatedAt = now, totalBytes = total, bytesPerSecond = speed)
+        // The Transfers widget: at the start and every 10 %, not on every step.
+        if (previous == null || (percent ?: 0) / 10 != (previous.percent ?: 0) / 10) widgets()
         notify { TransferNotification.progress(deviceId, jobId, upload, title ?: previous?.title.orEmpty(), percent ?: previous?.percent, total) }
     }
 
     /** The unified notification is told of every change; it must never break a transfer (nor a plain JVM test with no app). */
     private inline fun notify(block: () -> Unit) { runCatching { block() } }
 
+    private fun widgets() { runCatching { org.desklink.mobile.DeskLinkApplication.getInstance().let { org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(it) } } }
+
     /** The file arrived whole and is being put in place: no percentage, but not finished either. */
     @JvmStatic
     fun saving(deviceId: String, jobId: Long, title: String, totalBytes: Long) {
         current = Transfer(deviceId, jobId, upload = false, title = title, percent = null, totalBytes = totalBytes, saving = true)
+        widgets()
         notify { TransferNotification.saving(deviceId, jobId, title, totalBytes) }
     }
 
     @JvmStatic
     fun finish(jobId: Long, title: String, failed: Boolean) {
         current?.takeIf { it.jobId == jobId }?.let { current = it.copy(title = it.title.ifEmpty { title }, finished = true, failed = failed, updatedAt = SystemClock.elapsedRealtime()) }
+        widgets()
         notify { TransferNotification.ended(jobId, failed) }
     }
 
@@ -80,6 +86,7 @@ object TransferProgress {
     @JvmStatic
     fun resuming(jobId: Long) {
         current?.takeIf { it.jobId == jobId }?.let { current = it.copy(resuming = true, bytesPerSecond = 0, updatedAt = SystemClock.elapsedRealtime()) }
+        widgets()
         notify { TransferNotification.resuming(jobId) }
     }
 
@@ -100,6 +107,7 @@ object TransferProgress {
     @JvmStatic
     fun cancel(jobId: Long) {
         if (current?.jobId == jobId) current = null
+        widgets()
         notify { TransferNotification.cancelled(jobId) }
     }
 

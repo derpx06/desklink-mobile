@@ -120,6 +120,8 @@ class DeskLinkApplication : Application() {
         // The crash-loop times are read here, off the main thread, so the service's safe-mode check answers from memory.
         org.desklink.mobile.helpers.CrashLoop.preload(this)
         org.desklink.mobile.helpers.AppLog.init(this)
+        // The Notes widget hides its titles when the screen goes off and shows them after unlock.
+        org.desklink.mobile.ui.surfaces.widgets.DeskWidgets.watchLock(this)
         // Hidden, no settings row; inert while OFF_LAN_PAIRING_COMPILED is false (see PairingTransport).
         org.desklink.mobile.backends.PairingTransport.requested = runCatching {
             android.preference.PreferenceManager.getDefaultSharedPreferences(this)
@@ -367,7 +369,7 @@ class DeskLinkApplication : Application() {
             // The live-session notification follows the attached sessions, whoever changed them.
             // The job lives exactly as long as the client (shutDownTerminalClient).
             terminalWatchers[id] = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob() + org.desklink.mobile.helpers.Guarded.handler("terminal-watch")).launch {
-                client.state.map { state -> state.sessions.count { !it.gone } to state.sessions.count { it.attached && !it.gone } }.distinctUntilChanged().collect {
+                client.state.map { state -> Triple(state.sessions.count { !it.gone }, state.sessions.count { it.attached && !it.gone }, state.notAllowed) }.distinctUntilChanged().collect {
                     org.desklink.mobile.plugins.screen.SessionLiveNotification.refresh(this@DeskLinkApplication, id)
                     org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(this@DeskLinkApplication)
                 }

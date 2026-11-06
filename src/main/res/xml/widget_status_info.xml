@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Computer status: 2x1, up to 4x1. Redrawn on every change; the period is only the system's safety net against a picture left by a killed process. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_status_description"
+    android:initialLayout="@layout/widget_status"
+    android:maxResizeHeight="40dp"
+    android:maxResizeWidth="250dp"
+    android:minHeight="40dp"
+    android:minResizeHeight="40dp"
+    android:minResizeWidth="110dp"
+    android:minWidth="110dp"
+    android:previewImage="@drawable/widget_status_preview"
+    android:previewLayout="@layout/widget_status"
+    android:resizeMode="horizontal"
+    android:targetCellHeight="1"
+    android:targetCellWidth="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quick actions. The widget picker's picture before Android 12 (12+ draws the layout itself); the colours are the DeskLink tokens, which is what those versions use. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="250dp" android:height="120dp" android:left="0dp" android:top="0dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_bg" /><corners android:radius="24dp" /></shape>
+    </item>
+    <item android:width="8dp" android:height="8dp" android:left="14dp" android:top="18dp">
+        <shape android:shape="oval"><solid android:color="@color/widget_mint" /><corners android:radius="4dp" /></shape>
+    </item>
+    <item android:width="70dp" android:height="12dp" android:left="28dp" android:top="16dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_text" /><corners android:radius="6dp" /></shape>
+    </item>
+    <item android:width="86dp" android:height="8dp" android:left="150dp" android:top="18dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_faint" /><corners android:radius="4dp" /></shape>
+    </item>
+    <item android:width="36dp" android:height="36dp" android:left="14dp" android:top="60dp">
+        <shape android:shape="oval"><solid android:color="@color/widget_tonal" /><corners android:radius="18dp" /></shape>
+    </item>
+    <item android:width="28dp" android:height="6dp" android:left="18dp" android:top="102dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_faint" /><corners android:radius="3dp" /></shape>
+    </item>
+    <item android:width="36dp" android:height="36dp" android:left="60dp" android:top="60dp">
+        <shape android:shape="oval"><solid android:color="@color/widget_tonal" /><corners android:radius="18dp" /></shape>
+    </item>
+    <item android:width="28dp" android:height="6dp" android:left="64dp" android:top="102dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_faint" /><corners android:radius="3dp" /></shape>
+    </item>
+    <item android:width="36dp" android:height="36dp" android:left="106dp" android:top="60dp">
+        <shape android:shape="oval"><solid android:color="@color/widget_tonal" /><corners android:radius="18dp" /></shape>
+    </item>
+    <item android:width="28dp" android:height="6dp" android:left="110dp" android:top="102dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_faint" /><corners android:radius="3dp" /></shape>
+    </item>
+    <item android:width="36dp" android:height="36dp" android:left="152dp" android:top="60dp">
+        <shape android:shape="oval"><solid android:color="@color/widget_tonal" /><corners android:radius="18dp" /></shape>
+    </item>
+    <item android:width="28dp" android:height="6dp" android:left="156dp" android:top="102dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_faint" /><corners android:radius="3dp" /></shape>
+    </item>
+    <item android:width="36dp" android:height="36dp" android:left="198dp" android:top="60dp">
+        <shape android:shape="oval"><solid android:color="@color/widget_tonal" /><corners android:radius="18dp" /></shape>
+    </item>
+    <item android:width="28dp" android:height="6dp" android:left="202dp" android:top="102dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_faint" /><corners android:radius="3dp" /></shape>
+    </item>
+</layer-list>
