@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Build
 import android.view.WindowManager
+import org.desklink.mobile.BuildConfig
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
@@ -18,14 +19,26 @@ import androidx.compose.ui.platform.LocalContext
 object SecureWindows {
     private val users = HashMap<Activity, Int>()
 
+    /** Settings > Advanced > Debug, debug builds only: a developer can screenshot Files, Notes and Terminals over adb. */
+    const val KEY_ALLOW_SCREENSHOTS = "debug_allow_screenshots"
+
+    /** The one rule: the bypass needs a debug build *and* the switch. [debug] is `BuildConfig.DEBUG`, a constant false in release. */
+    fun bypassed(debug: Boolean, switchOn: Boolean) = debug && switchOn
+
+    private fun bypassed(activity: Activity) = BuildConfig.DEBUG && bypassed(
+        BuildConfig.DEBUG,
+        androidx.preference.PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(KEY_ALLOW_SCREENSHOTS, false),
+    )
+
     fun enter(activity: Activity) {
+        if (bypassed(activity)) return
         val first = (users[activity] ?: 0) == 0
         users[activity] = (users[activity] ?: 0) + 1
         if (first) apply(activity, secure = true)
     }
 
     fun leave(activity: Activity) {
-        val left = (users[activity] ?: 1) - 1
+        val left = (users[activity] ?: return) - 1
         if (left <= 0) {
             users.remove(activity)
             apply(activity, secure = false)

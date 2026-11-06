@@ -92,7 +92,7 @@ class HomeInteractionTest {
     @Test
     fun aComputerThatNeedsAnUpdateIsNotSentAnything() {
         show { HomeScreen(state { copy(updateNeeded = true) }, actions()) }
-        tap("Send clipboard")
+        tap("Clipboard")
         tap("Send files")
         assertEquals(listOf("unavailable", "unavailable"), calls)
     }
@@ -100,7 +100,7 @@ class HomeInteractionTest {
     @Test
     fun aReadyComputerIsSent() {
         show { HomeScreen(state(), actions()) }
-        tap("Send clipboard")
+        tap("Clipboard")
         assertEquals(listOf("clipboard"), calls)
     }
 
