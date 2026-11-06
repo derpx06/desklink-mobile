@@ -28,7 +28,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,6 +59,7 @@ import org.desklink.mobile.plugins.terminal.EndSessionDialog
 import org.desklink.mobile.plugins.terminal.NewTerminalSheet
 import org.desklink.mobile.plugins.terminal.TerminalRenameDialog
 import org.desklink.mobile.ui.SessionGate
+import org.desklink.mobile.ui.compose.DeskTextButton
 import org.desklink.mobile.ui.compose.PrimaryButton
 import org.desklink.mobile.ui.compose.SessionPasswordDialog
 import org.desklink.mobile.ui.compose.components.DeskSearchField
@@ -370,7 +370,7 @@ fun TerminalsContent(
                                 ) { actions.onOpen(session.id) }
                                 if (finished && connected) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                        TextButton(onClick = { actions.onRestart(session) }) { Text(stringResource(R.string.terminal_restart)) }
+                                        DeskTextButton(stringResource(R.string.terminal_restart), { actions.onRestart(session) })
                                     }
                                 }
                             }

@@ -233,7 +233,7 @@ class TerminalActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.terminal_device_unavailable, Toast.LENGTH_LONG).show()
             return toTerminalsTab()
         }
-        apply(destination)
+        show(destination)
         TerminalPalette.apply(
             (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES,
         )
@@ -256,7 +256,7 @@ class TerminalActivity : AppCompatActivity() {
             recreate() // a notification for another device
         } else {
             val destination = route(intent, null)
-            if (destination == TerminalRoute.Destination.Tab) toTerminalsTab() else apply(destination)
+            if (destination == TerminalRoute.Destination.Tab) toTerminalsTab() else show(destination)
         }
     }
 
@@ -264,7 +264,7 @@ class TerminalActivity : AppCompatActivity() {
         if (restored != null) TerminalRoute.Destination.Session(restored)
         else TerminalRoute.decide(intent.getStringExtra(EXTRA_TERMINAL_ID), intent.getBooleanExtra(EXTRA_NEW, false), intent.getStringExtra(EXTRA_LAUNCHER), intent.getStringExtra(EXTRA_CWD))
 
-    private fun apply(destination: TerminalRoute.Destination) {
+    private fun show(destination: TerminalRoute.Destination) {
         when (destination) {
             is TerminalRoute.Destination.Session -> openId = destination.id
             is TerminalRoute.Destination.New -> starting = destination
