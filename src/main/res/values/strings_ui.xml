@@ -527,6 +527,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="session_live_glide">Controlled by %1$s</string>
     <string name="home_live_glide">its pointer is on this phone</string>
     <string name="settings_glide">Let %1$s control this phone</string>
+    <string name="settings_glide_title">Glide</string>
+    <string name="settings_glide_explain">Move %1$s\'s mouse past its screen edge and it carries on here: its pointer and keyboard control this phone, as if the two screens were side by side.</string>
     <string name="settings_glide_on">Its pointer and keyboard continue here across the screen edge</string>
     <string name="settings_glide_off">Off. Move %1$s\'s pointer past its screen edge onto this phone</string>
     <string name="settings_glide_accessibility">Turn on DeskLink\'s accessibility service so %1$s can point and type here</string>
@@ -1043,6 +1045,58 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminals_new_launcher">New %1$s terminal</string>
     <string name="settings_search">Search settings</string>
     <string name="settings_search_none">Nothing matches “%1$s”.</string>
+    <!-- Settings search: words people look for that a row's title does not say (never shown) -->
+    <string name="kw_settings_phone_name" translatable="false">rename device name phone name</string>
+    <string name="kw_settings_connect_on_startup" translatable="false">autostart boot start launch reconnect</string>
+    <string name="kw_settings_keep_awake" translatable="false">sleep suspend caffeine wake idle</string>
+    <string name="kw_home_pair_another" translatable="false">add pair new device second computer</string>
+    <string name="kw_settings_phone_notifications" translatable="false">mirror sync alerts push messages</string>
+    <string name="kw_sg_choose_apps" translatable="false">apps filter which allow block</string>
+    <string name="kw_settings_desk_shows_notifications" translatable="false">popups toasts alerts</string>
+    <string name="kw_settings_private_notifications" translatable="false">hide content privacy lock screen sensitive</string>
+    <string name="kw_settings_desk_notifications_here" translatable="false">reverse show computer alerts on phone</string>
+    <string name="kw_settings_command_alerts" translatable="false">terminal finished done command</string>
+    <string name="kw_settings_activity_on" translatable="false">ongoing progress media sticky</string>
+    <string name="kw_settings_dnd_share" translatable="false">silent quiet mute do not disturb</string>
+    <string name="kw_select_ringtone" translatable="false">sound tone ring find my phone</string>
+    <string name="kw_setting_persistent_notification_oreo" translatable="false">foreground service status bar icon always on</string>
+    <string name="kw_settings_phone_clipboard" translatable="false">copy paste sync</string>
+    <string name="kw_settings_clipboard_offer" translatable="false">copy paste send ask prompt</string>
+    <string name="kw_settings_desk_clipboard" translatable="false">copy paste receive</string>
+    <string name="kw_home_send_clipboard" translatable="false">copy paste push now</string>
+    <string name="kw_settings_calls_on" translatable="false">phone call ring answer dial telephony</string>
+    <string name="kw_settings_show_caller" translatable="false">caller id incoming number</string>
+    <string name="kw_settings_desk_sound" translatable="false">audio speaker volume stream music</string>
+    <string name="kw_settings_desk_may_play" translatable="false">audio sound allow</string>
+    <string name="kw_settings_mic_consent" translatable="false">microphone mic voice record</string>
+    <string name="kw_settings_phone_media" translatable="false">music player now playing controls</string>
+    <string name="kw_settings_glide" translatable="false">glide mouse keyboard pointer cursor edge screen edge share mouse share keyboard barrier synergy control</string>
+    <string name="kw_mousepad_sensitivity_settings_title" translatable="false">pointer speed mouse sensitivity touchpad cursor</string>
+    <string name="kw_mousepad_scroll_direction_title" translatable="false">reverse scroll natural direction mouse wheel touchpad</string>
+    <string name="kw_settings_bucket_with" translatable="false">folder sync shared folder files drop</string>
+    <string name="kw_settings_downloads_folder" translatable="false">save location storage received files directory</string>
+    <string name="kw_sg_files_default_folder" translatable="false">reset downloads default</string>
+    <string name="kw_settings_gallery_send" translatable="false">photos screenshots auto upload camera roll</string>
+    <string name="kw_settings_gallery_screenshots" translatable="false">screenshot folder photos auto</string>
+    <string name="kw_settings_gallery_camera" translatable="false">camera folder photos dcim auto</string>
+    <string name="kw_settings_contacts_share" translatable="false">contacts address book people phone book</string>
+    <string name="kw_settings_session_password" translatable="false">password pin lock passcode secret</string>
+    <string name="kw_settings_session_gate" translatable="false">ask permission confirm approve terminal screen access prompt</string>
+    <string name="kw_settings_unlock_nearby" translatable="false">unlock lock screen login proximity</string>
+    <string name="kw_device_encryption" translatable="false">key fingerprint certificate security tls</string>
+    <string name="kw_privacy_policy" translatable="false">data legal terms</string>
+    <string name="kw_settings_unpair_row" translatable="false">forget remove disconnect delete device</string>
+    <string name="kw_settings_theme" translatable="false">dark light mode style night system</string>
+    <string name="kw_setting_dynamic_colors" translatable="false">wallpaper material you colour color</string>
+    <string name="kw_settings_phone_relay" translatable="false">internet away remote anywhere outside wan</string>
+    <string name="kw_settings_desk_relay" translatable="false">internet away remote anywhere outside wan</string>
+    <string name="kw_setting_advanced_network" translatable="false">relay turn stun server port</string>
+    <string name="kw_trusted_networks" translatable="false">wifi wi-fi ssid autodiscovery</string>
+    <string name="kw_custom_device_list" translatable="false">ip address manual add device</string>
+    <string name="kw_settings_permissions" translatable="false">allow access accessibility battery overlay notification camera storage</string>
+    <string name="kw_surfaces_add_tiles" translatable="false">quick settings tile widget shade</string>
+    <string name="kw_settings_export_logs" translatable="false">debug report bug diagnostics</string>
+    <string name="kw_about" translatable="false">version licence license credits authors</string>
     <string name="settings_quick_switches">Quick switches</string>
     <string name="settings_quick_clipboard">Share clipboard</string>
     <string name="settings_quick_clipboard_on">Synced with %1$s</string>

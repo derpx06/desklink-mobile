@@ -654,6 +654,8 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
     val speedValues = stringArrayResource(R.array.mousepad_sensitivity_values)
     val speedNames = stringArrayResource(R.array.mousepad_sensitivity_entries)
     val speed = prefs.getString(speedKey, stringResource(R.string.mousepad_default_sensitivity))
+    // The feature has a name people look for ("Glide"); the row below says what it does to this phone.
+    GlideNote(desk.name)
     SectionLabel(stringResource(R.string.sg_control_phone, desk.name))
     RowGroup {
         GroupRow(
@@ -701,6 +703,22 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
             choosingSpeed = false
             prefs.edit { putString(speedKey, speedValues[index]) }
             changed()
+        }
+    }
+}
+
+/** What "control this phone" is called, and what it is, in one card at the top of the Control page. */
+@Composable
+private fun GlideNote(deskName: String) {
+    val t = tokens
+    Row(
+        Modifier.fillMaxWidth().background(t.accentContainer, org.desklink.mobile.ui.compose.DeskLinkShape.banner).padding(14.dp).semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        IconTile(R.drawable.sym_mouse, size = 40.dp, radius = 12.dp, container = t.surface, content = t.accent)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.settings_glide_title), fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer)
+            Text(stringResource(R.string.settings_glide_explain, deskName), fontSize = 13.sp, lineHeight = 18.sp, color = t.onAccentContainer)
         }
     }
 }
