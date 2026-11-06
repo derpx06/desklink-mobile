@@ -188,6 +188,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     /** The note being edited in the Notes tab: an id, `NotesActivity.NEW`, or null for the list. */
     private val notesEditing = mutableStateOf<String?>(null)
 
+    /** A segment of the Notes tab asked for from outside (the clipboard tile's long-press: Snippets); the tab takes it and clears it. */
+    private var notesSegment by mutableStateOf<Int?>(null)
+
     /** Bumped by the Home tab's long-press: opens the computers sheet. */
     private var computersRequest by mutableIntStateOf(0)
     private val bucketUi by lazy { BucketUi(this) }
@@ -206,12 +209,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (!intent.isReadable()) return finish()
-        // Long-press on the clipboard tile: the snippets (F6), not the home screen.
-        if (savedInstanceState == null && clipboardTileLongPress(intent)) {
-            startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, snippets = true))
-            finish()
-            return
-        }
         DeviceHelper.initializeDeviceId(this)
 
         // Registered before reading the name: reading it can start a fetch that writes it.
@@ -262,7 +259,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         setIntent(intent)
         // A long-press on the clipboard tile while this activity is already up arrives here, not in onCreate.
         if (clipboardTileLongPress(intent)) {
-            startActivity(org.desklink.mobile.plugins.notes.NotesActivity.intent(this, snippets = true))
+            openSnippets()
             return
         }
         handleIntent(intent)
@@ -270,9 +267,23 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     private fun clipboardTileLongPress(intent: Intent): Boolean = isClipboardTileLongPress(intent)
 
+    private fun openSnippets() {
+        resetTo(HOME)
+        nav.select(AppTab.NOTES)
+        notesSegment = NOTES_SEGMENT_SNIPPETS
+    }
+
     /** Launcher, notifications and shortcuts: which computer, and the pairing screen if one waits. */
     private fun handleIntent(intent: Intent) {
         when {
+            // Long-press on the clipboard tile: the Snippets of the Notes tab (F6), not the home screen.
+            clipboardTileLongPress(intent) -> openSnippets()
+            // The note editor closed, or was started with no note: the Notes tab is the one list of notes.
+            intent.getBooleanExtra(EXTRA_OPEN_NOTES, false) -> {
+                resetTo(HOME)
+                nav.select(AppTab.NOTES)
+                if (intent.getBooleanExtra(EXTRA_SNIPPETS, false)) notesSegment = NOTES_SEGMENT_SNIPPETS
+            }
             // Launcher shortcuts (long-press the icon).
             intent.action == ACTION_NEW_NOTE -> {
                 resetTo(HOME)
@@ -726,6 +737,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onClipboard = { on -> setPluginEnabled(device, HomeModel.clipboardKey, on) },
             onSendClipboard = { sendClipboard(device) },
             onMessage = ::showMessage,
+            segmentRequest = notesSegment,
+            onSegmentShown = { notesSegment = null },
         )
     }
 
@@ -1416,6 +1429,15 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         const val EXTRA_DEVICE_ID = "deviceId"
         const val EXTRA_OPEN_FILES = "openFiles"
         const val EXTRA_OPEN_TERMINALS = "openTerminals"
+        const val EXTRA_OPEN_NOTES = "openNotes"
+        const val EXTRA_SNIPPETS = "snippets"
+        private const val NOTES_SEGMENT_SNIPPETS = 1
+
+        /** Opens the app on the Notes tab (on Snippets when asked): where the note editor goes when there is nothing to edit. */
+        fun notesIntent(context: Context, snippets: Boolean = false): Intent =
+            Intent(context, MainActivity::class.java)
+                .putExtra(EXTRA_OPEN_NOTES, true).putExtra(EXTRA_SNIPPETS, snippets)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         const val EXTRA_MESSAGE = "message"
 
         /** Opens the app on [deviceId]'s Terminals tab, with [message] in its snackbar. The one way anything "opens the terminals". */

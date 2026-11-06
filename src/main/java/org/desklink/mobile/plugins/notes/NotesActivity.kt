@@ -89,14 +89,16 @@ import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.tokens
 
 /**
- * Notes and snippets (F6): a list with search, pinned notes first; an editor that saves as you type
- * and reads markdown-lite; snippets that copy on a tap. Also "Save to DeskLink notes" in the share
- * sheet, and the clipboard tile's long-press (snippets).
+ * The note editor (F6): saves as you type and reads markdown-lite. Also "Save to DeskLink notes" in the share sheet.
+ * It lists nothing: the Notes tab is the one list of notes and snippets, so when there is no note to edit (or the
+ * editor closes) this goes there.
  */
 class NotesActivity : AppCompatActivity() {
-    /** The note being edited: an id, [NEW] for one not written yet, or null for the list. */
+    /** The note being edited: an id, [NEW] for one not written yet, or null for none (then the Notes tab shows). */
     private val editing = mutableStateOf<String?>(null)
-    private val tab = mutableStateOf(TAB_NOTES)
+
+    /** Which part of the Notes tab to land on when this closes. */
+    private var snippets = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -104,7 +106,6 @@ class NotesActivity : AppCompatActivity() {
         if (!intent.isReadable()) return finish()
         savedInstanceState?.let {
             editing.value = it.getString(STATE_EDITING)
-            tab.value = it.getInt(STATE_TAB)
         } ?: handle(intent)
         setContent { DeskLinkTheme(this) { org.desklink.mobile.ui.compose.SecureWindow(); Root() } }
     }
@@ -122,7 +123,6 @@ class NotesActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_EDITING, editing.value)
-        outState.putInt(STATE_TAB, tab.value)
     }
 
     private val pendingShare = mutableStateOf<Pair<String, String>?>(null)
@@ -132,7 +132,6 @@ class NotesActivity : AppCompatActivity() {
         val id = NotesStore.newNote(this, subject.lineSequence().first(), body)
         // A text that is too long is never cut without saying so.
         Toast.makeText(this, if (id == null) R.string.notes_full else if (cut) R.string.notes_saved_shared_cut else R.string.notes_saved_shared, if (cut) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
-        tab.value = TAB_NOTES
         editing.value = id
     }
 
@@ -142,16 +141,11 @@ class NotesActivity : AppCompatActivity() {
                 // Any app can send this intent: asked first (see Root), saved only on a yes.
                 pendingShare.value = org.desklink.mobile.plugins.share.ShareIntake.forNotes(intent) ?: return
             }
-            intent.getBooleanExtra(EXTRA_NEW, false) -> {
-                tab.value = TAB_NOTES
-                editing.value = NEW
-            }
-            intent.hasExtra(EXTRA_NOTE) -> {
-                tab.value = TAB_NOTES
-                editing.value = intent.getStringExtra(EXTRA_NOTE)
-            }
-            intent.getBooleanExtra(EXTRA_SNIPPETS, false) -> {
-                tab.value = TAB_SNIPPETS
+            intent.getBooleanExtra(EXTRA_NEW, false) -> editing.value = NEW
+            intent.hasExtra(EXTRA_NOTE) -> editing.value = intent.getStringExtra(EXTRA_NOTE)
+            // No note to edit: the Notes tab, on its Snippets segment if that was asked.
+            else -> {
+                snippets = intent.getBooleanExtra(EXTRA_SNIPPETS, false)
                 editing.value = null
             }
         }
@@ -169,55 +163,29 @@ class NotesActivity : AppCompatActivity() {
             )
         }
         val id = editing.value
+        // Nothing to edit, or the editor closed (and no share question open): the Notes tab, which is where the notes are listed.
+        LaunchedEffect(id, pendingShare.value) {
+            if (id == null && pendingShare.value == null) {
+                startActivity(org.desklink.mobile.ui.MainActivity.notesIntent(this@NotesActivity, snippets))
+                finish()
+            }
+        }
         if (id == null) {
-            Lists()
+            Box(Modifier.fillMaxSize().background(tokens.bg))
         } else {
             BackHandler { editing.value = null }
             androidx.compose.runtime.key(id) { Editor(id) { editing.value = null } }
         }
     }
 
-    // ---- lists --------------------------------------------------------------------------------------------
-
-    @Composable
-    private fun Lists() {
-        val t = tokens
-        Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-            ScreenHeader(::finish)
-            LargeTitle(stringResource(R.string.notes_title), subtitle = stringResource(R.string.notes_subtitle))
-            Tabs(tab.value) { tab.value = it }
-            Spacer(Modifier.height(12.dp))
-            Box(Modifier.weight(1f)) {
-                if (tab.value == TAB_NOTES) NotesList() else SnippetsList()
-            }
-        }
-    }
-
-    @Composable
-    private fun Tabs(selected: Int, onSelect: (Int) -> Unit) {
-        org.desklink.mobile.ui.compose.components.SegmentedControl(
-            listOf(stringResource(R.string.notes_tab_notes), stringResource(R.string.notes_tab_snippets)), selected, onSelect,
-            Modifier.padding(horizontal = 16.dp),
-        )
-    }
-
     private val ui by lazy { NotesUi(this, editing) }
-
-    @Composable
-    private fun NotesList() = ui.NotesList()
-
-    @Composable
-    private fun SnippetsList() = ui.SnippetsList()
 
     @Composable
     private fun Editor(id: String, onClose: () -> Unit) = ui.Editor(id, onDone = onClose)
 
     companion object {
         const val NEW = "\u0000new"
-        private const val TAB_NOTES = 0
-        private const val TAB_SNIPPETS = 1
         private const val STATE_EDITING = "editing"
-        private const val STATE_TAB = "tab"
         const val EXTRA_SNIPPETS = "snippets"
 
         const val EXTRA_NOTE = "note"

@@ -209,11 +209,15 @@ fun NotesTab(
     onClipboard: (Boolean) -> Unit,
     onSendClipboard: () -> Unit,
     onMessage: (String) -> Unit,
+    /** A segment asked for from outside (1 = Snippets); [onSegmentShown] says it was taken. */
+    segmentRequest: Int? = null,
+    onSegmentShown: () -> Unit = {},
 ) {
     org.desklink.mobile.ui.compose.SecureWindow()
     val t = tokens
     // Declared before the editor takes over, so the search and the segment are still there when it closes.
     var segment by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(segmentRequest) { segmentRequest?.let { segment = it; onSegmentShown() } }
     var query by rememberSaveable { mutableStateOf("") }
     val editing = notes.editing.value
     if (editing != null) {
