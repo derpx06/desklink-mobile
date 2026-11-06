@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -423,7 +425,8 @@ private fun SessionMenu(name: String, connected: Boolean, onRename: () -> Unit, 
 /** An explanation with at most one way forward. */
 @Composable
 private fun Notice(icon: Int, title: String, message: String, action: String? = null, onAction: () -> Unit = {}) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    // Scrolls: at the largest text the explanation and its button are taller than the screen, and a button squeezed under 48 dp is no target.
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
         EmptyState(icon, title, message) { if (action != null) SecondaryButton(action, onAction, tonal = true, height = 48.dp) }
     }
 }
