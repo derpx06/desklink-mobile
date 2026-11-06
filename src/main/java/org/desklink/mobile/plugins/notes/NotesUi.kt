@@ -257,6 +257,7 @@ class NotesUi(
         val t = tokens
         val revision by NotesStore.revision.collectAsState()
         val snippets = remember(revision, externalQuery) { NotesStore.snippets(host).filter { NotesModel.matches(it, externalQuery) } }
+        val haptics = org.desklink.mobile.ui.compose.components.rememberDeskHaptics()
         Column(Modifier.fillMaxSize()) {
             SecondaryButton(
                 stringResource(R.string.snippets_pin_clipboard),
@@ -278,7 +279,7 @@ class NotesUi(
                                     // Copy is the snippet's one tap; the label names the snippet for TalkBack.
                                     val copyLabel = stringResource(R.string.snippets_copy_named, snippet.label)
                                     Box(
-                                        Modifier.heightIn(min = 48.dp).clip(DeskLinkShape.stadium).clickable(role = Role.Button, onClickLabel = copyLabel) { copy(host, snippet.text) }.semantics { contentDescription = copyLabel },
+                                        Modifier.heightIn(min = 48.dp).clip(DeskLinkShape.stadium).clickable(role = Role.Button, onClickLabel = copyLabel) { copy(host, snippet.text); haptics.perform(org.desklink.mobile.ui.compose.components.Haptic.SUCCESS) }.semantics { contentDescription = copyLabel },
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
