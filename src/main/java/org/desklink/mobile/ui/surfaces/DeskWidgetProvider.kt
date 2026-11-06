@@ -21,7 +21,6 @@ import android.view.View
 import android.widget.RemoteViews
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.clipboard.ClipboardFloatingActivity
-import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.ui.MainActivity
 
 /**
@@ -117,7 +116,8 @@ class DeskWidgetProvider : AppWidgetProvider() {
                 }
             }
 
-            val terminals = Intent(context, TerminalActivity::class.java).putExtra(TerminalActivity.EXTRA_DEVICE_ID, desk?.id.orEmpty())
+            // The Terminals tab of the app, on this computer: the one list of terminals.
+            val terminals = MainActivity.terminalsIntent(context, desk?.id)
             if (large) views.setOnClickPendingIntent(R.id.widget_terminal_row, activity(context, 2, terminals))
             views.setOnClickPendingIntent(R.id.widget_terminals, activity(context, 2, terminals))
             views.setOnClickPendingIntent(R.id.widget_lock, action(context, DeskSurfaces.Action.LOCK, desk?.id))

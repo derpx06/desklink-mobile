@@ -535,7 +535,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         )
         FirstShareDialog(device)
         // Seen: opening the tab clears its dot.
-        LaunchedEffect(nav.selected, id) { if (nav.selected == AppTab.TERMINALS) TerminalAttentionBadge.clear(id) }
+        LaunchedEffect(nav.selected, id) {
+            if (nav.selected == AppTab.TERMINALS) {
+                TerminalAttentionBadge.clear(id)
+                // The widget's "finished" badge goes with the tab's dot: this is where the finished sessions are listed.
+                org.desklink.mobile.ui.surfaces.DeskSurfaces.clearFinished(this@MainActivity, id)
+            }
+        }
         TabsShell(nav, badges, onQuickAction = { quickAction(it, device) }) { tab ->
             when (tab) {
                 AppTab.HOME -> HomeTab(device, paired)
