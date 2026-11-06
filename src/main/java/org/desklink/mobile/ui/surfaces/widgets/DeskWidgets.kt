@@ -37,7 +37,7 @@ import java.util.concurrent.Executors
  * (30 minutes, which also corrects a picture left behind by a killed process), and each draw reads the live state.
  */
 object DeskWidgets {
-    private val family: List<FamilyWidget> = listOf(ComputerStatusWidget(), QuickActionsWidget(), NotesWidget(), TransfersWidget())
+    private val family: List<FamilyWidget> = listOf(ComputerStatusWidget(), QuickActionsWidget(), NotesWidget(), TransfersWidget(), TerminalsWidget())
 
     /** The phone's screen went off and no one has unlocked it since: notes stay hidden even before the keyguard says so. */
     @Volatile

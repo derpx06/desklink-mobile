@@ -18,4 +18,7 @@
   log errors only.
 - Security: other apps can no longer make the phone send to the computer unasked or read its private data; strangers on the
   Wi-Fi are limited like on the computer; unpairing forgets everything held for that computer.
+- Home-screen widgets: computer status, quick actions (screen, files, clipboard, ring, lock), notes (titles hidden while the
+  phone is locked), transfers and a new-terminal launcher (only where terminal access is on); they follow the wallpaper
+  colours on Android 12 and newer and say plainly when the computer cannot be reached.
 - Removed: browsing the phone's files, the presentation remote, Bluetooth.

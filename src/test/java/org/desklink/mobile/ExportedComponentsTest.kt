@@ -26,7 +26,7 @@ class ExportedComponentsTest {
     fun theOnlyExportedReceiversAreTheMediaButtonAndTheHomeWidgets() {
         // The widget providers are exported like the first one: they only redraw from the live state (the launcher's update broadcast
         // carries nothing they act on), and their buttons go through the non-exported receiver and WidgetActionActivity.
-        val widgets = setOf("DeskWidgetProvider", "ComputerStatusWidget", "QuickActionsWidget", "NotesWidget", "TransfersWidget")
+        val widgets = setOf("DeskWidgetProvider", "ComputerStatusWidget", "QuickActionsWidget", "NotesWidget", "TransfersWidget", "TerminalsWidget")
         assertEquals(setOf("MprisMediaNotificationReceiver") + widgets, exportedReceivers() - "ProfileInstallReceiver" /* androidx, guarded by its own permission */)
     }
 
