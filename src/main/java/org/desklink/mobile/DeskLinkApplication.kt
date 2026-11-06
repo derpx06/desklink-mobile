@@ -120,6 +120,8 @@ class DeskLinkApplication : Application() {
         // The crash-loop times are read here, off the main thread, so the service's safe-mode check answers from memory.
         org.desklink.mobile.helpers.CrashLoop.preload(this)
         org.desklink.mobile.helpers.AppLog.init(this)
+        // The Notes widget hides its titles when the screen goes off and shows them after unlock.
+        org.desklink.mobile.ui.surfaces.widgets.DeskWidgets.watchLock(this)
         // Hidden, no settings row; inert while OFF_LAN_PAIRING_COMPILED is false (see PairingTransport).
         org.desklink.mobile.backends.PairingTransport.requested = runCatching {
             android.preference.PreferenceManager.getDefaultSharedPreferences(this)

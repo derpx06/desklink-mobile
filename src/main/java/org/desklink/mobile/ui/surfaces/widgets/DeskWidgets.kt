@@ -6,12 +6,15 @@
 
 package org.desklink.mobile.ui.surfaces.widgets
 
+import android.app.KeyguardManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.text.format.DateUtils
@@ -34,7 +37,12 @@ import java.util.concurrent.Executors
  * (30 minutes, which also corrects a picture left behind by a killed process), and each draw reads the live state.
  */
 object DeskWidgets {
-    private val family: List<FamilyWidget> = listOf(ComputerStatusWidget(), QuickActionsWidget())
+    private val family: List<FamilyWidget> = listOf(ComputerStatusWidget(), QuickActionsWidget(), NotesWidget())
+
+    /** The phone's screen went off and no one has unlocked it since: notes stay hidden even before the keyguard says so. */
+    @Volatile
+    var screenOff = false
+        private set
 
     /** Redraws every placed widget of the family. Cheap when there are none. */
     fun updateAll(context: Context) {
@@ -45,12 +53,29 @@ object DeskWidgets {
         placed.forEach { (widget, ids) -> widget.update(context, manager, ids, facts) }
     }
 
+    /** Hides the notes at once when the screen goes off and shows them again when the phone is unlocked. */
+    fun watchLock(app: Context) {
+        val filter = IntentFilter().apply { addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT) }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                screenOff = intent.action == Intent.ACTION_SCREEN_OFF
+                runCatching { NotesWidget.redraw(context) }
+            }
+        }
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) app.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED) else app.registerReceiver(receiver, filter)
+        }
+    }
+
     private const val WORKER = "desklink-widgets"
     private val worker = Executors.newSingleThreadExecutor { Thread(it, WORKER).apply { isDaemon = true } }
 
     internal fun onWorker() = Thread.currentThread().name == WORKER
 
     internal fun background(job: () -> Unit) = worker.execute { runCatching(job) }
+
+    internal fun locked(context: Context): Boolean =
+        screenOff || context.getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
 
     // ---- taps ---------------------------------------------------------------------------------
 

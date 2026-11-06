@@ -88,6 +88,8 @@ object NotesStore {
                 if (current.notes.keys.any { Shelf.copyBase(it) != null }) tidied = current.removeDuplicates(false, System.currentTimeMillis())
                 saveSoon()
                 _revision.value++
+                // The Notes widget lists the newest titles.
+                org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
             }
             result
         }

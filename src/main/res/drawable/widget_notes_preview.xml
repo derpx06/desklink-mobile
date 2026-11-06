@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notes. The widget picker's picture before Android 12 (12+ draws the layout itself); the colours are the DeskLink tokens, which is what those versions use. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="160dp" android:height="160dp" android:left="0dp" android:top="0dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_bg" /><corners android:radius="24dp" /></shape>
+    </item>
+    <item android:width="58dp" android:height="12dp" android:left="14dp" android:top="18dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_text" /><corners android:radius="6dp" /></shape>
+    </item>
+    <item android:width="40dp" android:height="40dp" android:left="106dp" android:top="10dp">
+        <shape android:shape="oval"><solid android:color="@color/widget_accent" /><corners android:radius="20dp" /></shape>
+    </item>
+    <item android:width="110dp" android:height="10dp" android:left="14dp" android:top="62dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_text" /><corners android:radius="5dp" /></shape>
+    </item>
+    <item android:width="90dp" android:height="10dp" android:left="14dp" android:top="90dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_text" /><corners android:radius="5dp" /></shape>
+    </item>
+    <item android:width="100dp" android:height="10dp" android:left="14dp" android:top="118dp">
+        <shape android:shape="rectangle"><solid android:color="@color/widget_text" /><corners android:radius="5dp" /></shape>
+    </item>
+</layer-list>

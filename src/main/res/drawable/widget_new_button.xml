@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The filled round "+" of the Notes widget: 48 dp to touch, a 36 dp disc to see. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="@color/widget_button_bg">
+    <item>
+        <inset android:inset="6dp">
+            <shape android:shape="oval">
+                <solid android:color="@color/widget_accent" />
+            </shape>
+        </inset>
+    </item>
+</ripple>
