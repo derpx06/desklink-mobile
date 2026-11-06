@@ -410,7 +410,7 @@ fun TerminalsContent(
 private fun SessionMenu(name: String, connected: Boolean, onRename: () -> Unit, onEnd: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }, modifier = Modifier.size(40.dp)) {
+        IconButton(onClick = { open = true }, modifier = Modifier.size(48.dp)) {
             Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.terminal_session_options, name), tint = Color(0xFFA1A5AE))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {

@@ -25,7 +25,15 @@ import org.desklink.mobile.ui.compose.screen.settings.SettingsPage
 import org.desklink.mobile.ui.compose.screen.settings.SettingsTab
 import org.desklink.mobile.ui.compose.screen.tabs.FilesTab
 import org.desklink.mobile.ui.compose.screen.tabs.NotesTab
+import org.desklink.mobile.ui.compose.components.SessionPreview
+import org.desklink.mobile.ui.compose.screen.tabs.TerminalsActions
+import org.desklink.mobile.ui.compose.screen.tabs.TerminalsContent
+import org.desklink.mobile.ui.compose.screen.tabs.TerminalsPanel
 import org.desklink.mobile.ui.compose.screen.tabs.TerminalsTab
+import org.desklink.mobile.webrtc.SessionPasswordDenial
+import org.desklink.mobile.webrtc.terminal.TerminalClientState
+import org.desklink.mobile.webrtc.terminal.TerminalLinkState
+import org.desklink.mobile.webrtc.terminal.TerminalSessionState
 import org.desklink.mobile.ui.compose.screen.transfers.TransferActions
 import org.junit.Before
 import org.junit.Test
@@ -239,7 +247,42 @@ abstract class ScreenShots : ShotTest() {
         }
     }
 
-    @Test fun terminalsTab() = shoot("terminals") { TerminalsTab("d1", desk, onOpenSession = {}, onOpenTerminals = {}, onNew = {}) }
+    // The Terminals tab is the one list of terminals: every state it can be in.
+    @Test fun terminalsTab() = shoot("terminals") { TerminalsTab("d1", desk, onOpenSession = {}, onNewTerminal = { _, _ -> }) }
+
+    private fun session(id: String, title: String, cwd: String? = null, attached: Boolean = false, exit: Long? = null, gone: Boolean = false, elsewhere: Boolean = false) =
+        TerminalSessionState(id, title, 24, 80, exit, attached, attached, gone, attachedElsewhere = elsewhere, cwd = cwd, shell = "zsh")
+
+    private fun terminals(panel: TerminalsPanel, state: TerminalClientState, previews: Map<String, SessionPreview> = emptyMap(), labels: Map<String, String> = emptyMap()) =
+        @androidx.compose.runtime.Composable { TerminalsContent(desk, panel, state, previews, labels, TerminalsActions()) }
+
+    private val connected = TerminalClientState(link = TerminalLinkState.CONNECTED, listLoaded = true, launchers = listOf("claude", "codex"), folders = listOf("~", "~/code"))
+    private val sessions = listOf(
+        session("s1", "claude", attached = true),
+        session("s2", "", cwd = "~/code/desklink", elsewhere = true),
+        session("s3", "", cwd = "~", exit = 1),
+        session("s4", "codex", gone = true),
+    )
+
+    @Test fun terminalsList() = shoot(
+        "terminals-list",
+        terminals(
+            TerminalsPanel.LIST, connected.copy(sessions = sessions),
+            previews = mapOf(
+                "s1" to SessionPreview("s1", "Claude Code", "CC", true, listOf("Do you want to proceed?", "❯ 1. Yes"), "80×24", waiting = true),
+                "s2" to SessionPreview("s2", "~/code/desklink", ">_", true, listOf("BUILD SUCCESSFUL in 42s", "$ "), "80×24"),
+            ),
+            labels = mapOf("s2" to "Build"),
+        ),
+    )
+
+    @Test fun terminalsEmpty() = shoot("terminals-empty", terminals(TerminalsPanel.LIST, connected))
+    @Test fun terminalsReconnecting() = shoot("terminals-reconnecting", terminals(TerminalsPanel.LIST, connected.copy(link = TerminalLinkState.DISCONNECTED, sessions = sessions.take(2))))
+    @Test fun terminalsLoading() = shoot("terminals-loading", terminals(TerminalsPanel.LOADING, TerminalClientState()))
+    @Test fun terminalsNotAllowed() = shoot("terminals-not-allowed", terminals(TerminalsPanel.NOT_ALLOWED, connected.copy(notAllowed = true)))
+    @Test fun terminalsPasswordNeeded() = shoot("terminals-password", terminals(TerminalsPanel.LOCKED, connected.copy(passwordNeeded = SessionPasswordDenial.Required)))
+    @Test fun terminalsLockedOut() = shoot("terminals-locked-out", terminals(TerminalsPanel.LOCKED, connected.copy(passwordNeeded = SessionPasswordDenial.Locked(45))))
+    @Test fun terminalsPhoneCheck() = shoot("terminals-gate", terminals(TerminalsPanel.GATE, TerminalClientState()))
 }
 
 @RunWith(RobolectricTestRunner::class)
