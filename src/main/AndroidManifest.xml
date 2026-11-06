@@ -543,6 +543,17 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_notes_info" />
         </receiver>
+        <receiver
+            android:name="org.desklink.mobile.ui.surfaces.widgets.TransfersWidget"
+            android:exported="true"
+            android:label="@string/widget_transfers_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_transfers_info" />
+        </receiver>
 
         <activity
             android:name="org.desklink.mobile.ui.surfaces.widgets.WidgetActionActivity"
