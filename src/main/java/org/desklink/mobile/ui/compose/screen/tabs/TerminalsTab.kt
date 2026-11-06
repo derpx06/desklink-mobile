@@ -60,7 +60,7 @@ import org.desklink.mobile.plugins.terminal.NewTerminalSheet
 import org.desklink.mobile.plugins.terminal.TerminalRenameDialog
 import org.desklink.mobile.ui.SessionGate
 import org.desklink.mobile.ui.compose.DeskTextButton
-import org.desklink.mobile.ui.compose.PrimaryButton
+import org.desklink.mobile.ui.compose.SecondaryButton
 import org.desklink.mobile.ui.compose.SessionPasswordDialog
 import org.desklink.mobile.ui.compose.components.DeskSearchField
 import org.desklink.mobile.ui.compose.components.EmptyState
@@ -424,7 +424,7 @@ private fun SessionMenu(name: String, connected: Boolean, onRename: () -> Unit, 
 @Composable
 private fun Notice(icon: Int, title: String, message: String, action: String? = null, onAction: () -> Unit = {}) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        EmptyState(icon, title, message) { if (action != null) PrimaryButton(action, onAction, height = 48.dp) }
+        EmptyState(icon, title, message) { if (action != null) SecondaryButton(action, onAction, tonal = true, height = 48.dp) }
     }
 }
 
