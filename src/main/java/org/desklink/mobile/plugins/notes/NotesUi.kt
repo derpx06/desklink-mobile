@@ -119,6 +119,8 @@ internal val CappedText: androidx.compose.runtime.saveable.Saver<String, Any> = 
 class NotesUi(
     private val host: ComponentActivity,
     val editing: androidx.compose.runtime.MutableState<String?>,
+    /** Shows [message] with an Undo that runs `undo`; null where there is no snackbar (the full-screen Notes activity). */
+    private val undoable: ((message: String, undo: () -> Unit) -> Unit)? = null,
 ) {
     /**
      * The notes. [externalQuery] is the Notes tab's own search field (it searches notes and snippets together); without one the
@@ -281,7 +283,16 @@ class NotesUi(
                                             modifier = Modifier.background(t.accentContainer, DeskLinkShape.stadium).heightIn(min = 32.dp).padding(horizontal = 14.dp, vertical = 6.dp),
                                         )
                                     }
-                                    IconButton(onClick = { NotesStore.deleteSnippet(host, snippet.id) }, modifier = Modifier.size(48.dp)) {
+                                    val deletedText = stringResource(R.string.snippets_deleted)
+                    IconButton(
+                        onClick = {
+                            val text = snippet.text
+                            NotesStore.deleteSnippet(host, snippet.id)
+                            // Undo pins the same text again (a snippet is its text: nothing else is lost).
+                            undoable?.invoke(deletedText) { NotesStore.pin(host, text) }
+                        },
+                        modifier = Modifier.size(48.dp),
+                    ) {
                                         Icon(painterResource(R.drawable.sym_delete), contentDescription = stringResource(R.string.snippets_delete, snippet.label), tint = t.textDim)
                                     }
                                 }
@@ -388,11 +399,20 @@ class NotesUi(
                 }
                 IconButton(
                     onClick = {
+                        val (oldTitle, oldBody, oldPinned) = Triple(title, body, pinned)
                         val gone = id?.let { NotesStore.deleteNote(context, it, loaded = shown) } ?: true
                         NoteDrafts.clear(NoteDrafts.key(id))
                         dirty = false
                         // A newer version from the desk beats the delete: say so instead of "Note deleted".
-                        Toast.makeText(context, if (gone) R.string.notes_deleted else R.string.notes_delete_kept, Toast.LENGTH_SHORT).show()
+                        val undo = undoable
+                        if (gone && undo != null && id != null && (oldTitle.isNotBlank() || oldBody.isNotBlank())) {
+                            // Undo makes the note again (a new one, same words and pin); the desk gets it as a new note.
+                            undo(host.getString(R.string.notes_deleted)) {
+                                NotesStore.newNote(host, oldTitle, oldBody)?.let { back -> if (oldPinned) NotesStore.editNote(host, back) { it.copy(pinned = true) } }
+                            }
+                        } else {
+                            Toast.makeText(context, if (gone) R.string.notes_deleted else R.string.notes_delete_kept, Toast.LENGTH_SHORT).show()
+                        }
                         onDone()
                     },
                     modifier = Modifier.size(48.dp),

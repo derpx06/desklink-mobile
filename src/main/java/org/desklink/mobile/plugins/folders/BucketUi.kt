@@ -708,9 +708,10 @@ class BucketUi(
             if (waiting) {
                 Text(stringResource(R.string.bucket_asking, desk), fontSize = 14.sp, color = t.textDim)
             } else {
-                Text(stringResource(R.string.bucket_pick_hint), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
+                // The button first, the one-time folder note after it as a caption: what to do before how it works.
                 PrimaryButton(stringResource(R.string.bucket_turn_on), onTurnOn, icon = R.drawable.sym_inventory, height = 48.dp, modifier = Modifier.fillMaxWidth())
                 if (offered) SecondaryButton(stringResource(R.string.bucket_not_now), onDecline, height = 48.dp, modifier = Modifier.fillMaxWidth())
+                Text(stringResource(R.string.bucket_pick_hint), fontSize = 12.sp, lineHeight = 17.sp, color = t.textDim)
             }
         }
     }

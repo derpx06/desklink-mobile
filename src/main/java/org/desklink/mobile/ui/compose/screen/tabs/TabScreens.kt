@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
@@ -112,10 +113,12 @@ fun FilesTab(
     val t = tokens
     var showAll by rememberSaveable { mutableStateOf(false) }
     var filter by rememberSaveable { mutableIntStateOf(0) }
-    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
+    val collapse = org.desklink.mobile.ui.compose.components.rememberHeaderCollapse()
+    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().nestedScroll(collapse.connection)) {
         LargeTitle(
             stringResource(R.string.files_title),
             Modifier.padding(top = 12.dp),
+            collapse = collapse.fraction,
             subtitle = if (savedIn.isNotEmpty()) stringResource(R.string.files_saved_in, savedIn) else stringResource(R.string.files_subtitle),
         ) {
             // Also in the Bucket card: this one stays so that sending is one tap away with the Bucket off, too.
@@ -224,8 +227,9 @@ fun NotesTab(
         }
         return
     }
-    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-        LargeTitle(stringResource(R.string.notes_title), Modifier.padding(top = 12.dp), subtitle = stringResource(R.string.notes_subtitle)) {
+    val collapse = org.desklink.mobile.ui.compose.components.rememberHeaderCollapse()
+    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().nestedScroll(collapse.connection)) {
+        LargeTitle(stringResource(R.string.notes_title), Modifier.padding(top = 12.dp), subtitle = stringResource(R.string.notes_subtitle), collapse = collapse.fraction) {
             ClipboardSwitch(clipboardOn, onClipboard)
         }
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

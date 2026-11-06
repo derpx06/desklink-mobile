@@ -190,7 +190,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     /** Bumped by the Home tab's long-press: opens the computers sheet. */
     private var computersRequest by mutableIntStateOf(0)
     private val bucketUi by lazy { BucketUi(this) }
-    private val notesUi by lazy { NotesUi(this, notesEditing) }
+    private val notesUi by lazy { NotesUi(this, notesEditing, undoable = ::showUndo) }
     private var selectedId by mutableStateOf<String?>(null)
     private var tick by mutableIntStateOf(0)
     private val snackbar = SnackbarHostState()
@@ -366,6 +366,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         lifecycleScope.launch { snackbar.showSnackbar(message) }
     }
 
+    /** A message with an Undo: [undo] runs if it is tapped within the snackbar's time (long: it is a decision being reversed). */
+    fun showUndo(message: String, undo: () -> Unit) {
+        lifecycleScope.launch {
+            val result = snackbar.showSnackbar(message, actionLabel = getString(R.string.undo), duration = androidx.compose.material3.SnackbarDuration.Long)
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) undo()
+        }
+    }
+
     /**
      * Keeps the selection on a paired computer (the last one picked, else the first), switches to
      * a newly paired one, and opens the pairing screen when a computer asks to pair.
@@ -421,12 +429,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 SplashScreen(paired.firstOrNull { it.deviceId == selectedId }?.name ?: paired.firstOrNull()?.name.orEmpty())
             }
             // Above the tab bar when it is showing.
-            SnackbarHost(
+            // The design's inverse snackbar: its action is the opposite theme's accent (the app's accent is 1.7:1 on it).
+            org.desklink.mobile.ui.compose.components.DeskSnackbarHost(
                 snackbar,
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (onTabs && !isWide()) 16.dp + TabBarHeight else 16.dp),
-            ) { data ->
-                Snackbar(data, containerColor = tokens.inverse, contentColor = tokens.onInverse, actionColor = tokens.accent)
-            }
+            )
         }
     }
 
