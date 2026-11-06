@@ -120,8 +120,10 @@ class TerminalScreen(
             filterLocked(data)
             (changedLocked to settledLocked).also { changedLocked = false; settledLocked = false }
         }
-        // Not while a frame is being held: the screen is exactly what it was, and a draw would be a wasted one.
-        if (changed) listener?.onScreenChanged(settled)
+        // Not while a frame is being held (the screen is exactly what it was, a draw would be wasted), and
+        // not while history is replayed: that is every frame the program drew, fast-forwarded. The
+        // screen is shown once, when the replay ends.
+        if (changed && !quiet) listener?.onScreenChanged(settled) else if (changed) replayed = true
         observer?.onOutput(this)
     }
 
@@ -264,7 +266,15 @@ class TerminalScreen(
 
     override fun setReplaying(replaying: Boolean) {
         quiet = replaying
+        if (!replaying && replayed) {
+            replayed = false
+            listener?.onScreenChanged(true)
+        }
     }
+
+    /** Output landed while [quiet]: the view has not been told. */
+    @Volatile
+    private var replayed = false
 
     override fun resize(rows: Int, cols: Int) {
         val changed = synchronized(lock) {

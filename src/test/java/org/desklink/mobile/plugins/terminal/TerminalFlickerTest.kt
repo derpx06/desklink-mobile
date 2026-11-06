@@ -180,4 +180,53 @@ class TerminalFlickerTest {
         assertEquals("a frame that never ends is shown after a moment", listOf(false, true), l.calls)
         assertEquals("abchalf", s.tailText(5).trim())
     }
+
+    // ---- opening a terminal replays its history -----------------------------------------------------
+
+    /**
+     * Opening a terminal asks the desk for everything since offset 0 (up to a 256 KiB ring: dozens of
+     * repaints), sent at 64 KiB per 8 ms pump. The screen used to be drawn along the way: a fast-forward
+     * of old frames, some of them half drawn. Returns (draws, draws that were not the final screen).
+     */
+    private fun replay(holdWhileReplaying: Boolean, pacer: TerminalFramePacer): Pair<Int, Int> {
+        val history = FlickerSim.inkErase(40).fold(ByteArray(0)) { a, b -> a + b }
+        val final = TerminalScreen(40, 120, reply = {}).also { it.write(history) }.let { TerminalGrid.grid(it) }
+        val screen = TerminalScreen(40, 120, reply = {})
+        var clock = 0.0
+        screen.listener = object : TerminalScreen.Listener {
+            override fun onScreenChanged(settled: Boolean) = pacer.changed(clock.toLong(), settled)
+            override fun onSnapshot() = Unit
+            override fun onBell() = Unit
+        }
+        if (holdWhileReplaying) screen.setReplaying(true)
+        val pieces = history.toList().chunked(16 * 1024).map { it.toByteArray() }
+        var draws = 0
+        var wrong = 0
+        var next = 0
+        var v = FlickerSim.VSYNC_MS
+        while (v < 400) {
+            // 64 KiB per 8 ms pump tick = four 16 KiB chunks.
+            while (next < pieces.size && next / 4 * 8.0 <= v) {
+                clock = next / 4 * 8.0
+                screen.write(pieces[next++])
+                if (next == pieces.size && holdWhileReplaying) screen.setReplaying(false)
+            }
+            if (pacer.due(v.toLong())) {
+                draws++
+                if (TerminalGrid.grid(screen) != final) wrong++
+            }
+            v += FlickerSim.VSYNC_MS
+        }
+        return draws to wrong
+    }
+
+    @Test
+    fun aReplayIsShownOnceAsTheFinalScreen() {
+        val before = replay(false, TerminalFramePacer.legacy())
+        val beforePaced = replay(false, TerminalFramePacer())
+        val after = replay(true, TerminalFramePacer())
+        println("replay of 40 repaints (draws, draws that were not the final screen): legacy=$before settled-only=$beforePaced held=$after")
+        assertTrue("it used to fast-forward through old frames: $before", before.second > 0)
+        assertEquals("held: one draw, the final screen", 1 to 0, after)
+    }
 }

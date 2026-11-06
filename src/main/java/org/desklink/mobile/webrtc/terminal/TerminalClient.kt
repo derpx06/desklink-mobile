@@ -701,7 +701,12 @@ class TerminalClient(
         listLoaded = false
         unproven = null
         pendingCreate = null
-        sessions.values.forEach { it.attached = false; it.awaitingAttach = false }
+        sessions.values.forEach {
+            it.attached = false
+            it.awaitingAttach = false
+            // A replay cut off by the link going down must not leave the screen unshown.
+            sinks[it.id]?.setReplaying(false)
+        }
         pendingInput.clear()
         pendingInputBytes = 0
         publish()
