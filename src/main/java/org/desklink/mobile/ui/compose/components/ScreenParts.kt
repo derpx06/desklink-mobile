@@ -31,6 +31,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -87,15 +93,74 @@ fun ScreenHeader(onBack: () -> Unit, modifier: Modifier = Modifier, tint: Color 
     }
 }
 
-/** The big title under [ScreenHeader] (28/500), with a dim line below it. */
-@Composable
-fun LargeTitle(title: String, modifier: Modifier = Modifier, subtitle: String? = null, trailing: @Composable RowScope.() -> Unit = {}) {
-    Row(modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Medium, letterSpacing = (-0.3).sp, modifier = Modifier.semantics { heading() })
-            subtitle?.let { Text(it, fontSize = 13.sp, color = tokens.textDim) }
+/**
+ * How far a tab's big title has folded away while its list scrolls: 0 (whole) to 1 (small title, no subtitle). Scrolling up folds
+ * it before the list moves, scrolling back down unfolds it once the list is at its top: the top bar of the tab roots.
+ * Hand [connection] to `Modifier.nestedScroll` on the screen's root and [fraction] to [LargeTitle].
+ */
+@androidx.compose.runtime.Stable
+class HeaderCollapse(private val maxPx: Float) {
+    private var offset by androidx.compose.runtime.mutableFloatStateOf(0f)
+    val fraction: Float get() = if (maxPx <= 0f) 0f else (-offset / maxPx).coerceIn(0f, 1f)
+
+    val connection = object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+        override fun onPreScroll(available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+            if (available.y >= 0f || offset <= -maxPx) return Offset.Zero
+            val next = (offset + available.y).coerceAtLeast(-maxPx)
+            val used = next - offset
+            offset = next
+            return Offset(0f, used)
         }
-        trailing()
+
+        override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+            if (available.y <= 0f || offset >= 0f) return Offset.Zero
+            val next = (offset + available.y).coerceAtMost(0f)
+            val used = next - offset
+            offset = next
+            return Offset(0f, used)
+        }
+    }
+
+    /** What a finger needs to travel to fold the title completely. */
+    companion object {
+        const val DISTANCE_DP = 56
+    }
+}
+
+@Composable
+fun rememberHeaderCollapse(): HeaderCollapse {
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { HeaderCollapse.DISTANCE_DP.dp.toPx() }
+    return remember(px) { HeaderCollapse(px) }
+}
+
+/**
+ * The big title of a tab (30 sp, 22 sp once [collapse] is 1) and its trailing control, then a dim line full width under both
+ * (it folds away with [collapse]). The row is as tall as its tallest part, so a 48 dp control sets it and a small chip does not.
+ */
+@Composable
+fun LargeTitle(title: String, modifier: Modifier = Modifier, subtitle: String? = null, collapse: Float = 0f, trailing: @Composable RowScope.() -> Unit = {}) {
+    val size = (30f - 8f * collapse).sp
+    Column(modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 14.dp - (6 * collapse).dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                title, fontSize = size, lineHeight = size * 1.2f, fontWeight = FontWeight.Medium, letterSpacing = (-0.3).sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+            trailing()
+        }
+        if (subtitle != null) {
+            Text(
+                subtitle, fontSize = 13.sp, lineHeight = 18.sp, color = tokens.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                // Folds by height and fades, so the list below moves up with the finger instead of jumping.
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val h = (placeable.height * (1f - collapse)).roundToInt()
+                        layout(placeable.width, h) { placeable.placeWithLayer(0, 0) { alpha = 1f - collapse } }
+                    },
+            )
+        }
     }
 }
 
@@ -135,8 +200,9 @@ fun GroupRow(
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val t = tokens
+    val haptics = rememberDeskHaptics()
     val action = when {
-        checked != null && onClick != null -> Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch) { onClick() }
+        checked != null && onClick != null -> Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch) { haptics.toggle(!checked); onClick() }
         onClick != null -> Modifier.clickable(enabled = enabled, onClick = onClick)
         // A switch the phone only shows (set at the desk): still announced as a switch, and as off or on.
         checked != null -> Modifier.toggleable(value = checked, enabled = false, role = Role.Switch) {}

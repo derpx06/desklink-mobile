@@ -7,14 +7,14 @@
 package org.desklink.mobile.ui.compose.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -24,11 +24,19 @@ import org.desklink.mobile.R
 import org.desklink.mobile.webrtc.WebRtcConnectionPath
 import org.desklink.mobile.webrtc.WebRtcConnectionStats
 
-/** Haptics for a primary action: a light tick, or the confirm/reject patterns where they apply. */
+/** A list that is dragged hides the keyboard, as the platform's own lists do; focus and the cursor stay where they were. */
 @Composable
-fun rememberHaptics(): (HapticFeedbackType) -> Unit {
-    val haptics = LocalHapticFeedback.current
-    return remember(haptics) { { type -> haptics.performHapticFeedback(type) } }
+fun Modifier.dismissKeyboardOnScroll(): Modifier {
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val connection = remember(keyboard) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput && available.y != 0f) keyboard?.hide()
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    return nestedScroll(connection)
 }
 
 /**

@@ -34,7 +34,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,6 +83,8 @@ fun StatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp) {
 @Composable
 fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val t = tokens
+    val haptics = rememberDeskHaptics()
+    val ms = if (rememberReducedMotion()) 0 else 160
     CappedFontScale(1.3f) {
         Row(
             modifier.fillMaxWidth().selectableGroup().background(t.fill, RoundedCornerShape(30.dp)).padding(4.dp),
@@ -87,20 +92,24 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
         ) {
             options.forEachIndexed { i, label ->
                 val on = i == selected
+                // The selected segment's fill, edge and word fade over 160 ms instead of snapping.
+                val fill by animateColorAsState(if (on) (if (t.isDark) t.accentContainer else t.surface) else Color.Transparent, tween(ms), label = "segment-fill")
+                val edge by animateColorAsState(if (on) (if (t.isDark) t.accentText else t.hairlineStrong) else Color.Transparent, tween(ms), label = "segment-edge")
+                val ink by animateColorAsState(if (on) (if (t.isDark) t.onAccentContainer else t.text) else t.textDim, tween(ms), label = "segment-ink")
                 Box(
                     Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(if (on) (if (t.isDark) t.accentContainer else t.surface) else Color.Transparent)
-                        .then(if (on) Modifier.border(1.dp, if (t.isDark) t.accentText else t.hairlineStrong, RoundedCornerShape(24.dp)) else Modifier)
-                        .selectable(selected = on, role = Role.Tab, onClick = { onSelect(i) })
+                        .background(fill)
+                        .border(1.dp, edge, RoundedCornerShape(24.dp))
+                        .selectable(selected = on, role = Role.Tab, onClick = { if (!on) haptics.perform(Haptic.TICK); onSelect(i) })
                         .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         label, fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal,
-                        color = if (on) (if (t.isDark) t.onAccentContainer else t.text) else t.textDim,
+                        color = ink,
                         textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -114,17 +123,21 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
 fun DeskFilterChip(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val t = tokens
     val shape = RoundedCornerShape(18.dp)
+    val haptics = rememberDeskHaptics()
+    val ms = if (rememberReducedMotion()) 0 else 160
+    val fill by animateColorAsState(if (selected) t.accentContainer else Color.Transparent, tween(ms), label = "chip-fill")
+    val edge by animateColorAsState(if (selected) Color.Transparent else t.hairlineStrong, tween(ms), label = "chip-edge")
     Box(
         // The touch target is the node's own size, so the minimum goes inside the selectable, not around it.
-        modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick).minimumInteractiveComponentSize(),
+        modifier.selectable(selected = selected, role = Role.RadioButton, onClick = { if (!selected) haptics.perform(Haptic.TICK); onClick() }).minimumInteractiveComponentSize(),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier
                 .heightIn(min = 36.dp)
                 .clip(shape)
-                .background(if (selected) t.accentContainer else Color.Transparent)
-                .border(1.dp, if (selected) Color.Transparent else t.hairlineStrong, shape)
+                .background(fill)
+                .border(1.dp, edge, shape)
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -184,12 +197,13 @@ fun QuickActionTile(
 ) {
     val t = tokens
     val source = remember { MutableInteractionSource() }
+    val haptics = rememberDeskHaptics()
     Column(
         modifier
             .pressScale(source)
             .clip(RoundedCornerShape(12.dp))
             .clickable(interactionSource = source, indication = ripple(), enabled = enabled || onDisabledClick != null, role = Role.Button) {
-                if (enabled) onClick() else onDisabledClick?.invoke()
+                if (enabled) onClick() else { haptics.perform(Haptic.FAILURE); onDisabledClick?.invoke() }
             }
             .heightIn(min = 48.dp)
             .padding(horizontal = 2.dp),
@@ -226,6 +240,7 @@ fun ActionTile(
     val t = tokens
     val shape = DeskLinkShape.card
     val source = remember { MutableInteractionSource() }
+    val haptics = rememberDeskHaptics()
     val filled = primary && enabled
     val fg = when {
         filled -> t.onAccent
@@ -240,10 +255,11 @@ fun ActionTile(
             .background(if (filled) t.accent else t.surface)
             .then(if (filled) Modifier else Modifier.border(1.dp, t.hairline, shape))
             .clickable(interactionSource = source, indication = ripple(), enabled = enabled || onDisabledClick != null, role = Role.Button) {
-                if (enabled) onClick() else onDisabledClick?.invoke()
+                if (enabled) onClick() else { haptics.perform(Haptic.FAILURE); onDisabledClick?.invoke() }
             }
             .padding(12.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
+        // Icon, then the word, always at the same height: a tile whose word wraps or has a hint must not move its neighbours' words.
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(
             painterResource(icon), contentDescription = null,
@@ -266,8 +282,10 @@ fun ActionTile(
 /** A linear progress bar: 6 dp, [progress] 0..1, the percentage belongs in the text next to it. */
 @Composable
 fun DeskProgressBar(progress: Float, modifier: Modifier = Modifier, color: Color = tokens.accent, track: Color = tokens.surface2) {
-    val p = progress.coerceIn(0f, 1f)
-    Box(modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(track).progressSemantics(p)) {
+    val target = progress.coerceIn(0f, 1f)
+    // Glides to each new value; still with "Remove animations".
+    val p by androidx.compose.animation.core.animateFloatAsState(target, androidx.compose.animation.core.tween(if (rememberReducedMotion()) 0 else 300), label = "progress")
+    Box(modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(track).progressSemantics(target)) {
         Box(Modifier.fillMaxWidth(p).height(6.dp).background(color, RoundedCornerShape(3.dp)))
     }
 }

@@ -182,24 +182,25 @@ private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: 
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SectionLabel(stringResource(R.string.settings_quick_switches))
                 RowGroup {
+                    // One short line each: what a switch does is on its page, the list is for flipping them.
                     GroupRow(
-                        stringResource(R.string.settings_phone_clipboard), icon = R.drawable.sym_content_paste,
-                        subtitle = if (desk.clipboardOn) clipboardSummary(desk.name) else stringResource(R.string.home_clipboard_off),
+                        stringResource(R.string.settings_quick_clipboard), icon = R.drawable.sym_content_paste,
+                        subtitle = if (desk.clipboardOn) stringResource(R.string.settings_quick_clipboard_on, desk.name) else stringResource(R.string.home_clipboard_off),
                         checked = desk.clipboardOn, onClick = { actions.onPhoneClipboard(!desk.clipboardOn) },
                     )
                     GroupRow(
-                        stringResource(R.string.settings_phone_notifications, desk.name), icon = R.drawable.sym_notifications,
-                        subtitle = stringResource(R.string.settings_desk_notifications_summary),
+                        stringResource(R.string.settings_quick_notifications), icon = R.drawable.sym_notifications,
+                        subtitle = stringResource(R.string.settings_quick_notifications_summary, desk.name),
                         checked = desk.notificationsOn, onClick = { actions.onPhoneNotifications(!desk.notificationsOn) },
                     )
                     GroupRow(
-                        stringResource(R.string.settings_calls_on, desk.name), icon = R.drawable.sym_call,
-                        subtitle = stringResource(R.string.settings_calls_on_summary, desk.name),
+                        stringResource(R.string.settings_quick_calls), icon = R.drawable.sym_call,
+                        subtitle = stringResource(R.string.settings_quick_calls_summary, desk.name),
                         checked = desk.callsOn, onClick = { actions.onCalls(!desk.callsOn) },
                     )
                     GroupRow(
-                        stringResource(R.string.settings_desk_sound, desk.name), icon = R.drawable.sym_volume_up,
-                        subtitle = stringResource(R.string.settings_desk_sound_summary, desk.name),
+                        stringResource(R.string.settings_quick_sound), icon = R.drawable.sym_volume_up,
+                        subtitle = stringResource(R.string.settings_quick_sound_summary, desk.name),
                         checked = desk.deskSoundOn, onClick = { actions.onDeskSound(!desk.deskSoundOn) },
                     )
                 }
@@ -236,7 +237,8 @@ private fun ComputerCard(desk: DeskSettings, onOpen: () -> Unit, onSwitch: (() -
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(role = Role.Button, onClick = onOpen).heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            IconTile(R.drawable.ic_device_desktop_32dp, size = 48.dp, radius = 16.dp, container = t.surface, content = t.accent)
+            // At the largest font the tile would leave the name a sliver: it goes, the name keeps whole words.
+            if (androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.4f) IconTile(R.drawable.ic_device_desktop_32dp, size = 48.dp, radius = 16.dp, container = t.surface, content = t.accent)
             Column(Modifier.weight(1f)) {
                 Text(desk.name, fontFamily = MonoFamily, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
                 Text(stringResource(R.string.settings_paired_key, desk.key), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
@@ -652,6 +654,8 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
     val speedValues = stringArrayResource(R.array.mousepad_sensitivity_values)
     val speedNames = stringArrayResource(R.array.mousepad_sensitivity_entries)
     val speed = prefs.getString(speedKey, stringResource(R.string.mousepad_default_sensitivity))
+    // The feature has a name people look for ("Glide"); the row below says what it does to this phone.
+    GlideNote(desk.name)
     SectionLabel(stringResource(R.string.sg_control_phone, desk.name))
     RowGroup {
         GroupRow(
@@ -699,6 +703,22 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
             choosingSpeed = false
             prefs.edit { putString(speedKey, speedValues[index]) }
             changed()
+        }
+    }
+}
+
+/** What "control this phone" is called, and what it is, in one card at the top of the Control page. */
+@Composable
+private fun GlideNote(deskName: String) {
+    val t = tokens
+    Row(
+        Modifier.fillMaxWidth().background(t.accentContainer, org.desklink.mobile.ui.compose.DeskLinkShape.banner).padding(14.dp).semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        IconTile(R.drawable.sym_mouse, size = 40.dp, radius = 12.dp, container = t.surface, content = t.accent)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.settings_glide_title), fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer)
+            Text(stringResource(R.string.settings_glide_explain, deskName), fontSize = 13.sp, lineHeight = 18.sp, color = t.onAccentContainer)
         }
     }
 }
@@ -1024,6 +1044,18 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
                     changed()
                 })
             }
+            // Files, Notes and Terminals keep the window secure; this lets `adb exec-out screencap` see them. Off by default, never in release.
+            // (a local, like the other debug rows: the parity tests list the rows every build has, and debug builds have more)
+            val allowTitle = stringResource(R.string.setting_debug_allow_screenshots)
+            GroupRow(
+                allowTitle, subtitle = stringResource(R.string.setting_debug_allow_screenshots_description),
+                checked = prefs.getBoolean(org.desklink.mobile.ui.compose.SecureWindows.KEY_ALLOW_SCREENSHOTS, false),
+                onClick = {
+                    val key = org.desklink.mobile.ui.compose.SecureWindows.KEY_ALLOW_SCREENSHOTS
+                    prefs.edit { putBoolean(key, !prefs.getBoolean(key, false)) }
+                    changed()
+                },
+            )
         }
     }
 }

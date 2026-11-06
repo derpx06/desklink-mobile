@@ -28,6 +28,15 @@ class HomeDeriveTest {
         assertTrue(HomeDerive.recentFiles(emptyList()).isEmpty())
     }
 
+    @Test fun theSameFileSentOrReceivedAgainIsOneRecentCard() {
+        val again = listOf(1, 2, 3, 4).map { TransferRecord("x$it", "d1", "arch-desk", "dl-300m.bin", 300L, false, 1000L * it, "file:///f$it", null) }
+        val other = record(9)
+        val shown = HomeDerive.recentFiles(again + other)
+        assertEquals(listOf("x1", "r9"), shown.map { it.id })
+        // sent and received are different things, and so are two sizes
+        assertEquals(2, HomeDerive.recentFiles(listOf(again[0], again[1].copy(sent = true))).size)
+    }
+
     @Test fun seeAllShowsOnlyWhenThereIsMoreThanTheRowsShown() {
         val history = (5 downTo 1).map(::record)
         assertTrue(HomeDerive.moreFiles(state { copy(historyCount = 5, recent = HomeDerive.recentFiles(history)) }))

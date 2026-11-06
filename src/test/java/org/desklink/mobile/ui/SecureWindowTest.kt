@@ -31,6 +31,33 @@ class SecureWindowTest {
     }
 
     @Test
+    fun theDebugSwitchLetsAScreenshotThroughOnlyInADebugBuild() {
+        assertTrue(SecureWindows.bypassed(debug = true, switchOn = true))
+        assertFalse("release ignores the switch whatever a pref says", SecureWindows.bypassed(debug = false, switchOn = true))
+        assertFalse(SecureWindows.bypassed(debug = true, switchOn = false))
+        val activity = Robolectric.buildActivity(Activity::class.java).create().get()
+        val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(activity)
+        prefs.edit().putBoolean(SecureWindows.KEY_ALLOW_SCREENSHOTS, true).commit()
+        SecureWindows.enter(activity)
+        assertFalse("enter is a no-op with the switch on", secure(activity))
+        SecureWindows.leave(activity)
+        prefs.edit().putBoolean(SecureWindows.KEY_ALLOW_SCREENSHOTS, false).commit()
+        SecureWindows.enter(activity)
+        assertTrue("off by default: secure again", secure(activity))
+        SecureWindows.leave(activity)
+    }
+
+    @Test
+    fun theSwitchIsOnlyInTheDebugSection() {
+        fun source(path: String) = listOf(java.io.File(path), java.io.File("desklink-mobile/$path")).first { it.exists() }.readText()
+        val settings = source("src/main/java/org/desklink/mobile/ui/compose/screen/settings/SettingsTab.kt")
+        val debugAt = settings.indexOf("if (BuildConfig.DEBUG) {")
+        val uses = Regex("KEY_ALLOW_SCREENSHOTS").findAll(settings).map { it.range.first }.toList()
+        assertTrue(uses.isNotEmpty())
+        assertTrue("every use is inside the debug block", uses.all { it > debugAt })
+    }
+
+    @Test
     fun theDeskScreenAndTheBucketAreSecureScreens() {
         fun source(path: String) = listOf(java.io.File(path), java.io.File("desklink-mobile/$path")).first { it.exists() }.readText()
         assertTrue(source("src/main/java/org/desklink/mobile/plugins/mousepad/MousePadActivity.kt").contains("SecureWindows.enter(this)"))

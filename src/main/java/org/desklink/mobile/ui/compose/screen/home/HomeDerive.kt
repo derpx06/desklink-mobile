@@ -13,8 +13,12 @@ object HomeDerive {
     const val RECENT_NOTES = 2
     const val PREVIEW_CHARS = 48
 
-    /** The newest [RECENT_FILES] files sent or received, newest first (the store already lists them that way). */
-    fun recentFiles(history: List<TransferRecord>): List<TransferRecord> = history.take(RECENT_FILES)
+    /**
+     * The newest [RECENT_FILES] files sent or received, newest first (the store already lists them that way). The same file
+     * sent or received again (same name, size and direction) is one card here; the Files tab still lists every transfer.
+     */
+    fun recentFiles(history: List<TransferRecord>): List<TransferRecord> =
+        history.distinctBy { Triple(it.name, it.size, it.sent) }.take(RECENT_FILES)
 
     /** One line of the copied text, or null when there is nothing worth showing. */
     fun clipboardPreview(raw: String?, max: Int = PREVIEW_CHARS): String? {

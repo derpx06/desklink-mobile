@@ -82,6 +82,7 @@ import org.desklink.mobile.ui.compose.DeskTextButton
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.PrimaryButton
 import org.desklink.mobile.ui.compose.SecondaryButton
+import org.desklink.mobile.ui.compose.pressScale
 import org.desklink.mobile.ui.compose.components.ActionTile
 import org.desklink.mobile.ui.compose.components.DeskBottomSheet
 import org.desklink.mobile.ui.compose.components.DeskProgressBar
@@ -97,8 +98,11 @@ import org.desklink.mobile.ui.compose.components.SectionHeader
 import org.desklink.mobile.ui.compose.components.StatusDot
 import org.desklink.mobile.ui.compose.components.linkGlyphState
 import org.desklink.mobile.ui.compose.components.shimmer
+import org.desklink.mobile.ui.compose.components.rememberReducedMotion
 import org.desklink.mobile.ui.compose.model.device.DeviceConnection
+import org.desklink.mobile.ui.compose.screen.transfers.extensionBadge
 import org.desklink.mobile.ui.compose.screen.transfers.iconFor
+import org.desklink.mobile.ui.compose.screen.transfers.kindColors
 import org.desklink.mobile.ui.compose.screen.transfers.rememberFilePreview
 import org.desklink.mobile.ui.compose.tokens
 import org.desklink.mobile.webrtc.WebRtcConnectionPath
@@ -241,7 +245,13 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
     // Not saved: coming back to Home (rotation, the pager recreating the page) must not pop the keyboard.
     var palette by remember { mutableStateOf(false) }
     val notReady = notReadyMessage(state)
-    val gate = { action: () -> Unit -> if (HomeDerive.usable(state)) action() else actions.onUnavailable(notReady) }
+    val deskHaptics = org.desklink.mobile.ui.compose.components.rememberDeskHaptics()
+    val gate = { action: () -> Unit ->
+        if (HomeDerive.usable(state)) action() else {
+            deskHaptics.perform(org.desklink.mobile.ui.compose.components.Haptic.FAILURE)
+            actions.onUnavailable(notReady)
+        }
+    }
     // The Home tab's long-press asks for the computers sheet.
     androidx.compose.runtime.LaunchedEffect(actions.openComputersRequest) {
         if (actions.openComputersRequest > 0) {
@@ -275,6 +285,24 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                 // Local-first: the Bucket shows whether or not the computer is there.
                 org.desklink.mobile.plugins.folders.BucketHomeCard(state.deviceId, state.name, onOpen = actions.onBucket)
             }
+            // Pull down looks for the computer again: the same action as "Try again" (a discovery refresh, nothing destructive).
+            var refreshing by remember { mutableStateOf(false) }
+            val haptics = org.desklink.mobile.ui.compose.components.rememberDeskHaptics()
+            androidx.compose.runtime.LaunchedEffect(refreshing) {
+                if (refreshing) {
+                    delay(1200)
+                    refreshing = false
+                }
+            }
+            androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = {
+                    refreshing = true
+                    haptics.perform(org.desklink.mobile.ui.compose.components.Haptic.TICK)
+                    actions.onRetry()
+                },
+                modifier = Modifier.fillMaxSize(),
+            ) {
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -301,6 +329,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                         org.desklink.mobile.plugins.folders.BucketHomeCard(state.deviceId, state.name, onOpen = actions.onBucket)
                     }
                 }
+            }
             }
         }
         NowPlayingOverlay(state.media, actions, cardArt, playerOpen && state.media != null) { playerOpen = false }
@@ -472,10 +501,6 @@ private fun Hero(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActi
                     detail?.let { Text(it, fontSize = 13.sp, lineHeight = 19.sp, color = t.textDim, modifier = Modifier.padding(top = 4.dp)) }
                 },
             )
-            if (LocalDensity.current.fontScale <= 1.4f) LaptopIllustration(Modifier.padding(top = 8.dp))
-        }
-        if (HomeDerive.usable(state) && state.canUnlock) {
-            SecondaryButton(stringResource(R.string.home_unlock_desk, state.name), actions.onUnlockDesk, Modifier.fillMaxWidth(), icon = R.drawable.sym_lock_open, height = 48.dp)
         }
         // Three across; one column once the words would not fit. Terminals works with the computer away: it opens the tab, which keeps its own sessions.
         val terminalsHint = if (state.live.terminals > 0) pluralStringResource(R.plurals.home_live_terminals, state.live.terminals, state.live.terminals) else null
@@ -524,7 +549,6 @@ private fun OfflineHero(state: HomeState, actions: HomeActions, onSwitch: () -> 
                 header = { StatusChip(word, t.textFaint, t.textDim, t.fill) },
                 footer = { Text(body, fontSize = 13.sp, lineHeight = 19.sp, color = t.textDim, modifier = Modifier.padding(top = 4.dp)) },
             )
-            if (LocalDensity.current.fontScale <= 1.4f) LaptopIllustration(Modifier.padding(top = 8.dp).alpha(0.45f), dimmed = true)
         }
         PrimaryButton(stringResource(R.string.device_try_again), actions.onRetry, Modifier.fillMaxWidth(), icon = R.drawable.sym_refresh, height = 48.dp)
     }
@@ -592,8 +616,8 @@ private fun StillWorksOffline(state: HomeState, actions: HomeActions) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             tiles.chunked(columns).forEach { row ->
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { tile -> OfflineTile(tile, Modifier.weight(1f).fillMaxHeight(), unreachable) }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    // A lone last tile takes the whole row instead of leaving a hole beside it.
+                    row.forEach { tile -> OfflineTile(tile, Modifier.weight(columns.toFloat() / row.size).fillMaxHeight(), unreachable) }
                 }
             }
         }
@@ -642,13 +666,13 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
     val sharing = state.live.phoneScreen
     class Q(val icon: Int, val label: String, val show: Boolean, val run: () -> Unit)
     val items = listOf(
-        Q(R.drawable.sym_content_paste, stringResource(R.string.home_send_clipboard_short), shown(o.clipboard)) { gate(actions.onSendClipboard) },
+        Q(R.drawable.sym_content_paste, stringResource(R.string.home_tile_clipboard), shown(o.clipboard)) { gate(actions.onSendClipboard) },
         Q(R.drawable.sym_link, stringResource(R.string.home_send_link), shown(o.link)) { gate(onSendLink) },
         Q(R.drawable.sym_vibration, stringResource(R.string.home_ring_desk), shown(o.ring)) { gate(actions.onRing) },
         Q(R.drawable.sym_lock, stringResource(R.string.home_lock_desk), shown(o.lock)) { gate(actions.onLock) },
         Q(R.drawable.sym_mobile_screen_share, stringResource(if (sharing) R.string.home_stop_sharing else R.string.home_share_screen), shown(o.screen)) { gate(actions.onShareScreen) },
         Q(R.drawable.sym_waving_hand, stringResource(R.string.home_ping_desk), shown(o.ping)) { gate(actions.onPing) },
-        Q(R.drawable.sym_lock_open, stringResource(R.string.home_unlock_desk, state.name), usable && state.canUnlock) { actions.onUnlockDesk() },
+        Q(R.drawable.sym_lock_open, stringResource(R.string.home_tile_unlock), usable && state.canUnlock) { actions.onUnlockDesk() },
     ).filter { it.show }
     val clipboardLine = when {
         !usable || !o.clipboard -> null
@@ -665,10 +689,13 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
         ) {
             items.chunked(columns).forEach { row ->
                 Row(Modifier.fillMaxWidth()) {
+                    // A short last row is centred, so the grid does not end in a hole on one side.
+                    val gap = (columns - row.size) / 2f
+                    if (gap > 0f) Spacer(Modifier.weight(gap))
                     row.forEach { q ->
                         QuickActionTile(q.icon, q.label, q.run, Modifier.weight(1f), enabled = usable, onDisabledClick = { actions.onUnavailable(notReady) })
                     }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    if (gap > 0f) Spacer(Modifier.weight(gap))
                 }
             }
             clipboardLine?.let {
@@ -783,20 +810,27 @@ private fun RecentThumb(record: TransferRecord, now: Long, modifier: Modifier, o
     val meta = listOf(whenText, org.desklink.mobile.helpers.Sizes.iec(record.size)).joinToString(" · ")
     val openLabel = stringResource(R.string.home_open_file)
     val shape = DeskLinkShape.card
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Column(
         modifier
+            .pressScale(source)
             .clip(shape)
             .background(t.surface)
             .border(1.dp, t.hairline, shape)
-            .clickable(role = Role.Button, onClickLabel = openLabel, onClick = onOpen)
+            .clickable(interactionSource = source, indication = androidx.compose.material3.ripple(), role = Role.Button, onClickLabel = openLabel, onClick = onOpen)
             .semantics(mergeDescendants = true) { contentDescription = "$direction, ${record.name}, $meta" },
     ) {
-        Box(Modifier.fillMaxWidth().height(72.dp).background(t.accentContainer), contentAlignment = Alignment.Center) {
+        val (container, ink) = kindColors(kind)
+        Box(Modifier.fillMaxWidth().height(72.dp).background(container), contentAlignment = Alignment.Center) {
             val bitmap = preview.bitmap
             if (bitmap != null) {
                 Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
-                Icon(painterResource(iconFor(kind)), contentDescription = null, tint = t.onAccentContainer, modifier = Modifier.size(26.dp))
+                val badge = extensionBadge(record.name)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(painterResource(iconFor(kind)), contentDescription = null, tint = ink, modifier = Modifier.size(26.dp))
+                    if (badge.isNotEmpty()) Text(badge, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = MonoFamily, color = ink)
+                }
             }
             Box(Modifier.align(Alignment.TopStart).padding(8.dp).size(20.dp).background(t.surface, CircleShape), contentAlignment = Alignment.Center) {
                 Icon(painterResource(if (record.sent) R.drawable.sym_upload else R.drawable.sym_download), contentDescription = null, tint = t.textDim, modifier = Modifier.size(12.dp))
@@ -804,7 +838,9 @@ private fun RecentThumb(record: TransferRecord, now: Long, modifier: Modifier, o
         }
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp)) {
             Text(record.name, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
-            Text(meta, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            // Two short lines, always: the age, then the size ("471 KiB" never splits across them).
+            Text(whenText, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(org.desklink.mobile.helpers.Sizes.iec(record.size), fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 1)
         }
     }
 }
@@ -846,7 +882,9 @@ private fun TransferRow(transfer: HomeTransfer, actions: HomeActions) {
                 if (transfer.progress == null) {
                     LinearProgressIndicator(Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, gapSize = 0.dp)
                 } else {
-                    LinearProgressIndicator({ transfer.progress }, Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp)
+                    // The bar glides to each new value instead of jumping by whole percents.
+                    val shown by androidx.compose.animation.core.animateFloatAsState(transfer.progress, androidx.compose.animation.core.tween(if (rememberReducedMotion()) 0 else 300), label = "transfer-progress")
+                    LinearProgressIndicator({ shown }, Modifier.fillMaxWidth().height(4.dp), color = t.accent, trackColor = t.fill, drawStopIndicator = {}, gapSize = 0.dp)
                 }
             }
         }
@@ -898,12 +936,13 @@ private fun RecentFileRow(record: TransferRecord, now: Long, onOpen: () -> Unit)
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(t.accentContainer), contentAlignment = Alignment.Center) {
+        val (container, ink) = kindColors(kind)
+        Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(container), contentAlignment = Alignment.Center) {
             val bitmap = preview.bitmap
             if (bitmap != null) {
                 Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
-                Icon(painterResource(iconFor(kind)), contentDescription = null, tint = t.onAccentContainer, modifier = Modifier.size(22.dp))
+                Icon(painterResource(iconFor(kind)), contentDescription = null, tint = ink, modifier = Modifier.size(22.dp))
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

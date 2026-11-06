@@ -53,7 +53,9 @@ enum class DeskButtonStyle { Primary, Tonal, Outlined, Danger }
 @Composable
 fun Modifier.pressScale(source: MutableInteractionSource): Modifier {
     val pressed by source.collectIsPressedAsState()
-    val s = animateFloatAsState(if (pressed) 0.97f else 1f, tween(120), label = "press")
+    // With "Remove animations" the press is the ripple alone: nothing shrinks.
+    val reduced = org.desklink.mobile.ui.compose.components.rememberReducedMotion()
+    val s = animateFloatAsState(if (pressed && !reduced) 0.97f else 1f, tween(if (reduced) 0 else 120), label = "press")
     // Read inside the layer: a press redraws the layer, it does not recompose the button.
     return graphicsLayer { scaleX = s.value; scaleY = s.value }
 }

@@ -119,6 +119,8 @@ internal val CappedText: androidx.compose.runtime.saveable.Saver<String, Any> = 
 class NotesUi(
     private val host: ComponentActivity,
     val editing: androidx.compose.runtime.MutableState<String?>,
+    /** Shows [message] with an Undo that runs `undo`; null where there is no snackbar (the full-screen Notes activity). */
+    private val undoable: ((message: String, undo: () -> Unit) -> Unit)? = null,
 ) {
     /**
      * The notes. [externalQuery] is the Notes tab's own search field (it searches notes and snippets together); without one the
@@ -182,12 +184,15 @@ class NotesUi(
                 } else {
                     LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(blocks, key = { b -> when (b) { is NotesModel.Block.Checklist -> b.note.id; is NotesModel.Block.Row -> "row-" + b.notes.first().id } }) { block ->
+                            // Notes slide into place when one is added, deleted or pinned (still with "Remove animations": animateItem follows the scale).
+                            Box(Modifier.animateItem()) {
                             when (block) {
                                 is NotesModel.Block.Checklist -> ChecklistCard(block.note) { editing.value = block.note.id }
                                 is NotesModel.Block.Row -> Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     block.notes.forEach { note -> NoteCard(note, Modifier.weight(1f).fillMaxHeight()) { editing.value = note.id } }
                                     if (!narrow && block.notes.size == 1) Spacer(Modifier.weight(1f))
                                 }
+                            }
                             }
                         }
                     }
@@ -252,6 +257,7 @@ class NotesUi(
         val t = tokens
         val revision by NotesStore.revision.collectAsState()
         val snippets = remember(revision, externalQuery) { NotesStore.snippets(host).filter { NotesModel.matches(it, externalQuery) } }
+        val haptics = org.desklink.mobile.ui.compose.components.rememberDeskHaptics()
         Column(Modifier.fillMaxSize()) {
             SecondaryButton(
                 stringResource(R.string.snippets_pin_clipboard),
@@ -266,14 +272,14 @@ class NotesUi(
             } else {
                 LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(snippets, key = { it.id }) { snippet ->
-                        DeskCard(Modifier.fillMaxWidth()) {
+                        DeskCard(Modifier.fillMaxWidth().animateItem()) {
                             Column(Modifier.padding(start = 14.dp, top = 6.dp, end = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(snippet.label, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                     // Copy is the snippet's one tap; the label names the snippet for TalkBack.
                                     val copyLabel = stringResource(R.string.snippets_copy_named, snippet.label)
                                     Box(
-                                        Modifier.heightIn(min = 48.dp).clip(DeskLinkShape.stadium).clickable(role = Role.Button, onClickLabel = copyLabel) { copy(host, snippet.text) }.semantics { contentDescription = copyLabel },
+                                        Modifier.heightIn(min = 48.dp).clip(DeskLinkShape.stadium).clickable(role = Role.Button, onClickLabel = copyLabel) { copy(host, snippet.text); haptics.perform(org.desklink.mobile.ui.compose.components.Haptic.SUCCESS) }.semantics { contentDescription = copyLabel },
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
@@ -281,7 +287,16 @@ class NotesUi(
                                             modifier = Modifier.background(t.accentContainer, DeskLinkShape.stadium).heightIn(min = 32.dp).padding(horizontal = 14.dp, vertical = 6.dp),
                                         )
                                     }
-                                    IconButton(onClick = { NotesStore.deleteSnippet(host, snippet.id) }, modifier = Modifier.size(48.dp)) {
+                                    val deletedText = stringResource(R.string.snippets_deleted)
+                    IconButton(
+                        onClick = {
+                            val text = snippet.text
+                            NotesStore.deleteSnippet(host, snippet.id)
+                            // Undo pins the same text again (a snippet is its text: nothing else is lost).
+                            undoable?.invoke(deletedText) { NotesStore.pin(host, text) }
+                        },
+                        modifier = Modifier.size(48.dp),
+                    ) {
                                         Icon(painterResource(R.drawable.sym_delete), contentDescription = stringResource(R.string.snippets_delete, snippet.label), tint = t.textDim)
                                     }
                                 }
@@ -305,6 +320,7 @@ class NotesUi(
     fun Editor(start: String, barInset: Dp = 0.dp, onDone: () -> Unit) {
         val t = tokens
         val context = LocalContext.current
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
         var id by rememberSaveable { mutableStateOf(start.takeIf { it != NEW }) }
         val first = remember { id?.let { NotesStore.note(context, it) } }
         // A draft the store does not have (a body over the cap, kept across a rotation) wins over the stored note.
@@ -388,11 +404,20 @@ class NotesUi(
                 }
                 IconButton(
                     onClick = {
+                        val (oldTitle, oldBody, oldPinned) = Triple(title, body, pinned)
                         val gone = id?.let { NotesStore.deleteNote(context, it, loaded = shown) } ?: true
                         NoteDrafts.clear(NoteDrafts.key(id))
                         dirty = false
                         // A newer version from the desk beats the delete: say so instead of "Note deleted".
-                        Toast.makeText(context, if (gone) R.string.notes_deleted else R.string.notes_delete_kept, Toast.LENGTH_SHORT).show()
+                        val undo = undoable
+                        if (gone && undo != null && id != null && (oldTitle.isNotBlank() || oldBody.isNotBlank())) {
+                            // Undo makes the note again (a new one, same words and pin); the desk gets it as a new note.
+                            undo(host.getString(R.string.notes_deleted)) {
+                                NotesStore.newNote(host, oldTitle, oldBody)?.let { back -> if (oldPinned) NotesStore.editNote(host, back) { it.copy(pinned = true) } }
+                            }
+                        } else {
+                            Toast.makeText(context, if (gone) R.string.notes_deleted else R.string.notes_delete_kept, Toast.LENGTH_SHORT).show()
+                        }
                         onDone()
                     },
                     modifier = Modifier.size(48.dp),
@@ -408,7 +433,10 @@ class NotesUi(
                     onValueChange = { title = it.replace("\n", "").take(Shelf.MAX_NOTE_TITLE_CHARS); dirty = true },
                     textStyle = TextStyle(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Medium, color = t.text),
                     cursorBrush = SolidColor(t.accent),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    // Next goes on to the body instead of inserting a line break the title does not allow.
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = androidx.compose.ui.text.input.ImeAction.Next),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }),
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = titleHint },
                 )
             }

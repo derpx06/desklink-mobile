@@ -166,7 +166,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.recentTransfers(
             SectionHeader(dayLabel(context, day), Modifier.padding(top = 8.dp))
         }
         itemsIndexed(items, key = { _, r -> r.id }) { i, record ->
-            FileRow(record, deskName, revision, actions, first = i == 0, last = i == items.lastIndex)
+            Box(Modifier.animateItem()) { FileRow(record, deskName, revision, actions, first = i == 0, last = i == items.lastIndex) }
         }
     }
     if (view.matching > limit && onShowAll != null) {
@@ -260,7 +260,7 @@ private fun FileRow(record: TransferRecord, deskName: String, revision: Int, act
                 preview.loading && kind.hasPicture -> Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).shimmer())
                 preview.missing -> IconTile(R.drawable.sym_broken_image, container = t.fill, content = t.textDim)
                 bitmap != null -> Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)))
-                else -> IconTile(iconFor(kind))
+                else -> kindColors(kind).let { (container, ink) -> IconTile(iconFor(kind), container = container, content = ink) }
             }
             // Which way it went, at a glance.
             Box(
