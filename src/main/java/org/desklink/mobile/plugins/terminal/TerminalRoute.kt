@@ -21,7 +21,28 @@ object TerminalRoute {
 
         /** Nothing to show here: the Terminals tab lists the sessions. */
         data object Tab : Destination
+
+        /** A session was already asked for before this screen was rebuilt: show the progress, ask for nothing more. */
+        data object Waiting : Destination
     }
+
+    /** What a rebuilt screen (rotation, dark mode, another computer's notification) kept. */
+    data class Saved(val deviceId: String?, val openId: String?, val starting: Destination.New?, val creating: Boolean)
+
+    /**
+     * Where a screen starts. A rebuilt screen goes by what it kept, never by its intent again: the intent still says "new terminal",
+     * and following it would start a second session. What was kept for another computer is not this one's.
+     */
+    fun initial(saved: Saved?, deviceId: String, fromIntent: Destination): Destination = when {
+        saved == null || saved.deviceId != deviceId -> fromIntent
+        saved.openId != null -> Destination.Session(saved.openId)
+        saved.starting != null -> saved.starting
+        saved.creating -> Destination.Waiting
+        else -> Destination.Tab
+    }
+
+    /** A second "new terminal" (a double tap, a quick action on top of a tile) while one is being started is the same wish. */
+    fun acceptNew(starting: Boolean, creating: Boolean): Boolean = !starting && !creating
 
     fun decide(terminalId: String?, newRequested: Boolean, launcher: String? = null, cwd: String? = null): Destination = when {
         !terminalId.isNullOrBlank() -> Destination.Session(terminalId)

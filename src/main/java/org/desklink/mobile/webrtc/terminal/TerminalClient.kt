@@ -292,6 +292,17 @@ class TerminalClient(
     }
 
     /**
+     * The screen that asked for a new session went away without showing it: a create still waiting for the password or the link is
+     * forgotten (a later unlock must not start it), and an id that arrives for one already sent is nobody's.
+     */
+    fun abandonCreate() = post {
+        val had = pendingCreate != null || createdId != null
+        pendingCreate = null
+        createdId = null
+        if (had) publish()
+    }
+
+    /**
      * The terminal is on screen with the given cell grid: attach it if it is not, otherwise just
      * resize. Called on every layout change, so it must stay cheap when nothing changed.
      */

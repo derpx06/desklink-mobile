@@ -207,6 +207,9 @@ class TerminalActivity : AppCompatActivity() {
     /** A session to start and then show, until the client has made it ([TerminalRoute.Destination.New]). */
     private var starting by mutableStateOf<TerminalRoute.Destination.New?>(null)
 
+    /** A create was sent for this screen; the id that comes back is its to show. Any other id is nobody's. */
+    private var creating by mutableStateOf(false)
+
     /** The grid the terminal screen last had (rows, columns): a new session is made for it, not for 80x24. */
     private val remembered: Pair<Int, Int> get() = TerminalView.rememberedGrid(this, FALLBACK_ROWS, FALLBACK_COLS)
     private var resumed by mutableStateOf(false)
@@ -226,7 +229,14 @@ class TerminalActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deviceId = intent.getStringExtra(EXTRA_DEVICE_ID).orEmpty()
-        val destination = route(intent, savedInstanceState?.getString(STATE_OPEN_ID))
+        val saved = savedInstanceState?.let {
+            TerminalRoute.Saved(
+                it.getString(STATE_DEVICE_ID), it.getString(STATE_OPEN_ID),
+                if (it.getBoolean(STATE_STARTING)) TerminalRoute.Destination.New(it.getString(STATE_START_LAUNCHER), it.getString(STATE_START_CWD)) else null,
+                it.getBoolean(STATE_CREATING),
+            )
+        }
+        val destination = TerminalRoute.initial(saved, deviceId, fromIntent(intent))
         if (destination == TerminalRoute.Destination.Tab) return toTerminalsTab()
         val terminalClient = DeskLinkApplication.getInstance().terminalClient(deviceId)
         if (terminalClient == null) {
@@ -253,35 +263,54 @@ class TerminalActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (intent.getStringExtra(EXTRA_DEVICE_ID).orEmpty() != deviceId) {
-            recreate() // a notification for another device
+            client?.abandonCreate()
+            recreate() // a notification for another computer: rebuilt for it (what was kept says which computer it was for)
         } else {
-            val destination = route(intent, null)
-            if (destination == TerminalRoute.Destination.Tab) toTerminalsTab() else show(destination)
+            when (val destination = fromIntent(intent)) {
+                TerminalRoute.Destination.Tab -> toTerminalsTab()
+                is TerminalRoute.Destination.New -> if (TerminalRoute.acceptNew(starting != null, creating)) show(destination)
+                else -> show(destination)
+            }
         }
     }
 
-    private fun route(intent: Intent, restored: String?): TerminalRoute.Destination =
-        if (restored != null) TerminalRoute.Destination.Session(restored)
-        else TerminalRoute.decide(intent.getStringExtra(EXTRA_TERMINAL_ID), intent.getBooleanExtra(EXTRA_NEW, false), intent.getStringExtra(EXTRA_LAUNCHER), intent.getStringExtra(EXTRA_CWD))
+    private fun fromIntent(intent: Intent): TerminalRoute.Destination =
+        TerminalRoute.decide(intent.getStringExtra(EXTRA_TERMINAL_ID), intent.getBooleanExtra(EXTRA_NEW, false), intent.getStringExtra(EXTRA_LAUNCHER), intent.getStringExtra(EXTRA_CWD))
 
     private fun show(destination: TerminalRoute.Destination) {
         when (destination) {
-            is TerminalRoute.Destination.Session -> openId = destination.id
+            is TerminalRoute.Destination.Session -> { openId = destination.id; creating = false }
             is TerminalRoute.Destination.New -> starting = destination
+            TerminalRoute.Destination.Waiting -> creating = true
             TerminalRoute.Destination.Tab -> Unit
         }
+    }
+
+    /** Sends the create, and from now on the id that comes back is this screen's to show. */
+    private fun createSession(client: TerminalClient, launcher: String?, cwd: String?) {
+        creating = true
+        client.create(remembered.first, remembered.second, launcher?.let(::listOf), cwd)
     }
 
     /** The Terminals tab of the app, which this screen never duplicates; [message] is shown there. */
     private fun toTerminalsTab(message: String? = null) {
         if (isFinishing) return // already on its way (an End session and the session going are one leave)
+        // Whatever was asked for and not shown is dropped: not resent after a password, not opened by the next screen.
+        client?.abandonCreate()
         startActivity(org.desklink.mobile.ui.MainActivity.terminalsIntent(this, deviceId, message))
         finish()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        outState.putString(STATE_DEVICE_ID, deviceId)
         openId?.let { outState.putString(STATE_OPEN_ID, it) }
+        starting?.let {
+            outState.putBoolean(STATE_STARTING, true)
+            outState.putString(STATE_START_LAUNCHER, it.launcher)
+            outState.putString(STATE_START_CWD, it.cwd)
+        }
+        outState.putBoolean(STATE_CREATING, creating)
     }
 
     override fun onResume() {
@@ -302,6 +331,7 @@ class TerminalActivity : AppCompatActivity() {
         // Leaving for good stops output; a rotation or a background stay keeps it flowing so
         // notifications still fire and the screen is current when the person returns.
         if (isFinishing && !isChangingConfigurations) {
+            client?.abandonCreate()
             client?.detachAll()
             SessionLiveNotification.refresh(this, deviceId)
         }
@@ -367,7 +397,7 @@ class TerminalActivity : AppCompatActivity() {
                 state.notAllowed || state.passwordNeeded != null -> toTerminalsTab()
                 connected && state.listLoaded -> {
                     starting = null
-                    client.create(remembered.first, remembered.second, request.launcher?.let { listOf(it) }, request.cwd)
+                    createSession(client, request.launcher, request.cwd)
                 }
             }
         }
@@ -377,8 +407,16 @@ class TerminalActivity : AppCompatActivity() {
         LaunchedEffect(attached) { SessionLiveNotification.refresh(this@TerminalActivity, deviceId) }
         LaunchedEffect(state.createdId) {
             state.createdId?.let {
-                openId = it
+                // Only the session this screen asked for is shown; one left over from a screen that was left is dropped.
+                if (creating) { creating = false; openId = it }
                 client.consumeCreated()
+            }
+        }
+        // Nothing came of a new terminal: the tab, with why, instead of a spinner for ever.
+        LaunchedEffect(current == null) {
+            if (current == null) {
+                kotlinx.coroutines.delay(START_TIMEOUT_MS)
+                toTerminalsTab(getString(R.string.terminal_start_timeout, deskName()))
             }
         }
         LaunchedEffect(state.error) {
@@ -685,7 +723,7 @@ class TerminalActivity : AppCompatActivity() {
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp))
         }
-        if (newSheet) NewTerminalSheet(deskName(), state.launchers, state.folders, onDismiss = { newSheet = false }) { launcher, cwd -> newSheet = false; client.create(remembered.first, remembered.second, launcher?.let(::listOf), cwd) }
+        if (newSheet) NewTerminalSheet(deskName(), state.launchers, state.folders, onDismiss = { newSheet = false }) { launcher, cwd -> newSheet = false; createSession(client, launcher, cwd) }
         renamingOpen?.let { renameId ->
             TerminalRenameDialog(
                 initial = labels[renameId].orEmpty(),
@@ -1059,6 +1097,14 @@ class TerminalActivity : AppCompatActivity() {
         const val EXTRA_CWD = "cwd"
 
         private const val STATE_OPEN_ID = "openTerminalId"
+        private const val STATE_DEVICE_ID = "openTerminalDevice"
+        private const val STATE_STARTING = "startingTerminal"
+        private const val STATE_START_LAUNCHER = "startingLauncher"
+        private const val STATE_START_CWD = "startingCwd"
+        private const val STATE_CREATING = "creatingTerminal"
+
+        /** How long a new terminal may take before the screen gives up and says so on the tab. */
+        private const val START_TIMEOUT_MS = 10_000L
         private const val LABEL_PREFS = org.desklink.mobile.helpers.PerPeerState.LABELS
         private const val KEY_FULLSCREEN = "/fullscreen"
         private const val FALLBACK_ROWS = 24

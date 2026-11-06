@@ -107,6 +107,12 @@ object TabMotion {
     fun slides(from: Int, to: Int) = kotlin.math.abs(from - to) <= 1
 }
 
+/**
+ * False for a tab that is only peeking in while the pager is swiped (its page is composed, but is not the selected tab yet).
+ * A tab that asks something of the person (a fingerprint prompt) waits for true.
+ */
+val LocalPageSettled = androidx.compose.runtime.compositionLocalOf { true }
+
 /** What the bar takes from the bottom of the screen: the pill and the 8 dp above and below it (the navigation bar is extra). */
 val TabBarHeight = TabBarPillHeight + 16.dp
 
@@ -167,7 +173,9 @@ fun TabsShell(
             key = { tabs[it].key },
         ) { index ->
             Box(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }, contentAlignment = Alignment.TopCenter) {
-                Box(Modifier.widthIn(max = MaxContentWidth).fillMaxSize()) { content(tabs[index]) }
+                Box(Modifier.widthIn(max = MaxContentWidth).fillMaxSize()) {
+                    androidx.compose.runtime.CompositionLocalProvider(LocalPageSettled provides (nav.selected == tabs[index])) { content(tabs[index]) }
+                }
             }
         }
     }

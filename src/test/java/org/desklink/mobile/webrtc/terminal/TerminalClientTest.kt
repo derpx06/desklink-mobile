@@ -717,6 +717,27 @@ class TerminalClientTest {
     }
 
     @Test
+    fun anAbandonedCreateIsNotResentAfterAPasswordAndItsIdIsNobodys() {
+        val h = Harness()
+        h.ready(); h.listed(bash)
+        h.client.create(24, 80)
+        h.error(SessionPassword.REQUIRED)
+        // The screen that asked went away (the person left before the password).
+        h.client.abandonCreate()
+        h.client.unlock("secret")
+        h.sent.clear()
+        h.listed(bash)
+        assertTrue("entering the password in the tab must not start the shell the screen gave up on", h.controls(TerminalAction.CREATE).isEmpty())
+
+        // A create already on the wire when the screen left: its id arrives, and abandoning again clears it.
+        h.client.create(24, 80)
+        h.fromHost(h.hostControl(TerminalAction.CREATED).copy(terminalId = "t9", rows = 24, cols = 80))
+        assertEquals("t9", h.state().createdId)
+        h.client.abandonCreate()
+        assertNull(h.state().createdId)
+    }
+
+    @Test
     fun aWrongPasswordIsForgottenAndNotHiddenByLaterAnswers() {
         val h = Harness()
         h.ready()

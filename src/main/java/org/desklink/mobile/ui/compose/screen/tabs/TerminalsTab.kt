@@ -50,11 +50,16 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.repeatOnLifecycle
+import org.desklink.mobile.ui.compose.shell.LocalPageSettled
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.terminal.EndSessionDialog
@@ -174,8 +179,10 @@ fun TerminalsTab(
     // The phone-only check, once per connection (it answers at once when already passed or not asked for).
     var gate by remember(deviceId) { mutableStateOf(if (activity == null) TerminalsGate.OPEN else TerminalsGate.PENDING) }
     var gateRuns by remember { mutableIntStateOf(0) }
-    LaunchedEffect(deviceId, gateRuns) {
-        if (activity != null && client != null) {
+    // Not while the page is only peeking in during a swipe: the prompt comes when the tab is the one selected.
+    val settled = LocalPageSettled.current
+    LaunchedEffect(deviceId, gateRuns, settled) {
+        if (settled && activity != null && client != null) {
             gate = TerminalsGate.PENDING
             SessionGate.check(activity, deviceId, onOpen = { gate = TerminalsGate.OPEN }, onDenied = { gate = TerminalsGate.DENIED })
         }
@@ -198,6 +205,16 @@ fun TerminalsTab(
             tick++
         }
     }
+    // Back from the terminal screen: names given there, and new tiles may be tapped again.
+    var launching by remember { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { labelsRevision++; launching = false }
+    // A session this phone asked for from here is the terminal screen's to open; one that arrives with nobody asking (the person
+    // went back first) is nobody's. Only while this tab is the foreground screen, so the screen that asked still sees its own.
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(client, state.createdId, lifecycle) {
+        if (client != null && state.createdId != null) lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { client.consumeCreated() }
+    }
+    val start: (String?, String?) -> Unit = { launcher, cwd -> if (!launching) { launching = true; onNewTerminal(launcher, cwd) } }
     val labels = remember(labelsRevision, deviceId) { SessionPreviews.labels(context, deviceId) }
     val previews = remember(state, tick, labelsRevision, panel) {
         if (panel == TerminalsPanel.LIST) SessionPreviews.of(context, deviceId, lineCount = 2).associateBy { it.id } else emptyMap()
@@ -228,9 +245,10 @@ fun TerminalsTab(
         state = state,
         previews = previews,
         labels = labels,
+        busy = launching,
         actions = TerminalsActions(
             onOpen = onOpenSession,
-            onNew = onNewTerminal,
+            onNew = start,
             onRetry = { client?.refresh() },
             onEnterPassword = { passwordDismissed = false },
             onUnlock = { gateRuns++ },
@@ -238,7 +256,8 @@ fun TerminalsTab(
             onEnd = { id -> client?.close(id); onMessage(ended) },
             onRestart = { session ->
                 client?.close(session.id)
-                onNewTerminal(session.title.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }, null)
+                // In the folder it was in, not the computer's default.
+                start(session.title.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }, session.cwd)
             },
         ),
     )
@@ -263,6 +282,8 @@ fun TerminalsContent(
     /** The names people gave sessions, by id. */
     labels: Map<String, String>,
     actions: TerminalsActions,
+    /** A terminal is being started: the tiles wait for it, so a second tap is not a second session. */
+    busy: Boolean = false,
 ) {
     val t = tokens
     val context = LocalContext.current
@@ -276,6 +297,26 @@ fun TerminalsContent(
     val listed = panel == TerminalsPanel.LIST
 
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
+        // At a larger font the title and its three controls do not fit one line (the title broke mid-word): the controls get their own row.
+        val big = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.15f
+        val controls: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
+            if (listed) {
+                if (state.sessions.isNotEmpty()) {
+                    IconButton(
+                        onClick = { searching = !searching; if (!searching) query = "" },
+                        modifier = Modifier.size(48.dp).semantics { selected = searching },
+                    ) {
+                        Icon(painterResource(R.drawable.sym_search), contentDescription = stringResource(R.string.terminal_search), tint = t.text)
+                    }
+                }
+                IconButton(onClick = { if (connected && !busy) newSheet = true }, enabled = connected && !busy, modifier = Modifier.size(48.dp)) {
+                    Icon(painterResource(R.drawable.sym_add), contentDescription = stringResource(R.string.terminal_new_terminal), tint = t.text)
+                }
+                LinkChip(connected)
+            }
+        }
+        // The last session ended with the search open: nothing to search, and its button is gone.
+        LaunchedEffect(state.sessions.isEmpty()) { if (state.sessions.isEmpty()) { searching = false; query = "" } }
         LargeTitle(
             stringResource(R.string.terminal_section),
             Modifier.padding(top = 12.dp),
@@ -284,19 +325,8 @@ fun TerminalsContent(
                 live.isEmpty() -> stringResource(R.string.terminals_subtitle_none, deskName)
                 else -> pluralStringResource(R.plurals.terminal_count_on, live.size, live.size, deskName)
             },
-        ) {
-            if (listed) {
-                if (state.sessions.isNotEmpty()) {
-                    IconButton(onClick = { searching = !searching; if (!searching) query = "" }, modifier = Modifier.size(48.dp)) {
-                        Icon(painterResource(R.drawable.sym_search), contentDescription = stringResource(R.string.terminal_search), tint = t.text)
-                    }
-                }
-                IconButton(onClick = { if (connected) newSheet = true }, enabled = connected, modifier = Modifier.size(48.dp)) {
-                    Icon(painterResource(R.drawable.sym_add), contentDescription = stringResource(R.string.terminal_new_terminal), tint = t.text)
-                }
-                LinkChip(connected)
-            }
-        }
+        ) { if (!big) controls() }
+        if (big && listed) Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) { controls() }
         if (listed && searching) {
             DeskSearchField(
                 query, { query = it.take(80) }, stringResource(R.string.terminal_search_hint), stringResource(R.string.palette_clear),
@@ -334,7 +364,7 @@ fun TerminalsContent(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item(key = "launchers") { Launchers(state.launchers, connected, actions.onNew) }
+                    item(key = "launchers") { Launchers(state.launchers, connected && !busy, actions.onNew) }
                     if (state.sessions.isEmpty()) {
                         item(key = "none") {
                             Text(stringResource(R.string.terminal_empty_hint), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp))

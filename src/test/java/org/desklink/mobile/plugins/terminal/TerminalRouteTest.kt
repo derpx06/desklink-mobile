@@ -65,6 +65,34 @@ class TerminalRouteTest {
     }
 
     @Test
+    fun aRebuiltScreenGoesByWhatItKeptNeverByItsIntentAgain() {
+        val asked = Destination.New("claude", null)
+        // First start: the intent.
+        assertEquals(asked, TerminalRoute.initial(null, "d1", asked))
+        // Rebuilt (dark mode) after the create was sent: wait for it, never a second session.
+        assertEquals(Destination.Waiting, TerminalRoute.initial(TerminalRoute.Saved("d1", null, null, true), "d1", asked))
+        assertEquals(Destination.Session("s1"), TerminalRoute.initial(TerminalRoute.Saved("d1", "s1", null, false), "d1", asked))
+        assertEquals("not yet sent: still to send", asked, TerminalRoute.initial(TerminalRoute.Saved("d1", null, asked, false), "d1", asked))
+        assertEquals("nothing kept and nothing asked", Destination.Tab, TerminalRoute.initial(TerminalRoute.Saved("d1", null, null, false), "d1", asked))
+        // A notification for another computer rebuilds the screen: the old computer's session is not reopened.
+        assertEquals(Destination.Session("other"), TerminalRoute.initial(TerminalRoute.Saved("d1", "s1", null, true), "d2", Destination.Session("other")))
+    }
+
+    @Test
+    fun aSecondNewTerminalWhileOneIsBeingStartedIsTheSameWish() {
+        assertTrue(TerminalRoute.acceptNew(starting = false, creating = false))
+        assertFalse(TerminalRoute.acceptNew(starting = true, creating = false))
+        assertFalse(TerminalRoute.acceptNew(starting = false, creating = true))
+    }
+
+    @Test
+    fun theHomeLookingLineIsSaidOnceInAWhile() {
+        assertTrue(MainActivity.messageDue(10_000, -5_000, 5_000))
+        assertFalse(MainActivity.messageDue(12_000, 10_000, 5_000))
+        assertTrue(MainActivity.messageDue(15_000, 10_000, 5_000))
+    }
+
+    @Test
     fun theTerminalsIntentSelectsTheTabOnThatComputerWithTheMessage() {
         val context = org.robolectric.RuntimeEnvironment.getApplication()
         val intent = MainActivity.terminalsIntent(context, "d1", "Session ended")

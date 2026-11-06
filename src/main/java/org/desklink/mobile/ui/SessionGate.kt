@@ -78,10 +78,21 @@ object SessionGate {
     /** deviceId → the connection on which the gate was passed. */
     private val passed = HashMap<String, Long>()
 
-    /** The gate was passed on [connection] (a session id): only that connection, never the next. */
-    internal fun markPassed(deviceId: String, connection: Long) = synchronized(passed) { passed[deviceId] = connection }
+    /** Passed while there was no connection: holds, and sticks to the first connection that follows. */
+    private const val OFFLINE = -1L
 
-    internal fun isPassed(deviceId: String, connection: Long?) = connection != null && synchronized(passed) { passed[deviceId] == connection }
+    /** The gate was passed on [connection] (a session id; null while offline): only that connection, never the next. */
+    internal fun markPassed(deviceId: String, connection: Long?) = synchronized(passed) { passed[deviceId] = connection ?: OFFLINE }
+
+    internal fun isPassed(deviceId: String, connection: Long?): Boolean = synchronized(passed) {
+        val at = passed[deviceId] ?: return false
+        if (at == OFFLINE) {
+            if (connection != null) passed[deviceId] = connection
+            true
+        } else {
+            connection == at
+        }
+    }
 
     internal fun clearPassed() = synchronized(passed) { passed.clear() }
 
@@ -111,7 +122,7 @@ object SessionGate {
             anyAuth = Biometrics.available(activity, Biometrics.WEAK_OR_CREDENTIAL),
         )
         fun pass() {
-            connection?.let { markPassed(deviceId, it) }
+            markPassed(deviceId, connection)
             onOpen()
         }
         val desk = DeskNames.of(deviceId)

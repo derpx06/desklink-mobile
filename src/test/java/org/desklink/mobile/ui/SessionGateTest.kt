@@ -62,6 +62,17 @@ class SessionGateTest {
     }
 
     @Test
+    fun aGatePassedWhileOfflineHoldsAndSticksToTheFirstConnection() {
+        SessionGate.clearPassed()
+        SessionGate.markPassed("desk-1", null)
+        assertEquals("the tab is not asked again for every look", true, SessionGate.isPassed("desk-1", null))
+        assertEquals(true, SessionGate.isPassed("desk-1", 2001L))
+        assertEquals("then it is that connection's, as any pass", false, SessionGate.isPassed("desk-1", 2002L))
+        assertEquals(true, SessionGate.isPassed("desk-1", 2001L))
+        SessionGate.clearPassed()
+    }
+
+    @Test
     fun aGatePassedOnOneConnectionIsNotPassedOnTheNext() {
         SessionGate.clearPassed()
         SessionGate.markPassed("desk-1", 1001L)

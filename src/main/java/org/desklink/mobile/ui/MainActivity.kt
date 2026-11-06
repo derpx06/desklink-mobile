@@ -189,6 +189,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     /** The note being edited in the Notes tab: an id, `NotesActivity.NEW`, or null for the list. */
     private val notesEditing = mutableStateOf<String?>(null)
 
+    private var lastLookingMessageAt = -LOOKING_MESSAGE_EVERY_MS
+
     /** A segment of the Notes tab asked for from outside (the clipboard tile's long-press: Snippets); the tab takes it and clears it. */
     private var notesSegment by mutableStateOf<Int?>(null)
 
@@ -784,7 +786,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onPairAnother = { push(SCAN) },
             onRetry = {
                 BackgroundService.ForceRefreshConnections(this)
-                showMessage(getString(R.string.home_looking_for, device.name))
+                // Every pull asks again, but the line is said once in a while, not queued up behind itself.
+                val now = SystemClock.elapsedRealtime()
+                if (messageDue(now, lastLookingMessageAt, LOOKING_MESSAGE_EVERY_MS)) {
+                    lastLookingMessageAt = now
+                    showMessage(getString(R.string.home_looking_for, device.name))
+                }
             },
             onEndLive = { SessionLiveNotification.endAll(this, id) },
             // Each goes to the desk's current player through the plugin of *now* (never one held
@@ -1475,6 +1482,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         const val FLAG_FORCE_OVERVIEW = "forceOverview"
         const val EXTRA_SETTINGS_PAGE = "settingsPage"
 
+        private const val LOOKING_MESSAGE_EVERY_MS = 5_000L
+
+        /** Whether a line said at [last] may be said again at [now]. */
+        fun messageDue(now: Long, last: Long, every: Long): Boolean = now - last >= every
         private const val HOME = "home"
         private const val SCAN = "scan"
         private const val SETTINGS = "settings"
