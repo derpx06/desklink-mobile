@@ -746,8 +746,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="notes_clipboard_history_body">Android does not let an app read what was copied before, so DeskLink cannot list your clipboard history. What was shared is on the other device as it arrives. Pin a copy as a snippet to keep it.</string>
     <string name="notes_clipboard_pin">Pin the clipboard as a snippet</string>
     <string name="terminals_subtitle_none">No terminals on %1$s yet</string>
-    <string name="terminals_unavailable">Terminals are not available right now. Open them to unlock or retry.</string>
-    <string name="terminals_open">Open terminals</string>
+    <string name="terminals_unavailable">Terminals are not available for this computer right now.</string>
+    <string name="terminals_gate_message">Confirm it is you to see the terminals on this computer.</string>
+    <string name="terminals_unlock">Unlock</string>
+    <string name="terminals_no_match">No terminal named “%1$s”</string>
     <!-- W5: the tab bar -->
     <string name="tab_home">Home</string>
     <string name="tab_files">Files</string>

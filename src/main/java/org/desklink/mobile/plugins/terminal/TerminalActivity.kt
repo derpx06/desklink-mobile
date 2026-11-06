@@ -193,14 +193,19 @@ import org.desklink.mobile.webrtc.terminal.TerminalProtocol
 import org.desklink.mobile.webrtc.terminal.TerminalSessionState
 
 /**
- * Terminal sessions on the paired desktop: a session list, and a full-screen terminal with a key
- * bar. All state that must survive rotation lives in [TerminalClient], which the application owns.
+ * One live terminal session on the paired desktop, full screen with a key bar. It lists nothing: the Terminals tab
+ * is the one place sessions are listed, so an intent that names no session and asks for no new one goes there
+ * ([TerminalRoute]), and so does leaving (back, End session, the shell exiting). All state that must survive
+ * rotation lives in [TerminalClient], which the application owns.
  */
 class TerminalActivity : AppCompatActivity() {
     private var deviceId: String = ""
     /** Looked up each time: the application owns the client, per device. */
     private val client: TerminalClient? get() = DeskLinkApplication.getInstance().terminalClient(deviceId)
     private var openId by mutableStateOf<String?>(null)
+
+    /** A session to start and then show, until the client has made it ([TerminalRoute.Destination.New]). */
+    private var starting by mutableStateOf<TerminalRoute.Destination.New?>(null)
 
     /** The grid the terminal screen last had (rows, columns): a new session is made for it, not for 80x24. */
     private val remembered: Pair<Int, Int> get() = TerminalView.rememberedGrid(this, FALLBACK_ROWS, FALLBACK_COLS)
@@ -221,16 +226,17 @@ class TerminalActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deviceId = intent.getStringExtra(EXTRA_DEVICE_ID).orEmpty()
+        val destination = route(intent, savedInstanceState?.getString(STATE_OPEN_ID))
+        if (destination == TerminalRoute.Destination.Tab) return toTerminalsTab()
         val terminalClient = DeskLinkApplication.getInstance().terminalClient(deviceId)
         if (terminalClient == null) {
             Toast.makeText(this, R.string.terminal_device_unavailable, Toast.LENGTH_LONG).show()
-            finish()
-            return
+            return toTerminalsTab()
         }
+        apply(destination)
         TerminalPalette.apply(
             (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES,
         )
-        openId = savedInstanceState?.getString(STATE_OPEN_ID) ?: intent.getStringExtra(EXTRA_TERMINAL_ID)
         loadLabels()
         fullscreen = getSharedPreferences(LABEL_PREFS, MODE_PRIVATE).getBoolean(KEY_FULLSCREEN, true)
         SessionGate.check(this, deviceId, onOpen = {
@@ -249,8 +255,28 @@ class TerminalActivity : AppCompatActivity() {
         if (intent.getStringExtra(EXTRA_DEVICE_ID).orEmpty() != deviceId) {
             recreate() // a notification for another device
         } else {
-            intent.getStringExtra(EXTRA_TERMINAL_ID)?.let { openId = it }
+            val destination = route(intent, null)
+            if (destination == TerminalRoute.Destination.Tab) toTerminalsTab() else apply(destination)
         }
+    }
+
+    private fun route(intent: Intent, restored: String?): TerminalRoute.Destination =
+        if (restored != null) TerminalRoute.Destination.Session(restored)
+        else TerminalRoute.decide(intent.getStringExtra(EXTRA_TERMINAL_ID), intent.getBooleanExtra(EXTRA_NEW, false), intent.getStringExtra(EXTRA_LAUNCHER), intent.getStringExtra(EXTRA_CWD))
+
+    private fun apply(destination: TerminalRoute.Destination) {
+        when (destination) {
+            is TerminalRoute.Destination.Session -> openId = destination.id
+            is TerminalRoute.Destination.New -> starting = destination
+            TerminalRoute.Destination.Tab -> Unit
+        }
+    }
+
+    /** The Terminals tab of the app, which this screen never duplicates; [message] is shown there. */
+    private fun toTerminalsTab(message: String? = null) {
+        if (isFinishing) return // already on its way (an End session and the session going are one leave)
+        startActivity(org.desklink.mobile.ui.MainActivity.terminalsIntent(this, deviceId, message))
+        finish()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -318,11 +344,8 @@ class TerminalActivity : AppCompatActivity() {
     }
 
     private fun setLabel(id: String, label: String) {
-        val trimmed = label.trim().take(60)
+        val trimmed = SessionPreviews.setLabel(this, deviceId, id, label)
         if (trimmed.isEmpty()) labels.remove(id) else labels[id] = trimmed
-        getSharedPreferences(LABEL_PREFS, MODE_PRIVATE).edit {
-            if (trimmed.isEmpty()) remove(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, id)) else putString(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, id), trimmed)
-        }
     }
 
     // ---- root ---------------------------------------------------------------------------------------
@@ -332,16 +355,20 @@ class TerminalActivity : AppCompatActivity() {
         val state by client.state.collectAsState()
         val snackbar = remember { SnackbarHostState() }
         val current = openId
+        val connected = state.link == TerminalLinkState.CONNECTED
 
         LaunchedEffect(Unit) { client.refresh() }
-        // "New terminal" from the Terminals tab: one shell, started as soon as the list is known and open to us.
-        var newRequested by rememberSaveable { mutableStateOf(intent.getBooleanExtra(EXTRA_NEW, false)) }
-        LaunchedEffect(newRequested, state.link, state.listLoaded, state.notAllowed, state.passwordNeeded) {
-            if (newRequested && state.link == TerminalLinkState.CONNECTED && state.listLoaded && !state.notAllowed && state.passwordNeeded == null) {
-                newRequested = false
-                // The tab's launcher tiles ask for Claude Code or Codex; anything else is a shell.
-                val launcher = intent.getStringExtra(EXTRA_LAUNCHER)?.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }
-                client.create(remembered.first, remembered.second, launcher?.let { listOf(it) })
+        // "New terminal" (the tab, a quick action, the palette): one session, started as soon as the list is known and open to
+        // us, then shown. If it cannot be started the tab says why (not allowed, locked, an error), so it is not left hanging here.
+        val request = starting
+        LaunchedEffect(request, state.link, state.listLoaded, state.notAllowed, state.passwordNeeded) {
+            if (request == null) return@LaunchedEffect
+            when {
+                state.notAllowed || state.passwordNeeded != null -> toTerminalsTab()
+                connected && state.listLoaded -> {
+                    starting = null
+                    client.create(remembered.first, remembered.second, request.launcher?.let { listOf(it) }, request.cwd)
+                }
             }
         }
         LaunchedEffect(current, resumed) { TerminalForeground.terminalId = if (resumed) current else null }
@@ -356,29 +383,39 @@ class TerminalActivity : AppCompatActivity() {
         }
         LaunchedEffect(state.error) {
             state.error?.let {
-                snackbar.showSnackbar(if (it == TerminalProtocol.ERROR_BAD_CWD) getString(R.string.terminal_bad_cwd, deskName()) else it)
+                val text = if (it == TerminalProtocol.ERROR_BAD_CWD) getString(R.string.terminal_bad_cwd, deskName()) else it
                 client.clearError()
+                // Nothing to show yet (a session that could not be started): the tab, with the reason.
+                if (openId == null) toTerminalsTab(text) else snackbar.showSnackbar(text)
             }
         }
-        // Ended from the desk: back to the list, which the client is already refreshing. The
+        // Ended from the desk: back to the Terminals tab, which the client is already refreshing. The
         // session is not attached again until the person opens it.
         LaunchedEffect(state.endedByComputer) {
             if (state.endedByComputer) {
-                openId?.let { leaveTerminal(client, it) }
-                // Shown before the event is consumed: consuming changes this effect's key, which
-                // would cancel it mid-way and the message would never appear.
-                snackbar.showSnackbar(getString(R.string.terminal_ended_by_computer))
                 client.consumeEnded()
+                leave(client, openId, TerminalRoute.Ending.ByComputer)
+            }
+        }
+        // The shell exits, or the session goes, while it is open: the tab, and the reason.
+        val session = state.sessions.firstOrNull { it.id == current }
+        var wasRunning by remember(current) { mutableStateOf(false) }
+        LaunchedEffect(current, session) {
+            if (TerminalRoute.isRunning(session)) {
+                wasRunning = true
+            } else {
+                TerminalRoute.ending(wasRunning, session)?.let { leave(client, current, it) }
             }
         }
 
-        // Cancelled: the list shows "Locked" until the person asks for the dialog again.
+        // Cancelled: the tab shows "Locked" until the person asks for the dialog again.
         var passwordDismissed by remember(state.passwordNeeded == null) { mutableStateOf(false) }
 
         if (current == null) {
-            SessionListScreen(client, state, snackbar) { passwordDismissed = false }
+            BackHandler { toTerminalsTab() }
+            StartingScreen(connected, onBack = ::toTerminalsTab)
         } else {
-            BackHandler { leaveTerminal(client, current) }
+            BackHandler { leave(client, current, null) }
             TerminalScreenUi(client, state, current, snackbar)
         }
 
@@ -395,382 +432,32 @@ class TerminalActivity : AppCompatActivity() {
                 onDismiss = {
                     passwordDismissed = true
                     client.cancelUnlock()
-                    openId?.let { leaveTerminal(client, it) }
+                    leave(client, openId, null)
                 },
             )
         }
     }
 
-    private fun leaveTerminal(client: TerminalClient, id: String) {
-        client.leave(id)
-        openId = null
-    }
-
-    // ---- session list ---------------------------------------------------------------------------------
-
-    @Composable
-    private fun SessionListScreen(
-        client: TerminalClient,
-        state: TerminalClientState,
-        snackbar: SnackbarHostState,
-        onEnterPassword: () -> Unit,
-    ) {
-        var renaming by remember { mutableStateOf<TerminalSessionState?>(null) }
-        var closing by remember { mutableStateOf<TerminalSessionState?>(null) }
-        var newSheet by rememberSaveable { mutableStateOf(false) }
-        var searching by rememberSaveable { mutableStateOf(false) }
-        var query by rememberSaveable { mutableStateOf("") }
-        val connected = state.link == TerminalLinkState.CONNECTED
-        val locked = state.passwordNeeded != null
-        val t = tokens
-        // Sessions can also start at the desk, which the desktop does not announce: look again
-        // while the list is on screen. Not while it is locked: only the person retries that.
-        org.desklink.mobile.ui.compose.components.StartedEffect(connected, locked) {
-            while (connected && !locked) {
-                client.refresh()
-                kotlinx.coroutines.delay(LIST_REFRESH_MS)
-            }
-        }
-        val live = state.sessions.filter { !it.gone }
-
-        Box(Modifier.fillMaxSize().background(t.bg).safeDrawingPadding()) {
-            Column(Modifier.fillMaxSize()) {
-                ScreenHeader(onBack = { finish() })
-                LargeTitle(
-                    stringResource(R.string.terminal_section),
-                    subtitle = if (connected) {
-                        pluralStringResource(R.plurals.terminal_count_on, live.size, live.size, deskName())
-                    } else {
-                        stringResource(R.string.terminal_status_reconnecting)
-                    },
-                ) {
-                    IconButton(onClick = { searching = !searching; if (!searching) query = "" }, modifier = Modifier.size(48.dp)) {
-                        Icon(painterResource(R.drawable.sym_search), contentDescription = stringResource(R.string.terminal_search), tint = t.text)
-                    }
-                }
-                if (searching) {
-                    org.desklink.mobile.ui.compose.components.DeskSearchField(
-                        query, { query = it.take(80) }, stringResource(R.string.terminal_search_hint), stringResource(R.string.palette_clear),
-                        Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
-                    )
-                }
-                if (!connected && state.listLoaded) ReconnectingBanner()
-                when {
-                    state.notAllowed -> StatePanel(
-                        title = stringResource(R.string.terminal_not_allowed_title),
-                        message = stringResource(R.string.terminal_not_allowed_message),
-                        action = stringResource(R.string.terminal_retry),
-                        onAction = { client.refresh() },
-                    )
-                    state.passwordNeeded != null -> Locked(state.passwordNeeded, onEnterPassword, onRetry = { client.refresh() })
-                    !state.listLoaded -> CenteredProgress()
-                    state.sessions.isEmpty() -> Column(Modifier.padding(16.dp)) {
-                        EmptyTerminalTile(
-                            launchers = listOf(stringResource(R.string.terminal_launch_shell) to { client.create(remembered.first, remembered.second, null) }) +
-                                state.launchers.mapNotNull { launcher -> agentName(launcher)?.let { it to { client.create(remembered.first, remembered.second, listOf(launcher)) } } },
-                            enabled = connected,
-                        )
-                    }
-                    else -> {
-                        // Previews re-read the screens now and then: output arrives without a state change.
-                        var tick by remember { mutableIntStateOf(0) }
-                        org.desklink.mobile.ui.compose.components.StartedEffect(Unit) {
-                            while (true) {
-                                kotlinx.coroutines.delay(PREVIEW_REFRESH_MS)
-                                tick++
-                            }
-                        }
-                        val previews = remember(state, tick, labels.toMap()) { SessionPreviews.of(this@TerminalActivity, deviceId, lineCount = 2) }.associateBy { it.id }
-                        val shown = state.sessions.filter { s ->
-                            query.isBlank() || (labels[s.id] ?: s.title).contains(query.trim(), ignoreCase = true)
-                        }
-                        LazyColumn(
-                            Modifier.fillMaxSize(),
-                            // Clear of the floating button.
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            items(shown, key = { it.id }) { session ->
-                                val preview = previews[session.id] ?: SessionPreview(
-                                    id = session.id,
-                                    name = labels[session.id] ?: agentName(session.title) ?: session.title.ifBlank { session.id.take(8) },
-                                    badge = SessionPreviews.badgeOf(session.title),
-                                    live = false,
-                                    lines = emptyList(),
-                                    size = stringResource(R.string.terminal_session_size, session.cols, session.rows),
-                                )
-                                SessionCard(
-                                    session = session,
-                                    preview = preview,
-                                    connected = connected,
-                                    onOpen = { openId = session.id },
-                                    onRename = { renaming = session },
-                                    onClose = { closing = session },
-                                    onRestart = {
-                                        client.close(session.id)
-                                        client.create(remembered.first, remembered.second, session.title.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }?.let(::listOf))
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            if (!state.notAllowed && !locked) {
-                NewTerminalButton(
-                    Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                    onClick = { if (connected) newSheet = true },
-                )
-            }
-            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
-        }
-
-        if (newSheet) NewTerminalSheet(state.launchers, state.folders, onDismiss = { newSheet = false }) { command, cwd -> newSheet = false; client.create(remembered.first, remembered.second, command, cwd) }
-        renaming?.let { session ->
-            RenameDialog(
-                initial = labels[session.id].orEmpty(),
-                onDismiss = { renaming = null },
-                onConfirm = { setLabel(session.id, it); renaming = null },
-            )
-        }
-        closing?.let { session ->
-            DeskDialog(
-                onDismissRequest = { closing = null },
-                title = stringResource(R.string.terminal_close_title),
-                text = { Text(stringResource(R.string.terminal_close_message)) },
-                confirm = DialogAction(stringResource(R.string.terminal_close_confirm), destructive = true) { client.close(session.id); closing = null },
-                dismiss = DialogAction(stringResource(android.R.string.cancel)) { closing = null },
-            )
-        }
+    /** Leaves the terminal for the Terminals tab, with what happened as the message there. */
+    private fun leave(client: TerminalClient, id: String?, ending: TerminalRoute.Ending?) {
+        id?.let(client::leave)
+        toTerminalsTab(
+            when (ending) {
+                null -> null
+                TerminalRoute.Ending.Ended -> getString(R.string.terminal_snack_ended)
+                TerminalRoute.Ending.ByComputer -> getString(R.string.terminal_ended_by_computer)
+                is TerminalRoute.Ending.Exited -> if (ending.status == 0L) getString(R.string.terminal_snack_ended) else getString(R.string.terminal_snack_exited, ending.status)
+            },
+        )
     }
 
     private fun deskName(): String = DeskNames.of(deviceId)
-
-    @Composable
-    private fun NewTerminalButton(modifier: Modifier, onClick: () -> Unit) {
-        val t = tokens
-        Row(
-            modifier
-                .shadow(8.dp, RoundedCornerShape(18.dp))
-                .heightIn(min = 56.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(t.accentContainer)
-                .clickable(role = Role.Button, onClick = onClick)
-                .padding(start = 16.dp, end = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Icon(painterResource(R.drawable.sym_add), contentDescription = null, tint = t.onAccentContainer)
-            Text(stringResource(R.string.terminal_new_terminal), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = t.onAccentContainer)
-        }
-    }
-
-    /**
-     * What to start: a shell or one of the agent CLIs the desktop has. The "Start in" folder chips
-     * go between the choice and the button once the desktop reports folders.
-     */
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    private fun NewTerminalSheet(launchers: List<String>, folders: List<String>, onDismiss: () -> Unit, onStart: (List<String>?, String?) -> Unit) {
-        val t = tokens
-        val options = listOf<Pair<String, List<String>?>>(stringResource(R.string.terminal_launch_shell) to null) +
-            launchers.mapNotNull { launcher -> agentName(launcher)?.let { it to listOf(launcher) } }
-        var choice by rememberSaveable { mutableIntStateOf(0) }
-        // "Start in": the desk's folders ("~" first), the first one picked. An older desk sends none.
-        var folder by rememberSaveable { mutableIntStateOf(0) }
-        ModalBottomSheet(
-            onDismissRequest = onDismiss,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = t.surface2,
-            // The stock handle: TalkBack names it and it expands or collapses the sheet.
-            dragHandle = { androidx.compose.material3.BottomSheetDefaults.DragHandle(width = 32.dp, height = 4.dp, color = t.hairlineStrong) },
-        ) {
-            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.terminal_new_terminal), fontSize = 22.sp, fontWeight = FontWeight.Medium, modifier = Modifier.semantics { heading() })
-                    Text(stringResource(R.string.terminal_new_runs_on, deskName()), fontSize = 14.sp, color = t.textDim)
-                }
-                Text(stringResource(R.string.terminal_new_start), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.textDim)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
-                    options.forEachIndexed { index, (label, _) -> org.desklink.mobile.ui.compose.components.DeskFilterChip(label, index == choice, { choice = index }) }
-                }
-                if (folders.isNotEmpty()) {
-                    Text(stringResource(R.string.terminal_new_start_in), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.textDim)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
-                        folders.forEachIndexed { index, path ->
-                            val selected = index == folder
-                            Box(
-                                Modifier
-                                    .heightIn(min = 48.dp)
-                                    .selectable(selected = selected, role = Role.RadioButton) { folder = index },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    path,
-                                    fontFamily = MonoFamily,
-                                    fontSize = 13.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.MiddleEllipsis,
-                                    color = if (selected) t.onAccentContainer else t.text,
-                                    modifier = Modifier
-                                        .widthIn(max = 220.dp)
-                                        .background(if (selected) t.accentContainer else Color.Transparent, RoundedCornerShape(18.dp))
-                                        .border(1.dp, if (selected) Color.Transparent else t.hairlineStrong, RoundedCornerShape(18.dp))
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-                PrimaryButton(
-                    stringResource(R.string.terminal_new_start_button),
-                    { onStart(options.getOrNull(choice)?.second, folders.getOrNull(folder)) },
-                    Modifier.fillMaxWidth().padding(top = 6.dp),
-                    icon = R.drawable.sym_terminal,
-                )
-            }
-        }
-    }
 
     @Composable
     private fun agentName(title: String): String? = when (title) {
         TerminalProtocol.LAUNCHER_CLAUDE -> stringResource(R.string.terminal_launcher_claude)
         TerminalProtocol.LAUNCHER_CODEX -> stringResource(R.string.terminal_launcher_codex)
         else -> null
-    }
-
-    /** A session as a dark card: name, its last lines, and whether this phone has it open. */
-    @Composable
-    private fun SessionCard(
-        session: TerminalSessionState,
-        preview: SessionPreview,
-        connected: Boolean,
-        onOpen: () -> Unit,
-        onRename: () -> Unit,
-        onClose: () -> Unit,
-        onRestart: () -> Unit,
-    ) {
-        val finished = session.gone || session.exitStatus != null
-        var menu by remember { mutableStateOf(false) }
-        val here = session.attached && !finished
-        Column {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(TermBg)
-                    .then(if (here) Modifier.border(1.5.dp, TermCoral.copy(alpha = 0.6f), RoundedCornerShape(24.dp)) else Modifier)
-                    .clickable(onClickLabel = stringResource(R.string.terminal_open_session), onClick = onOpen)
-                    .padding(start = 18.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                // Its folder names a plain shell best; a name given here or an agent's name wins.
-                val cardTitle = labels[session.id] ?: agentName(session.title) ?: session.cwd ?: preview.name
-                val meta = listOfNotNull(session.shell, session.startedAt?.let { startedLabel(it) }).joinToString(" · ")
-                    .ifEmpty { "${preview.badge} · ${preview.size}" }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(cardTitle, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, modifier = Modifier.weight(1f))
-                    Text(meta, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1)
-                    Box {
-                        IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
-                            Icon(painterResource(R.drawable.sym_more_vert), contentDescription = stringResource(R.string.terminal_session_options, preview.name), tint = TermIcon)
-                        }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text(stringResource(R.string.terminal_rename)) }, onClick = { menu = false; onRename() })
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.terminal_close_session)) },
-                                enabled = connected,
-                                onClick = { menu = false; onClose() },
-                            )
-                        }
-                    }
-                }
-                Column(Modifier.padding(end = 14.dp)) {
-                    if (preview.lines.isEmpty()) {
-                        Text(stringResource(R.string.terminal_preview_open), fontFamily = MonoFamily, fontSize = 11.sp, lineHeight = 16.sp, color = TermDim, maxLines = 1)
-                    } else {
-                        preview.lines.takeLast(2).forEach {
-                            Text(it, fontFamily = MonoFamily, fontSize = 11.sp, lineHeight = 16.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-                Row(Modifier.heightIn(min = 40.dp).padding(end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    when {
-                        finished -> Text(
-                            if (session.gone) stringResource(R.string.terminal_chip_ended) else stringResource(R.string.terminal_chip_exited, session.exitStatus ?: 0L),
-                            fontSize = 12.sp,
-                            color = TermDim,
-                        )
-                        here -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            PresenceDot(color = TermCoral)
-                            Text(stringResource(R.string.terminal_you_are_here), fontSize = 12.sp, color = TermCoralText)
-                        }
-                        session.attachedElsewhere -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            PresenceDot(color = TermCoral)
-                            Text(stringResource(R.string.terminal_open_elsewhere), fontSize = 12.sp, color = TermCoralText)
-                        }
-                        else -> Text(stringResource(R.string.terminal_running_on, deskName()), fontSize = 12.sp, color = TermDim)
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Icon(painterResource(R.drawable.sym_arrow_forward), contentDescription = null, tint = TermIcon, modifier = Modifier.size(20.dp))
-                }
-            }
-            if (finished && connected) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onRestart) { Text(stringResource(R.string.terminal_restart)) }
-                }
-            }
-        }
-    }
-
-    /** "10:42" today, "Mon 10:42" otherwise. */
-    private fun startedLabel(unixSecs: Long): String {
-        val millis = unixSecs * 1000
-        val time = android.text.format.DateFormat.getTimeFormat(this).format(java.util.Date(millis))
-        return if (android.text.format.DateUtils.isToday(millis)) time else
-            android.text.format.DateUtils.formatDateTime(this, millis, android.text.format.DateUtils.FORMAT_SHOW_WEEKDAY or android.text.format.DateUtils.FORMAT_ABBREV_WEEKDAY) + " " + time
-    }
-
-    /** The desktop wants its session password. During a lockout only a retry is offered. */
-    @Composable
-    private fun Locked(denial: SessionPasswordDenial, onEnterPassword: () -> Unit, onRetry: () -> Unit) {
-        val lockedOut = denial is SessionPasswordDenial.Locked
-        StatePanel(
-            title = stringResource(R.string.terminal_locked_title),
-            message = if (denial is SessionPasswordDenial.Locked) {
-                sessionPasswordLockedMessage(this@TerminalActivity, denial.seconds)
-            } else {
-                stringResource(R.string.session_password_message)
-            },
-            action = stringResource(if (lockedOut) R.string.terminal_retry else R.string.terminal_enter_password),
-            onAction = if (lockedOut) onRetry else onEnterPassword,
-        )
-    }
-
-    /** A centred explanation with one way forward: access turned off, or a password wanted. */
-    @Composable
-    private fun StatePanel(title: String, message: String, action: String, onAction: () -> Unit) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            EmptyState(icon = R.drawable.sym_lock, title = title, body = message) {
-                PrimaryButton(action, onAction, height = 48.dp)
-            }
-        }
-    }
-
-    /** Loading the list: cards shaped like the real ones, with a sheen. */
-    @Composable
-    private fun CenteredProgress() {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .semantics { contentDescription = getString(R.string.terminal_loading) },
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            repeat(3) {
-                Box(Modifier.fillMaxWidth().height(132.dp).clip(RoundedCornerShape(24.dp)).shimmer())
-            }
-        }
     }
 
     @Composable
@@ -784,24 +471,27 @@ class TerminalActivity : AppCompatActivity() {
         }
     }
 
+    /** Starting a terminal for the Terminals tab: a moment of progress on the terminal's own black, then the session. */
     @Composable
-    private fun RenameDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-        var text by remember { mutableStateOf(initial) }
-        DeskDialog(
-            onDismissRequest = onDismiss,
-            title = stringResource(R.string.terminal_rename),
-            text = {
-                DeskTextField(
-                    value = text,
-                    onValueChange = { text = it.take(60) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = stringResource(R.string.terminal_rename_hint),
-                )
-            },
-            confirm = DialogAction(stringResource(android.R.string.ok)) { onConfirm(text) },
-            dismiss = DialogAction(stringResource(android.R.string.cancel)) { onDismiss() },
-        )
+    private fun StartingScreen(connected: Boolean, onBack: () -> Unit) {
+        Box(Modifier.fillMaxSize().background(TermBg).safeDrawingPadding()) {
+            Column(Modifier.fillMaxSize()) {
+                TerminalHeader(
+                    name = stringResource(R.string.terminal_new_terminal),
+                    detail = deskName(),
+                    status = if (connected) null else stringResource(R.string.terminal_status_reconnecting),
+                    size = null,
+                    backLabel = stringResource(R.string.terminal_back_to_sessions),
+                    onBack = onBack,
+                ) {}
+                Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        color = TermAccent,
+                        modifier = Modifier.semantics { contentDescription = getString(R.string.terminal_starting) },
+                    )
+                }
+            }
+        }
     }
 
     // ---- terminal ------------------------------------------------------------------------------------------
@@ -824,6 +514,7 @@ class TerminalActivity : AppCompatActivity() {
         var fitWidth by remember { mutableStateOf(context.getSharedPreferences("desklink_terminal_view", Context.MODE_PRIVATE).getBoolean("fit_width", false)) }
         var menu by remember { mutableStateOf(false) }
         var newSheet by rememberSaveable { mutableStateOf(false) }
+        var endingOpen by rememberSaveable { mutableStateOf(false) }
         var composing by rememberSaveable { mutableStateOf(false) }
         var draft by rememberSaveable { mutableStateOf("") }
         val imeVisible = WindowInsets.isImeVisible
@@ -892,7 +583,7 @@ class TerminalActivity : AppCompatActivity() {
                     status = subtitle,
                     size = session?.takeIf { it.cols > 0 && it.rows > 0 }?.let { stringResource(R.string.terminal_session_size, it.cols, it.rows) },
                     backLabel = stringResource(R.string.terminal_back_to_sessions),
-                    onBack = { leaveTerminal(client, id) },
+                    onBack = { leave(client, id, null) },
                 ) {
                     Box {
                         IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) {
@@ -919,11 +610,12 @@ class TerminalActivity : AppCompatActivity() {
                             )
                             DropdownMenuItem(text = { Text(stringResource(R.string.terminal_paste)) }, onClick = { menu = false; paste(context, screen, snackbar) })
                             DropdownMenuItem(text = { Text(stringResource(R.string.terminal_rename)) }, onClick = { menu = false; renamingOpen = id })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.terminal_close_session)) }, enabled = connected, onClick = { menu = false; endingOpen = true })
                         }
                     }
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(TermEdge))
-                SessionChips(state, id, onPick = { other -> leaveTerminal(client, id); openId = other }, onNew = { newSheet = true })
+                SessionChips(state, id, onPick = { other -> client.leave(id); openId = other }, onNew = { newSheet = true })
                 if (state.notAllowed) {
                     Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.terminal_not_allowed_message), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
@@ -993,13 +685,19 @@ class TerminalActivity : AppCompatActivity() {
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp))
         }
-        if (newSheet) NewTerminalSheet(state.launchers, state.folders, onDismiss = { newSheet = false }) { command, cwd -> newSheet = false; client.create(remembered.first, remembered.second, command, cwd) }
+        if (newSheet) NewTerminalSheet(deskName(), state.launchers, state.folders, onDismiss = { newSheet = false }) { launcher, cwd -> newSheet = false; client.create(remembered.first, remembered.second, launcher?.let(::listOf), cwd) }
         renamingOpen?.let { renameId ->
-            RenameDialog(
+            TerminalRenameDialog(
                 initial = labels[renameId].orEmpty(),
                 onDismiss = { renamingOpen = null },
                 onConfirm = { setLabel(renameId, it); renamingOpen = null },
             )
+        }
+        // End session: the shell stops on the computer, and the Terminals tab says so.
+        if (endingOpen) EndSessionDialog(onDismiss = { endingOpen = false }) {
+            endingOpen = false
+            client.close(id)
+            leave(client, id, TerminalRoute.Ending.Ended)
         }
     }
 
@@ -1355,9 +1053,10 @@ class TerminalActivity : AppCompatActivity() {
         const val EXTRA_DEVICE_ID = "deviceId"
         const val EXTRA_TERMINAL_ID = "terminalId"
 
-        /** Start one shell as soon as the list is up (the Terminals tab's "New terminal"). */
+        /** Start a session ([EXTRA_LAUNCHER], in [EXTRA_CWD]) as soon as the list is up, and show it. Without this or [EXTRA_TERMINAL_ID] the activity shows nothing: it goes to the Terminals tab. */
         const val EXTRA_NEW = "newTerminal"
         const val EXTRA_LAUNCHER = "launcher"
+        const val EXTRA_CWD = "cwd"
 
         private const val STATE_OPEN_ID = "openTerminalId"
         private const val LABEL_PREFS = org.desklink.mobile.helpers.PerPeerState.LABELS
@@ -1368,10 +1067,11 @@ class TerminalActivity : AppCompatActivity() {
         /** Bigger than any reasonable paste; keeps one tap from queueing megabytes onto the channel. */
         private const val MAX_PASTE_CHARS = 100_000
 
-        fun intent(context: Context, deviceId: String, newTerminal: Boolean = false, launcher: String? = null): Intent =
+        fun intent(context: Context, deviceId: String, newTerminal: Boolean = false, launcher: String? = null, cwd: String? = null): Intent =
             Intent(context, TerminalActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId).apply {
                 if (newTerminal) putExtra(EXTRA_NEW, true)
                 launcher?.let { putExtra(EXTRA_LAUNCHER, it) }
+                cwd?.let { putExtra(EXTRA_CWD, it) }
             }
     }
 }
@@ -1427,12 +1127,6 @@ private val TermCoralText = Color(0xFFFF9A88)
 /** A held arrow repeats like a hardware key: after this long, then this often. */
 private const val ARROW_REPEAT_DELAY_MS = 400L
 private const val ARROW_REPEAT_MS = 50L
-
-/** How often the session list re-reads the preview tiles' screens. */
-private const val PREVIEW_REFRESH_MS = 1_500L
-
-/** How often the session list asks for sessions started elsewhere. */
-private const val LIST_REFRESH_MS = 5_000L
 
 /**
  * The session header of the design: back, the `>_` badge, the name over "folder · computer · status", the size in mono and the menu

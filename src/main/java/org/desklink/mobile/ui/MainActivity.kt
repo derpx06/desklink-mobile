@@ -11,6 +11,7 @@ import org.desklink.mobile.ui.compose.components.DialogAction
 import org.desklink.mobile.ui.compose.components.DeskDialog
 import org.desklink.mobile.extensions.isReadable
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
@@ -280,6 +281,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             }
             intent.action == ACTION_ADD_TO_BUCKET -> startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this, selectedId))
             intent.hasExtra(FLAG_FORCE_OVERVIEW) -> { resetTo(HOME); nav.select(AppTab.HOME) }
+            // "Open the terminals" from anywhere (the widget, a closed or ended session, an old shortcut): the Terminals tab is the one list.
+            intent.getBooleanExtra(EXTRA_OPEN_TERMINALS, false) -> {
+                intent.getStringExtra(EXTRA_DEVICE_ID)?.takeIf { DeskLinkApplication.getInstance().getDevice(it)?.isPaired == true }?.let(::select)
+                resetTo(HOME)
+                nav.select(AppTab.TERMINALS)
+                intent.getStringExtra(EXTRA_MESSAGE)?.let(::showMessage)
+            }
             // A Settings page asked for from outside (the desk screen's settings button): the tab, on that page.
             intent.hasExtra(EXTRA_SETTINGS_PAGE) -> {
                 val page = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
@@ -537,9 +545,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     deviceId = id,
                     deskName = device.name,
                     onOpenSession = { sessionId -> startActivity(TerminalActivity.intent(this, id).putExtra(TerminalActivity.EXTRA_TERMINAL_ID, sessionId)) },
-                    onOpenTerminals = { startActivity(TerminalActivity.intent(this, id)) },
-                    onNew = { startActivity(TerminalActivity.intent(this, id, newTerminal = true)) },
-                    onNewLauncher = { launcher -> startActivity(TerminalActivity.intent(this, id, newTerminal = true, launcher = launcher)) },
+                    onNewTerminal = { launcher, cwd -> startActivity(TerminalActivity.intent(this, id, newTerminal = true, launcher = launcher, cwd = cwd)) },
+                    onMessage = ::showMessage,
                 )
                 AppTab.SETTINGS -> SettingsContent(device)
             }
@@ -1402,6 +1409,18 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         const val ACTION_ADD_TO_BUCKET = "org.desklink.mobile.action.ADD_TO_BUCKET"
         const val EXTRA_DEVICE_ID = "deviceId"
         const val EXTRA_OPEN_FILES = "openFiles"
+        const val EXTRA_OPEN_TERMINALS = "openTerminals"
+        const val EXTRA_MESSAGE = "message"
+
+        /** Opens the app on [deviceId]'s Terminals tab, with [message] in its snackbar. The one way anything "opens the terminals". */
+        fun terminalsIntent(context: Context, deviceId: String?, message: String? = null): Intent =
+            Intent(context, MainActivity::class.java)
+                .putExtra(EXTRA_OPEN_TERMINALS, true)
+                .apply {
+                    deviceId?.takeIf { it.isNotEmpty() }?.let { putExtra(EXTRA_DEVICE_ID, it) }
+                    message?.let { putExtra(EXTRA_MESSAGE, it) }
+                }
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         const val PAIR_REQUEST_STATUS = "pair_req_status"
         const val PAIRING_PENDING = "pending"
         const val RESULT_NEEDS_RELOAD = RESULT_FIRST_USER

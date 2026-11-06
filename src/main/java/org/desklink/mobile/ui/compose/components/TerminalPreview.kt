@@ -72,6 +72,8 @@ data class SessionPreview(
     val size: String,
     /** The last lines ask the person something (a y/n, an approval menu, a password): the card says so. */
     val waiting: Boolean = false,
+    /** "You're here", "Open on another phone", "Ended", "Exited (1)": what the dot cannot say. Null for a plain running session. */
+    val status: String? = null,
 )
 
 object SessionPreviews {
@@ -96,6 +98,7 @@ object SessionPreviews {
                 id = session.id,
                 name = labels.getString(org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, session.id), null)
                     ?: agentName(context, session.title)
+                    ?: session.cwd?.takeIf { it.isNotBlank() }
                     ?: session.title.ifBlank { session.id.take(8) },
                 badge = badgeOf(session.title),
                 live = session.exitStatus == null && state.link == TerminalLinkState.CONNECTED,
@@ -104,6 +107,22 @@ object SessionPreviews {
                 waiting = waiting,
             )
         }
+    }
+
+    /** The names people gave [deviceId]'s sessions, by session id. */
+    fun labels(context: Context, deviceId: String): Map<String, String> =
+        (context.applicationContext ?: context).getSharedPreferences(LABEL_PREFS, Context.MODE_PRIVATE).all
+            .mapNotNull { (key, value) -> if (key.startsWith("$deviceId/") && value is String) key.removePrefix("$deviceId/") to value else null }
+            .toMap()
+
+    /** Names a session (blank clears the name); returns the stored name. The same names the tab's cards and the terminal screen show. */
+    fun setLabel(context: Context, deviceId: String, sessionId: String, label: String): String {
+        val trimmed = label.trim().take(60)
+        val key = org.desklink.mobile.helpers.PerPeerState.labelKey(deviceId, sessionId)
+        (context.applicationContext ?: context).getSharedPreferences(LABEL_PREFS, Context.MODE_PRIVATE).edit().apply {
+            if (trimmed.isEmpty()) remove(key) else putString(key, trimmed)
+        }.apply()
+        return trimmed
     }
 
     /** The last lines the notification tracker looks at: a prompt older than these has been answered or scrolled away. */
@@ -191,6 +210,7 @@ fun TerminalTile(
                     }
                 }
             }
+            preview.status?.let { Text(it, fontSize = 12.sp, color = TileDim, modifier = Modifier.padding(top = 6.dp)) }
         }
         if (preview.waiting) {
             Row(
