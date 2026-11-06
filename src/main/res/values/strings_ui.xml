@@ -460,6 +460,50 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="other">%1$d commands finished</item>
     </plurals>
 
+    <!-- The widget family: status, quick actions, notes, transfers, terminals -->
+    <string name="widget_status_label">Computer status</string>
+    <string name="widget_status_description">Which computer you are linked to and how: over Wi‑Fi, through the relay or not reachable, with its battery.</string>
+    <string name="widget_actions_label">Quick actions</string>
+    <string name="widget_actions_description">Computer screen, send files, send clipboard and ring, with Lock when your computer allows it.</string>
+    <string name="widget_notes_label">Notes</string>
+    <string name="widget_notes_description">Your newest notes and a button for a new one. Titles stay hidden while the phone is locked.</string>
+    <string name="widget_transfers_label">Transfers</string>
+    <string name="widget_transfers_description">The file going to or from your computer now, or the last one, and the size of the Bucket.</string>
+    <string name="widget_terminals_label">New terminal</string>
+    <string name="widget_terminals_description">Start a terminal on your computer. Shows when terminal access is off.</string>
+    <string name="widget_cant_reach">Can\'t reach</string>
+    <string name="widget_pc_preview_battery">84%</string>
+    <string name="widget_pc_battery">%1$d%%</string>
+    <string name="widget_pc_battery_charging">%1$d%% ⚡</string>
+    <string name="widget_status_preview_detail">12 ms · 14:05</string>
+    <string name="widget_status_updated">Updated %1$s</string>
+    <string name="widget_status_last_seen">Last seen %1$s</string>
+    <string name="widget_join">%1$s · %2$s</string>
+    <string name="widget_action_off">%1$s, unavailable. %2$s</string>
+    <string name="widget_notes_preview_1">Shopping list</string>
+    <string name="widget_notes_preview_2">Meeting notes</string>
+    <string name="widget_notes_preview_3">Ideas for the weekend</string>
+    <string name="widget_notes_preview_4">Wi‑Fi passwords</string>
+    <string name="widget_notes_preview_5">Reading list</string>
+    <string name="widget_notes_locked">Unlock your phone to see your notes</string>
+    <string name="widget_notes_locked_hint">Tap to open</string>
+    <string name="widget_notes_none">No notes yet. Tap + to write one.</string>
+    <string name="widget_notes_unavailable">Notes are not available right now</string>
+    <plurals name="widget_notes_more">
+        <item quantity="one">+%1$d more</item>
+        <item quantity="other">+%1$d more</item>
+    </plurals>
+    <string name="widget_notes_open">Open note: %1$s</string>
+    <string name="widget_transfers_preview_name">holiday-photos.zip</string>
+    <string name="widget_transfers_preview_sub">Sending · 42%</string>
+    <string name="widget_transfers_preview_bucket">Bucket · 120 MB</string>
+    <string name="widget_transfers_idle">No transfers yet</string>
+    <string name="widget_transfers_idle_hint">Files you send or get show up here</string>
+    <string name="widget_bucket_size">Bucket · %1$s</string>
+    <string name="widget_terminals_new">New terminal</string>
+    <string name="widget_terminals_access_off">Terminal access is off</string>
+    <string name="widget_terminals_access_hint">Open settings</string>
+
     <!-- Phase 3: calls -->
     <string name="pref_plugin_calls">Calls on the computer</string>
     <string name="pref_plugin_calls_desc">See, answer and place this phone\'s calls from the computer</string>

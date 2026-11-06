@@ -178,6 +178,7 @@ object DeskSurfaces {
                 pending = false
                 lastRefreshAt = SystemClock.elapsedRealtime()
                 runCatching { DeskWidgetProvider.updateAll(app) }
+                runCatching { org.desklink.mobile.ui.surfaces.widgets.DeskWidgets.updateAll(app) }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     listOf(LockDeskTileService::class.java, KeepAwakeTileService::class.java, RingDeskTileService::class.java,
                         org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java).forEach {
@@ -208,7 +209,9 @@ object DeskSurfaces {
         val device = deviceId?.let { DeskLinkApplication.getInstance().getDevice(it) }?.takeIf { it.isPaired } ?: currentDesk(context)
         fun tell(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         if (device == null) return tell(context.getString(R.string.surfaces_not_paired))
-        if (!device.hasActiveWebRtcFeatureTransport) return tell(context.getString(R.string.settings_waiting_for, device.name))
+        // Home's own wording for a computer that is not ready (Still connecting / Can't set up / offline / update needed).
+        org.desklink.mobile.ui.surfaces.widgets.WidgetRules.notReady(org.desklink.mobile.ui.surfaces.widgets.WidgetFacts.of(context, device))
+            ?.let { return tell(context.getString(org.desklink.mobile.ui.surfaces.widgets.WidgetRules.notReadyMessage(it), device.name)) }
         when (action) {
             Action.LOCK -> {
                 if (device.getPlugin(org.desklink.mobile.plugins.lockdevice.LockDevicePlugin::class.java) == null) return tell(context.getString(R.string.home_feature_off))

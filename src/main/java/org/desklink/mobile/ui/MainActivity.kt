@@ -8,6 +8,7 @@
 package org.desklink.mobile.ui
 
 import org.desklink.mobile.ui.compose.components.DialogAction
+import org.desklink.mobile.ui.surfaces.DeskSurfaces
 import org.desklink.mobile.ui.compose.components.DeskDialog
 import org.desklink.mobile.extensions.isReadable
 import android.Manifest
@@ -278,6 +279,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 nav.select(AppTab.NOTES)
                 notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW
             }
+            // The Notes widget: "" is the list, an id is that note. Navigation only.
+            intent.hasExtra(EXTRA_NOTE_ID) -> {
+                val noteId = intent.getStringExtra(EXTRA_NOTE_ID).orEmpty()
+                resetTo(HOME)
+                nav.select(AppTab.NOTES)
+                if (noteId.isNotEmpty() && org.desklink.mobile.plugins.notes.NotesStore.note(this, noteId) != null) notesEditing.value = noteId
+            }
             intent.action == ACTION_ADD_TO_BUCKET -> startActivity(org.desklink.mobile.plugins.folders.BucketActivity.intent(this, selectedId))
             intent.hasExtra(FLAG_FORCE_OVERVIEW) -> { resetTo(HOME); nav.select(AppTab.HOME) }
             // A Settings page asked for from outside (the desk screen's settings button): the tab, on that page.
@@ -360,6 +368,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private fun select(id: String?) {
         selectedId = id
         selection.edit { putString(STATE_SELECTED_DEVICE, id) }
+        // The widgets follow the computer picked here.
+        DeskSurfaces.refresh(this)
     }
 
     fun showMessage(message: String) {
@@ -1402,6 +1412,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         const val ACTION_ADD_TO_BUCKET = "org.desklink.mobile.action.ADD_TO_BUCKET"
         const val EXTRA_DEVICE_ID = "deviceId"
         const val EXTRA_OPEN_FILES = "openFiles"
+        const val EXTRA_NOTE_ID = "noteId"
         const val PAIR_REQUEST_STATUS = "pair_req_status"
         const val PAIRING_PENDING = "pending"
         const val RESULT_NEEDS_RELOAD = RESULT_FIRST_USER

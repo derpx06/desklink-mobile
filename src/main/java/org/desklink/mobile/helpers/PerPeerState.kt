@@ -21,9 +21,12 @@ object PerPeerState {
     fun seenKey(deviceId: String) = "seen_$deviceId"
     fun finishedKey(deviceId: String) = "finished_$deviceId"
 
+    /** The last answer to "may this phone open a terminal there": the widget shows it while the link is down. */
+    fun terminalAccessKey(deviceId: String) = "termaccess_$deviceId"
+
     val stores: List<Store> = listOf(
         Store(LABELS) { key, id -> key.startsWith("$id/") },
-        Store(SURFACES) { key, id -> key == seenKey(id) || key == finishedKey(id) },
+        Store(SURFACES) { key, id -> key == seenKey(id) || key == finishedKey(id) || key == terminalAccessKey(id) },
         Store(SHARE_QUEUE) { key, id -> key == id || key == "attempts_$id" },
         Store(DND_RESTORE) { key, id -> key == id },
     )

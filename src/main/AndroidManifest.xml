@@ -507,6 +507,29 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <receiver
             android:name="org.desklink.mobile.ui.surfaces.DeskWidgetActionReceiver"
             android:exported="false" />
+
+        <!-- The widget family. Home screen only, never the lock screen. Their buttons go through the
+             non-exported receiver above or the non-exported WidgetActionActivity, which checks the live state first. -->
+        <receiver
+            android:name="org.desklink.mobile.ui.surfaces.widgets.ComputerStatusWidget"
+            android:exported="true"
+            android:label="@string/widget_status_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_status_info" />
+        </receiver>
+
+        <activity
+            android:name="org.desklink.mobile.ui.surfaces.widgets.WidgetActionActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Transparent" />
+
     </application>
 
 </manifest>

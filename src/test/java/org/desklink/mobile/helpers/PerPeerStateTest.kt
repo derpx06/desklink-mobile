@@ -21,7 +21,7 @@ class PerPeerStateTest {
     // Keys as the writers build them, for both computers, in every registered store.
     private fun keysFor(store: String, id: String): List<String> = when (store) {
         PerPeerState.LABELS -> listOf(PerPeerState.labelKey(id, "session-1"))
-        PerPeerState.SURFACES -> listOf(PerPeerState.seenKey(id), PerPeerState.finishedKey(id))
+        PerPeerState.SURFACES -> listOf(PerPeerState.seenKey(id), PerPeerState.finishedKey(id), PerPeerState.terminalAccessKey(id))
         PerPeerState.SHARE_QUEUE -> listOf(id, "attempts_$id")
         PerPeerState.DND_RESTORE -> listOf(id)
         else -> error("a store without a key list in this test: $store")

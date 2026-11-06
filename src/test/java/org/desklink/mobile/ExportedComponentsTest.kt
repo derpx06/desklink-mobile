@@ -23,8 +23,17 @@ class ExportedComponentsTest {
         .filter { it.exported }.map { it.name.substringAfterLast('.') }.toSet()
 
     @Test
-    fun theOnlyExportedReceiversAreTheMediaButtonAndTheHomeWidget() {
-        assertEquals(setOf("MprisMediaNotificationReceiver", "DeskWidgetProvider"), exportedReceivers() - "ProfileInstallReceiver" /* androidx, guarded by its own permission */)
+    fun theOnlyExportedReceiversAreTheMediaButtonAndTheHomeWidgets() {
+        // The widget providers are exported like the first one: they only redraw from the live state (the launcher's update broadcast
+        // carries nothing they act on), and their buttons go through the non-exported receiver and WidgetActionActivity.
+        val widgets = setOf("DeskWidgetProvider", "ComputerStatusWidget")
+        assertEquals(setOf("MprisMediaNotificationReceiver") + widgets, exportedReceivers() - "ProfileInstallReceiver" /* androidx, guarded by its own permission */)
+    }
+
+    @Test
+    fun theWidgetActivityIsNotExported() {
+        val info = app.packageManager.getActivityInfo(android.content.ComponentName(app, "org.desklink.mobile.ui.surfaces.widgets.WidgetActionActivity"), 0)
+        assertEquals(false, info.exported)
     }
 
     private fun info(flags: Int) = app.packageManager.getPackageInfo(app.packageName, flags)

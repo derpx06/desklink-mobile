@@ -25,11 +25,14 @@ object HomeDerive {
     /** The computer's actions can be used: connected and not waiting for an update. Everything that sends something asks this, never `ready`. */
     fun usable(s: HomeState): Boolean = whyNot(s) == null
 
-    fun whyNot(s: HomeState): NotReady? = when {
-        s.updateNeeded -> NotReady.UPDATE
-        s.ready -> null
-        s.connection == DeviceConnection.CONNECTING -> NotReady.CONNECTING
-        s.connection == DeviceConnection.UNAVAILABLE -> NotReady.CANT_REACH
+    fun whyNot(s: HomeState): NotReady? = whyNot(s.updateNeeded, s.ready, s.connection)
+
+    /** The same rule from its three inputs, for the widgets and tiles that have no [HomeState]. */
+    fun whyNot(updateNeeded: Boolean, ready: Boolean, connection: DeviceConnection): NotReady? = when {
+        updateNeeded -> NotReady.UPDATE
+        ready -> null
+        connection == DeviceConnection.CONNECTING -> NotReady.CONNECTING
+        connection == DeviceConnection.UNAVAILABLE -> NotReady.CANT_REACH
         else -> NotReady.OFFLINE
     }
 
