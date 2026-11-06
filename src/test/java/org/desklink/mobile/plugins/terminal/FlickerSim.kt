@@ -31,9 +31,11 @@ class FlickerSim(
     private val jitterMs: Double = 4.0,
     private val burstGapMs: Double = 100.0,
 ) {
-    data class Result(val presented: Int, val partial: Int, val blank: Int, val redundant: Int, val seconds: Double, val bytes: Int, val examples: List<String>) {
+    data class Result(val presented: Int, val partial: Int, val blank: Int, val redundant: Int, val seconds: Double, val bytes: Int, val examples: List<String>, val latencies: List<Double> = emptyList()) {
+        val meanLatencyMs get() = if (latencies.isEmpty()) 0.0 else latencies.average()
+        val maxLatencyMs get() = latencies.maxOrNull() ?: 0.0
         val presentsPerSecond get() = presented / seconds
-        override fun toString() = "presented=$presented partial=$partial blank=$blank redundant=$redundant presents/s=%.1f bytes=$bytes".format(presentsPerSecond)
+        override fun toString() = "presented=$presented partial=$partial blank=$blank redundant=$redundant presents/s=%.1f latency(mean/max ms)=%.1f/%.1f bytes=$bytes".format(presentsPerSecond, meanLatencyMs, maxLatencyMs)
     }
 
     private class Write(val at: Double, val bytes: ByteArray)
@@ -44,18 +46,22 @@ class FlickerSim(
         // The whole frames, as a reference screen fed each burst in one piece.
         val reference = TerminalScreen(rows, cols, reply = {})
         val complete = HashSet<String>()
+        val afterBurst = ArrayList<String>()
         if (prefix.isNotEmpty()) reference.write(prefix)
         complete += TerminalGrid.grid(reference)
         for (b in bursts) {
             reference.write(b)
-            complete += TerminalGrid.grid(reference)
+            afterBurst += TerminalGrid.grid(reference)
+            complete += afterBurst.last()
         }
+        val burstEnd = DoubleArray(bursts.size)
 
         // The delivery timeline.
         val writes = ArrayList<Write>()
         if (prefix.isNotEmpty()) writes += Write(0.0, prefix)
         var burstAt = 20.0
         var bytes = prefix.size
+        var burstIndex = 0
         for (b in bursts) {
             val pieces = b.toList().chunked(readBytes).map { it.toByteArray() }
             var tick = Math.floor(burstAt / pumpMs) * pumpMs + pumpMs
@@ -67,7 +73,9 @@ class FlickerSim(
                     jitter = rng.nextDouble() * jitterMs
                 }
                 writes += Write(tick + jitter + 0.05 * n++, piece)
+                burstEnd[burstIndex] = writes.last().at
             }
+            burstIndex++
             bytes += b.size
             burstAt += burstGapMs * (0.6 + 0.8 * rng.nextDouble())
         }
@@ -77,7 +85,7 @@ class FlickerSim(
         val pacer = pacerFactory()
         var clock = 0.0
         screen.listener = object : TerminalScreen.Listener {
-            override fun onScreenChanged() = pacer.changed(clock.toLong())
+            override fun onScreenChanged(settled: Boolean) = pacer.changed(clock.toLong(), settled)
             override fun onSnapshot() = Unit
             override fun onBell() = Unit
         }
@@ -89,6 +97,8 @@ class FlickerSim(
         var redundant = 0
         var previous: String? = null
         val examples = ArrayList<String>()
+        val latencies = ArrayList<Double>()
+        val shown = BooleanArray(bursts.size)
         var next = 0
         val end = (writes.lastOrNull()?.at ?: 0.0) + 200.0
         var v = VSYNC_MS
@@ -107,11 +117,12 @@ class FlickerSim(
                     if (examples.size < 2) examples += screen.tailText(rows).lines().count { it.isNotBlank() }.toString() + " non-blank rows at t=${v.toInt()}"
                 }
                 if (screen.tailText(rows).isBlank() && complete.any { it.contains("|") }) blank++
+                for (i in bursts.indices) if (!shown[i] && burstEnd[i] <= v && afterBurst[i] == grid) { shown[i] = true; latencies += v - burstEnd[i] }
                 previous = grid
             }
             v += VSYNC_MS
         }
-        return Result(presented, partial, blank, redundant, end / 1000.0, bytes, examples)
+        return Result(presented, partial, blank, redundant, end / 1000.0, bytes, examples, latencies)
     }
 
     companion object {

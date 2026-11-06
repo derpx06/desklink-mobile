@@ -11,6 +11,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
+import android.os.SystemClock
 import android.text.InputType
 import android.util.TypedValue
 import android.view.ActionMode
@@ -115,6 +116,7 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
     private var selectionMode: ActionMode? = null
 
     private val updatePending = AtomicBoolean(false)
+    private val pacer = TerminalFramePacer()
 
     private val scaling = ScaleGestureDetector(
         context,
@@ -273,9 +275,24 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
 
     // ---- TerminalScreen.Listener (client thread) ----------------------------------------------
 
-    override fun onScreenChanged() {
+    override fun onScreenChanged(settled: Boolean) {
+        synchronized(pacer) { pacer.changed(SystemClock.uptimeMillis(), settled) }
         // Coalesced: a flood of output costs one UI pass per frame, not one per chunk.
-        if (updatePending.compareAndSet(false, true)) postOnAnimation(::screenUpdated)
+        if (updatePending.compareAndSet(false, true)) postOnAnimation(::frame)
+    }
+
+    /**
+     * A vsync with output waiting: draw if the output has settled (see [TerminalFramePacer]), else look
+     * again at the next one. A repaint that reached us in two chunks is never shown with half of it.
+     */
+    private fun frame() {
+        updatePending.set(false)
+        val (due, waiting) = synchronized(pacer) { pacer.due(SystemClock.uptimeMillis()) to pacer.pending }
+        if (due) {
+            screenUpdated()
+        } else if (waiting && updatePending.compareAndSet(false, true)) {
+            postOnAnimation(::frame)
+        }
     }
 
     override fun onSnapshot() {
@@ -290,7 +307,6 @@ class TerminalView(context: Context, private val host: Host) : View(context), Te
     }
 
     private fun screenUpdated() {
-        updatePending.set(false)
         val s = screen ?: return
         val (shift, history) = s.withEmulator {
             val shift = it.scrollCounter

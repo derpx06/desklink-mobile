@@ -35,7 +35,8 @@ class TerminalScreen(
 
     /** Called on the client thread, so a UI implementation must post. */
     interface Listener {
-        fun onScreenChanged()
+        /** The emulator changed. [settled]: a whole frame is in (the end of a synchronized update, a resize), so showing it now is safe. */
+        fun onScreenChanged(settled: Boolean)
         fun onSnapshot()
         fun onBell()
     }
@@ -115,9 +116,22 @@ class TerminalScreen(
 
     override fun write(data: ByteArray) {
         if (data.isEmpty()) return
-        synchronized(lock) { filterLocked(data) }
-        listener?.onScreenChanged()
+        val (changed, settled) = synchronized(lock) {
+            filterLocked(data)
+            (changedLocked to settledLocked).also { changedLocked = false; settledLocked = false }
+        }
+        // Not while a frame is being held: the screen is exactly what it was, and a draw would be a wasted one.
+        if (changed) listener?.onScreenChanged(settled)
         observer?.onOutput(this)
+    }
+
+    // Set by the code that feeds the emulator, read and cleared by `write`. Guarded by `lock`.
+    private var changedLocked = false
+    private var settledLocked = false
+
+    private fun appendLocked(bytes: ByteArray, count: Int) {
+        emulator.append(bytes, count)
+        changedLocked = true
     }
 
     /**
@@ -151,7 +165,7 @@ class TerminalScreen(
         fun put(b: Byte) { out[n++] = b }
         fun flushRun() {
             if (n == 0) return
-            if (syncing) held.write(out, 0, n) else emulator.append(out.copyOf(n), n)
+            if (syncing) held.write(out, 0, n) else appendLocked(out.copyOf(n), n)
             n = 0
         }
         for (b in data) {
@@ -173,6 +187,11 @@ class TerminalScreen(
                         when {
                             c == 'h'.code && params == "?2026" -> { flushRun(); beginSyncLocked() }
                             c == 'l'.code && params == "?2026" -> { flushRun(); flushHeldLocked() }
+                            // DECRQM: "is synchronized output supported?" Claude Code, neovim and helix draw
+                            // each frame between `?2026h` and `l` only if told yes; Termux says "unknown".
+                            c == 'p'.code && params == "?2026\$" -> {
+                                if (!quiet) reply(("\u001b[?2026;" + (if (syncing) 1 else 2) + "\$y").toByteArray())
+                            }
                             c == 'u'.code && (params.startsWith("=") || params.startsWith("<")) -> Unit
                             // Colon-separated SGR (`38:2::r:g:b`, `4:3`), which Termux prints as text.
                             c == 'm'.code && ':' in params -> {
@@ -217,8 +236,17 @@ class TerminalScreen(
         val generation = ++syncGeneration
         // A program that dies mid-frame must not freeze the screen: show what there is after a moment.
         FLUSHER.schedule({
-            val flushed = synchronized(lock) { if (syncing && syncGeneration == generation) { flushHeldLocked(); true } else false }
-            if (flushed) listener?.onScreenChanged()
+            val flushed = synchronized(lock) {
+                if (syncing && syncGeneration == generation) {
+                    flushHeldLocked()
+                    changedLocked = false
+                    settledLocked = false
+                    true
+                } else {
+                    false
+                }
+            }
+            if (flushed) listener?.onScreenChanged(true)
         }, SYNC_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
 
@@ -229,8 +257,9 @@ class TerminalScreen(
         if (held.size() > 0) {
             val bytes = held.toByteArray()
             held.reset()
-            emulator.append(bytes, bytes.size)
+            appendLocked(bytes, bytes.size)
         }
+        settledLocked = true
     }
 
     override fun setReplaying(replaying: Boolean) {
@@ -248,7 +277,7 @@ class TerminalScreen(
                 true
             }
         }
-        if (changed) listener?.onScreenChanged()
+        if (changed) listener?.onScreenChanged(true)
     }
 
     override fun onEnded(exitStatus: Long?) {
