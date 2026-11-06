@@ -419,3 +419,13 @@ fun DeskSnackbarHost(state: SnackbarHostState, modifier: Modifier = Modifier) {
         DeskSnackbar(data.visuals.message, actionLabel = data.visuals.actionLabel, onAction = { data.performAction() })
     }
 }
+
+/**
+ * A message with an Undo. Only one is ever on screen: the snackbar still showing is dismissed first (its Undo is gone, not
+ * queued behind the new one), so the Undo you can tap is always the newest message's, never an older deletion's.
+ */
+suspend fun SnackbarHostState.showUndo(message: String, actionLabel: String, undo: () -> Unit) {
+    currentSnackbarData?.dismiss()
+    val result = showSnackbar(message, actionLabel = actionLabel, duration = androidx.compose.material3.SnackbarDuration.Long)
+    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) undo()
+}

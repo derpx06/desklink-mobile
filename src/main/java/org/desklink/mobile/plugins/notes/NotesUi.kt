@@ -287,13 +287,12 @@ class NotesUi(
                                             modifier = Modifier.background(t.accentContainer, DeskLinkShape.stadium).heightIn(min = 32.dp).padding(horizontal = 14.dp, vertical = 6.dp),
                                         )
                                     }
-                                    val deletedText = stringResource(R.string.snippets_deleted)
-                    IconButton(
+                                    IconButton(
                         onClick = {
                             val text = snippet.text
                             NotesStore.deleteSnippet(host, snippet.id)
                             // Undo pins the same text again (a snippet is its text: nothing else is lost).
-                            undoable?.invoke(deletedText) { NotesStore.pin(host, text) }
+                            undoable?.invoke(host.getString(R.string.snippets_deleted_named, NotesModel.undoName(snippet.label, text))) { NotesStore.pin(host, text) }
                         },
                         modifier = Modifier.size(48.dp),
                     ) {
@@ -410,9 +409,11 @@ class NotesUi(
                         dirty = false
                         // A newer version from the desk beats the delete: say so instead of "Note deleted".
                         val undo = undoable
-                        if (gone && undo != null && id != null && (oldTitle.isNotBlank() || oldBody.isNotBlank())) {
-                            // Undo makes the note again (a new one, same words and pin); the desk gets it as a new note.
-                            undo(host.getString(R.string.notes_deleted)) {
+                        // A body over the sync cap (an unsaved draft kept in the editor) would be cut by a new note: no Undo for it.
+                        if (gone && undo != null && id != null && (oldTitle.isNotBlank() || oldBody.isNotBlank()) && Shelf.syncable(oldBody)) {
+                            // Undo makes the note again (a new one, same words and pin); the desk gets it as a new note. The message
+                            // names the note, so with two deletions in a row it is clear which one the Undo brings back.
+                            undo(host.getString(R.string.notes_deleted_named, NotesModel.undoName(oldTitle, oldBody))) {
                                 NotesStore.newNote(host, oldTitle, oldBody)?.let { back -> if (oldPinned) NotesStore.editNote(host, back) { it.copy(pinned = true) } }
                             }
                         } else {

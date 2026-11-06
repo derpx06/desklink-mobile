@@ -54,6 +54,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Snackbar
+import org.desklink.mobile.ui.compose.components.showUndo
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -366,12 +367,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         lifecycleScope.launch { snackbar.showSnackbar(message) }
     }
 
-    /** A message with an Undo: [undo] runs if it is tapped within the snackbar's time (long: it is a decision being reversed). */
+    /** A message with an Undo: [undo] runs if it is tapped within the snackbar's time; it replaces any Undo still showing. */
     fun showUndo(message: String, undo: () -> Unit) {
-        lifecycleScope.launch {
-            val result = snackbar.showSnackbar(message, actionLabel = getString(R.string.undo), duration = androidx.compose.material3.SnackbarDuration.Long)
-            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) undo()
-        }
+        lifecycleScope.launch { snackbar.showUndo(message, getString(R.string.undo), undo) }
     }
 
     /**
