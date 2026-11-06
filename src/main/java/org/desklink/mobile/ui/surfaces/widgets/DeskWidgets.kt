@@ -34,7 +34,7 @@ import java.util.concurrent.Executors
  * (30 minutes, which also corrects a picture left behind by a killed process), and each draw reads the live state.
  */
 object DeskWidgets {
-    private val family: List<FamilyWidget> = listOf(ComputerStatusWidget())
+    private val family: List<FamilyWidget> = listOf(ComputerStatusWidget(), QuickActionsWidget())
 
     /** Redraws every placed widget of the family. Cheap when there are none. */
     fun updateAll(context: Context) {
