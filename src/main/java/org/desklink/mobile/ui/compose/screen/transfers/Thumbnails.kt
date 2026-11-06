@@ -18,6 +18,7 @@ import android.util.Size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -128,4 +129,23 @@ object Thumbnails {
 fun rememberFilePreview(record: TransferRecord, sizePx: Int, revision: Int = 0): State<FilePreview> {
     val context = LocalContext.current
     return produceState(FilePreview(), record.id, sizePx, revision) { value = Thumbnails.load(context, record, sizePx) }
+}
+
+/** The type's badge text for a file with no picture: "BIN", "PDF", "ZIP"; empty when the name has no usable extension. */
+fun extensionBadge(name: String): String {
+    val ext = name.substringAfterLast('.', "")
+    return if (ext.isEmpty() || ext.length > 4 || ext.any { !it.isLetterOrDigit() }) "" else ext.uppercase()
+}
+
+/** A tint per kind of file, so a column of cards without pictures is not a column of the same grey page. */
+@Composable
+fun kindColors(kind: PreviewKind): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> {
+    val t = org.desklink.mobile.ui.compose.tokens
+    return when (kind) {
+        PreviewKind.IMAGE, PreviewKind.VIDEO, PreviewKind.TEXT -> t.accentContainer to t.onAccentContainer
+        PreviewKind.PDF -> t.coralContainer to t.coralText
+        PreviewKind.AUDIO -> t.mint.copy(alpha = 0.18f).compositeOver(t.surface) to t.mintText
+        PreviewKind.ARCHIVE -> t.amber.copy(alpha = 0.20f).compositeOver(t.surface) to t.text
+        PreviewKind.OTHER -> t.fill to t.textDim
+    }
 }

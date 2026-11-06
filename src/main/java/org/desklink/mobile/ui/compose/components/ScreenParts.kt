@@ -135,8 +135,9 @@ fun GroupRow(
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val t = tokens
+    val haptics = rememberDeskHaptics()
     val action = when {
-        checked != null && onClick != null -> Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch) { onClick() }
+        checked != null && onClick != null -> Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch) { haptics.toggle(!checked); onClick() }
         onClick != null -> Modifier.clickable(enabled = enabled, onClick = onClick)
         // A switch the phone only shows (set at the desk): still announced as a switch, and as off or on.
         checked != null -> Modifier.toggleable(value = checked, enabled = false, role = Role.Switch) {}

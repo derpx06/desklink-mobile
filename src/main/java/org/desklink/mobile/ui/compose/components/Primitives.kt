@@ -13,8 +13,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -23,13 +21,6 @@ import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.webrtc.WebRtcConnectionPath
 import org.desklink.mobile.webrtc.WebRtcConnectionStats
-
-/** Haptics for a primary action: a light tick, or the confirm/reject patterns where they apply. */
-@Composable
-fun rememberHaptics(): (HapticFeedbackType) -> Unit {
-    val haptics = LocalHapticFeedback.current
-    return remember(haptics) { { type -> haptics.performHapticFeedback(type) } }
-}
 
 /**
  * Text in chrome that has a fixed number of equal slots (the tab bar, a segmented control) grows with the

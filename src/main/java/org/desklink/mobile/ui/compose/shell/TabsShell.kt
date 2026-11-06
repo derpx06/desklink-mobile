@@ -3,7 +3,10 @@
 
 package org.desklink.mobile.ui.compose.shell
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -47,10 +50,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -74,6 +82,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.components.CappedFontScale
+import org.desklink.mobile.ui.compose.components.Haptic
+import org.desklink.mobile.ui.compose.components.rememberDeskHaptics
 import org.desklink.mobile.ui.compose.components.rememberReducedMotion
 import org.desklink.mobile.ui.compose.model.device.DeviceConnection
 import org.desklink.mobile.ui.compose.tokens
@@ -86,6 +96,16 @@ val MaxContentWidth = 840.dp
 
 /** The bar itself, a floating pill of this height. */
 val TabBarPillHeight = 68.dp
+
+/** How far above the bar the scrolling content fades out. */
+val ScrollFadeHeight = 20.dp
+
+/** The tab changes, as motion: a neighbour slides, a far jump crossfades. Pure, so a test can pin the rule. */
+object TabMotion {
+    const val CROSSFADE_MS = 180
+    const val INDICATOR_MS = 180
+    fun slides(from: Int, to: Int) = kotlin.math.abs(from - to) <= 1
+}
 
 /** What the bar takes from the bottom of the screen: the pill and the 8 dp above and below it (the navigation bar is extra). */
 val TabBarHeight = TabBarPillHeight + 16.dp
@@ -110,15 +130,34 @@ fun TabsShell(
 ) {
     val tabs = AppTab.entries
     val pager = rememberPagerState(initialPage = nav.selected.ordinal) { tabs.size }
+    val reduced = rememberReducedMotion()
+    val haptics = rememberDeskHaptics()
+    // A jump of more than one tab crossfades instead of sliding through every tab in between (which would build them all).
+    val fade = remember { Animatable(1f) }
     // Tapping a tab scrolls the pager; swiping the pager selects the tab.
     LaunchedEffect(nav.selected) {
-        if (pager.currentPage != nav.selected.ordinal && !pager.isScrollInProgress) pager.animateScrollToPage(nav.selected.ordinal)
+        val target = nav.selected.ordinal
+        if (pager.currentPage != target && !pager.isScrollInProgress) {
+            when {
+                reduced -> pager.scrollToPage(target)
+                TabMotion.slides(pager.currentPage, target) -> pager.animateScrollToPage(target)
+                else -> {
+                    fade.snapTo(0f)
+                    pager.scrollToPage(target)
+                    fade.animateTo(1f, tween(TabMotion.CROSSFADE_MS))
+                }
+            }
+        }
     }
     LaunchedEffect(pager) {
         snapshotFlow { pager.settledPage }.collect { nav.select(tabs[it]) }
     }
     val bar: @Composable (Modifier) -> Unit = { itemModifier ->
-        TabItems(nav.selected, badges, vertical = wide, itemModifier, onSelect = nav::select, onQuickAction = onQuickAction)
+        TabItems(
+            nav.selected, badges, vertical = wide, itemModifier,
+            onSelect = { tab -> if (tab != nav.selected) haptics.perform(Haptic.TICK); nav.select(tab) },
+            onQuickAction = { action -> haptics.perform(Haptic.LONG_PRESS); onQuickAction(action) },
+        )
     }
     val pages: @Composable (Modifier) -> Unit = { mod ->
         HorizontalPager(
@@ -127,7 +166,7 @@ fun TabsShell(
             beyondViewportPageCount = 0,
             key = { tabs[it].key },
         ) { index ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }, contentAlignment = Alignment.TopCenter) {
                 Box(Modifier.widthIn(max = MaxContentWidth).fillMaxSize()) { content(tabs[index]) }
             }
         }
@@ -145,9 +184,17 @@ fun TabsShell(
     } else {
         Column(modifier.fillMaxSize().background(tokens.bg)) {
             // The bar owns the navigation-bar inset, so the screens above it must not pad for it twice.
-            pages(Modifier.weight(1f).fillMaxWidth().consumeWindowInsets(WindowInsets.navigationBars))
+            // Content that scrolls under the bar fades out into the window instead of being cut by a hard edge.
+            val bg = tokens.bg
+            pages(
+                Modifier.weight(1f).fillMaxWidth().consumeWindowInsets(WindowInsets.navigationBars).drawWithContent {
+                    drawContent()
+                    val h = ScrollFadeHeight.toPx()
+                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, bg), startY = size.height - h, endY = size.height), topLeft = Offset(0f, size.height - h), size = Size(size.width, h))
+                },
+            )
             // The design's bar: a pill floating 12 dp from the sides on the window, with a hairline and a soft shadow.
-            Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)) {
+            Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 8.dp)) {
                 val shape = RoundedCornerShape(30.dp)
                 // Five equal slots: a tab is never pushed off the edge by a long label or a large font size.
                 BoxWithConstraints(
@@ -198,9 +245,17 @@ private fun TabItem(
     val state = tabState(tab, badges)
     val quick = tab.quickAction()?.let { quickLabel(it) }
     val description = if (state != null) "$label, $state" else label
+    val reduced = rememberReducedMotion()
+    // The selected pill grows out of the icon and the icon and word change colour, over 180 ms (nothing moves with "Remove animations").
+    val ms = if (reduced) 0 else TabMotion.INDICATOR_MS
+    val pillWidth by animateDpAsState(if (selected) 56.dp else 32.dp, tween(ms), label = "tab-pill")
+    val pillColor by animateColorAsState(if (selected) t.accentContainer else Color.Transparent, tween(ms), label = "tab-pill-color")
+    val iconColor by animateColorAsState(if (selected) t.onAccentContainer else t.textDim, tween(ms), label = "tab-icon")
+    val textColor by animateColorAsState(if (selected) t.text else t.textDim, tween(ms), label = "tab-label")
     Box(
         modifier
             .defaultMinSize(minWidth = 64.dp, minHeight = 48.dp)
+            .clip(RoundedCornerShape(24.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = quick)
             .semantics(mergeDescendants = true) {
                 role = Role.Tab
@@ -211,26 +266,13 @@ private fun TabItem(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Box(
-                Modifier.height(32.dp).width(56.dp).clip(RoundedCornerShape(16.dp)).background(if (selected) t.accentContainer else Color.Transparent),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painterResource(tab.icon),
-                    contentDescription = null,
-                    tint = if (selected) t.onAccentContainer else t.textDim,
-                    modifier = Modifier.size(24.dp),
-                )
+            Box(Modifier.height(32.dp).width(56.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.height(32.dp).width(pillWidth).clip(RoundedCornerShape(16.dp)).background(pillColor))
+                Icon(painterResource(tab.icon), contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
                 TabBadge(tab, badges)
             }
-            Text(
-                label,
-                fontSize = 12.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (selected) t.text else t.textDim,
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-            )
+            // One weight for both states: a bold selected word is wider than the slot it was measured in.
+            Text(label, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, color = textColor, maxLines = 1, softWrap = false, textAlign = TextAlign.Center)
         }
     }
 }

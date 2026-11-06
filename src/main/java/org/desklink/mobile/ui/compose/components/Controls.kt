@@ -35,6 +35,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -243,7 +244,8 @@ fun ActionTile(
                 if (enabled) onClick() else onDisabledClick?.invoke()
             }
             .padding(12.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
+        // Icon, then the word, always at the same height: a tile whose word wraps or has a hint must not move its neighbours' words.
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(
             painterResource(icon), contentDescription = null,
@@ -266,8 +268,10 @@ fun ActionTile(
 /** A linear progress bar: 6 dp, [progress] 0..1, the percentage belongs in the text next to it. */
 @Composable
 fun DeskProgressBar(progress: Float, modifier: Modifier = Modifier, color: Color = tokens.accent, track: Color = tokens.surface2) {
-    val p = progress.coerceIn(0f, 1f)
-    Box(modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(track).progressSemantics(p)) {
+    val target = progress.coerceIn(0f, 1f)
+    // Glides to each new value; still with "Remove animations".
+    val p by androidx.compose.animation.core.animateFloatAsState(target, androidx.compose.animation.core.tween(if (rememberReducedMotion()) 0 else 300), label = "progress")
+    Box(modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(track).progressSemantics(target)) {
         Box(Modifier.fillMaxWidth(p).height(6.dp).background(color, RoundedCornerShape(3.dp)))
     }
 }
