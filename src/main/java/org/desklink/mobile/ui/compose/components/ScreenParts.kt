@@ -135,13 +135,13 @@ fun rememberHeaderCollapse(): HeaderCollapse {
 
 /**
  * The big title of a tab (30 sp, 22 sp once [collapse] is 1) and its trailing control, then a dim line full width under both
- * (it folds away with [collapse]). The title row is 48 dp at least so the control never moves it.
+ * (it folds away with [collapse]). The row is as tall as its tallest part, so a 48 dp control sets it and a small chip does not.
  */
 @Composable
 fun LargeTitle(title: String, modifier: Modifier = Modifier, subtitle: String? = null, collapse: Float = 0f, trailing: @Composable RowScope.() -> Unit = {}) {
     val size = (30f - 8f * collapse).sp
     Column(modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, bottom = 14.dp - (6 * collapse).dp)) {
-        Row(Modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 title, fontSize = size, lineHeight = size * 1.2f, fontWeight = FontWeight.Medium, letterSpacing = (-0.3).sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).semantics { heading() },

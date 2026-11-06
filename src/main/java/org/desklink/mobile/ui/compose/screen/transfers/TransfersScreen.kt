@@ -166,7 +166,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.recentTransfers(
             SectionHeader(dayLabel(context, day), Modifier.padding(top = 8.dp))
         }
         itemsIndexed(items, key = { _, r -> r.id }) { i, record ->
-            FileRow(record, deskName, revision, actions, first = i == 0, last = i == items.lastIndex)
+            Box(Modifier.animateItem()) { FileRow(record, deskName, revision, actions, first = i == 0, last = i == items.lastIndex) }
         }
     }
     if (view.matching > limit && onShowAll != null) {

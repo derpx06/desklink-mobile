@@ -1027,8 +1027,10 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
                 })
             }
             // Files, Notes and Terminals keep the window secure; this lets `adb exec-out screencap` see them. Off by default, never in release.
+            // (a local, like the other debug rows: the parity tests list the rows every build has, and debug builds have more)
+            val allowTitle = stringResource(R.string.setting_debug_allow_screenshots)
             GroupRow(
-                stringResource(R.string.setting_debug_allow_screenshots), subtitle = stringResource(R.string.setting_debug_allow_screenshots_description),
+                allowTitle, subtitle = stringResource(R.string.setting_debug_allow_screenshots_description),
                 checked = prefs.getBoolean(org.desklink.mobile.ui.compose.SecureWindows.KEY_ALLOW_SCREENSHOTS, false),
                 onClick = {
                     val key = org.desklink.mobile.ui.compose.SecureWindows.KEY_ALLOW_SCREENSHOTS

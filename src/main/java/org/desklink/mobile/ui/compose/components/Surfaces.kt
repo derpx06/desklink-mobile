@@ -176,6 +176,7 @@ fun DeskSearchField(
     label: String = placeholder,
 ) {
     val t = tokens
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     Row(
         modifier.fillMaxWidth().heightIn(min = 52.dp).background(t.surface2, DeskLinkShape.stadium).padding(start = 18.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -189,7 +190,8 @@ fun DeskSearchField(
                 textStyle = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, color = t.text),
                 cursorBrush = SolidColor(t.accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                // Search hides the keyboard: the results are what the person wants to see.
+                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide(); onSearch() }),
                 // 48 dp tall with the text centred: the node a screen reader or a finger finds is the whole field, not one line.
                 decorationBox = { inner -> Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) { inner() } },
                 modifier = Modifier.fillMaxWidth()

@@ -7,6 +7,8 @@
 package org.desklink.mobile.ui.compose.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.getValue
@@ -21,6 +23,21 @@ import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.webrtc.WebRtcConnectionPath
 import org.desklink.mobile.webrtc.WebRtcConnectionStats
+
+/** A list that is dragged hides the keyboard, as the platform's own lists do; focus and the cursor stay where they were. */
+@Composable
+fun Modifier.dismissKeyboardOnScroll(): Modifier {
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val connection = remember(keyboard) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput && available.y != 0f) keyboard?.hide()
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+    return nestedScroll(connection)
+}
 
 /**
  * Text in chrome that has a fixed number of equal slots (the tab bar, a segmented control) grows with the

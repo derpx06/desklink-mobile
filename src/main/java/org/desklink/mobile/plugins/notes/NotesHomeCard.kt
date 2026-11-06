@@ -45,7 +45,7 @@ fun NotesHomeCard(onOpenList: () -> Unit, onOpenNote: (String) -> Unit, onNew: (
     val context = LocalContext.current
     val revision by NotesStore.revision.collectAsState()
     val notes = remember(revision) { NotesStore.notes(context).take(limit) }
-    val shape = RoundedCornerShape(24.dp)
+    val shape = org.desklink.mobile.ui.compose.DeskLinkShape.group
     Column(Modifier.fillMaxWidth().clip(shape).background(t.surface).border(1.dp, t.hairline, shape)) {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onOpenList).padding(start = 16.dp, end = 4.dp),
@@ -59,7 +59,7 @@ fun NotesHomeCard(onOpenList: () -> Unit, onOpenNote: (String) -> Unit, onNew: (
             }
         }
         if (notes.isEmpty()) {
-            Box(Modifier.fillMaxWidth().height(1.dp).background(t.hairline))
+            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp).background(t.hairline))
             Text(
                 stringResource(R.string.notes_home_empty),
                 fontSize = 13.sp, color = t.textDim,
@@ -67,7 +67,8 @@ fun NotesHomeCard(onOpenList: () -> Unit, onOpenNote: (String) -> Unit, onNew: (
             )
         }
         notes.forEach { note ->
-            Box(Modifier.fillMaxWidth().height(1.dp).background(t.hairline))
+            // Inset rules, like the other cards' rows: a rule that runs into the card's edge reads as a second border.
+            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp).background(t.hairline))
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button) { onOpenNote(note.id) }.padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,

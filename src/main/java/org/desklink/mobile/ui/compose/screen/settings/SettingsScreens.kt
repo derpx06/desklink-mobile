@@ -22,6 +22,7 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import org.desklink.mobile.ui.compose.components.dismissKeyboardOnScroll
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
@@ -200,7 +201,7 @@ internal fun SettingsColumn(title: String, onBack: (() -> Unit)?, subtitle: Stri
         // A tab's first page has no back arrow: the bar below is how you leave it.
         // A pushed page: back arrow and title on one row (the design's sub-page bar).
         if (onBack != null) ScreenHeader(onBack, title = title) else Spacer(Modifier.height(8.dp))
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxSize().dismissKeyboardOnScroll().verticalScroll(rememberScrollState())) {
             if (onBack == null) LargeTitle(title, subtitle = subtitle)
             else if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = t.textDim, modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 14.dp))
             Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {

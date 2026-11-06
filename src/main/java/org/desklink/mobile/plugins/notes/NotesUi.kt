@@ -184,12 +184,15 @@ class NotesUi(
                 } else {
                     LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(blocks, key = { b -> when (b) { is NotesModel.Block.Checklist -> b.note.id; is NotesModel.Block.Row -> "row-" + b.notes.first().id } }) { block ->
+                            // Notes slide into place when one is added, deleted or pinned (still with "Remove animations": animateItem follows the scale).
+                            Box(Modifier.animateItem()) {
                             when (block) {
                                 is NotesModel.Block.Checklist -> ChecklistCard(block.note) { editing.value = block.note.id }
                                 is NotesModel.Block.Row -> Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     block.notes.forEach { note -> NoteCard(note, Modifier.weight(1f).fillMaxHeight()) { editing.value = note.id } }
                                     if (!narrow && block.notes.size == 1) Spacer(Modifier.weight(1f))
                                 }
+                            }
                             }
                         }
                     }
@@ -268,7 +271,7 @@ class NotesUi(
             } else {
                 LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(snippets, key = { it.id }) { snippet ->
-                        DeskCard(Modifier.fillMaxWidth()) {
+                        DeskCard(Modifier.fillMaxWidth().animateItem()) {
                             Column(Modifier.padding(start = 14.dp, top = 6.dp, end = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(snippet.label, fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -316,6 +319,7 @@ class NotesUi(
     fun Editor(start: String, barInset: Dp = 0.dp, onDone: () -> Unit) {
         val t = tokens
         val context = LocalContext.current
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
         var id by rememberSaveable { mutableStateOf(start.takeIf { it != NEW }) }
         val first = remember { id?.let { NotesStore.note(context, it) } }
         // A draft the store does not have (a body over the cap, kept across a rotation) wins over the stored note.
@@ -428,7 +432,10 @@ class NotesUi(
                     onValueChange = { title = it.replace("\n", "").take(Shelf.MAX_NOTE_TITLE_CHARS); dirty = true },
                     textStyle = TextStyle(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Medium, color = t.text),
                     cursorBrush = SolidColor(t.accent),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    // Next goes on to the body instead of inserting a line break the title does not allow.
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = androidx.compose.ui.text.input.ImeAction.Next),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) }),
                     modifier = Modifier.fillMaxWidth().semantics { contentDescription = titleHint },
                 )
             }

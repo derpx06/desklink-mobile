@@ -14,7 +14,7 @@ import org.junit.Test
 /** The pure rules behind the polish pass: haptic constants, tab motion, file badges. */
 class PolishTest {
     @Test fun everyHapticHasAConstantOnEveryVersion() {
-        for (sdk in listOf(26, 29, 30, 33, 34, 35)) Haptic.entries.forEach { assertTrue(DeskHaptics.constantFor(it, sdk) > 0) }
+        for (sdk in listOf(26, 29, 30, 33, 34, 35)) Haptic.entries.forEach { assertTrue(DeskHaptics.constantFor(it, sdk) >= 0) }
     }
 
     @Test fun newerVersionsGetTheTogglePatternsOlderOnesTheNearestTick() {

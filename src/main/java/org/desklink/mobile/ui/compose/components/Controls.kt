@@ -185,12 +185,13 @@ fun QuickActionTile(
 ) {
     val t = tokens
     val source = remember { MutableInteractionSource() }
+    val haptics = rememberDeskHaptics()
     Column(
         modifier
             .pressScale(source)
             .clip(RoundedCornerShape(12.dp))
             .clickable(interactionSource = source, indication = ripple(), enabled = enabled || onDisabledClick != null, role = Role.Button) {
-                if (enabled) onClick() else onDisabledClick?.invoke()
+                if (enabled) onClick() else { haptics.perform(Haptic.FAILURE); onDisabledClick?.invoke() }
             }
             .heightIn(min = 48.dp)
             .padding(horizontal = 2.dp),
@@ -227,6 +228,7 @@ fun ActionTile(
     val t = tokens
     val shape = DeskLinkShape.card
     val source = remember { MutableInteractionSource() }
+    val haptics = rememberDeskHaptics()
     val filled = primary && enabled
     val fg = when {
         filled -> t.onAccent
@@ -241,7 +243,7 @@ fun ActionTile(
             .background(if (filled) t.accent else t.surface)
             .then(if (filled) Modifier else Modifier.border(1.dp, t.hairline, shape))
             .clickable(interactionSource = source, indication = ripple(), enabled = enabled || onDisabledClick != null, role = Role.Button) {
-                if (enabled) onClick() else onDisabledClick?.invoke()
+                if (enabled) onClick() else { haptics.perform(Haptic.FAILURE); onDisabledClick?.invoke() }
             }
             .padding(12.dp),
         // Icon, then the word, always at the same height: a tile whose word wraps or has a hint must not move its neighbours' words.

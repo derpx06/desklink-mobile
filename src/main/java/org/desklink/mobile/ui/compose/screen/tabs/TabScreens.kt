@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -60,6 +61,7 @@ import org.desklink.mobile.plugins.folders.BucketUi
 import org.desklink.mobile.plugins.notes.NotesActivity
 import org.desklink.mobile.plugins.notes.NotesUi
 import org.desklink.mobile.ui.compose.components.DeskSearchField
+import org.desklink.mobile.ui.compose.components.dismissKeyboardOnScroll
 import org.desklink.mobile.ui.compose.components.EmptyState
 import org.desklink.mobile.ui.compose.components.SegmentedControl
 import org.desklink.mobile.ui.compose.components.GroupRow
@@ -228,16 +230,23 @@ fun NotesTab(
         return
     }
     val collapse = org.desklink.mobile.ui.compose.components.rememberHeaderCollapse()
-    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().nestedScroll(collapse.connection)) {
+    Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().nestedScroll(collapse.connection).dismissKeyboardOnScroll()) {
         LargeTitle(stringResource(R.string.notes_title), Modifier.padding(top = 12.dp), subtitle = stringResource(R.string.notes_subtitle), collapse = collapse.fraction) {
             ClipboardSwitch(clipboardOn, onClipboard)
         }
-        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (segment < 2) DeskSearchField(query, { query = it }, stringResource(R.string.notes_search_all), stringResource(R.string.palette_clear))
-            SegmentedControl(
-                listOf(stringResource(R.string.notes_tab_notes), stringResource(R.string.notes_tab_snippets), stringResource(R.string.notes_tab_clipboard)),
-                segment, { segment = it },
-            )
+        val segments = listOf(stringResource(R.string.notes_tab_notes), stringResource(R.string.notes_tab_snippets), stringResource(R.string.notes_tab_clipboard))
+        val search: @Composable (Modifier) -> Unit = { m -> DeskSearchField(query, { query = it }, stringResource(R.string.notes_search_all), stringResource(R.string.palette_clear), m) }
+        if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 560) {
+            // Wide or sideways: the search and the three views share one row (a landscape phone has no height to spend on two).
+            Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (segment < 2) search(Modifier.weight(1f)) else Box(Modifier.weight(1f))
+                SegmentedControl(segments, segment, { segment = it }, Modifier.width(360.dp))
+            }
+        } else {
+            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (segment < 2) search(Modifier)
+                SegmentedControl(segments, segment, { segment = it })
+            }
         }
         Box(Modifier.weight(1f)) {
             when (segment) {

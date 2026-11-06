@@ -29,7 +29,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="manifest_label_share">Send to computer</string>
     <string name="foreground_notification_no_devices">Not connected to any device</string>
     <string name="foreground_notification_devices">Connected to: %s</string>
-    <string name="foreground_notification_send_clipboard">Send Clipboard</string>
+    <string name="foreground_notification_send_clipboard">Send clipboard</string>
     <string name="foreground_notification_allow_background">Allow background connection</string>
     <string name="pref_plugin_battery">Battery report</string>
     <string name="pref_plugin_battery_desc">Periodically report battery status</string>
@@ -37,7 +37,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="pref_plugin_activity">Ongoing items</string>
     <string name="pref_plugin_activity_desc">Show timers, progress, navigation and calls that are running on this phone</string>
     <string name="pref_plugin_clipboard_desc">Share the clipboard content</string>
-    <string name="pref_plugin_clipboard_sent">Clipboard Sent</string>
+    <string name="pref_plugin_clipboard_sent">Clipboard sent</string>
     <string name="pref_plugin_mousepad">Remote input</string>
     <string name="pref_plugin_mousepad_desc_nontv">Use your phone or tablet as a touchpad and keyboard</string>
     <string name="pref_plugin_screen_control">Screen control</string>
@@ -270,15 +270,15 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
       <item>light</item>
       <item>dark</item>
     </string-array>
-    <string name="report_bug">Report Bug</string>
+    <string name="report_bug">Report a bug</string>
     <string name="donate">Donate</string>
-    <string name="source_code">Source Code</string>
+    <string name="source_code">Source code</string>
     <string name="source_code_url" translatable="false">https://github.com/derpx06/desklink-mobile</string>
     <string name="licenses">Licenses</string>
 
     <string name="about">About</string>
     <string name="authors">Authors</string>
-    <string name="easter_egg">Easter Egg</string>
+    <string name="easter_egg">Easter egg</string>
     <string name="version">Version %s</string>
 
   <string name="click_here_to_type">Tap here to type</string>

@@ -82,6 +82,7 @@ import org.desklink.mobile.ui.compose.DeskTextButton
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.PrimaryButton
 import org.desklink.mobile.ui.compose.SecondaryButton
+import org.desklink.mobile.ui.compose.pressScale
 import org.desklink.mobile.ui.compose.components.ActionTile
 import org.desklink.mobile.ui.compose.components.DeskBottomSheet
 import org.desklink.mobile.ui.compose.components.DeskProgressBar
@@ -244,7 +245,13 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
     // Not saved: coming back to Home (rotation, the pager recreating the page) must not pop the keyboard.
     var palette by remember { mutableStateOf(false) }
     val notReady = notReadyMessage(state)
-    val gate = { action: () -> Unit -> if (HomeDerive.usable(state)) action() else actions.onUnavailable(notReady) }
+    val deskHaptics = org.desklink.mobile.ui.compose.components.rememberDeskHaptics()
+    val gate = { action: () -> Unit ->
+        if (HomeDerive.usable(state)) action() else {
+            deskHaptics.perform(org.desklink.mobile.ui.compose.components.Haptic.FAILURE)
+            actions.onUnavailable(notReady)
+        }
+    }
     // The Home tab's long-press asks for the computers sheet.
     androidx.compose.runtime.LaunchedEffect(actions.openComputersRequest) {
         if (actions.openComputersRequest > 0) {
@@ -278,6 +285,24 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                 // Local-first: the Bucket shows whether or not the computer is there.
                 org.desklink.mobile.plugins.folders.BucketHomeCard(state.deviceId, state.name, onOpen = actions.onBucket)
             }
+            // Pull down looks for the computer again: the same action as "Try again" (a discovery refresh, nothing destructive).
+            var refreshing by remember { mutableStateOf(false) }
+            val haptics = org.desklink.mobile.ui.compose.components.rememberDeskHaptics()
+            androidx.compose.runtime.LaunchedEffect(refreshing) {
+                if (refreshing) {
+                    delay(1200)
+                    refreshing = false
+                }
+            }
+            androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = {
+                    refreshing = true
+                    haptics.perform(org.desklink.mobile.ui.compose.components.Haptic.TICK)
+                    actions.onRetry()
+                },
+                modifier = Modifier.fillMaxSize(),
+            ) {
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -304,6 +329,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                         org.desklink.mobile.plugins.folders.BucketHomeCard(state.deviceId, state.name, onOpen = actions.onBucket)
                     }
                 }
+            }
             }
         }
         NowPlayingOverlay(state.media, actions, cardArt, playerOpen && state.media != null) { playerOpen = false }
@@ -590,8 +616,8 @@ private fun StillWorksOffline(state: HomeState, actions: HomeActions) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             tiles.chunked(columns).forEach { row ->
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { tile -> OfflineTile(tile, Modifier.weight(1f).fillMaxHeight(), unreachable) }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    // A lone last tile takes the whole row instead of leaving a hole beside it.
+                    row.forEach { tile -> OfflineTile(tile, Modifier.weight(columns.toFloat() / row.size).fillMaxHeight(), unreachable) }
                 }
             }
         }
@@ -784,12 +810,14 @@ private fun RecentThumb(record: TransferRecord, now: Long, modifier: Modifier, o
     val meta = listOf(whenText, org.desklink.mobile.helpers.Sizes.iec(record.size)).joinToString(" · ")
     val openLabel = stringResource(R.string.home_open_file)
     val shape = DeskLinkShape.card
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Column(
         modifier
+            .pressScale(source)
             .clip(shape)
             .background(t.surface)
             .border(1.dp, t.hairline, shape)
-            .clickable(role = Role.Button, onClickLabel = openLabel, onClick = onOpen)
+            .clickable(interactionSource = source, indication = androidx.compose.material3.ripple(), role = Role.Button, onClickLabel = openLabel, onClick = onOpen)
             .semantics(mergeDescendants = true) { contentDescription = "$direction, ${record.name}, $meta" },
     ) {
         val (container, ink) = kindColors(kind)
