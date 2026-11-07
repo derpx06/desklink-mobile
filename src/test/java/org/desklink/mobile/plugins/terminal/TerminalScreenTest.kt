@@ -161,7 +161,7 @@ class TerminalScreenTest {
         val s = screen()
         var bells = 0
         s.listener = object : TerminalScreen.Listener {
-            override fun onScreenChanged() = Unit
+            override fun onScreenChanged(settled: Boolean) = Unit
             override fun onSnapshot() = Unit
             override fun onBell() { bells++ }
         }

@@ -35,7 +35,8 @@ class TerminalScreen(
 
     /** Called on the client thread, so a UI implementation must post. */
     interface Listener {
-        fun onScreenChanged()
+        /** The emulator changed. [settled]: a whole frame is in (the end of a synchronized update, a resize), so showing it now is safe. */
+        fun onScreenChanged(settled: Boolean)
         fun onSnapshot()
         fun onBell()
     }
@@ -115,21 +116,26 @@ class TerminalScreen(
 
     override fun write(data: ByteArray) {
         if (data.isEmpty()) return
-        synchronized(lock) { filterLocked(data) }
-        listener?.onScreenChanged()
+        val (changed, settled) = synchronized(lock) {
+            filterLocked(data)
+            (changedLocked to settledLocked).also { changedLocked = false; settledLocked = false }
+        }
+        // Not while a frame is being held (the screen is exactly what it was, a draw would be wasted), and
+        // not while history is replayed: that is every frame the program drew, fast-forwarded. The
+        // screen is shown once, when the replay ends.
+        if (changed && !quiet) listener?.onScreenChanged(settled) else if (changed) replayed = true
         observer?.onOutput(this)
     }
 
-    /**
-     * Cleans [data] on its way to the emulator, with state kept across chunks (a sequence may be cut
-     * anywhere):
-     *
-     *  * synchronized output (`CSI ? 2026 h` / `l`) holds a frame until it is complete;
-     *  * APC, PM and SOS strings (`ESC _`, `ESC ^`, `ESC X` ... ST) are dropped: Claude Code asks the kitty
-     *    graphics protocol if it is there with one at start-up, and Termux prints its payload as text;
-     *  * kitty keyboard protocol sequences with a `=` or `<` marker (`CSI = 5 ; 1 u`) are dropped for the
-     *    same reason.
-     */
+    // Set by the code that feeds the emulator, read and cleared by `write`. Guarded by `lock`.
+    private var changedLocked = false
+    private var settledLocked = false
+
+    private fun appendLocked(bytes: ByteArray, count: Int) {
+        emulator.append(bytes, count)
+        changedLocked = true
+    }
+
     /**
      * The last [count] lines a person would see, trailing blank rows skipped: read row by row from the
      * bottom, so Home's every-second preview never builds the whole screen's text under the lock.
@@ -145,23 +151,43 @@ class TerminalScreen(
         out.toList()
     }
 
+    /**
+     * Cleans [data] on its way to the emulator, with state kept across chunks (a sequence may be cut
+     * anywhere):
+     *
+     *  * synchronized output (`CSI ? 2026 h` / `l`) holds a frame until it is complete;
+     *  * APC, PM and SOS strings (`ESC _`, `ESC ^`, `ESC X` ... ST) are dropped: Claude Code asks the kitty
+     *    graphics protocol if it is there with one at start-up, and Termux prints its payload as text;
+     *  * kitty keyboard protocol sequences with a `=` or `<` marker (`CSI = 5 ; 1 u`) are dropped for the
+     *    same reason.
+     *
+     * Sets [changedLocked] when the emulator got bytes, and [settledLocked] when a synchronized frame ended
+     * and nothing but whitespace or a cursor show/hide followed it in this chunk.
+     */
     private fun filterLocked(data: ByteArray) {
         val out = ByteArray(data.size + STASH_MAX + 2)
         var n = 0
         fun put(b: Byte) { out[n++] = b }
+        // Shown output after the end of a frame: the screen is no longer a whole frame.
+        fun content() { if (!syncing) settledLocked = false }
         fun flushRun() {
             if (n == 0) return
-            if (syncing) held.write(out, 0, n) else emulator.append(out.copyOf(n), n)
+            if (syncing) held.write(out, 0, n) else appendLocked(out.copyOf(n), n)
             n = 0
         }
         for (b in data) {
             when (scan) {
-                SCAN_TEXT -> if (b == ESC) scan = SCAN_ESC else put(b)
+                SCAN_TEXT -> if (b == ESC) {
+                    scan = SCAN_ESC
+                } else {
+                    put(b)
+                    if (b != SPACE && b != CR && b != LF) content()
+                }
                 SCAN_ESC -> when (b) {
                     '_'.code.toByte(), '^'.code.toByte(), 'X'.code.toByte() -> { scan = SCAN_STRING; stringBytes = 0 }
                     '['.code.toByte() -> { scan = SCAN_CSI; stashLen = 0 }
-                    ESC -> put(ESC) // the first ESC was a literal one; this one may start something
-                    else -> { put(ESC); put(b); scan = SCAN_TEXT }
+                    ESC -> { put(ESC); content() } // the first ESC was a literal one; this one may start something
+                    else -> { put(ESC); put(b); content(); scan = SCAN_TEXT }
                 }
                 SCAN_CSI -> {
                     val c = b.toInt() and 0xff
@@ -173,9 +199,15 @@ class TerminalScreen(
                         when {
                             c == 'h'.code && params == "?2026" -> { flushRun(); beginSyncLocked() }
                             c == 'l'.code && params == "?2026" -> { flushRun(); flushHeldLocked() }
+                            // DECRQM: "is synchronized output supported?" Claude Code, neovim and helix draw
+                            // each frame between `?2026h` and `l` only if told yes; Termux says "unknown".
+                            c == 'p'.code && params == "?2026\$" -> {
+                                if (!quiet) reply(("\u001b[?2026;" + (if (syncing) 1 else 2) + "\$y").toByteArray())
+                            }
                             c == 'u'.code && (params.startsWith("=") || params.startsWith("<")) -> Unit
                             // Colon-separated SGR (`38:2::r:g:b`, `4:3`), which Termux prints as text.
                             c == 'm'.code && ':' in params -> {
+                                content()
                                 val plain = semicolonSgr(params)
                                 if (plain.isNotEmpty()) {
                                     put(ESC); put('['.code.toByte())
@@ -184,6 +216,7 @@ class TerminalScreen(
                                 }
                             }
                             else -> {
+                                if (params != "?25" || (c != 'h'.code && c != 'l'.code)) content()
                                 put(ESC); put('['.code.toByte())
                                 for (i in 0 until stashLen) put(stash[i])
                                 put(b)
@@ -192,6 +225,7 @@ class TerminalScreen(
                     } else {
                         // Not a sequence we know the end of: give it to the emulator as it came.
                         scan = SCAN_TEXT
+                        content()
                         put(ESC); put('['.code.toByte())
                         for (i in 0 until stashLen) put(stash[i])
                         if (b == ESC) scan = SCAN_ESC else put(b)
@@ -217,8 +251,20 @@ class TerminalScreen(
         val generation = ++syncGeneration
         // A program that dies mid-frame must not freeze the screen: show what there is after a moment.
         FLUSHER.schedule({
-            val flushed = synchronized(lock) { if (syncing && syncGeneration == generation) { flushHeldLocked(); true } else false }
-            if (flushed) listener?.onScreenChanged()
+            val flushed = synchronized(lock) {
+                if (syncing && syncGeneration == generation) {
+                    flushHeldLocked()
+                    changedLocked = false
+                    settledLocked = false
+                    true
+                } else {
+                    false
+                }
+            }
+            // Not drawn mid-replay either: the end of the replay draws it.
+            if (flushed) {
+                if (quiet) replayed = true else listener?.onScreenChanged(true)
+            }
         }, SYNC_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
 
@@ -229,13 +275,22 @@ class TerminalScreen(
         if (held.size() > 0) {
             val bytes = held.toByteArray()
             held.reset()
-            emulator.append(bytes, bytes.size)
+            appendLocked(bytes, bytes.size)
         }
+        settledLocked = true
     }
 
     override fun setReplaying(replaying: Boolean) {
         quiet = replaying
+        if (!replaying && replayed) {
+            replayed = false
+            listener?.onScreenChanged(true)
+        }
     }
+
+    /** Output landed while [quiet]: the view has not been told. */
+    @Volatile
+    private var replayed = false
 
     override fun resize(rows: Int, cols: Int) {
         val changed = synchronized(lock) {
@@ -248,7 +303,7 @@ class TerminalScreen(
                 true
             }
         }
-        if (changed) listener?.onScreenChanged()
+        if (changed) listener?.onScreenChanged(true)
     }
 
     override fun onEnded(exitStatus: Long?) {
@@ -314,6 +369,9 @@ class TerminalScreen(
         const val DEFAULT_TRANSCRIPT_ROWS = 5000
         private const val MIN_CELLS = 4
         private const val ESC: Byte = 0x1b
+        private const val SPACE: Byte = 0x20
+        private const val CR: Byte = 0x0d
+        private const val LF: Byte = 0x0a
         private const val ST8: Byte = 0x9c.toByte()
         private const val SCAN_TEXT = 0
         private const val SCAN_ESC = 1
