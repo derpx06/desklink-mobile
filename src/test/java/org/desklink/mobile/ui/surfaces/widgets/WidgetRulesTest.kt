@@ -168,7 +168,7 @@ class WidgetRulesTest {
         assertEquals(TerminalAccess.ALLOWED, WidgetRules.terminalAccess(liveAllowed = true, storedAllowed = false))
         assertEquals(TerminalAccess.OFF, WidgetRules.terminalAccess(liveAllowed = false, storedAllowed = true))
         assertEquals(TerminalAccess.UNKNOWN, WidgetRules.terminalAccess(null, null))
-        assertEquals("Tap to check again", context.getString(R.string.widget_terminals_access_hint))
+        assertEquals("Tap to retry", context.getString(R.string.widget_terminals_access_hint))
     }
 
     // ---- transfers -----------------------------------------------------------------------------------------------
