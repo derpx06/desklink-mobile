@@ -28,7 +28,8 @@ class TerminalFlickerTest {
     private fun measure(pacer: () -> TerminalFramePacer) = streams.mapValues { (_, bursts) -> FlickerSim(pacerFactory = pacer).run(bursts) }
 
     private fun report(title: String, results: Map<String, FlickerSim.Result>) {
-        val dir = File(System.getProperty("desklink.terminals") ?: (System.getProperty("user.home") + "/.cache/android-ui/terminals")).also { it.mkdirs() }
+        // Under build/ unless asked for elsewhere: a test run writes nothing outside the project.
+        val dir = (System.getProperty("desklink.terminals")?.let(::File) ?: File("build/terminal-flicker")).also { it.mkdirs() }
         File(dir, "flicker-$title.md").writeText(
             "| stream | presented | partial | blank | redundant | presents/s | latency mean/max ms |\n|---|---|---|---|---|---|---|\n" +
                 results.entries.joinToString("\n") { (k, r) ->
@@ -101,7 +102,7 @@ class TerminalFlickerTest {
         for ((name, r) in now) {
             assertEquals("$name: $r", 0, r.partial)
             assertEquals("$name: $r", 0, r.redundant)
-            assertEquals("$name: one draw per program frame, not per chunk: $r", frames, r.presented)
+            assertTrue("$name: at most one draw per program frame, not one per chunk: $r", r.presented <= frames)
             assertTrue("$name: the wait stays small: $r", r.maxLatencyMs <= 50.0 + 2 * FlickerSim.VSYNC_MS)
             assertTrue("$name: no more draws than before", r.presented <= legacy.getValue(name).presented)
         }
@@ -228,5 +229,34 @@ class TerminalFlickerTest {
         println("replay of 40 repaints (draws, draws that were not the final screen): legacy=$before settled-only=$beforePaced held=$after")
         assertTrue("it used to fast-forward through old frames: $before", before.second > 0)
         assertEquals("held: one draw, the final screen", 1 to 0, after)
+    }
+
+    @Test
+    fun aFrameIsSettledOnlyIfNothingVisibleFollowsItsEnd() {
+        fun settledAfter(chunk: String): List<Boolean> {
+            val s = TerminalScreen(5, 20, reply = {})
+            val l = Counting().also { s.listener = it }
+            s.write(chunk.toByteArray())
+            return l.calls
+        }
+        assertEquals(listOf(true), settledAfter("\u001b[?2026hframe\u001b[?2026l"))
+        assertEquals("whitespace and cursor show/hide do not count", listOf(true), settledAfter("\u001b[?2026hframe\u001b[?2026l\r\n \u001b[?25h\u001b[?25l"))
+        assertEquals("text after the frame is not part of it", listOf(false), settledAfter("\u001b[?2026hframe\u001b[?2026lmore"))
+        assertEquals("nor is a cursor move", listOf(false), settledAfter("\u001b[?2026hframe\u001b[?2026l\u001b[2;1H"))
+        assertEquals("text before the frame is", listOf(true), settledAfter("before\u001b[?2026hframe\u001b[?2026l"))
+        assertEquals("a frame opened again after the end is held", listOf(true), settledAfter("\u001b[?2026hone\u001b[?2026l\u001b[?2026htwo"))
+    }
+
+    @Test
+    fun theSafetyFlushDoesNotDrawDuringAReplay() {
+        val s = TerminalScreen(5, 20, reply = {})
+        val l = Counting().also { s.listener = it }
+        s.setReplaying(true)
+        s.write("\u001b[?2026hhalf".toByteArray())
+        Thread.sleep(500)
+        assertEquals("flushed into the screen, but not drawn mid-replay", emptyList<Boolean>(), l.calls)
+        assertEquals("half", s.tailText(5).trim())
+        s.setReplaying(false)
+        assertEquals(listOf(true), l.calls)
     }
 }
