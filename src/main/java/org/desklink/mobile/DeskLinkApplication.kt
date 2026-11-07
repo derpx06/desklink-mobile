@@ -369,7 +369,7 @@ class DeskLinkApplication : Application() {
             // The live-session notification follows the attached sessions, whoever changed them.
             // The job lives exactly as long as the client (shutDownTerminalClient).
             terminalWatchers[id] = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob() + org.desklink.mobile.helpers.Guarded.handler("terminal-watch")).launch {
-                client.state.map { state -> Triple(state.sessions.count { !it.gone }, state.sessions.count { it.attached && !it.gone }, state.notAllowed) }.distinctUntilChanged().collect {
+                client.state.map { state -> listOf(state.sessions.count { !it.gone }, state.sessions.count { it.attached && !it.gone }, state.notAllowed, state.listLoaded) }.distinctUntilChanged().collect {
                     org.desklink.mobile.plugins.screen.SessionLiveNotification.refresh(this@DeskLinkApplication, id)
                     org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(this@DeskLinkApplication)
                 }

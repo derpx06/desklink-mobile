@@ -93,7 +93,7 @@ object TransferProgress {
     /** The paused send for [deviceId] will never resume (discarded): its "resumes when back" row goes. */
     @JvmStatic
     fun dropResuming(deviceId: String) {
-        if (current?.let { it.deviceId == deviceId && it.resuming } == true) current = null
+        if (current?.let { it.deviceId == deviceId && it.resuming } == true) { current = null; widgets() }
         notify { TransferNotification.dropWaiting(deviceId) }
     }
 
@@ -101,6 +101,7 @@ object TransferProgress {
     @JvmStatic
     fun suspended(jobId: Long) {
         if (current?.jobId == jobId) current = null
+        widgets()
         notify { TransferNotification.suspended(jobId) }
     }
 

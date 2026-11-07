@@ -209,9 +209,10 @@ class ClipboardListener private constructor(ctx: Context) {
      * [force]d (an explicit "Send clipboard"). Returns whether text went to at least one desk.
      */
     @MainThread
-    fun sync(force: Boolean): Boolean {
+    @JvmOverloads
+    fun sync(force: Boolean, only: ClipboardObserver? = null): Boolean {
         lastRefusedTooLarge = false // set only by this call, for the caller that reads it next
-        if (observers.isEmpty()) {
+        if (observers.isEmpty() || (only != null && only !in observers)) {
             if (force) Log.i(TAG, "clipboard: no desk has clipboard sync on")
             return false
         }
@@ -230,7 +231,7 @@ class ClipboardListener private constructor(ctx: Context) {
         lastClipStamp = stamp
         // Password managers mark their copies sensitive: never sent unless asked for.
         if (!force && isSensitive(description)) return false
-        if (description.hasMimeType("image/*")) return syncImage(force)
+        if (description.hasMimeType("image/*")) return syncImage(force, only)
         val previous = currentContent
         val content = readNow() ?: return false
         if (!force && content == previous) return false
@@ -244,7 +245,7 @@ class ClipboardListener private constructor(ctx: Context) {
         lastRefusedTooLarge = false
         Log.i(TAG, "clipboard: ${content.length} chars to ${observers.size} desk(s) (${if (force) "asked" else "new copy"})")
         ClipboardOffer.cancel(context)
-        val targets = observers.toList()
+        val targets = observers.filter { only == null || it === only }
         // Off the main thread: sizing and queueing a megabyte of text is not the UI's work.
         val at = copyTime(description)
         execute { targets.forEach { it.clipboardChanged(content, at) } }
@@ -253,14 +254,14 @@ class ClipboardListener private constructor(ctx: Context) {
 
     /** An image copy goes as a PNG file transfer; decoding happens off the main thread. */
     @MainThread
-    private fun syncImage(force: Boolean): Boolean {
+    private fun syncImage(force: Boolean, only: ClipboardObserver? = null): Boolean {
         val uri = try { cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri } catch (_: Exception) { null } ?: return false
         val at = cm.primaryClipDescription?.let { copyTime(it) } ?: System.currentTimeMillis()
         val key = "image:$uri"
         if (!force && key == currentContent) return false
         currentContent = key
         updateTimestamp = System.currentTimeMillis()
-        val targets = observers.toList()
+        val targets = observers.filter { only == null || it === only }
         ClipboardOffer.cancel(context)
         Log.i(TAG, "clipboard: image to ${targets.size} desk(s) (${if (force) "asked" else "new copy"})")
         execute {

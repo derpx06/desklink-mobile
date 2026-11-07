@@ -58,22 +58,16 @@ object WidgetFacts {
         )
     }
 
-    /** What the computer last said about terminal access; the answer is kept so a restart does not forget "off". */
+    /** What the computer last said about terminal access; the answer is kept so a restart does not forget it (the tap asks again). */
     private fun terminalAccess(context: Context, id: String): TerminalAccess {
         val prefs = context.getSharedPreferences(PerPeerState.SURFACES, Context.MODE_PRIVATE)
+        val key = PerPeerState.terminalAccessKey(id)
         val state = DeskLinkApplication.getInstance().terminalClient(id)?.state?.value
-        if (state != null && state.listLoaded) {
-            val allowed = !state.notAllowed
-            if (prefs.getBoolean(PerPeerState.terminalAccessKey(id), true) != allowed || !prefs.contains(PerPeerState.terminalAccessKey(id))) {
-                prefs.edit { putBoolean(PerPeerState.terminalAccessKey(id), allowed) }
-            }
-            return if (allowed) TerminalAccess.ALLOWED else TerminalAccess.OFF
-        }
-        return if (prefs.contains(PerPeerState.terminalAccessKey(id))) {
-            if (prefs.getBoolean(PerPeerState.terminalAccessKey(id), true)) TerminalAccess.ALLOWED else TerminalAccess.OFF
-        } else {
-            TerminalAccess.UNKNOWN
-        }
+        // A refused first request has no list yet (notAllowed without listLoaded): that is an answer too.
+        val live = state?.takeIf { it.listLoaded || it.notAllowed }?.let { !it.notAllowed }
+        val stored = if (prefs.contains(key)) prefs.getBoolean(key, true) else null
+        if (live != null && live != stored) prefs.edit { putBoolean(key, live) }
+        return WidgetRules.terminalAccess(live, stored)
     }
 
     /**

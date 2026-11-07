@@ -206,8 +206,10 @@ object DeskSurfaces {
      * and only through the feature the person has on.
      */
     fun perform(context: Context, action: Action, deviceId: String? = null) {
-        val device = deviceId?.let { DeskLinkApplication.getInstance().getDevice(it) }?.takeIf { it.isPaired } ?: currentDesk(context)
+        // A widget names its computer: act on that one, or say it is gone and redraw; never swap in another.
+        val device = if (deviceId != null) DeskLinkApplication.getInstance().getDevice(deviceId)?.takeIf { it.isPaired } else currentDesk(context)
         fun tell(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        if (deviceId != null && device == null) { refresh(context); return tell(context.getString(R.string.widget_unpaired)) }
         if (device == null) return tell(context.getString(R.string.surfaces_not_paired))
         // Home's own wording for a computer that is not ready (Still connecting / Can't set up / offline / update needed).
         org.desklink.mobile.ui.surfaces.widgets.WidgetRules.notReady(org.desklink.mobile.ui.surfaces.widgets.WidgetFacts.of(context, device))

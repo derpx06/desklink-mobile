@@ -80,8 +80,11 @@ sealed interface Gate {
     /** Say it (a short toast, formatted with the computer's name) and do nothing else. */
     data class Say(@StringRes val message: Int) : Gate
 
-    /** Terminal access is off: say so, then open settings. */
-    data object Settings : Gate
+    /**
+     * The last answer was "terminal access is off": never start a terminal on it, but never trust it for good either. The tap
+     * asks the computer again and opens the Terminals tab, which has the Retry and the explanation.
+     */
+    data object TerminalsTab : Gate
 }
 
 sealed interface NotesView {
@@ -100,7 +103,7 @@ sealed interface TerminalsView {
     /** "New terminal", with how many are open. */
     data class Ready(val open: Int) : TerminalsView
 
-    /** The computer has not allowed it: shown as it is, the tap opens settings. */
+    /** The computer has not allowed it (as last heard): shown as it is; the tap asks again through the Terminals tab. */
     data object AccessOff : TerminalsView
     data class NotReady(@StringRes val label: Int) : TerminalsView
 }
@@ -186,7 +189,7 @@ object WidgetRules {
     fun gate(a: WidgetAction, f: ComputerFacts?): Gate {
         if (f == null) return Gate.Say(R.string.surfaces_not_paired)
         notReady(f)?.let { return Gate.Say(notReadyMessage(it)) }
-        if (a == WidgetAction.TERMINAL) return if (f.terminals == TerminalAccess.OFF) Gate.Settings else Gate.Go
+        if (a == WidgetAction.TERMINAL) return if (f.terminals == TerminalAccess.OFF) Gate.TerminalsTab else Gate.Go
         return if (offered(a, f)) Gate.Go else Gate.Say(R.string.home_feature_off)
     }
 
@@ -206,6 +209,16 @@ object WidgetRules {
         f == null -> TerminalsView.NotReady(R.string.surfaces_not_paired)
         f.terminals == TerminalAccess.OFF -> TerminalsView.AccessOff
         else -> notReady(f)?.let { TerminalsView.NotReady(notReadyHint(it)) } ?: TerminalsView.Ready(f.terminalCount)
+    }
+
+    /**
+     * What the computer last said about terminal access: its live answer when it has given one (a list, or a refusal of the
+     * first request, which has no list), else the stored last answer, else unknown. Only a hint while the link is down.
+     */
+    fun terminalAccess(liveAllowed: Boolean?, storedAllowed: Boolean?): TerminalAccess = when (liveAllowed ?: storedAllowed) {
+        true -> TerminalAccess.ALLOWED
+        false -> TerminalAccess.OFF
+        null -> TerminalAccess.UNKNOWN
     }
 
     /** A running transfer first, else the newest finished one, else nothing. */

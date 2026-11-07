@@ -32,6 +32,18 @@ class TerminalRouteTest {
         TerminalSessionState(id, title, 24, 80, exit, attached, attached, gone, attachedElsewhere = elsewhere)
 
     @Test
+    fun theWidgetsNewTerminalIntentAlwaysAsksForANewSession() {
+        // What the widget sends (also to a TerminalActivity that is already on top: onNewIntent routes it the same way): a new session,
+        // never the tab, whatever the activity was showing.
+        val intent = TerminalActivity.intent(org.robolectric.RuntimeEnvironment.getApplication(), "dev", newTerminal = true)
+        assertEquals(Destination.New(null, null), TerminalRoute.decide(intent.getStringExtra(TerminalActivity.EXTRA_TERMINAL_ID), intent.getBooleanExtra(TerminalActivity.EXTRA_NEW, false)))
+        // And the Terminals tab intent the widget uses for "access is off" carries the computer.
+        val tab = MainActivity.terminalsIntent(org.robolectric.RuntimeEnvironment.getApplication(), "dev")
+        assertEquals("dev", tab.getStringExtra(MainActivity.EXTRA_DEVICE_ID))
+        assertTrue(tab.getBooleanExtra(MainActivity.EXTRA_OPEN_TERMINALS, false))
+    }
+
+    @Test
     fun anIntentNamingASessionShowsIt() {
         assertEquals(Destination.Session("abc"), TerminalRoute.decide("abc", newRequested = false))
         assertEquals("a session wins over a stray new request", Destination.Session("abc"), TerminalRoute.decide("abc", newRequested = true, launcher = "claude"))
