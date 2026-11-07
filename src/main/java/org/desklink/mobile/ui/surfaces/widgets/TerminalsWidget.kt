@@ -25,8 +25,8 @@ class TerminalsWidget : FamilyWidget() {
                 if (view.open > 0) context.resources.getQuantityString(R.plurals.widget_terminals, view.open, view.open) else name,
                 DeskWidgets.act(context, WidgetAction.TERMINAL, id),
             )
-            // Access is the computer's to give: shown as it is, and the tap opens settings, never a terminal.
-            TerminalsView.AccessOff -> Triple(context.getString(R.string.widget_terminals_access_off), context.getString(R.string.widget_terminals_access_hint), DeskWidgets.openSettings(context, id))
+            // Access is the computer's to give: shown as last heard; the tap asks again and opens the Terminals tab, never a terminal.
+            TerminalsView.AccessOff -> Triple(context.getString(R.string.widget_terminals_access_off), context.getString(R.string.widget_terminals_access_hint), DeskWidgets.act(context, WidgetAction.TERMINAL, id))
             is TerminalsView.NotReady -> Triple(context.getString(R.string.widget_terminals_new), context.getString(view.label, name), DeskWidgets.act(context, WidgetAction.TERMINAL, id))
         }
         v.setTextViewText(R.id.term_title, title)

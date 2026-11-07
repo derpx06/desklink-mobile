@@ -18,6 +18,7 @@ import org.desklink.mobile.ui.compose.model.device.DeviceConnection
 import org.desklink.mobile.ui.shots.ShotDir
 import org.desklink.mobile.webrtc.WebRtcConnectionPath
 import org.junit.Assert.assertEquals
+import org.junit.Assert.fail
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -114,7 +115,8 @@ abstract class WidgetShots {
     @Test fun notesSmall() = shoot("notes-2x2", w2, h(2), { NotesWidget().draw(it, NotesView.Titles(titles.lines.take(1), 6)) })
     @Test fun notesMedium() = shoot("notes-4x3", w4, h(3), { NotesWidget().draw(it, NotesView.Titles(titles.lines.take(3), 4)) })
     @Test fun notesTall() = shoot("notes-4x4", w4, h(4), { NotesWidget().draw(it, titles) })
-    @Test fun notesLocked() = shoot("notes-locked", w2, h(2), { NotesWidget().draw(it, NotesView.Hidden) }, check = { root, ctx ->
+    // The real render path, locked: a source that fails the test if it is read at all, with notes that would show if it were.
+    @Test fun notesLocked() = shoot("notes-locked", w2, h(2), { NotesWidget().renderWith(it, SizeF(110f, 160f), locked = true) { fail("the notes were read while the phone is locked"); titles.lines } }, check = { root, ctx ->
         // The lock-screen rule: no row, no title, no text of any note is in the tree.
         val texts = mutableListOf<String>()
         fun walk(v: View) { if (v.visibility == View.VISIBLE && v is TextView) texts += v.text.toString(); if (v is ViewGroup) (0 until v.childCount).forEach { walk(v.getChildAt(it)) } }
@@ -122,6 +124,10 @@ abstract class WidgetShots {
         assertTrue(texts.none { t -> titles.lines.any { it.title == t } })
         assertTrue(texts.any { it.startsWith(ctx.getString(org.desklink.mobile.R.string.widget_notes_locked)) })
     })
+    @Test fun notesUnlockedThroughTheRealPathShowsTheTitles() {
+        val v = NotesWidget().renderWith(base, SizeF(110f, 260f), locked = false, unavailable = false) { titles.lines }.apply(base, FrameLayout(base))
+        assertEquals("Shopping list", (find(v, org.desklink.mobile.R.id.n_row1) as TextView).text.toString())
+    }
     @Test fun notesEmpty() = shoot("notes-empty", w2, h(2), { NotesWidget().draw(it, NotesView.Empty) })
 
     @Test fun transfersRunning() = shoot("transfers-running", w4, h(1), { TransfersWidget().draw(it, live, TransfersView.Running("holiday-photos.zip", true, 42), "Bucket · 120 MB") })

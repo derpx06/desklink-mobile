@@ -19,11 +19,14 @@ class NotesWidget : FamilyWidget() {
     override val sizes = listOf(SizeF(110f, 110f), SizeF(110f, 160f), SizeF(110f, 210f), SizeF(110f, 260f))
     override val background = true
 
-    override fun render(context: Context, facts: ComputerFacts?, size: SizeF): RemoteViews {
-        val locked = DeskWidgets.locked(context)
+    override fun render(context: Context, facts: ComputerFacts?, size: SizeF): RemoteViews =
+        renderWith(context, size, DeskWidgets.locked(context)) { NotesStore.notes(context).map { NoteLine(it.id, it.label) } }
+
+    /** The real render path, with the notes source and the lock state given (a test passes a source that fails if it is read while locked). */
+    fun renderWith(context: Context, size: SizeF, locked: Boolean, unavailable: Boolean = NotesStore.unavailable.value, notes: () -> List<NoteLine>): RemoteViews {
         // The notes are read only when the phone is unlocked: a locked phone never loads their text into the widget.
-        val lines = if (locked) emptyList() else NotesStore.notes(context).map { NoteLine(it.id, it.label) }
-        return draw(context, WidgetRules.notes(lines, locked, NotesStore.unavailable.value, WidgetRules.noteRows(size.height)))
+        val lines = if (locked) emptyList() else notes()
+        return draw(context, WidgetRules.notes(lines, locked, unavailable, WidgetRules.noteRows(size.height)))
     }
 
     fun draw(context: Context, view: NotesView): RemoteViews {

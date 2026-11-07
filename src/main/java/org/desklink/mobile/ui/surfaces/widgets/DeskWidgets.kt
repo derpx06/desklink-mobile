@@ -26,7 +26,6 @@ import androidx.annotation.LayoutRes
 import androidx.core.net.toUri
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.MainActivity
-import org.desklink.mobile.ui.compose.screen.settings.SettingsPage
 import org.desklink.mobile.ui.surfaces.DeskSurfaces
 import org.desklink.mobile.ui.surfaces.DeskWidgetActionReceiver
 import java.util.concurrent.Executors
@@ -41,16 +40,28 @@ object DeskWidgets {
 
     /** The phone's screen went off and no one has unlocked it since: notes stay hidden even before the keyguard says so. */
     @Volatile
-    var screenOff = false
-        private set
+    internal var screenOff = false
+
+    /** The facts of the last good read: a transient failure keeps the picture (or the last facts), it never says "No computer paired". */
+    @Volatile
+    private var lastFacts: Result? = null
+
+    /** The computer's facts now, or the last good ones; null (skip this redraw) when there are none and the read failed. */
+    internal fun facts(context: Context): Result? {
+        runCatching { WidgetFacts.current(context) }.onSuccess { return Result(it).also { r -> lastFacts = r } }
+        return lastFacts
+    }
+
+    /** [facts] is null when no computer is paired. */
+    internal class Result(val facts: ComputerFacts?)
 
     /** Redraws every placed widget of the family. Cheap when there are none. */
     fun updateAll(context: Context) {
         val manager = AppWidgetManager.getInstance(context) ?: return
         val placed = family.map { it to manager.getAppWidgetIds(ComponentName(context, it.javaClass)) }.filter { it.second.isNotEmpty() }
         if (placed.isEmpty()) return
-        val facts = runCatching { WidgetFacts.current(context) }.getOrNull()
-        placed.forEach { (widget, ids) -> widget.update(context, manager, ids, facts) }
+        val facts = facts(context) ?: return
+        placed.forEach { (widget, ids) -> widget.update(context, manager, ids, facts.facts) }
     }
 
     /** Hides the notes at once when the screen goes off and shows them again when the phone is unlocked. */
@@ -93,13 +104,6 @@ object DeskWidgets {
 
     fun openFiles(context: Context, id: String?): PendingIntent =
         activity(context, Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN_FILES, true).apply { if (id != null) putExtra(MainActivity.EXTRA_DEVICE_ID, id) }, "files", id)
-
-    fun openSettings(context: Context, id: String?): PendingIntent =
-        activity(
-            context,
-            Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_SETTINGS_PAGE, SettingsPage.PRIVACY.route).apply { if (id != null) putExtra(MainActivity.EXTRA_DEVICE_ID, id) },
-            "settings", id,
-        )
 
     fun newNote(context: Context): PendingIntent = activity(context, Intent(context, MainActivity::class.java).setAction(MainActivity.ACTION_NEW_NOTE), "note-new", null)
 
@@ -170,8 +174,8 @@ abstract class FamilyWidget : AppWidgetProvider() {
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) = refresh(context, manager, intArrayOf(id))
 
     private fun refresh(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        val facts = runCatching { WidgetFacts.current(context) }.getOrNull()
-        update(context, manager, ids, facts)
+        val facts = DeskWidgets.facts(context) ?: return
+        update(context, manager, ids, facts.facts)
     }
 
     fun update(context: Context, manager: AppWidgetManager, ids: IntArray, facts: ComputerFacts?) {

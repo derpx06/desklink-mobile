@@ -153,11 +153,22 @@ class WidgetRulesTest {
 
     @Test
     fun aTerminalTapNeverLaunchesWhenAccessIsOff() {
-        assertEquals(Gate.Settings, WidgetRules.gate(WidgetAction.TERMINAL, facts(terminals = TerminalAccess.OFF)))
+        assertEquals(Gate.TerminalsTab, WidgetRules.gate(WidgetAction.TERMINAL, facts(terminals = TerminalAccess.OFF)))
         assertEquals(Gate.Go, WidgetRules.gate(WidgetAction.TERMINAL, facts()))
         // Unknown until the computer has answered once: the terminal screen asks (and shows its own panel).
         assertEquals(Gate.Go, WidgetRules.gate(WidgetAction.TERMINAL, facts(terminals = TerminalAccess.UNKNOWN)))
         assertTrue(WidgetRules.gate(WidgetAction.TERMINAL, offline()) is Gate.Say)
+    }
+
+    @Test
+    fun anOffAnswerIsAHintTheLiveAnswerAlwaysBeats() {
+        // Stored "off" while the link is down and no list is loaded: still a hint (the tap asks again), not a verdict.
+        assertEquals(TerminalAccess.OFF, WidgetRules.terminalAccess(liveAllowed = null, storedAllowed = false))
+        // The live answer wins either way, and a refused first request (no list) counts as an answer.
+        assertEquals(TerminalAccess.ALLOWED, WidgetRules.terminalAccess(liveAllowed = true, storedAllowed = false))
+        assertEquals(TerminalAccess.OFF, WidgetRules.terminalAccess(liveAllowed = false, storedAllowed = true))
+        assertEquals(TerminalAccess.UNKNOWN, WidgetRules.terminalAccess(null, null))
+        assertEquals("Tap to check again", context.getString(R.string.widget_terminals_access_hint))
     }
 
     // ---- transfers -----------------------------------------------------------------------------------------------
@@ -185,5 +196,18 @@ class WidgetRulesTest {
         assertEquals(colorNames("values-v31"), colorNames("values-night-v31"))
         // The family's own colours are among them.
         assertTrue(colorNames("values-v31").containsAll(listOf("widget_bg", "widget_text", "widget_text_dim", "widget_tonal", "widget_on_tonal", "widget_accent", "widget_on_accent")))
+    }
+
+    // ---- a widget whose computer is gone ------------------------------------------------------------------------------
+
+    @Test
+    fun aWidgetWhoseComputerIsNoLongerPairedSaysSoAndActsOnNothing() {
+        val intent = android.content.Intent(context, WidgetActionActivity::class.java)
+            .putExtra(WidgetActionActivity.EXTRA_ACTION, WidgetAction.FILES.name)
+            .putExtra(WidgetActionActivity.EXTRA_DEVICE_ID, "gone-0000-0000-0000-000000000000")
+        org.robolectric.Robolectric.buildActivity(WidgetActionActivity::class.java, intent).create()
+        assertEquals("This widget's computer is no longer paired", org.robolectric.shadows.ShadowToast.getTextOfLatestToast())
+        // Nothing else was opened in its place (no file picker, no other computer's screen).
+        assertEquals(null, org.robolectric.Shadows.shadowOf(context).nextStartedActivity)
     }
 }
