@@ -50,6 +50,30 @@ class ClipboardListenerTest {
     }
 
     @Test
+    fun aSendAskedForOneComputerGoesToThatComputerOnly() {
+        val other = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val second = object : ClipboardListener.ClipboardObserver {
+            override fun clipboardChanged(content: String, copiedAt: Long) { other += content }
+        }
+        listener.registerObserver(second)
+        try {
+            context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("other app", "for one"))
+            ShadowLooper.idleMainLooper()
+            assertTrue(listener.sync(force = true, only = second))
+            val end = System.currentTimeMillis() + 5_000
+            while (other.isEmpty() && System.currentTimeMillis() < end) Thread.sleep(5)
+            Thread.sleep(50)
+            assertEquals(listOf("for one"), other.toList())
+            assertEquals(emptyList<String>(), sent.toList())
+            // A computer that is not (or no longer) sharing the clipboard gets nothing, and the person is told it was not sent.
+            listener.removeObserver(second)
+            assertFalse(listener.sync(force = true, only = second))
+        } finally {
+            listener.removeObserver(second)
+        }
+    }
+
+    @Test
     fun aCopyTooLargeForOneMessageIsRefusedAndSaidSoNeverSent() {
         val huge = "x".repeat(org.desklink.mobile.plugins.clipboard.ClipboardPlugin.MAX_SHARED_TEXT_BYTES + 1)
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("other app", huge))

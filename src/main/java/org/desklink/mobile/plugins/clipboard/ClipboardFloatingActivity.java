@@ -41,6 +41,13 @@ public class ClipboardFloatingActivity extends AppCompatActivity {
 
     private static final String KEY_SHOW_TOAST = "SHOW_TOAST";
 
+    private static final String KEY_DEVICE_ID = "DEVICE_ID";
+
+    /** Send to this computer only (the widget's), not to every one that shares the clipboard. */
+    public static Intent getIntent(Context context, boolean showToast, String deviceId) {
+        return getIntent(context, showToast).putExtra(KEY_DEVICE_ID, deviceId);
+    }
+
     public static Intent getIntent(Context context, boolean showToast) {
         Intent startIntent = new Intent(context.getApplicationContext(), ClipboardFloatingActivity.class);
         startIntent.putExtra(KEY_SHOW_TOAST, showToast);
@@ -56,14 +63,25 @@ public class ClipboardFloatingActivity extends AppCompatActivity {
             // widget) sends whatever is there; the automatic path sends only a new copy.
             boolean asked = shouldShowToast();
             // Every computer that would take it has clipboard sharing off: say so instead of "sent".
-            String ignoring = asked ? ClipboardPlugin.ignoringComputers() : null;
+            String only = getIntent().getStringExtra(KEY_DEVICE_ID);
+            ClipboardPlugin target = null;
+            if (only != null) {
+                org.desklink.mobile.Device device = org.desklink.mobile.DeskLinkApplication.getInstance().getDevice(only);
+                target = device == null ? null : device.getPlugin(ClipboardPlugin.class);
+                if (target == null) {
+                    Toast.makeText(this, R.string.home_feature_off, Toast.LENGTH_SHORT).show();
+                    finish();
+                    return;
+                }
+            }
+            String ignoring = !asked ? null : target != null ? (target.deskIgnoresClipboard() ? target.getComputerName() : null) : ClipboardPlugin.ignoringComputers();
             if (ignoring != null) {
                 ClipboardOffer.INSTANCE.cancel(this);
                 Toast.makeText(this, getString(R.string.clipboard_desk_off, ignoring), Toast.LENGTH_LONG).show();
                 finish();
                 return;
             }
-            boolean sent = ClipboardListener.instance(this).sync(asked);
+            boolean sent = target != null ? target.sendNow() : ClipboardListener.instance(this).sync(asked);
             ClipboardOffer.INSTANCE.cancel(this);
             if (asked) {
                 boolean tooLarge = !sent && ClipboardListener.instance(this).getLastRefusedTooLarge();

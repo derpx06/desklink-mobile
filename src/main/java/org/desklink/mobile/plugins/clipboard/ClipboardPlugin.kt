@@ -102,8 +102,8 @@ class ClipboardPlugin : Plugin() {
     /** The desk says its clipboard sharing is off: it ignores a copy, so an explicit send must say so instead of "sent". */
     fun deskIgnoresClipboard(): Boolean = ignores(device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings)
 
-    /** Home's "Send clipboard to <desk>": whatever is on the clipboard, text or image, sent now. */
-    fun sendNow(): Boolean = ClipboardListener.instance(context).sync(force = true)
+    /** "Send clipboard to <desk>" (Home, the widget): whatever is on the clipboard, text or image, sent now, to this computer only. */
+    fun sendNow(): Boolean = ClipboardListener.instance(context).sync(force = true, only = observer)
 
     private fun sendConnectPacket() {
         val content = ClipboardListener.instance(context).currentContent?.takeIf(::fitsWire) ?: return // Send clipboard only if it had been initialized
