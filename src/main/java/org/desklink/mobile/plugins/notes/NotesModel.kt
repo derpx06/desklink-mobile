@@ -44,4 +44,10 @@ object NotesModel {
         flush()
         return out
     }
+
+    /** What an Undo message calls the item: its title, else its first line, cut to a short whole phrase. */
+    fun undoName(title: String, body: String, max: Int = 28): String {
+        val text = title.trim().ifEmpty { body.lineSequence().map(String::trim).firstOrNull(String::isNotEmpty).orEmpty() }
+        return if (text.length <= max) text else text.take(max - 1).trimEnd() + "…"
+    }
 }
