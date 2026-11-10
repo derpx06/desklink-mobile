@@ -149,6 +149,7 @@ class ScreenControlPlugin : Plugin() {
     /** First frame of the current view reached a renderer. */
     private fun noteRemoteFrame() {
         if (frameSeen.compareAndSet(false, true)) {
+            Log.i(TAG, "First desktop frame ${viewRequestedAt?.let { ViewWait.clockMs() - it } ?: -1} ms after the view request")
             remoteLive = true
             latestStatus = context.getString(R.string.remote_screen_connected)
         }
