@@ -306,18 +306,21 @@ private fun DeskSwitch(desk: DeskSettings, actions: SettingsActions, key: String
     val live = desk.ready && remote != null
     val pending = key in desk.pending
     val on = DeskSettingsPlugin.shown(key, reported, desk.pending)
+    val subtitle = when {
+        !live -> stringResource(R.string.settings_waiting_for, desk.name)
+        notAllowedHere -> stringResource(R.string.settings_turn_on_at, desk.name)
+        pending -> stringResource(R.string.settings_saving)
+        else -> summary
+    }
     GroupRow(
         title,
         icon = icon,
-        subtitle = when {
-            !live -> stringResource(R.string.settings_waiting_for, desk.name)
-            notAllowedHere -> stringResource(R.string.settings_turn_on_at, desk.name)
-            pending -> stringResource(R.string.settings_saving)
-            else -> summary
-        },
+        subtitle = subtitle,
         checked = on,
         enabled = live && !pending && !notAllowedHere,
         onClick = { actions.onDeskSetting(key, !on) },
+        // Not while saving: that answers itself in a moment.
+        onDisabledClick = if (pending) null else ({ actions.onMessage("$title: $subtitle") }),
     )
 }
 
@@ -487,12 +490,15 @@ private fun NotificationsGroup(desk: DeskSettings?, actions: SettingsActions, pr
         )
         // W14: the switch lives at the computer; the phone shows it, and asks for Do Not Disturb access only once it is on.
         val dndSync = desk.remote?.dndSync == true
+        val dndSubtitle = stringResource(if (!desk.ready || desk.remote == null) R.string.settings_waiting_for else if (dndSync) R.string.settings_dnd_share_on else R.string.settings_turn_on_at, desk.name)
+        val dndWhy = stringResource(R.string.settings_dnd_share, desk.name) + ": " + dndSubtitle
         GroupRow(
             stringResource(R.string.settings_dnd_share, desk.name),
             icon = R.drawable.sym_notifications,
-            subtitle = stringResource(if (!desk.ready || desk.remote == null) R.string.settings_waiting_for else if (dndSync) R.string.settings_dnd_share_on else R.string.settings_turn_on_at, desk.name),
+            subtitle = dndSubtitle,
             checked = dndSync,
             enabled = false,
+            onDisabledClick = { actions.onMessage(dndWhy) },
         )
         if (dndSync && !org.desklink.mobile.plugins.battery.DndSync.canSet(context)) {
             AllowRow(stringResource(R.string.settings_dnd_access), stringResource(R.string.settings_dnd_access_summary, desk.name)) {

@@ -38,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
@@ -101,6 +102,8 @@ fun PaletteScreen(
     val copied = stringResource(R.string.snippets_copied)
     fun run(id: String) {
         close()
+        // A dimmed action says why and how to fix it; it never sends anything.
+        built.items.firstOrNull { it.id == id }?.blocked?.let { b -> return actions.onBlocked(id, built.items.first { it.id == id }.title, b) }
         when {
             id == Action.SEND_FILES -> actions.onSendFiles()
             id == Action.SEND_CLIPBOARD -> actions.onSendClipboard()
@@ -185,6 +188,7 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
             .background(t.surface)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) {}
+            .alpha(if (item.blocked == null) 1f else 0.55f)
             .heightIn(min = 52.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -193,9 +197,10 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
         IconTile(item.icon, size = 36.dp, radius = 18.dp)
         Column(Modifier.weight(1f)) {
             Text(item.title, fontSize = 15.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis)
-            if (big && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
+            // What a dimmed action needs is said whole, under its name.
+            if ((big || item.blocked != null) && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
         }
-        if (!big && item.hint.isNotEmpty()) {
+        if (!big && item.blocked == null && item.hint.isNotEmpty()) {
             Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(0.6f, fill = false))
         }
     }
@@ -206,8 +211,10 @@ private class Built(val items: List<PaletteItem>, val files: Map<String, org.des
 private fun buildItems(context: android.content.Context, state: HomeState, notes: List<org.desklink.mobile.plugins.notes.Note>, snippets: List<org.desklink.mobile.plugins.notes.Snippet>): Built {
     val items = mutableListOf<PaletteItem>()
     val name = state.name
-    fun action(id: String, icon: Int, title: String, hint: String = "", keywords: String = "") =
-        items.add(PaletteItem(id, PaletteGroup.ACTIONS, title, icon, hint, keywords))
+    fun action(id: String, icon: Int, title: String, hint: String = "", keywords: String = "") {
+        val blocked = HomeDerive.blocker(state, id)
+        items.add(PaletteItem(id, PaletteGroup.ACTIONS, title, icon, blocked?.let { context.getString(HomeDerive.needs(it), name) } ?: hint, keywords, blocked))
+    }
     val kwClipboard = context.getString(R.string.palette_keywords_clipboard)
     val kwFiles = context.getString(R.string.palette_keywords_files)
     val kwScreen = context.getString(R.string.palette_keywords_screen)

@@ -19,6 +19,8 @@ data class PaletteItem(
     val icon: Int = 0,
     val hint: String = "",
     val keywords: String = "",
+    /** Why it cannot run now: it is listed dimmed with its "Needs …" as the hint, and choosing it says how to fix it. */
+    val blocked: Blocker? = null,
 )
 
 data class PaletteSection(val group: PaletteGroup, val items: List<PaletteItem>)
@@ -100,30 +102,14 @@ object PaletteModel {
     }
 
     /**
-     * The actions to offer for this state, in the order they are listed. What needs the computer is there only while it can
-     * be reached and its DeskLink has the feature ([HomeOffers]); what is on this phone (notes, the terminals list, the Bucket,
-     * pairing) is always there.
+     * The actions, in the order they are listed: all of them, always. One the computer cannot take now is listed dimmed with
+     * why ([HomeDerive.blocker]), never left out, so what DeskLink can do is always findable.
      */
-    fun offeredActions(s: HomeState): List<String> = buildList {
-        val o = s.offers
-        if (HomeDerive.usable(s)) {
-            if (o.files) add(Action.SEND_FILES)
-            if (o.clipboard) add(Action.SEND_CLIPBOARD)
-            if (o.link) add(Action.SEND_LINK)
-            if (o.screen) add(Action.DESK_SCREEN)
-            // Terminals travel on their own channel, not as a feature packet: no capability to ask, so always offered.
-            add(Action.NEW_TERMINAL)
-        }
-        add(Action.OPEN_TERMINALS)
-        add(Action.NEW_NOTE)
-        add(Action.OPEN_BUCKET)
-        if (HomeDerive.usable(s)) {
-            if (o.ring) add(Action.RING)
-            if (o.ping) add(Action.PING)
-            if (o.lock) add(Action.LOCK)
-            if (s.canUnlock) add(Action.UNLOCK)
-            if (o.screen) add(Action.SHARE_SCREEN)
-        }
-        add(Action.PAIR_ANOTHER)
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun offeredActions(s: HomeState): List<String> = listOf(
+        Action.SEND_FILES, Action.SEND_CLIPBOARD, Action.SEND_LINK, Action.DESK_SCREEN, Action.NEW_TERMINAL,
+        Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET,
+        Action.RING, Action.PING, Action.LOCK, Action.UNLOCK, Action.SHARE_SCREEN,
+        Action.PAIR_ANOTHER,
+    )
 }

@@ -43,6 +43,7 @@ class HomeInteractionTest {
         onDeskScreen = log("screen"), onSendFiles = log("files"), onSendLink = {}, onLock = log("lock"), onShareScreen = log("share"),
         onPing = log("ping"), onRing = log("ring"), onOpenFiles = log("openFiles"), onUnlockDesk = log("unlock"),
         onUnavailable = { calls += "unavailable" },
+        onBlocked = { action, _, blocker -> calls += "blocked:$action:$blocker" },
         onNotes = {}, onNote = { calls += "note:$it" }, onNewNote = log("newNote"), onBucket = log("bucket"),
         openComputersRequest = computersRequest, onComputersShown = log("shown"),
         onSendClipboard = log("clipboard"), onCancelTransfer = {}, onOpenRecent = { calls += "open:${it.id}" },
@@ -94,7 +95,8 @@ class HomeInteractionTest {
         show { HomeScreen(state { copy(updateNeeded = true) }, actions()) }
         tap("Clipboard")
         tap("Send files")
-        assertEquals(listOf("unavailable", "unavailable"), calls)
+        // Said why (with the fix), never sent.
+        assertEquals(listOf("blocked:action:send-clipboard:UPDATE", "blocked:action:send-files:UPDATE"), calls)
     }
 
     @Test

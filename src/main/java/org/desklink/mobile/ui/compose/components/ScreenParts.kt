@@ -197,11 +197,14 @@ fun GroupRow(
     onClick: (() -> Unit)? = null,
     /** A trailing chevron: the row opens something. */
     chevron: Boolean = false,
+    /** A dimmed row still answers a tap: with why it is off and how to turn it on. */
+    onDisabledClick: (() -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val t = tokens
     val haptics = rememberDeskHaptics()
     val action = when {
+        !enabled && onDisabledClick != null -> Modifier.clickable(onClick = onDisabledClick)
         checked != null && onClick != null -> Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch) { haptics.toggle(!checked); onClick() }
         onClick != null -> Modifier.clickable(enabled = enabled, onClick = onClick)
         // A switch the phone only shows (set at the desk): still announced as a switch, and as off or on.

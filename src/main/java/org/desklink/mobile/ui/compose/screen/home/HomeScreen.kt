@@ -141,6 +141,8 @@ data class HomeOffers(
     val ring: Boolean = true,
     val ping: Boolean = true,
     val lock: Boolean = true,
+    /** Why an action above is false, by [PaletteModel.Action] id (the computer's own "off" when missing). */
+    val why: Map<String, Blocker> = emptyMap(),
 )
 
 @Immutable
@@ -169,6 +171,8 @@ data class HomeState(
     val historyCount: Int = 0,
     /** The desk lets this phone unlock it and the link is the local network: "Unlock desk" shows. */
     val canUnlock: Boolean = false,
+    /** Why "Unlock desk" cannot be used, while [canUnlock] is false. */
+    val unlockBlocker: Blocker = Blocker.UNLOCK_OFF,
     /** The newest few files sent or received (see [HomeDerive.recentFiles]). */
     val recent: List<TransferRecord> = emptyList(),
     /** One line of what is on this phone's clipboard, only while clipboard sharing is on. */
@@ -211,6 +215,8 @@ class HomeActions(
     val onUnlockDesk: () -> Unit,
     /** An action was tapped while the computer cannot take it; the message says why. */
     val onUnavailable: (String) -> Unit,
+    /** A dimmed action was tapped: say why ([HomeDerive.message]) and offer its [Fix]. [title] is the action's name. Sends nothing. */
+    val onBlocked: (action: String, title: String, blocker: Blocker) -> Unit = { _, _, _ -> },
     val onNotes: () -> Unit = {},
     val onNote: (String) -> Unit = {},
     val onNewNote: () -> Unit = {},
@@ -505,9 +511,19 @@ private fun Hero(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActi
         }
         // Three across; one column once the words would not fit. Terminals works with the computer away: it opens the tab, which keeps its own sessions.
         val terminalsHint = if (state.live.terminals > 0) pluralStringResource(R.plurals.home_live_terminals, state.live.terminals, state.live.terminals) else null
+        // Dimmed, never hidden: the hint says what is missing and a tap says how to get it.
+        @Composable
+        fun tile(action: String, icon: Int, title: String, run: () -> Unit, primary: Boolean, m: Modifier) {
+            val blocked = HomeDerive.blocker(state, action)
+            ActionTile(
+                icon, title, { gate(run) }, m, primary = primary, enabled = blocked == null,
+                hint = off ?: blocked?.let { stringResource(HomeDerive.needs(it), state.name) },
+                onDisabledClick = { blocked?.let { actions.onBlocked(action, title, it) } },
+            )
+        }
         val tiles: List<@Composable (Modifier) -> Unit> = listOf(
-            { m -> ActionTile(R.drawable.sym_desktop_windows, stringResource(R.string.home_desk_screen), { gate(actions.onDeskScreen) }, m, primary = true, enabled = why == null, hint = off, onDisabledClick = { actions.onUnavailable(notReady) }) },
-            { m -> ActionTile(R.drawable.sym_upload_file, stringResource(R.string.home_send_files), { gate(actions.onSendFiles) }, m, enabled = why == null, hint = off, onDisabledClick = { actions.onUnavailable(notReady) }) },
+            { m -> tile(PaletteModel.Action.DESK_SCREEN, R.drawable.sym_desktop_windows, stringResource(R.string.home_desk_screen), actions.onDeskScreen, true, m) },
+            { m -> tile(PaletteModel.Action.SEND_FILES, R.drawable.sym_upload_file, stringResource(R.string.home_send_files), actions.onSendFiles, false, m) },
             { m -> ActionTile(R.drawable.sym_terminal, stringResource(R.string.tab_terminals), actions.onTerminals, m, hint = terminalsHint) },
         )
         if (LocalDensity.current.fontScale > 1.4f) {
@@ -661,20 +677,19 @@ private fun OfflineTile(tile: Tile, modifier: Modifier, unreachable: String) {
 private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActions, notReady: String, onAll: () -> Unit, onSendLink: () -> Unit) {
     val t = tokens
     val o = state.offers
-    // Until the link is up nothing is known about the computer, so every action is listed (dimmed); then only what it has.
+    // Every action is listed, whatever the computer has: one it cannot take is dimmed, and a tap says why and how to turn it on.
     val usable = HomeDerive.usable(state)
-    fun shown(offered: Boolean) = !usable || offered
     val sharing = state.live.phoneScreen
-    class Q(val icon: Int, val label: String, val show: Boolean, val run: () -> Unit)
+    class Q(val id: String, val icon: Int, val label: String, val run: () -> Unit) { val blocked = HomeDerive.blocker(state, id) }
     val items = listOf(
-        Q(R.drawable.sym_content_paste, stringResource(R.string.home_tile_clipboard), shown(o.clipboard)) { gate(actions.onSendClipboard) },
-        Q(R.drawable.sym_link, stringResource(R.string.home_send_link), shown(o.link)) { gate(onSendLink) },
-        Q(R.drawable.sym_vibration, stringResource(R.string.home_ring_desk), shown(o.ring)) { gate(actions.onRing) },
-        Q(R.drawable.sym_lock, stringResource(R.string.home_lock_desk), shown(o.lock)) { gate(actions.onLock) },
-        Q(R.drawable.sym_mobile_screen_share, stringResource(if (sharing) R.string.home_stop_sharing else R.string.home_share_screen), shown(o.screen)) { gate(actions.onShareScreen) },
-        Q(R.drawable.sym_waving_hand, stringResource(R.string.home_ping_desk), shown(o.ping)) { gate(actions.onPing) },
-        Q(R.drawable.sym_lock_open, stringResource(R.string.home_tile_unlock), usable && state.canUnlock) { actions.onUnlockDesk() },
-    ).filter { it.show }
+        Q(PaletteModel.Action.SEND_CLIPBOARD, R.drawable.sym_content_paste, stringResource(R.string.home_tile_clipboard)) { gate(actions.onSendClipboard) },
+        Q(PaletteModel.Action.SEND_LINK, R.drawable.sym_link, stringResource(R.string.home_send_link)) { gate(onSendLink) },
+        Q(PaletteModel.Action.RING, R.drawable.sym_vibration, stringResource(R.string.home_ring_desk)) { gate(actions.onRing) },
+        Q(PaletteModel.Action.LOCK, R.drawable.sym_lock, stringResource(R.string.home_lock_desk)) { gate(actions.onLock) },
+        Q(PaletteModel.Action.SHARE_SCREEN, R.drawable.sym_mobile_screen_share, stringResource(if (sharing) R.string.home_stop_sharing else R.string.home_share_screen)) { gate(actions.onShareScreen) },
+        Q(PaletteModel.Action.PING, R.drawable.sym_waving_hand, stringResource(R.string.home_ping_desk)) { gate(actions.onPing) },
+        Q(PaletteModel.Action.UNLOCK, R.drawable.sym_lock_open, stringResource(R.string.home_tile_unlock)) { actions.onUnlockDesk() },
+    )
     val clipboardLine = when {
         !usable || !o.clipboard -> null
         !state.clipboardOn -> stringResource(R.string.home_tile_clipboard_off)
@@ -694,7 +709,7 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
                     val gap = (columns - row.size) / 2f
                     if (gap > 0f) Spacer(Modifier.weight(gap))
                     row.forEach { q ->
-                        QuickActionTile(q.icon, q.label, q.run, Modifier.weight(1f), enabled = usable, onDisabledClick = { actions.onUnavailable(notReady) })
+                        QuickActionTile(q.icon, q.label, q.run, Modifier.weight(1f), enabled = q.blocked == null, onDisabledClick = { q.blocked?.let { actions.onBlocked(q.id, q.label, it) } })
                     }
                     if (gap > 0f) Spacer(Modifier.weight(gap))
                 }

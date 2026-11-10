@@ -142,6 +142,24 @@ abstract class FirstRunShots : ShotTest() {
         HomeScreen(homeState, homeActions) { FinishSetupCard(setupRows, expanded = false, onExpanded = {}, onAllowAll = {}) }
     }
 
+    private val blockedState = homeState.copy(
+        notificationsOff = false,
+        offers = org.desklink.mobile.ui.compose.screen.home.HomeOffers(
+            ring = false, lock = false, screen = false,
+            why = mapOf(
+                org.desklink.mobile.ui.compose.screen.home.PaletteModel.Action.RING to org.desklink.mobile.ui.compose.screen.home.Blocker.PHONE_OFF,
+                org.desklink.mobile.ui.compose.screen.home.PaletteModel.Action.LOCK to org.desklink.mobile.ui.compose.screen.home.Blocker.PERMISSION,
+            ),
+        ),
+        unlockBlocker = org.desklink.mobile.ui.compose.screen.home.Blocker.UNLOCK_OFF,
+    )
+
+    @Test fun homeBlockedActions() = shoot("fr-home-blocked") { HomeScreen(blockedState, homeActions) }
+
+    @Test fun paletteBlockedActions() = shoot("fr-palette-blocked") {
+        org.desklink.mobile.ui.compose.screen.home.PaletteScreen(blockedState, homeActions, onClose = {}, onSendLink = {})
+    }
+
     @Test fun permissionsAllOn() = shoot("fr-permissions-done") {
         PermissionsChecklistScreen("arch-desk", perms.map { PermissionRow(it.icon, it.title, it.summary, true) { } }) {}
     }

@@ -7,6 +7,24 @@ import org.desklink.mobile.ui.compose.model.device.DeviceConnection
 /** Why the computer's actions cannot be used right now; null from [HomeDerive.whyNot] when they can. */
 enum class NotReady { UPDATE, CONNECTING, CANT_REACH, OFFLINE }
 
+/**
+ * Why one action cannot be used, checked in this order: the link ([NotReady]), then the action itself. An action is never hidden for
+ * it: it shows dimmed, says this in one line, and offers the [Fix].
+ */
+enum class Blocker { UPDATE, CONNECTING, CANT_REACH, OFFLINE, PHONE_OFF, PERMISSION, DESK_OFF, NOT_SAME_WIFI, UNLOCK_OFF }
+
+/** What a tap on a blocked action does besides saying why: nothing from it ever reaches the computer. */
+enum class Fix {
+    /** Look for the computer again. */
+    RETRY,
+    /** The feature is off on this phone: a button turns it on. */
+    TURN_ON_HERE,
+    /** Android has not granted it: the request (or the system page) opens at once. */
+    ALLOW,
+    /** Only the computer (or an update) can change it: the line says where. */
+    NONE,
+}
+
 /** What Home shows for a given state: pure, so a test can say what appears without drawing anything. */
 object HomeDerive {
     const val RECENT_FILES = 3
@@ -38,6 +56,73 @@ object HomeDerive {
         connection == DeviceConnection.CONNECTING -> NotReady.CONNECTING
         connection == DeviceConnection.UNAVAILABLE -> NotReady.CANT_REACH
         else -> NotReady.OFFLINE
+    }
+
+    fun blocker(n: NotReady): Blocker = when (n) {
+        NotReady.UPDATE -> Blocker.UPDATE
+        NotReady.CONNECTING -> Blocker.CONNECTING
+        NotReady.CANT_REACH -> Blocker.CANT_REACH
+        NotReady.OFFLINE -> Blocker.OFFLINE
+    }
+
+    /** Why [action] (a [PaletteModel.Action] id) cannot be used now; null when it can. Actions that do not need the computer never are. */
+    fun blocker(s: HomeState, action: String): Blocker? {
+        val o = s.offers
+        val offered = when (action) {
+            PaletteModel.Action.SEND_FILES -> o.files
+            PaletteModel.Action.SEND_CLIPBOARD -> o.clipboard
+            PaletteModel.Action.SEND_LINK -> o.link
+            PaletteModel.Action.DESK_SCREEN, PaletteModel.Action.SHARE_SCREEN -> o.screen
+            PaletteModel.Action.RING -> o.ring
+            PaletteModel.Action.PING -> o.ping
+            PaletteModel.Action.LOCK -> o.lock
+            PaletteModel.Action.UNLOCK -> s.canUnlock
+            PaletteModel.Action.NEW_TERMINAL -> true
+            else -> return null
+        }
+        whyNot(s)?.let { return blocker(it) }
+        if (offered) return null
+        return if (action == PaletteModel.Action.UNLOCK) s.unlockBlocker else o.why[action] ?: Blocker.DESK_OFF
+    }
+
+    fun fix(b: Blocker): Fix = when (b) {
+        Blocker.CONNECTING, Blocker.CANT_REACH, Blocker.OFFLINE -> Fix.RETRY
+        Blocker.PHONE_OFF -> Fix.TURN_ON_HERE
+        Blocker.PERMISSION -> Fix.ALLOW
+        Blocker.UPDATE, Blocker.DESK_OFF, Blocker.NOT_SAME_WIFI, Blocker.UNLOCK_OFF -> Fix.NONE
+    }
+
+    /** The one line a tap says, formatted with the action's name and then the computer's. */
+    @androidx.annotation.StringRes
+    fun message(b: Blocker): Int = when (b) {
+        Blocker.UPDATE -> org.desklink.mobile.R.string.home_blocked_update
+        Blocker.CONNECTING -> org.desklink.mobile.R.string.home_blocked_connecting
+        Blocker.CANT_REACH -> org.desklink.mobile.R.string.home_blocked_unreachable
+        Blocker.OFFLINE -> org.desklink.mobile.R.string.home_blocked_offline
+        Blocker.PHONE_OFF -> org.desklink.mobile.R.string.home_blocked_phone_off
+        Blocker.PERMISSION -> org.desklink.mobile.R.string.home_blocked_permission
+        Blocker.DESK_OFF -> org.desklink.mobile.R.string.home_blocked_desk_off
+        Blocker.NOT_SAME_WIFI -> org.desklink.mobile.R.string.home_blocked_same_wifi
+        Blocker.UNLOCK_OFF -> org.desklink.mobile.R.string.home_blocked_unlock_off
+    }
+
+    /** The short "Needs …" under a dimmed action (the palette, a tile), formatted with the computer's name. */
+    @androidx.annotation.StringRes
+    fun needs(b: Blocker): Int = when (b) {
+        Blocker.UPDATE -> org.desklink.mobile.R.string.home_needs_update
+        Blocker.CONNECTING, Blocker.CANT_REACH, Blocker.OFFLINE -> org.desklink.mobile.R.string.home_needs_link
+        Blocker.PHONE_OFF -> org.desklink.mobile.R.string.home_needs_turning_on
+        Blocker.PERMISSION -> org.desklink.mobile.R.string.home_needs_permission
+        Blocker.DESK_OFF, Blocker.UNLOCK_OFF -> org.desklink.mobile.R.string.home_needs_desk
+        Blocker.NOT_SAME_WIFI -> org.desklink.mobile.R.string.home_needs_same_wifi
+    }
+
+    /** The fix button's words, or null when the line alone says what to do ([Fix.ALLOW] acts at once). */
+    @androidx.annotation.StringRes
+    fun fixLabel(f: Fix): Int? = when (f) {
+        Fix.RETRY -> org.desklink.mobile.R.string.terminal_retry
+        Fix.TURN_ON_HERE -> org.desklink.mobile.R.string.home_turn_on
+        Fix.ALLOW, Fix.NONE -> null
     }
 
     /** The "Happening now" area exists only while something is happening. */

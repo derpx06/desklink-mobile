@@ -78,6 +78,12 @@ object HomeModel {
                 device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby == true &&
                 device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java) != null &&
                 device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST),
+            unlockBlocker = when {
+                device.getPlugin(org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin::class.java) == null ||
+                    !device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_UNLOCK_REQUEST) -> Blocker.DESK_OFF
+                device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.unlockNearby != true -> Blocker.UNLOCK_OFF
+                else -> Blocker.NOT_SAME_WIFI
+            },
             offers = offers(context, device),
             history = history.take(HISTORY_SEARCHED),
             terminalAttention = org.desklink.mobile.plugins.terminal.TerminalAttentionBadge.has(id),
@@ -92,7 +98,9 @@ object HomeModel {
     private fun offers(context: Context, device: Device): HomeOffers {
         fun menu(name: Int) = device.loadedPlugins.values.any { p -> p.getUiMenuEntries().any { it.name == context.getString(name) } }
         val share = device.getPlugin(org.desklink.mobile.plugins.share.SharePlugin::class.java) != null
+        val why = PLUGIN_FOR.mapNotNull { (action, cls) -> blocker(device, Plugin.getPluginKey(cls))?.let { action to it } }.toMap()
         return HomeOffers(
+            why = why,
             files = share,
             clipboard = device.getPlugin(ClipboardPlugin::class.java) != null,
             link = share,
@@ -101,6 +109,32 @@ object HomeModel {
             ping = menu(R.string.send_ping),
             lock = menu(R.string.lock_remote_device),
         )
+    }
+
+    /** The phone's plugin behind each of Home's computer actions: what [blocker] looks at, and what "Turn on" or "Allow" acts on. */
+    val PLUGIN_FOR: Map<String, Class<out Plugin>> = mapOf(
+        PaletteModel.Action.SEND_FILES to org.desklink.mobile.plugins.share.SharePlugin::class.java,
+        PaletteModel.Action.SEND_LINK to org.desklink.mobile.plugins.share.SharePlugin::class.java,
+        PaletteModel.Action.SEND_CLIPBOARD to ClipboardPlugin::class.java,
+        PaletteModel.Action.DESK_SCREEN to ScreenControlPlugin::class.java,
+        PaletteModel.Action.SHARE_SCREEN to ScreenControlPlugin::class.java,
+        PaletteModel.Action.RING to org.desklink.mobile.plugins.findremotedevice.FindRemoteDevicePlugin::class.java,
+        PaletteModel.Action.PING to org.desklink.mobile.plugins.ping.PingPlugin::class.java,
+        PaletteModel.Action.LOCK to org.desklink.mobile.plugins.lockdevice.LockDevicePlugin::class.java,
+    )
+
+    /** Why a plugin is not working: off on this phone, waiting for a permission, or (anything else) not offered by the computer. */
+    fun blocker(device: Device, key: String): Blocker? = blocker(
+        loaded = device.loadedPlugins[key] != null && !device.pluginsWithoutPermissions.containsKey(key),
+        enabledHere = device.isPluginEnabled(key),
+        needsPermission = device.pluginsWithoutPermissions.containsKey(key),
+    )
+
+    fun blocker(loaded: Boolean, enabledHere: Boolean, needsPermission: Boolean): Blocker? = when {
+        loaded -> null
+        !enabledHere -> Blocker.PHONE_OFF
+        needsPermission -> Blocker.PERMISSION
+        else -> Blocker.DESK_OFF
     }
 
     /** How many of the computer's notifications are in this phone's shade now (0 when it does not mirror them). */

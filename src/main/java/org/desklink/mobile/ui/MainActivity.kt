@@ -128,6 +128,7 @@ import org.desklink.mobile.ui.compose.components.ScreenHeader
 import org.desklink.mobile.ui.compose.components.rememberConnectionStats
 import org.desklink.mobile.ui.compose.screen.about.AboutScreen
 import org.desklink.mobile.ui.compose.screen.home.HomeActions
+import org.desklink.mobile.ui.compose.screen.home.HomeDerive
 import org.desklink.mobile.ui.compose.screen.home.HomeModel
 import org.desklink.mobile.ui.compose.screen.home.HomeScreen
 import org.desklink.mobile.ui.compose.screen.pairing.NearbyComputer
@@ -417,6 +418,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     /** A message with an Undo: [undo] runs if it is tapped within the snackbar's time; it replaces any Undo still showing. */
     fun showUndo(message: String, undo: () -> Unit) {
         lifecycleScope.launch { snackbar.showUndo(message, getString(R.string.undo), undo) }
+    }
+
+    /** A message with one button that fixes what it says ("Retry", "Turn on"). */
+    private fun showFix(message: String, label: String, fix: () -> Unit) {
+        lifecycleScope.launch { snackbar.showUndo(message, label, fix) }
     }
 
     /**
@@ -906,9 +912,29 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onNewNote = { nav.select(AppTab.NOTES); notesEditing.value = org.desklink.mobile.plugins.notes.NotesActivity.NEW },
             onBucket = { nav.select(AppTab.FILES) },
             onUnavailable = ::showMessage,
+            onBlocked = { action, title, blocker -> explainBlocked(device, action, title, blocker) },
             openComputersRequest = computersRequest,
             onComputersShown = { computersRequest = 0 },
         )
+    }
+
+    /**
+     * A dimmed action was tapped: one line saying why, and the fix: Retry or Turn on as the snackbar's button, a permission asked
+     * at once (through the plugin's own explanation), or just where to turn it on at the computer. Nothing is sent to it.
+     */
+    private fun explainBlocked(device: Device, action: String, title: String, blocker: org.desklink.mobile.ui.compose.screen.home.Blocker) {
+        val message = getString(HomeDerive.message(blocker), title, device.name)
+        val plugin = HomeModel.PLUGIN_FOR[action]?.let { Plugin.getPluginKey(it) }
+        when (HomeDerive.fix(blocker)) {
+            org.desklink.mobile.ui.compose.screen.home.Fix.RETRY -> showFix(message, getString(R.string.terminal_retry)) { BackgroundService.ForceRefreshConnections(this) }
+            org.desklink.mobile.ui.compose.screen.home.Fix.TURN_ON_HERE ->
+                if (plugin == null) showMessage(message) else showFix(message, getString(R.string.home_turn_on)) { setPluginEnabled(device, plugin, true) }
+            org.desklink.mobile.ui.compose.screen.home.Fix.ALLOW -> {
+                showMessage(message)
+                device.pluginsWithoutPermissions[plugin]?.let { showPluginPermission(it, optional = false) }
+            }
+            org.desklink.mobile.ui.compose.screen.home.Fix.NONE -> showMessage(message)
+        }
     }
 
     private fun media(device: Device, action: (org.desklink.mobile.plugins.mpris.MprisPlugin) -> Unit) {

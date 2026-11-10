@@ -1,8 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package org.desklink.mobile.ui
 
+import android.app.Application
+import androidx.test.core.app.ApplicationProvider
 import org.desklink.mobile.ui.compose.model.device.DeviceConnection
+import org.desklink.mobile.ui.compose.screen.home.Blocker
+import org.desklink.mobile.ui.compose.screen.home.Fix
 import org.desklink.mobile.ui.compose.screen.home.HomeDerive
+import org.desklink.mobile.ui.compose.screen.home.HomeModel
 import org.desklink.mobile.ui.compose.screen.home.HomeOffers
 import org.desklink.mobile.ui.compose.screen.home.HomeState
 import org.desklink.mobile.ui.compose.screen.home.PaletteGroup
@@ -13,8 +18,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /** What "Find anything" lists and in what order, without drawing it. */
+@RunWith(RobolectricTestRunner::class)
 class PaletteModelTest {
     private fun item(id: String, group: PaletteGroup, title: String, hint: String = "", keywords: String = "") = PaletteItem(id, group, title, 0, hint, keywords)
 
@@ -90,34 +98,70 @@ class PaletteModelTest {
     private fun state(connection: DeviceConnection, offers: HomeOffers = HomeOffers(), canUnlock: Boolean = false) =
         HomeState("d1", "arch-desk", connection, emptyList(), offers = offers, canUnlock = canUnlock)
 
+    private val everything = listOf(
+        Action.SEND_FILES, Action.SEND_CLIPBOARD, Action.SEND_LINK, Action.DESK_SCREEN, Action.NEW_TERMINAL,
+        Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.RING, Action.PING, Action.LOCK, Action.UNLOCK, Action.SHARE_SCREEN, Action.PAIR_ANOTHER,
+    )
+
     @Test
-    fun aReachableComputerOffersItsActions() {
-        val ids = PaletteModel.offeredActions(state(DeviceConnection.LOCAL))
-        listOf(Action.SEND_FILES, Action.RING, Action.LOCK, Action.DESK_SCREEN, Action.NEW_NOTE).forEach { assertTrue(it, it in ids) }
-        assertFalse("unlock only when the desk allows it", Action.UNLOCK in ids)
-        assertTrue(Action.UNLOCK in PaletteModel.offeredActions(state(DeviceConnection.LOCAL, canUnlock = true)))
+    fun everyActionIsListedWhateverTheComputerCanTake() {
+        assertEquals(everything, PaletteModel.offeredActions(state(DeviceConnection.LOCAL)))
+        assertEquals("offline: listed, dimmed", everything, PaletteModel.offeredActions(state(DeviceConnection.OFFLINE)))
+        assertEquals(everything, PaletteModel.offeredActions(state(DeviceConnection.LOCAL, HomeOffers(ring = false, lock = false, screen = false))))
     }
 
     @Test
-    fun anUnreachableComputerOffersOnlyWhatIsOnThePhone() {
-        val ids = PaletteModel.offeredActions(state(DeviceConnection.OFFLINE))
-        assertEquals(listOf(Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.PAIR_ANOTHER), ids)
+    fun anUnreachableComputerBlocksWhatNeedsItAndNothingElse() {
+        val s = state(DeviceConnection.OFFLINE)
+        listOf(Action.SEND_FILES, Action.RING, Action.LOCK, Action.UNLOCK, Action.NEW_TERMINAL).forEach { assertEquals(it, Blocker.OFFLINE, HomeDerive.blocker(s, it)) }
+        listOf(Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.PAIR_ANOTHER).forEach { assertEquals(it, null, HomeDerive.blocker(s, it)) }
     }
 
     @Test
-    fun aFeatureTheComputerLacksIsNotOffered() {
-        val ids = PaletteModel.offeredActions(state(DeviceConnection.LOCAL, HomeOffers(ring = false, lock = false, screen = false)))
-        listOf(Action.RING, Action.LOCK, Action.DESK_SCREEN, Action.SHARE_SCREEN).forEach { assertFalse(it, it in ids) }
-        assertTrue(Action.SEND_FILES in ids)
+    fun aFeatureTheComputerLacksIsBlockedWithItsReason() {
+        val offers = HomeOffers(ring = false, lock = false, screen = false, why = mapOf(Action.RING to Blocker.PHONE_OFF, Action.LOCK to Blocker.PERMISSION))
+        val s = state(DeviceConnection.LOCAL, offers)
+        assertEquals(Blocker.PHONE_OFF, HomeDerive.blocker(s, Action.RING))
+        assertEquals(Blocker.PERMISSION, HomeDerive.blocker(s, Action.LOCK))
+        assertEquals("no reason known: the computer's", Blocker.DESK_OFF, HomeDerive.blocker(s, Action.DESK_SCREEN))
+        assertEquals(null, HomeDerive.blocker(s, Action.SEND_FILES))
+        assertEquals("unlock says why it is off", Blocker.NOT_SAME_WIFI, HomeDerive.blocker(s.copy(unlockBlocker = Blocker.NOT_SAME_WIFI), Action.UNLOCK))
+        assertEquals(null, HomeDerive.blocker(state(DeviceConnection.LOCAL, canUnlock = true), Action.UNLOCK))
     }
 
     @Test
-    fun aComputerThatNeedsAnUpdateOffersOnlyWhatIsOnThePhone() {
-        // Connected, but its DeskLink is another version: nothing that sends a packet is offered (it would only queue).
+    fun aComputerThatNeedsAnUpdateBlocksEverythingThatSends() {
+        // Connected, but its DeskLink is another version: nothing that sends a packet can run (it would only queue).
         val s = state(DeviceConnection.LOCAL).copy(updateNeeded = true)
         assertFalse(HomeDerive.usable(s))
-        assertEquals(listOf(Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.PAIR_ANOTHER), PaletteModel.offeredActions(s))
+        assertEquals(Blocker.UPDATE, HomeDerive.blocker(s, Action.SEND_FILES))
         assertTrue(HomeDerive.usable(state(DeviceConnection.LOCAL)))
-        assertFalse(HomeDerive.usable(state(DeviceConnection.CONNECTING)))
+        assertEquals(Blocker.CONNECTING, HomeDerive.blocker(state(DeviceConnection.CONNECTING), Action.PING))
+    }
+
+    @Test
+    fun eachReasonHasItsFixAndWords() {
+        val fixes = Blocker.entries.associateWith(HomeDerive::fix)
+        assertEquals(Fix.RETRY, fixes[Blocker.OFFLINE])
+        assertEquals(Fix.RETRY, fixes[Blocker.CANT_REACH])
+        assertEquals(Fix.TURN_ON_HERE, fixes[Blocker.PHONE_OFF])
+        assertEquals(Fix.ALLOW, fixes[Blocker.PERMISSION])
+        assertEquals(Fix.NONE, fixes[Blocker.DESK_OFF])
+        assertEquals(Fix.NONE, fixes[Blocker.UNLOCK_OFF])
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        Blocker.entries.forEach { b ->
+            val line = app.getString(HomeDerive.message(b), "Ring", "arch-desk")
+            assertTrue("$b: $line", "Ring" in line || "Unlock" in line || b == Blocker.UNLOCK_OFF)
+            assertTrue(app.getString(HomeDerive.needs(b), "arch-desk").startsWith("Needs"))
+        }
+        assertEquals(null, HomeDerive.fixLabel(Fix.ALLOW))
+    }
+
+    @Test
+    fun aPluginIsOffHereWaitingForAPermissionOrMissingAtTheComputer() {
+        assertEquals(null, HomeModel.blocker(loaded = true, enabledHere = true, needsPermission = false))
+        assertEquals(Blocker.PHONE_OFF, HomeModel.blocker(loaded = false, enabledHere = false, needsPermission = false))
+        assertEquals(Blocker.PERMISSION, HomeModel.blocker(loaded = false, enabledHere = true, needsPermission = true))
+        assertEquals(Blocker.DESK_OFF, HomeModel.blocker(loaded = false, enabledHere = true, needsPermission = false))
     }
 }
