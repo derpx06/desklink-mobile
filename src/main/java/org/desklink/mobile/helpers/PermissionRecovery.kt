@@ -72,14 +72,11 @@ object PermissionRecovery {
     }
 
     /**
-     * Asks through [launch], or, when Android will not ask any more, opens the app's permission page and says so.
-     * Returns whether it asked (false: it opened the page).
+     * Asks through [launch], always: [blocked] is only a guess (after a grant revoked in system settings Android asks again), so
+     * the request is tried first and, if Android answers "no" at once without asking, [onResult] opens the app's permission page.
+     * Returns whether it launched the request.
      */
     fun requestOrExplain(context: Context, permissions: Array<String>, launch: (Array<String>) -> Unit): Boolean {
-        if (blocked(context, permissions.toList()).isNotEmpty()) {
-            openSettings(context)
-            return false
-        }
         markAsked(context, permissions.toList())
         launchedAt = android.os.SystemClock.elapsedRealtime()
         launch(permissions)
