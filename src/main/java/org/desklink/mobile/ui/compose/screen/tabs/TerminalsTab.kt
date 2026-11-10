@@ -9,8 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -85,7 +83,6 @@ import org.desklink.mobile.ui.compose.tokens
 import org.desklink.mobile.webrtc.SessionPasswordDenial
 import org.desklink.mobile.webrtc.terminal.TerminalClientState
 import org.desklink.mobile.webrtc.terminal.TerminalLinkState
-import org.desklink.mobile.webrtc.terminal.TerminalProtocol
 import org.desklink.mobile.webrtc.terminal.TerminalSessionState
 
 // ---- Terminals --------------------------------------------------------------------------------------------------
@@ -155,6 +152,8 @@ class TerminalsActions(
     val onRename: (id: String, name: String) -> Unit = { _, _ -> },
     val onEnd: (id: String) -> Unit = {},
     val onRestart: (TerminalSessionState) -> Unit = {},
+    /** A dimmed "new terminal" was tapped with the computer not connected: say so and look for it again (never starts anything). */
+    val onUnavailable: () -> Unit = {},
 )
 
 /**
@@ -239,6 +238,7 @@ fun TerminalsTab(
     }
 
     val ended = stringResource(R.string.terminal_snack_ended)
+    val needsLink = stringResource(R.string.terminal_needs_link, deskName)
     TerminalsContent(
         deskName = deskName,
         panel = panel,
@@ -254,10 +254,11 @@ fun TerminalsTab(
             onUnlock = { gateRuns++ },
             onRename = { id, name -> SessionPreviews.setLabel(context, deviceId, id, name); labelsRevision++ },
             onEnd = { id -> client?.close(id); onMessage(ended) },
+            onUnavailable = { client?.refresh(); onMessage(needsLink) },
             onRestart = { session ->
                 client?.close(session.id)
-                // In the folder it was in, not the computer's default.
-                start(session.title.takeIf { it in TerminalProtocol.KNOWN_LAUNCHERS }, session.cwd)
+                // A shell in the folder it was in, not the computer's default (agent CLIs are not started from the phone).
+                start(null, session.cwd)
             },
         ),
     )
@@ -309,7 +310,8 @@ fun TerminalsContent(
                         Icon(painterResource(R.drawable.sym_search), contentDescription = stringResource(R.string.terminal_search), tint = t.text)
                     }
                 }
-                IconButton(onClick = { if (connected && !busy) newSheet = true }, enabled = connected && !busy, modifier = Modifier.size(48.dp)) {
+                // Dimmed while the computer is away, but still answers a tap with why.
+                IconButton(onClick = { if (!connected) actions.onUnavailable() else if (!busy) newSheet = true }, modifier = Modifier.size(48.dp).alpha(if (connected && !busy) 1f else 0.5f)) {
                     Icon(painterResource(R.drawable.sym_add), contentDescription = stringResource(R.string.terminal_new_terminal), tint = t.text)
                 }
                 LinkChip(connected)
@@ -364,7 +366,7 @@ fun TerminalsContent(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item(key = "launchers") { Launchers(state.launchers, connected && !busy, actions.onNew) }
+                    item(key = "launchers") { NewTerminalTile(connected && !busy, actions.onNew) { if (!connected) actions.onUnavailable() } }
                     if (state.sessions.isEmpty()) {
                         item(key = "none") {
                             Text(stringResource(R.string.terminal_empty_hint), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp))
@@ -420,7 +422,7 @@ fun TerminalsContent(
     }
 
     if (newSheet) {
-        NewTerminalSheet(deskName, state.launchers, state.folders, onDismiss = { newSheet = false }) { launcher, cwd ->
+        NewTerminalSheet(deskName, state.folders, onDismiss = { newSheet = false }) { launcher, cwd ->
             newSheet = false
             actions.onNew(launcher, cwd)
         }
@@ -488,25 +490,16 @@ private fun LinkChip(connected: Boolean) {
     }
 }
 
-/** Shell, then the agent CLIs the computer has: three dark tiles to a row (one each at a large font). Each starts that terminal. */
+/** One "New terminal" tile: a shell on the computer (agent CLIs are started from it, not offered here). */
 @Composable
-private fun Launchers(offered: List<String>, enabled: Boolean, onStart: (String?, String?) -> Unit) {
-    val context = LocalContext.current
-    val agents = offered.mapNotNull { id -> SessionPreviews.agentName(context, id)?.let { id to it } }
-    val options = listOf<Pair<String?, String>>(null to stringResource(R.string.terminal_launch_shell)) + agents
-    val wide = androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.3f
-    @OptIn(ExperimentalLayoutApi::class)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), maxItemsInEachRow = if (wide) 3 else 1) {
-        options.forEach { (id, name) ->
-            LauncherTile(SessionPreviews.badgeOf(id.orEmpty()), name, enabled, Modifier.weight(1f)) { onStart(id, null) }
-        }
-    }
+private fun NewTerminalTile(enabled: Boolean, onStart: (String?, String?) -> Unit, onDisabled: () -> Unit) {
+    LauncherTile(SessionPreviews.badgeOf(""), stringResource(R.string.terminal_new_terminal), enabled, Modifier.fillMaxWidth()) { if (enabled) onStart(null, null) else onDisabled() }
 }
 
 @Composable
 private fun LauncherTile(badge: String, name: String, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val t = tokens
-    val label = stringResource(R.string.terminals_new_launcher, name)
+    val label = name
     Column(
         modifier
             .heightIn(min = 96.dp)
@@ -514,7 +507,7 @@ private fun LauncherTile(badge: String, name: String, enabled: Boolean, modifier
             .background(t.terminalBg)
             .border(1.dp, Color(0xFF262931), RoundedCornerShape(20.dp))
             .alpha(if (enabled) 1f else 0.5f)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = label }
             .padding(12.dp),
         verticalArrangement = Arrangement.SpaceBetween,

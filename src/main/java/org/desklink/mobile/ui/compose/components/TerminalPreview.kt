@@ -7,11 +7,6 @@
 package org.desklink.mobile.ui.compose.components
 
 import android.content.Context
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -28,15 +23,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -53,7 +45,6 @@ import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.terminal.TerminalScreen
 import org.desklink.mobile.ui.compose.DeskLinkType
-import org.desklink.mobile.ui.compose.components.rememberReducedMotion
 import org.desklink.mobile.ui.compose.tokens
 import org.desklink.mobile.webrtc.terminal.TerminalLinkState
 import org.desklink.mobile.webrtc.terminal.TerminalProtocol
@@ -221,45 +212,6 @@ fun TerminalTile(
                 Text(stringResource(R.string.terminal_notification_open), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFFFF9A88))
             }
         }
-        }
-    }
-}
-
-/** No sessions yet: a dark tile with a blinking coral cursor and the three ways to start one. */
-@Composable
-fun EmptyTerminalTile(launchers: List<Pair<String, () -> Unit>>, enabled: Boolean, modifier: Modifier = Modifier) {
-    val t = tokens
-    // A steady cursor when the person asked for less motion.
-    val still = rememberReducedMotion()
-    val blink = if (still) 1f else rememberInfiniteTransition(label = "cursor").animateFloat(
-        1f, 0f, infiniteRepeatable(tween(530), RepeatMode.Reverse), label = "blink",
-    ).value
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = t.terminalBg,
-        contentColor = TileText,
-        border = BorderStroke(1.dp, TileHairline),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("$", style = DeskLinkType.mono, color = t.mint)
-                Spacer(Modifier.width(8.dp))
-                Box(Modifier.size(width = 8.dp, height = 15.dp).alpha(if (blink > 0.5f) 1f else 0f).background(t.coral))
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.terminal_empty_hint), style = DeskLinkType.cardTitle, color = TileText)
-            Spacer(Modifier.height(14.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                launchers.forEach { (label, start) ->
-                    OutlinedButton(
-                        onClick = start,
-                        enabled = enabled,
-                        border = BorderStroke(1.dp, Color(0xFF33363F)),
-                        colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(contentColor = TileText, disabledContentColor = TileDim),
-                    ) { Text(label) }
-                }
-            }
         }
     }
 }

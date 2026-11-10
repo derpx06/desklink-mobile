@@ -169,7 +169,6 @@ import org.desklink.mobile.ui.compose.DeskLinkType
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.SessionPasswordDialog
 import org.desklink.mobile.ui.compose.components.EmptyState
-import org.desklink.mobile.ui.compose.components.EmptyTerminalTile
 import org.desklink.mobile.ui.compose.components.Hairline
 import org.desklink.mobile.ui.compose.components.LabelChip
 import org.desklink.mobile.ui.compose.components.LargeTitle
@@ -723,7 +722,7 @@ class TerminalActivity : AppCompatActivity() {
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp))
         }
-        if (newSheet) NewTerminalSheet(deskName(), state.launchers, state.folders, onDismiss = { newSheet = false }) { launcher, cwd -> newSheet = false; createSession(client, launcher, cwd) }
+        if (newSheet) NewTerminalSheet(deskName(), state.folders, onDismiss = { newSheet = false }) { launcher, cwd -> newSheet = false; createSession(client, launcher, cwd) }
         renamingOpen?.let { renameId ->
             TerminalRenameDialog(
                 initial = labels[renameId].orEmpty(),

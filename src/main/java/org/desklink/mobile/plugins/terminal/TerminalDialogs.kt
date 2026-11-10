@@ -42,8 +42,6 @@ import androidx.compose.ui.unit.sp
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.MonoFamily
 import org.desklink.mobile.ui.compose.PrimaryButton
-import org.desklink.mobile.ui.compose.components.DeskFilterChip
-import org.desklink.mobile.ui.compose.components.SessionPreviews
 import org.desklink.mobile.ui.compose.components.DeskDialog
 import org.desklink.mobile.ui.compose.components.DialogAction
 import org.desklink.mobile.ui.compose.components.DeskTextField
@@ -53,24 +51,19 @@ import org.desklink.mobile.ui.compose.tokens
 // Both start sessions and rename them; neither owns a copy.
 
 /**
- * What to start: a shell or one of the agent CLIs the desktop has. The "Start in" folder chips
- * go between the choice and the button once the desktop reports folders.
+ * A new shell on the desk: the "Start in" folder chips go above the button once the desktop reports folders. Agent CLIs are not
+ * offered (the person starts them in the shell); a session the desk started with one still shows with its name.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NewTerminalSheet(
     deskName: String,
-    launchers: List<String>,
     folders: List<String>,
     onDismiss: () -> Unit,
-    /** The launcher to run (null for a shell) and the folder (null for the desk's default). */
+    /** Always a shell (null launcher), in the folder (null for the desk's default). */
     onStart: (launcher: String?, cwd: String?) -> Unit,
 ) {
     val t = tokens
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val options = listOf<Pair<String, String?>>(stringResource(R.string.terminal_launch_shell) to null) +
-        launchers.mapNotNull { launcher -> SessionPreviews.agentName(context, launcher)?.let { it to launcher } }
-    var choice by rememberSaveable { mutableIntStateOf(0) }
     // "Start in": the desk's folders ("~" first), the first one picked. An older desk sends none.
     var folder by rememberSaveable { mutableIntStateOf(0) }
     ModalBottomSheet(
@@ -84,10 +77,6 @@ fun NewTerminalSheet(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(R.string.terminal_new_terminal), fontSize = 22.sp, fontWeight = FontWeight.Medium, modifier = Modifier.semantics { heading() })
                 Text(stringResource(R.string.terminal_new_runs_on, deskName), fontSize = 14.sp, color = t.textDim)
-            }
-            Text(stringResource(R.string.terminal_new_start), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.textDim)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
-                options.forEachIndexed { index, (label, _) -> DeskFilterChip(label, index == choice, { choice = index }) }
             }
             if (folders.isNotEmpty()) {
                 Text(stringResource(R.string.terminal_new_start_in), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = t.textDim)
@@ -119,7 +108,7 @@ fun NewTerminalSheet(
             }
             PrimaryButton(
                 stringResource(R.string.terminal_new_start_button),
-                { onStart(options.getOrNull(choice)?.second, folders.getOrNull(folder)) },
+                { onStart(null, folders.getOrNull(folder)) },
                 Modifier.fillMaxWidth().padding(top = 6.dp),
                 icon = R.drawable.sym_terminal,
             )

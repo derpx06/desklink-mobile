@@ -46,7 +46,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_session_size">%1$d×%2$d</string>
     <string name="terminal_section">Terminals</string>
     <string name="terminal_preview_open">Open to see its output</string>
-    <string name="terminal_empty_hint">Start Claude Code, Codex or a shell</string>
+    <string name="terminal_empty_hint">Start a shell on your computer</string>
     <string name="terminal_session_options">Options for %1$s</string>
     <string name="terminal_restart">Restart</string>
 
