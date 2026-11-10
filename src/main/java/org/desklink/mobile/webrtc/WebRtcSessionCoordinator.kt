@@ -1962,6 +1962,7 @@ class WebRtcSessionCoordinator(
                     ?: screen?.onRemoteControlDenied(message.reason)
             }
             WebRtcRemoteSessionControlKind.INPUT_FOCUS -> {
+                Log.i(TAG, "Desk text focus: editable=${message.editable}")
                 device.getPlugin(ScreenControlPlugin::class.java)
                     ?.desktopTextFocused = message.editable == true
             }
