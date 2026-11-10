@@ -10,6 +10,7 @@ import org.desklink.mobile.R
 import org.desklink.mobile.ui.QrScanFlow
 import org.desklink.mobile.ui.compose.screen.onboarding.OnboardingScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsChecklistScreen
+import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsSetupScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.SplashScreen
 import org.desklink.mobile.ui.compose.screen.pairing.InstallLinkContent
 import org.desklink.mobile.ui.compose.screen.pairing.NearbyComputer
@@ -34,7 +35,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The first-run screens, light and dark: splash, the five tour pages, welcome, scan, compare codes and the permissions checklist.
+ * The first-run screens, light and dark: splash, the five tour pages, the permissions setup, welcome, scan, compare codes and the permissions checklist.
  * `./gradlew testDebugUnitTest --tests "*FirstRunShots*"`; images land in `~/.cache/android-ui/shots/` as `<form>-fr-<screen>-<theme>.png`.
  */
 abstract class FirstRunShots : ShotTest() {
@@ -98,6 +99,36 @@ abstract class FirstRunShots : ShotTest() {
     )
 
     @Test fun permissions() = shoot("fr-permissions") { PermissionsChecklistScreen("arch-desk", perms) {} }
+
+    private fun setupRow(id: String, icon: Int, title: String, summary: String, granted: Boolean, perms: List<String> = emptyList(), unknown: Boolean = false, blocked: Boolean = false) =
+        PermissionRow(icon, title, summary, granted, unknown, id = id, permissions = perms, blocked = blocked) { }
+
+    private val setupRows = listOf(
+        setupRow("notifications", R.drawable.sym_notifications_active, "Notifications", "Transfers, pairing and live sessions", granted = true, perms = listOf("n")),
+        setupRow("camera", R.drawable.sym_qr_code_scanner, "Camera", "Scan the code your computer shows to pair", granted = false, perms = listOf("c")),
+        setupRow("notification_access", R.drawable.sym_notifications, "Notification access", "Mirror and reply from your computer", granted = false),
+        setupRow("calls", R.drawable.sym_call, "Calls", "Show, answer and dial calls on your computer", granted = false, perms = listOf("p")),
+        setupRow("contacts", R.drawable.sym_person, "Contacts", "Share contacts and caller names with your computer", granted = false, perms = listOf("k"), blocked = true),
+        setupRow("microphone", R.drawable.sym_mic, "Microphone", "Use this phone as a microphone for your computer", granted = true, perms = listOf("m")),
+        setupRow("battery", R.drawable.sym_battery_full, "Unrestricted battery", "Stay reachable in the background", granted = false),
+        setupRow("oem", R.drawable.sym_restart_alt, "Keep DeskLink running", "This phone stops apps in the background. Allow background activity and auto-launch so your computer stays connected.", granted = false, unknown = true),
+    )
+
+    @Test fun setup() = shoot("fr-setup") { PermissionsSetupScreen(setupRows, onAllowAll = {}, onDone = {}) }
+
+    @Test fun setupAllOn() = shoot("fr-setup-done") {
+        PermissionsSetupScreen(setupRows.map { setupRow(it.id, it.icon, it.title, it.summary, granted = !it.unknown, unknown = it.unknown) }, onAllowAll = {}, onDone = {})
+    }
+
+    @Test fun setupStep() = shoot("fr-setup-step") {
+        Box(androidx.compose.ui.Modifier.fillMaxSize().background(tokens.bg), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            org.desklink.mobile.ui.compose.components.DeskDialogCard(
+                "Notification access",
+                org.desklink.mobile.ui.compose.components.DialogAction("Open") {},
+                org.desklink.mobile.ui.compose.components.DialogAction("Not now") {},
+            ) { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.setup_step_notification_access)) }
+        }
+    }
 
     @Test fun permissionsAllOn() = shoot("fr-permissions-done") {
         PermissionsChecklistScreen("arch-desk", perms.map { PermissionRow(it.icon, it.title, it.summary, true) { } }) {}

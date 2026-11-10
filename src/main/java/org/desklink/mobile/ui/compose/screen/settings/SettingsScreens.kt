@@ -316,9 +316,22 @@ internal fun Chevron() = Icon(painterResource(R.drawable.sym_chevron_right), con
 
 // ---- permissions ------------------------------------------------------------------------------------------------
 
-/** What the person's choices need: opt-in permissions (accessibility, notification access, calls, contacts) count only when a feature that uses them is on. */
-internal data class PermissionNeeds(val accessibility: Boolean = true, val notificationAccess: Boolean = true, val calls: Boolean = true, val contacts: Boolean = true) {
+/**
+ * What the person's choices need: opt-in permissions (accessibility, notification access, calls, contacts) count only when a feature that uses them is on.
+ * Camera and microphone are asked in context (the scan screen, "Phone as microphone"), so only the first-run setup lists them.
+ */
+internal data class PermissionNeeds(
+    val accessibility: Boolean = true,
+    val notificationAccess: Boolean = true,
+    val calls: Boolean = true,
+    val contacts: Boolean = true,
+    val camera: Boolean = true,
+    val microphone: Boolean = true,
+) {
     companion object {
+        /** Before pairing nothing is turned on yet: everything a feature can use, except accessibility, which is asked when the desk first controls the phone. */
+        val setup = PermissionNeeds(accessibility = false)
+
         fun of(context: Context): PermissionNeeds {
             val devices = runCatching { org.desklink.mobile.DeskLinkApplication.getInstance().devices.values.filter { it.isPaired } }.getOrDefault(emptyList())
             fun any(check: (org.desklink.mobile.Device) -> Boolean) = devices.any { runCatching { check(it) }.getOrDefault(false) }
@@ -335,6 +348,8 @@ internal data class PermissionNeeds(val accessibility: Boolean = true, val notif
                         // The application context: an activity's own would check the disk for this preferences file again, on the main thread.
                         org.desklink.mobile.plugins.telephony.TelephonyPlugin.showCaller(context.applicationContext, it.deviceId)
                 },
+                camera = false,
+                microphone = false,
             )
         }
     }
@@ -349,6 +364,12 @@ internal class PermissionRow(
     val unknown: Boolean = false,
     /** False when nothing the person turned on uses it and it is not granted: the post-pairing checklist leaves it out. */
     val relevant: Boolean = true,
+    /** Stable name of the row ("camera", "battery"…), for ordering and for remembering which rows were missing. */
+    val id: String = title,
+    /** The runtime permissions [allow] asks for; empty for a special access, which opens a system page instead. */
+    val permissions: List<String> = emptyList(),
+    /** Android will not ask for [permissions] any more: [allow] opens the app's permission page. */
+    val blocked: Boolean = false,
     val allow: () -> Unit,
 )
 
@@ -407,7 +428,7 @@ internal fun PermissionsSection(desk: DeskSettings?) {
                         Text(stringResource(R.string.settings_allowed), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = t.mintText)
                     }
                 } else {
-                    org.desklink.mobile.ui.compose.SecondaryButton(stringResource(if (row.unknown) R.string.settings_open else R.string.settings_allow), row.allow, tonal = true, height = 48.dp, modifier = Modifier.padding(start = 4.dp))
+                    org.desklink.mobile.ui.compose.SecondaryButton(stringResource(row.actionLabel()), row.allow, tonal = true, height = 48.dp, modifier = Modifier.padding(start = 4.dp))
                 }
             }
         }
@@ -421,9 +442,30 @@ fun waitingPermissions(context: Context, deskName: String, extra: Int = 0): Int 
 @Composable
 private fun pluralsString(id: Int, count: Int) = androidx.compose.ui.res.pluralStringResource(id, count, count)
 
-/** The permissions DeskLink uses here, each with the system screen that grants it. */
-internal fun permissionRows(context: Context, desk: String, request: (Array<String>) -> Unit, needs: PermissionNeeds = PermissionNeeds.of(context)): List<PermissionRow> {
+/** What a row's button says: Open for a page Android cannot report on, Open settings once Android stops asking, else Allow. */
+@androidx.annotation.StringRes
+internal fun PermissionRow.actionLabel(): Int = when {
+    unknown -> R.string.settings_open
+    blocked -> R.string.perm_open_settings
+    else -> R.string.settings_allow
+}
+
+/** The permissions DeskLink uses here, each with the system screen that grants it. [sdk] is the running release (a parameter so tests can pick one). */
+internal fun permissionRows(
+    context: Context,
+    desk: String,
+    request: (Array<String>) -> Unit,
+    needs: PermissionNeeds = PermissionNeeds.of(context),
+    sdk: Int = Build.VERSION.SDK_INT,
+): List<PermissionRow> {
     fun granted(permission: String) = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    /** A row that asks Android for [permissions] in one dialog. */
+    fun runtime(id: String, @DrawableRes icon: Int, title: String, summary: String, vararg permissions: String) = PermissionRow(
+        icon, title, summary, permissions.all(::granted),
+        id = id,
+        permissions = permissions.toList(),
+        blocked = org.desklink.mobile.helpers.PermissionRecovery.blocked(context, permissions.toList()).isNotEmpty(),
+    ) { request(arrayOf(*permissions)) }
     fun open(intent: Intent) = {
         runCatching { context.startActivity(intent) }.onFailure {
             context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)))
@@ -432,10 +474,11 @@ internal fun permissionRows(context: Context, desk: String, request: (Array<Stri
     }
     val prefs = PreferenceManager.getDefaultSharedPreferences(context)
     return buildList {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            add(PermissionRow(R.drawable.sym_notifications_active, context.getString(R.string.settings_perm_notifications), context.getString(R.string.settings_perm_notifications_summary), granted(Manifest.permission.POST_NOTIFICATIONS)) {
-                request(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
-            })
+        if (sdk >= Build.VERSION_CODES.TIRAMISU) {
+            add(runtime("notifications", R.drawable.sym_notifications_active, context.getString(R.string.settings_perm_notifications), context.getString(R.string.settings_perm_notifications_summary), Manifest.permission.POST_NOTIFICATIONS))
+        }
+        if (needs.camera) {
+            add(runtime("camera", R.drawable.sym_qr_code_scanner, context.getString(R.string.perm_camera), context.getString(R.string.perm_camera_summary), Manifest.permission.CAMERA))
         }
         add(PermissionRow(
             R.drawable.sym_notifications, context.getString(R.string.settings_perm_notification_access), context.getString(R.string.settings_perm_notification_access_summary, desk),
@@ -444,36 +487,38 @@ internal fun permissionRows(context: Context, desk: String, request: (Array<Stri
             unknown = !needs.notificationAccess && !NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName),
             allow = open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
             relevant = needs.notificationAccess || NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName),
+            id = "notification_access",
         ))
         if (needs.calls) {
             val calls = buildList {
                 add(Manifest.permission.READ_PHONE_STATE)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) add(Manifest.permission.ANSWER_PHONE_CALLS)
+                if (sdk >= Build.VERSION_CODES.O) add(Manifest.permission.ANSWER_PHONE_CALLS)
                 add(Manifest.permission.CALL_PHONE)
             }.toTypedArray()
-            add(PermissionRow(R.drawable.sym_call, context.getString(R.string.settings_perm_calls), context.getString(R.string.settings_perm_calls_summary, desk), calls.all(::granted)) { request(calls) })
+            add(runtime("calls", R.drawable.sym_call, context.getString(R.string.settings_perm_calls), context.getString(R.string.settings_perm_calls_summary, desk), *calls))
         }
         if (needs.contacts) {
-            add(PermissionRow(R.drawable.sym_person, context.getString(R.string.settings_perm_contacts), context.getString(R.string.settings_perm_contacts_summary, desk), granted(Manifest.permission.READ_CONTACTS)) {
-                request(arrayOf(Manifest.permission.READ_CONTACTS))
-            })
+            add(runtime("contacts", R.drawable.sym_person, context.getString(R.string.settings_perm_contacts), context.getString(R.string.settings_perm_contacts_summary, desk), Manifest.permission.READ_CONTACTS))
         }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            add(PermissionRow(R.drawable.sym_photo_library, context.getString(R.string.settings_perm_files), context.getString(R.string.settings_perm_files_summary, desk), granted(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-                request(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE))
-            })
+        if (needs.microphone) {
+            add(runtime("microphone", R.drawable.sym_mic, context.getString(R.string.perm_microphone), context.getString(R.string.perm_microphone_summary, desk), Manifest.permission.RECORD_AUDIO))
+        }
+        if (sdk < Build.VERSION_CODES.R) {
+            add(runtime("files", R.drawable.sym_photo_library, context.getString(R.string.settings_perm_files), context.getString(R.string.settings_perm_files_summary, desk), Manifest.permission.WRITE_EXTERNAL_STORAGE))
         }
         val power = context.getSystemService(PowerManager::class.java)
         add(PermissionRow(
             R.drawable.sym_battery_full, context.getString(R.string.settings_perm_battery), context.getString(R.string.settings_perm_battery_summary),
             power?.isIgnoringBatteryOptimizations(context.packageName) == true,
             allow = open(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${context.packageName}".toUri())),
+            id = "battery",
         ))
         if (needsOemBackgroundSetting(Build.MANUFACTURER)) {
             add(PermissionRow(
                 R.drawable.sym_restart_alt, context.getString(R.string.settings_perm_oem), context.getString(R.string.settings_perm_oem_summary, desk),
                 granted = false,
                 unknown = true,
+                id = "oem",
                 allow = {
                     // App info (Battery usage → Allow background activity) underneath, and on
                     // ColorOS its auto-launch list on top; back from that lands on app info.
@@ -490,6 +535,7 @@ internal fun permissionRows(context: Context, desk: String, request: (Array<Stri
             unknown = !needs.accessibility && !AccessibilitySetupActivity.running(),
             allow = { AccessibilitySetupActivity.open(context) },
             relevant = needs.accessibility || AccessibilitySetupActivity.running(),
+            id = "accessibility",
         ))
     }
 }

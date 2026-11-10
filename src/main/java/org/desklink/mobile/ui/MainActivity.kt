@@ -141,6 +141,7 @@ import org.desklink.mobile.ui.compose.screen.onboarding.ForgetLeftRoutes
 import org.desklink.mobile.ui.compose.screen.onboarding.PairingStack
 import org.desklink.mobile.ui.compose.screen.onboarding.OnboardingRoute
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsChecklistRoute
+import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsSetupRoute
 import org.desklink.mobile.ui.compose.screen.onboarding.SplashScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.needsPermissionsChecklist
 import org.desklink.mobile.ui.compose.screen.settings.DeskSettings
@@ -207,6 +208,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     /** Whether the tour has been seen (or the person had paired before it existed): a new default-preferences key. */
     private var onboardingSeen by mutableStateOf(false)
+
+    /** Whether the first-run permissions step was left (or a computer paired): a new default-preferences key. */
+    private var setupDone by mutableStateOf(false)
     private val selection: SharedPreferences by lazy { applicationContext.getSharedPreferences("stored_menu_selection", MODE_PRIVATE) } // the application context has the path cached (no main-thread disk check)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -219,6 +223,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         PreferenceManager.getDefaultSharedPreferences(applicationContext).registerOnSharedPreferenceChangeListener(this)
         DeviceHelper.getDeviceName(this)
         onboardingSeen = FirstRun.seen(defaultPrefs)
+        setupDone = FirstRun.setupDone(defaultPrefs)
 
         selectedId = savedInstanceState?.getString(STATE_SELECTED_DEVICE) ?: selection.getString(STATE_SELECTED_DEVICE, null)
         stack.addAll(savedInstanceState?.getStringArrayList(STATE_STACK)?.takeIf { it.isNotEmpty() } ?: listOf(HOME))
@@ -438,7 +443,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val splash = splashShowing(paired)
         ForgetLeftRoutes(stack.last(), holder, setOf(ONBOARDING))
         // A paired person never sees the tour, now or if they unpair later.
-        LaunchedEffect(paired.isNotEmpty()) { if (paired.isNotEmpty()) FirstRun.markSeen(defaultPrefs).also { onboardingSeen = true } }
+        LaunchedEffect(paired.isNotEmpty()) {
+            if (paired.isNotEmpty()) {
+                FirstRun.markSeen(defaultPrefs).also { onboardingSeen = true }
+                FirstRun.markSetupDone(defaultPrefs).also { setupDone = true }
+            }
+        }
         val onTabs = stack.last() == HOME && paired.isNotEmpty()
         BackHandler(enabled = stack.size > 1 || (onTabs && nav.canGoBack)) {
             if (stack.size > 1) onBack(stack.last()) else nav.back()
@@ -502,6 +512,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         pop()
     }
 
+    /** "Pair with a computer": the permissions step first on a first run, then the scan screen. */
+    private fun startPairing(pairedCount: Int) = push(if (FirstRun.showSetup(setupDone, pairedCount)) SETUP else SCAN)
+
     private fun markOnboardingSeen() {
         FirstRun.markSeen(defaultPrefs)
         onboardingSeen = true
@@ -522,17 +535,23 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 device != null -> TabsRoute(device, paired)
                 FirstRun.showOnboarding(onboardingSeen, paired.size) -> OnboardingRoute(
                     paired = false,
-                    onFinish = { markOnboardingSeen(); push(SCAN) },
+                    onFinish = { markOnboardingSeen(); startPairing(paired.size) },
                     onSkip = ::markOnboardingSeen,
                 )
-                else -> WelcomeScreen(onPair = { push(SCAN) }, onSettings = { push(SETTINGS) })
+                else -> WelcomeScreen(onPair = { startPairing(paired.size) }, onSettings = { push(SETTINGS) })
             }
             route == ONBOARDING -> OnboardingRoute(
                 paired = device != null,
-                onFinish = { pop(); if (device == null) push(SCAN) },
+                onFinish = { pop(); if (device == null) startPairing(paired.size) },
                 onSkip = ::pop,
             )
             route == PERMISSIONS -> PermissionsChecklistRoute(device?.name ?: getString(R.string.settings_your_computer)) { resetTo(HOME) }
+            route == SETUP -> PermissionsSetupRoute {
+                FirstRun.markSetupDone(defaultPrefs)
+                setupDone = true
+                pop()
+                push(SCAN)
+            }
             route == SCAN -> ScanRoute()
             route.startsWith(PAIR_PREFIX) -> PairRoute(route.removePrefix(PAIR_PREFIX))
             route == SETTINGS -> SettingsContent(device)
@@ -1489,6 +1508,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         private const val SETTINGS = "settings"
         private const val ONBOARDING = "onboarding"
         private const val PERMISSIONS = "permissions"
+        private const val SETUP = "setup"
         private const val VIEWER_PREFIX = "viewer/"
         private const val PAIR_PREFIX = "pair/"
         private fun pairRoute(id: String) = PAIR_PREFIX + id

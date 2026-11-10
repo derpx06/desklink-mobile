@@ -37,6 +37,18 @@ object FirstRun {
     fun markSeen(prefs: SharedPreferences) {
         if (!seen(prefs)) prefs.edit { putBoolean(KEY_ONBOARDING_SEEN, true) }
     }
+
+    /** Set once the first-run permissions step is left with Continue or Skip, or once a computer is paired. A new key, like [KEY_ONBOARDING_SEEN]. */
+    const val KEY_SETUP_DONE = "permissions_setup_done"
+
+    /** "Pair with a computer" goes through the permissions step first, once, and only for someone who has never paired. */
+    fun showSetup(done: Boolean, pairedCount: Int): Boolean = !done && pairedCount == 0
+
+    fun setupDone(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_SETUP_DONE, false)
+
+    fun markSetupDone(prefs: SharedPreferences) {
+        if (!setupDone(prefs)) prefs.edit { putBoolean(KEY_SETUP_DONE, true) }
+    }
 }
 
 /** Forgets what a screen remembered once the person has left it, so coming back starts afresh (the tour replays from page one). */

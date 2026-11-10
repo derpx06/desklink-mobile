@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +43,7 @@ import org.desklink.mobile.ui.compose.PrimaryButton
 import org.desklink.mobile.ui.compose.components.ChecklistRow
 import org.desklink.mobile.ui.compose.components.ChecklistState
 import org.desklink.mobile.ui.compose.screen.settings.PermissionRow
+import org.desklink.mobile.ui.compose.screen.settings.actionLabel
 import org.desklink.mobile.ui.compose.screen.settings.permissionRows
 import org.desklink.mobile.ui.compose.screen.settings.rememberPermissionAsker
 import org.desklink.mobile.ui.compose.screen.settings.rememberResumeTick
@@ -59,6 +61,9 @@ internal fun checklistCounted(rows: List<PermissionRow>): List<PermissionRow> = 
 /** Whether the screen has anything to offer after pairing: a listed permission whose state is known and that is not granted yet. */
 internal fun hasChecklistWork(rows: List<PermissionRow>): Boolean = checklistCounted(rows).any { !it.granted }
 
+/** The listed rows not granted yet: what the checklist shows after pairing (the first-run setup may already have granted the rest). */
+internal fun stillMissing(rows: List<PermissionRow>): List<String> = checklistRows(rows).filter { !it.granted }.map { it.id }
+
 /** Read once when a pairing completes, to decide whether to show the checklist at all. */
 internal fun needsPermissionsChecklist(context: Context, deskName: String): Boolean =
     hasChecklistWork(permissionRows(context, deskName, request = { }))
@@ -73,7 +78,9 @@ fun PermissionsChecklistRoute(deskName: String, onDone: () -> Unit) {
     val tick = rememberResumeTick()
     val asker = rememberPermissionAsker()
     val rows = remember(tick, asker.asked) { permissionRows(context, deskName, asker.ask) }
-    PermissionsChecklistScreen(deskName, rows, onDone)
+    // The rows missing when it opened, kept as they turn "On", so a row does not vanish under the person's finger.
+    val missing = rememberSaveable { ArrayList(stillMissing(rows)) }
+    PermissionsChecklistScreen(deskName, rows.filter { it.id in missing }, onDone)
 }
 
 @Composable
@@ -109,7 +116,7 @@ internal fun PermissionsChecklistScreen(deskName: String, rows: List<PermissionR
                         title = row.title,
                         description = row.summary,
                         state = if (row.granted) ChecklistState.Done else ChecklistState.Todo,
-                        actionLabel = stringResource(if (row.unknown) R.string.settings_open else R.string.settings_allow),
+                        actionLabel = stringResource(row.actionLabel()),
                         doneLabel = stringResource(R.string.perm_on),
                         onClick = if (row.granted) null else row.allow,
                     )
