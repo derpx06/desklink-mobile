@@ -385,9 +385,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         stack.add(route)
     }
 
+    /** The screens a pairing passes through: the first-run permissions step (a desk may start the pairing while it is open), scan and compare codes. */
+    private fun isPairingRoute(route: String) = route == SETUP || route == SCAN || route.startsWith(PAIR_PREFIX)
+
     /** A pairing completed: the scan and pair screens go, anything else stays (the checklist may already be up, whichever finished first). */
     private fun settleAfterPairing() {
-        val next = PairingStack.settle(stack.toList(), HOME) { it == SCAN || it.startsWith(PAIR_PREFIX) }
+        val next = PairingStack.settle(stack.toList(), HOME, ::isPairingRoute)
         stack.clear()
         stack.addAll(next)
     }
@@ -421,7 +424,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             val id = fresh.first()
             select(id)
             qrFlow.succeeded(id) // a QR pairing that completed: leaving the scan screen must not take it back
-            if (stack.any { it == SCAN || it.startsWith(PAIR_PREFIX) }) settleAfterPairing()
+            if (stack.any(::isPairingRoute)) settleAfterPairing()
             val name = paired.first { it.deviceId == id }.name
             showMessage(getString(R.string.pair_paired_with, name))
             // Only when something can still be turned on, and only on top of Home: never over a screen the person is in.
