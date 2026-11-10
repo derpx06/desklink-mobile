@@ -16,6 +16,17 @@ import org.desklink.mobile.ui.compose.screen.home.HomeActions
 import org.desklink.mobile.ui.compose.screen.home.HomeScreen
 import org.desklink.mobile.ui.compose.screen.home.HomeState
 import org.desklink.mobile.ui.compose.screen.home.PaletteScreen
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import org.desklink.mobile.ui.compose.screen.home.LiveSessions
+import org.desklink.mobile.ui.compose.screen.onboarding.FinishSetupCard
+import org.desklink.mobile.ui.compose.screen.settings.PermissionRow
+import org.desklink.mobile.ui.compose.screen.tabs.TerminalsActions
+import org.desklink.mobile.ui.compose.screen.tabs.TerminalsContent
+import org.desklink.mobile.ui.compose.screen.tabs.TerminalsPanel
+import org.desklink.mobile.webrtc.terminal.TerminalClientState
+import org.desklink.mobile.webrtc.terminal.TerminalLinkState
+import org.desklink.mobile.webrtc.terminal.TerminalSessionState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -126,5 +137,42 @@ class HomeInteractionTest {
     fun theComputersRequestIsTakenOnce() {
         show { HomeScreen(state(), actions(computersRequest = 1)) }
         assertEquals(listOf("shown"), calls)
+    }
+
+    @Test
+    fun stoppingThisPhonesScreenShareWorksWithTheLinkDown() {
+        // Not usable (an update is needed), but ending the capture here is local: it runs, nothing else does.
+        show { HomeScreen(state { copy(updateNeeded = true, live = LiveSessions(phoneScreen = true)) }, actions()) }
+        tap("Stop sharing")
+        tap("Clipboard")
+        assertEquals(listOf("share", "blocked:action:send-clipboard:UPDATE"), calls)
+    }
+
+    @Test
+    fun theFinishSetupCountIsTheRowsItLists() {
+        val rows = listOf("notifications", "camera", "notification_access", "calls", "battery", "oem").map { id ->
+            PermissionRow(org.desklink.mobile.R.drawable.sym_info, id, "s", granted = false, unknown = id == "oem", id = id) { }
+        }
+        show { FinishSetupCard(rows, expanded = true, onExpanded = {}, onAllowAll = {}) }
+        compose.onNodeWithText("6 permissions left", substring = true).assertExists()
+        rows.forEach { compose.onNodeWithText(it.title).assertExists() }
+    }
+
+    private fun finishedSession() = TerminalClientState(
+        link = TerminalLinkState.CONNECTED, listLoaded = true,
+        sessions = listOf(TerminalSessionState("s1", "", 24, 80, 0, false, false, true, cwd = "~", shell = "zsh")),
+    )
+
+    @Test
+    fun restartIsIgnoredWhileATerminalIsStarting() {
+        val restart = TerminalsActions(onRestart = { calls += "restart:${it.id}" })
+        var busy by androidx.compose.runtime.mutableStateOf(true)
+        show { TerminalsContent("arch-desk", TerminalsPanel.LIST, finishedSession(), emptyMap(), emptyMap(), restart, busy = busy) }
+        tap("Restart")
+        assertEquals("a second tap while the first restart starts does nothing", emptyList<String>(), calls)
+        busy = false
+        compose.waitForIdle()
+        tap("Restart")
+        assertEquals(listOf("restart:s1"), calls)
     }
 }

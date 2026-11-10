@@ -256,9 +256,12 @@ fun TerminalsTab(
             onEnd = { id -> client?.close(id); onMessage(ended) },
             onUnavailable = { client?.refresh(); onMessage(needsLink) },
             onRestart = { session ->
-                client?.close(session.id)
-                // A shell in the folder it was in, not the computer's default (agent CLIs are not started from the phone).
-                start(null, session.cwd)
+                // One restart at a time: a second tap while the first is starting must not close a session with nothing to replace it.
+                if (!launching) {
+                    client?.close(session.id)
+                    // A shell in the folder it was in, not the computer's default (agent CLIs are not started from the phone).
+                    start(null, session.cwd)
+                }
             },
         ),
     )
@@ -404,7 +407,7 @@ fun TerminalsContent(
                                 ) { actions.onOpen(session.id) }
                                 if (finished && connected) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                        DeskTextButton(stringResource(R.string.terminal_restart), { actions.onRestart(session) })
+                                        DeskTextButton(stringResource(R.string.terminal_restart), { actions.onRestart(session) }, enabled = !busy)
                                     }
                                 }
                             }
