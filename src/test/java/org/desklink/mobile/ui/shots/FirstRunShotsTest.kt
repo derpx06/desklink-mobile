@@ -11,6 +11,7 @@ import org.desklink.mobile.ui.QrScanFlow
 import org.desklink.mobile.ui.compose.screen.onboarding.OnboardingScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsChecklistScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsSetupScreen
+import org.desklink.mobile.ui.compose.screen.onboarding.FinishSetupCard
 import org.desklink.mobile.ui.compose.screen.onboarding.SplashScreen
 import org.desklink.mobile.ui.compose.screen.pairing.InstallLinkContent
 import org.desklink.mobile.ui.compose.screen.pairing.NearbyComputer
@@ -128,6 +129,17 @@ abstract class FirstRunShots : ShotTest() {
                 org.desklink.mobile.ui.compose.components.DialogAction("Not now") {},
             ) { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.setup_step_notification_access)) }
         }
+    }
+
+    private val homeState = HomeState("d1", "arch-desk", DeviceConnection.LOCAL, listOf(ComputerRow("d1", "arch-desk", DeviceConnection.LOCAL)), rttMs = 12, notificationsOff = true)
+    private val homeActions = HomeActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+
+    @Test fun homeFinishSetup() = shoot("fr-home-finish-setup") {
+        HomeScreen(homeState, homeActions) { FinishSetupCard(setupRows, expanded = true, onExpanded = {}, onAllowAll = {}) }
+    }
+
+    @Test fun homeFinishSetupFolded() = shoot("fr-home-finish-setup-folded") {
+        HomeScreen(homeState, homeActions) { FinishSetupCard(setupRows, expanded = false, onExpanded = {}, onAllowAll = {}) }
     }
 
     @Test fun permissionsAllOn() = shoot("fr-permissions-done") {

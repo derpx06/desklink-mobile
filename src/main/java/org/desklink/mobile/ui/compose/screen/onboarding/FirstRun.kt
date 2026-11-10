@@ -49,6 +49,24 @@ object FirstRun {
     fun markSetupDone(prefs: SharedPreferences) {
         if (!setupDone(prefs)) prefs.edit { putBoolean(KEY_SETUP_DONE, true) }
     }
+
+    /** Home's "Finish setting up" card, folded by the person. */
+    const val KEY_HOME_SETUP_COLLAPSED = "home_setup_collapsed"
+
+    /** A pairing finished with something still to allow: the checklist waits for the screen to be free. Kept across a restart. */
+    const val KEY_CHECKLIST_PENDING = "permissions_checklist_pending"
+
+    /** The paired computers last seen, so a pairing that finished while the activity was gone still counts as new. */
+    const val KEY_KNOWN_PAIRED = "known_paired_ids"
+
+    fun checklistPending(prefs: SharedPreferences): Boolean = prefs.getBoolean(KEY_CHECKLIST_PENDING, false)
+
+    fun setChecklistPending(prefs: SharedPreferences, pending: Boolean) = prefs.edit { putBoolean(KEY_CHECKLIST_PENDING, pending) }
+
+    /** Null until first written: an app updated from a build without it treats nobody as newly paired. */
+    fun knownPaired(prefs: SharedPreferences): Set<String>? = prefs.getStringSet(KEY_KNOWN_PAIRED, null)?.toSet()
+
+    fun setKnownPaired(prefs: SharedPreferences, ids: Set<String>) = prefs.edit { putStringSet(KEY_KNOWN_PAIRED, ids.toSet()) }
 }
 
 /** Forgets what a screen remembered once the person has left it, so coming back starts afresh (the tour replays from page one). */
@@ -74,6 +92,16 @@ object PairingStack {
 
     /** Whether the checklist may be pushed: only straight on top of Home. */
     fun canOfferChecklist(stack: List<String>, home: String) = stack == listOf(home)
+
+    /** The computers paired since [previous] (none when nothing was known yet: a first look is not a pairing). */
+    fun fresh(previous: Set<String>?, ids: Set<String>): Set<String> = previous?.let { ids - it }.orEmpty()
+
+    /**
+     * Whether a queued checklist goes up now: only with this activity in front (not under a desk's screen-share or microphone
+     * prompt, the camera, or the system's permission dialog), a computer paired, and nothing but Home on the stack.
+     */
+    fun offerChecklistNow(pending: Boolean, resumed: Boolean, paired: Boolean, stack: List<String>, home: String): Boolean =
+        pending && resumed && paired && canOfferChecklist(stack, home)
 
     /** The checklist is pushed once. */
     fun withChecklist(stack: List<String>, checklist: String) = if (stack.lastOrNull() == checklist) stack else stack + checklist

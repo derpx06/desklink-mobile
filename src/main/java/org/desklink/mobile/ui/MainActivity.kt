@@ -142,6 +142,14 @@ import org.desklink.mobile.ui.compose.screen.onboarding.PairingStack
 import org.desklink.mobile.ui.compose.screen.onboarding.OnboardingRoute
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsChecklistRoute
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsSetupRoute
+import org.desklink.mobile.ui.compose.screen.onboarding.FinishSetupCard
+import org.desklink.mobile.ui.compose.screen.onboarding.finishSetupRows
+import org.desklink.mobile.ui.compose.screen.onboarding.hasChecklistWork
+import org.desklink.mobile.ui.compose.screen.onboarding.rememberAllowAll
+import org.desklink.mobile.ui.compose.screen.settings.PermissionNeeds
+import org.desklink.mobile.ui.compose.screen.settings.permissionRows
+import org.desklink.mobile.ui.compose.screen.settings.rememberPermissionAsker
+import org.desklink.mobile.ui.compose.screen.settings.rememberResumeTick
 import org.desklink.mobile.ui.compose.screen.onboarding.SplashScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.needsPermissionsChecklist
 import org.desklink.mobile.ui.compose.screen.settings.DeskSettings
@@ -417,9 +425,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
      */
     private fun reconcile(paired: List<Device>) {
         val ids = paired.map { it.deviceId }.toSet()
-        val previous = knownPaired
+        // Kept on disk: a pairing that finished while this activity was gone (the camera or a desk's prompt in front, ColorOS
+        // reclaiming it) is still new when it comes back, so the checklist is not lost.
+        val previous = knownPaired ?: FirstRun.knownPaired(defaultPrefs)
+        if (ids != previous) FirstRun.setKnownPaired(defaultPrefs, ids)
         knownPaired = ids
-        val fresh = previous?.let { ids - it }.orEmpty()
+        val fresh = PairingStack.fresh(previous, ids)
         if (fresh.isNotEmpty()) {
             val id = fresh.first()
             select(id)
@@ -427,14 +438,21 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             if (stack.any(::isPairingRoute)) settleAfterPairing()
             val name = paired.first { it.deviceId == id }.name
             showMessage(getString(R.string.pair_paired_with, name))
-            // Only when something can still be turned on, and only on top of Home: never over a screen the person is in.
-            if (PairingStack.canOfferChecklist(stack, HOME) && needsPermissionsChecklist(this, name)) push(PERMISSIONS)
+            // Queued, not pushed: a desk's prompt, the pairing screens or the first-share question may be in front right now.
+            if (needsPermissionsChecklist(this, name)) FirstRun.setChecklistPending(defaultPrefs, true)
         } else if (selectedId !in ids) {
             select(paired.firstOrNull { it.isReachable }?.deviceId ?: paired.firstOrNull()?.deviceId)
         }
         DeskLinkApplication.getInstance().devices.values
             .firstOrNull { it.pairStatus == PairState.RequestedByPeer && it.isReachable }
             ?.let { asking -> if (stack.none { it == pairRoute(asking.deviceId) }) push(pairRoute(asking.deviceId)) }
+        // The checklist comes up once the screen is free: this activity in front and nothing but Home under it.
+        val resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        if (PairingStack.offerChecklistNow(FirstRun.checklistPending(defaultPrefs), resumed, paired.isNotEmpty(), stack, HOME)) {
+            FirstRun.setChecklistPending(defaultPrefs, false)
+            val name = paired.firstOrNull { it.deviceId == selectedId }?.name ?: paired.first().name
+            if (needsPermissionsChecklist(this, name)) push(PERMISSIONS)
+        }
     }
 
     @Composable
@@ -680,7 +698,21 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         var sharingInfo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
         // One actions object per computer: a new one every second would make Home recompose even when nothing changed.
         val actions = androidx.compose.runtime.remember(device, computersRequest) { homeActions(device) { sharingInfo = true } }
-        HomeScreen(state, actions)
+        // "Finish setting up": every permission a feature can use that is still missing, until none is.
+        val resumed = rememberResumeTick()
+        val asker = rememberPermissionAsker()
+        val setupRows = androidx.compose.runtime.remember(resumed, asker.asked, device.name) { permissionRows(this, device.name, asker.ask, PermissionNeeds.remaining(this)) }
+        val allowAll = rememberAllowAll(finishSetupRows(setupRows), asker)
+        var setupExpanded by androidx.compose.runtime.remember { mutableStateOf(!defaultPrefs.getBoolean(FirstRun.KEY_HOME_SETUP_COLLAPSED, false)) }
+        val finishSetup: (@Composable () -> Unit)? = if (!hasChecklistWork(setupRows)) null else {
+            {
+                FinishSetupCard(setupRows, setupExpanded, { open ->
+                    setupExpanded = open
+                    defaultPrefs.edit { putBoolean(FirstRun.KEY_HOME_SETUP_COLLAPSED, !open) }
+                }, allowAll)
+            }
+        }
+        HomeScreen(state, actions, finishSetup)
         if (sharingInfo) {
             DeskDialog(
                 onDismissRequest = { sharingInfo = false },

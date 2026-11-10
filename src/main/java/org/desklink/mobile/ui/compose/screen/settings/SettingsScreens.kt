@@ -332,6 +332,12 @@ internal data class PermissionNeeds(
         /** Before pairing nothing is turned on yet: everything a feature can use, except accessibility, which is asked when the desk first controls the phone. */
         val setup = PermissionNeeds(accessibility = false)
 
+        /**
+         * What is still missing, for Home's "Finish setting up" and the post-pairing checklist: everything a feature can use, whether or
+         * not it is turned on yet, so the person can allow it all at once. Accessibility only once the person let the desk control the phone.
+         */
+        fun remaining(context: Context) = setup.copy(accessibility = of(context).accessibility)
+
         fun of(context: Context): PermissionNeeds {
             val devices = runCatching { org.desklink.mobile.DeskLinkApplication.getInstance().devices.values.filter { it.isPaired } }.getOrDefault(emptyList())
             fun any(check: (org.desklink.mobile.Device) -> Boolean) = devices.any { runCatching { check(it) }.getOrDefault(false) }
@@ -505,6 +511,10 @@ internal fun permissionRows(
         }
         if (sdk < Build.VERSION_CODES.R) {
             add(runtime("files", R.drawable.sym_photo_library, context.getString(R.string.settings_perm_files), context.getString(R.string.settings_perm_files_summary, desk), Manifest.permission.WRITE_EXTERNAL_STORAGE))
+        }
+        // Limited to trusted networks: without location Android hides the Wi-Fi name, and DeskLink then trusts no network at all.
+        if (!org.desklink.mobile.helpers.TrustedNetworkHelper(context).allNetworksAllowed) {
+            add(runtime("location", R.drawable.sym_public, context.getString(R.string.setup_later_location), context.getString(R.string.perm_location_summary), Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
         }
         val power = context.getSystemService(PowerManager::class.java)
         add(PermissionRow(

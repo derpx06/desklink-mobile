@@ -321,11 +321,15 @@ private fun DeskSwitch(desk: DeskSettings, actions: SettingsActions, key: String
     )
 }
 
-/** A feature is on but Android has not granted what it needs: say so where the feature is, with one button. */
+/**
+ * A feature is on but Android has not granted what it needs: say so where the feature is, with one button. Once Android will not ask
+ * for [permissions] again the button says "Open settings" (the request then opens the app's permission page).
+ */
 @Composable
-private fun AllowRow(title: String, summary: String, onAllow: () -> Unit) {
+private fun AllowRow(title: String, summary: String, permissions: List<String> = emptyList(), onAllow: () -> Unit) {
+    val blocked = permissions.isNotEmpty() && org.desklink.mobile.helpers.PermissionRecovery.blocked(LocalContext.current, permissions).isNotEmpty()
     GroupRow(title, icon = R.drawable.sym_info, subtitle = summary) {
-        SecondaryButton(stringResource(R.string.settings_allow), onAllow, tonal = true, height = 48.dp, modifier = Modifier.padding(start = 4.dp))
+        SecondaryButton(stringResource(if (blocked) R.string.perm_open_settings else R.string.settings_allow), onAllow, tonal = true, height = 48.dp, modifier = Modifier.padding(start = 4.dp))
     }
 }
 
@@ -596,8 +600,14 @@ private fun CallsGroup(desk: DeskSettings?, actions: SettingsActions) {
                 checked = desk.showCaller,
                 onClick = { actions.onShowCaller(!desk.showCaller) },
             )
-            if (!granted(context, Manifest.permission.READ_PHONE_STATE) || !granted(context, Manifest.permission.CALL_PHONE)) {
-                AllowRow(stringResource(R.string.sg_calls_permission), stringResource(R.string.sg_calls_permission_summary, desk.name)) {
+            // Answering and hanging up need ANSWER_PHONE_CALLS too: without it the desk's Answer button did nothing, with no row here.
+            val calls = buildList {
+                add(Manifest.permission.READ_PHONE_STATE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) add(Manifest.permission.ANSWER_PHONE_CALLS)
+                add(Manifest.permission.CALL_PHONE)
+            }
+            if (!calls.all { granted(context, it) }) {
+                AllowRow(stringResource(R.string.sg_calls_permission), stringResource(R.string.sg_calls_permission_summary, desk.name), calls) {
                     actions.onCalls(true)
                 }
             }
@@ -812,7 +822,7 @@ private fun FilesGroup(desk: DeskSettings?, actions: SettingsActions, prefs: and
                 onClick = { actions.onContacts(!desk.contactsOn) },
             )
             if (desk.contactsOn && !desk.contactsReadable) {
-                AllowRow(stringResource(R.string.sg_contacts_permission), stringResource(R.string.settings_contacts_share_permission, desk.name)) { actions.onContacts(true) }
+                AllowRow(stringResource(R.string.sg_contacts_permission), stringResource(R.string.settings_contacts_share_permission, desk.name), listOf(Manifest.permission.READ_CONTACTS)) { actions.onContacts(true) }
             }
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && !granted(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {

@@ -9,6 +9,17 @@ package org.desklink.mobile.ui.compose.screen.onboarding
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +57,7 @@ import org.desklink.mobile.ui.compose.components.DialogAction
 import org.desklink.mobile.ui.compose.components.GroupRow
 import org.desklink.mobile.ui.compose.components.RowGroup
 import org.desklink.mobile.ui.compose.components.SectionLabel
+import org.desklink.mobile.ui.compose.screen.settings.PermissionAsker
 import org.desklink.mobile.ui.compose.screen.settings.PermissionNeeds
 import org.desklink.mobile.ui.compose.screen.settings.PermissionRow
 import org.desklink.mobile.ui.compose.screen.settings.actionLabel
@@ -104,22 +116,19 @@ fun PermissionsSetupRoute(onDone: () -> Unit) {
     val asker = rememberPermissionAsker()
     val desk = stringResource(R.string.settings_your_computer)
     val rows = remember(tick, asker.asked) { permissionRows(context, desk, asker.ask, PermissionNeeds.setup) }
-    // The special accesses "Allow all" still has to walk through, and whether its system request is still on screen.
+    PermissionsSetupScreen(rows, rememberAllowAll(rows, asker), onDone)
+}
+
+/**
+ * What "Allow all" runs: one system request for every missing runtime permission, then, once it is answered, each special access
+ * in turn behind a dialog saying what the next system page is for ("Open" or "Not now"; back ends the walk). Draws that dialog.
+ */
+@Composable
+internal fun rememberAllowAll(rows: List<PermissionRow>, asker: PermissionAsker): () -> Unit {
+    // The special accesses still to walk through, and whether the system request is still on screen.
     var steps by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var asking by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(asker.asked) { if (asker.asked > 0) asking = false }
-    PermissionsSetupScreen(
-        rows,
-        onAllowAll = {
-            steps = specialSteps(rows)
-            val request = allowAllRequest(rows)
-            if (request.isNotEmpty()) {
-                asking = true
-                asker.ask(request.toTypedArray())
-            }
-        },
-        onDone = onDone,
-    )
     val step = if (asking) null else currentStep(steps, rows)
     if (step != null) {
         val rest = steps.dropWhile { it != step.id }.drop(1)
@@ -130,6 +139,14 @@ fun PermissionsSetupRoute(onDone: () -> Unit) {
             confirm = DialogAction(stringResource(R.string.settings_open)) { steps = rest; step.allow() },
             dismiss = DialogAction(stringResource(R.string.setup_not_now)) { steps = rest },
         )
+    }
+    return {
+        steps = specialSteps(rows)
+        val request = allowAllRequest(rows)
+        if (request.isNotEmpty()) {
+            asking = true
+            asker.ask(request.toTypedArray())
+        }
     }
 }
 
@@ -159,13 +176,70 @@ internal fun PermissionsSetupScreen(rows: List<PermissionRow>, onAllowAll: () ->
                 }
             }
         }
-        Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 10.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (allDone) {
-                PrimaryButton(stringResource(R.string.perm_continue), onDone, Modifier.fillMaxWidth())
-            } else {
-                PrimaryButton(stringResource(R.string.setup_allow_all), onAllowAll, Modifier.fillMaxWidth())
-                DeskTextButton(stringResource(R.string.perm_skip), onDone, Modifier.padding(top = 4.dp))
+        SetupButtons(allDone, onAllowAll, onDone)
+    }
+}
+
+/** The foot of the setup and of the checklist: "Allow all" over "Skip for now" while something is missing, then "Continue". */
+@Composable
+internal fun SetupButtons(allDone: Boolean, onAllowAll: () -> Unit, onDone: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 10.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        if (allDone) {
+            PrimaryButton(stringResource(R.string.perm_continue), onDone, Modifier.fillMaxWidth())
+        } else {
+            PrimaryButton(stringResource(R.string.setup_allow_all), onAllowAll, Modifier.fillMaxWidth())
+            DeskTextButton(stringResource(R.string.perm_skip), onDone, Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+/** Home's "Finish setting up" rows: what is still missing, with what it unlocks; the card shows while [hasChecklistWork] says so. */
+internal fun finishSetupRows(rows: List<PermissionRow>): List<PermissionRow> = checklistRows(rows).filter { !it.granted }
+
+/**
+ * On Home, until everything a feature can use is allowed: a card that says how many are left, opens to the rows (each with its own
+ * Allow, or Open settings once Android stops asking) and "Allow all". [expanded] is the person's choice and is kept.
+ */
+@Composable
+internal fun FinishSetupCard(rows: List<PermissionRow>, expanded: Boolean, onExpanded: (Boolean) -> Unit, onAllowAll: () -> Unit) {
+    val t = tokens
+    val missing = finishSetupRows(rows)
+    val left = checklistCounted(rows).count { !it.granted }
+    val shape = org.desklink.mobile.ui.compose.DeskLinkShape.group
+    val state = stringResource(if (expanded) R.string.home_setup_expanded else R.string.home_setup_collapsed)
+    Column(Modifier.fillMaxWidth().clip(shape).background(t.surface).border(1.dp, t.amber.copy(alpha = 0.5f), shape)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(role = Role.Button) { onExpanded(!expanded) }
+                .semantics { stateDescription = state }
+                .heightIn(min = 56.dp)
+                .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Icon(painterResource(R.drawable.sym_tune), contentDescription = null, tint = t.amber, modifier = Modifier.size(22.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.home_setup_title), fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, color = t.text, modifier = Modifier.semantics { heading() })
+                Text(pluralStringResource(R.plurals.home_setup_left, left, left), fontSize = 13.sp, lineHeight = 17.sp, color = t.textDim)
             }
+            Icon(painterResource(if (expanded) R.drawable.sym_expand_less else R.drawable.sym_expand_more), contentDescription = null, tint = t.textDim, modifier = Modifier.size(22.dp))
+        }
+        if (expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.background(t.bg).padding(top = 2.dp)) {
+                missing.forEach { row ->
+                    ChecklistRow(
+                        icon = row.icon,
+                        title = row.title,
+                        description = row.summary,
+                        state = ChecklistState.Todo,
+                        actionLabel = stringResource(row.actionLabel()),
+                        doneLabel = stringResource(R.string.perm_on),
+                        onClick = row.allow,
+                    )
+                }
+            }
+            PrimaryButton(stringResource(R.string.setup_allow_all), onAllowAll, Modifier.fillMaxWidth().padding(16.dp), height = 48.dp)
         }
     }
 }

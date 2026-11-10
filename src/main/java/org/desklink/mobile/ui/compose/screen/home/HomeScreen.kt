@@ -238,7 +238,7 @@ class HomeActions(
 private val TWO_COLUMNS = 560.dp
 
 @Composable
-fun HomeScreen(state: HomeState, actions: HomeActions) {
+fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable () -> Unit)? = null) {
     val t = tokens
     var sheet by rememberSaveable { mutableStateOf(false) }
     var linkDialog by rememberSaveable { mutableStateOf(false) }
@@ -308,7 +308,8 @@ fun HomeScreen(state: HomeState, actions: HomeActions) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Greeting(onSearch = { palette = true })
-                if (state.notificationsOff) NotificationsNudge(actions.onTurnOnNotifications)
+                // "Finish setting up" lists notifications with the rest, so the one-line nudge is for when it is not there.
+                if (finishSetup != null) finishSetup() else if (state.notificationsOff) NotificationsNudge(actions.onTurnOnNotifications)
                 if (two) {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { doing() }

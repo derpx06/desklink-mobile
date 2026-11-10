@@ -7,6 +7,9 @@ import androidx.preference.PreferenceManager
 import androidx.test.core.app.ApplicationProvider
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.compose.screen.onboarding.FirstRun
+import org.desklink.mobile.ui.compose.screen.onboarding.PairingStack
+import org.desklink.mobile.ui.compose.screen.onboarding.finishSetupRows
+import org.desklink.mobile.ui.compose.screen.onboarding.hasChecklistWork
 import org.desklink.mobile.ui.compose.screen.onboarding.allowAllRequest
 import org.desklink.mobile.ui.compose.screen.onboarding.checklistRows
 import org.desklink.mobile.ui.compose.screen.onboarding.currentStep
@@ -135,5 +138,53 @@ class PermissionsSetupTest {
         assertFalse(needs.camera || needs.microphone)
         val ids = permissionRows(app, "Desk", {}, needs).map { it.id }
         assertFalse(ids.toString(), "camera" in ids || "microphone" in ids)
+    }
+
+    @Test
+    fun afterPairingEverythingAFeatureCanUseIsListedSoItCanAllBeAllowed() {
+        val needs = PermissionNeeds.remaining(app)
+        assertTrue(needs.notificationAccess && needs.calls && needs.contacts && needs.camera && needs.microphone)
+        assertFalse("accessibility only once the desk may control the phone", needs.accessibility)
+    }
+
+    @Test
+    fun theHomeCardListsOnlyWhatIsMissingAndGoesWhenOnlyTheOemRowIsLeft() {
+        val rows = listOf(row("camera", granted = true, permissions = listOf("c")), row("calls", permissions = listOf("p")), row("oem", unknown = true))
+        assertEquals(listOf("calls", "oem"), finishSetupRows(rows).map { it.id })
+        assertTrue(hasChecklistWork(rows))
+        assertFalse("Android cannot tell the OEM setting: it never keeps the card up", hasChecklistWork(rows.filter { it.id != "calls" }))
+    }
+
+    @Test
+    fun locationIsListedOnlyWhileDeskLinkIsLimitedToTrustedNetworks() {
+        assertFalse(setup(34).any { it.id == "location" })
+        org.desklink.mobile.helpers.TrustedNetworkHelper(app).allNetworksAllowed = false
+        val location = setup(34).first { it.id == "location" }
+        assertEquals(listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), location.permissions)
+        assertTrue(allowAllRequest(setup(34)).containsAll(location.permissions))
+    }
+
+    @Test
+    fun aPairingThatFinishedWhileTheActivityWasGoneIsStillNew() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(app)
+        assertEquals("a first look is not a pairing", emptySet<String>(), PairingStack.fresh(FirstRun.knownPaired(prefs), setOf("a")))
+        FirstRun.setKnownPaired(prefs, emptySet())
+        // The activity is recreated (its memory is gone) and the computer is paired now.
+        assertEquals(setOf("a"), PairingStack.fresh(FirstRun.knownPaired(prefs), setOf("a")))
+        FirstRun.setKnownPaired(prefs, setOf("a"))
+        assertEquals(emptySet<String>(), PairingStack.fresh(FirstRun.knownPaired(prefs), setOf("a")))
+    }
+
+    @Test
+    fun theChecklistWaitsUntilTheScreenIsFree() {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(app)
+        assertFalse(FirstRun.checklistPending(prefs))
+        FirstRun.setChecklistPending(prefs, true)
+        val pending = FirstRun.checklistPending(prefs)
+        assertTrue(PairingStack.offerChecklistNow(pending, resumed = true, paired = true, stack = listOf("home"), home = "home"))
+        assertFalse("under a desk's screen-share prompt", PairingStack.offerChecklistNow(pending, resumed = false, paired = true, stack = listOf("home"), home = "home"))
+        assertFalse("over the compare-codes screen", PairingStack.offerChecklistNow(pending, resumed = true, paired = true, stack = listOf("home", "pair/x"), home = "home"))
+        assertFalse(PairingStack.offerChecklistNow(pending, resumed = true, paired = false, stack = listOf("home"), home = "home"))
+        assertFalse(PairingStack.offerChecklistNow(false, resumed = true, paired = true, stack = listOf("home"), home = "home"))
     }
 }
