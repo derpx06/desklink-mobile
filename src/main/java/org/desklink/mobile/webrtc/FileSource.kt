@@ -48,7 +48,6 @@ class UriFileSource(private val context: android.content.Context, private val ur
      */
     private var held: android.os.ParcelFileDescriptor? = null
     private var heldStat: FileSource.Stat? = null
-    private var persisted = false
     private var heldProc = 0L
 
     /** Opens the file now, on the caller's thread, while it may still be read. False: left to be opened when it is read. */
@@ -61,9 +60,9 @@ class UriFileSource(private val context: android.content.Context, private val ur
             return false
         }
         // Best effort: where the provider offers it, the permission outlives the share (and a restart of this app).
-        persisted = runCatching {
+        runCatching {
             resolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }.isSuccess
+        }
         held = pfd
         // The time as the provider reports it (what a resumed send will compare with after a restart), and the file's own
         // time at this moment, so a change while it is read still shows.
@@ -78,11 +77,7 @@ class UriFileSource(private val context: android.content.Context, private val ur
     override fun close() {
         runCatching { held?.close() }
         held = null
-        if (persisted) {
-            // Persisted grants are few (a hundred or so per app): given back when the send is over.
-            runCatching { resolver.releasePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            persisted = false
-        }
+        // A persisted grant is kept: the Files list opens what was sent. `SentGrants.trim` gives back all but the newest.
     }
 
     override fun stat(): FileSource.Stat? {

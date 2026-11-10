@@ -6,6 +6,7 @@
 
 package org.desklink.mobile.plugins.share
 
+import org.desklink.mobile.ui.compose.screen.transfers.Thumbnails
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -90,5 +91,28 @@ class TransferHistoryTest {
         assertEquals(PreviewKind.TEXT, previewKind("text/x-rust", "main.rs"))
         assertEquals(PreviewKind.ARCHIVE, previewKind(null, "backup.tar.gz"))
         assertEquals(PreviewKind.OTHER, previewKind(null, "Makefile"))
+    }
+
+    @Test
+    fun onlyReadGrantsOnFilesNoKeptSendNeedsAreGivenBack() {
+        val held = listOf(
+            TransferHistory.HeldGrant("content://docs/doc/new", tree = false, write = false),
+            TransferHistory.HeldGrant("content://docs/doc/old", tree = false, write = false),
+            TransferHistory.HeldGrant("content://docs/tree/bucket", tree = true, write = true),
+            TransferHistory.HeldGrant("content://docs/tree/gallery", tree = true, write = false),
+            TransferHistory.HeldGrant("content://docs/doc/saveHere", tree = false, write = true),
+        )
+        assertEquals(
+            listOf("content://docs/doc/old"),
+            TransferHistory.grantsToRelease(held, setOf("content://docs/doc/new")),
+        )
+    }
+
+    @Test
+    fun aRefusedReadIsNotAMissingFile() {
+        assertEquals(Thumbnails.Access.OPEN, Thumbnails.access { true })
+        assertEquals(Thumbnails.Access.NOT_ALLOWED, Thumbnails.access { throw SecurityException("grant ended") })
+        assertEquals(Thumbnails.Access.GONE, Thumbnails.access { throw java.io.FileNotFoundException("deleted") })
+        assertEquals(Thumbnails.Access.GONE, Thumbnails.access { false })
     }
 }

@@ -236,7 +236,11 @@ private fun FileRow(record: TransferRecord, deskName: String, revision: Int, act
     val time = DateFormat.getTimeFormat(context).format(Date(record.time))
     val desk = record.deviceName.ifBlank { deskName }
     val description = stringResource(if (record.sent) R.string.transfers_item_sent else R.string.transfers_item_received, record.name, size, desk, time) +
-        if (preview.missing) ". " + stringResource(R.string.transfers_missing) else ""
+        when {
+            preview.missing -> ". " + stringResource(R.string.transfers_missing)
+            preview.notAllowed -> ". " + stringResource(R.string.transfers_not_allowed)
+            else -> ""
+        }
     val moreLabel = stringResource(R.string.transfers_more, record.name)
     val round = 24.dp
     val shape = RoundedCornerShape(topStart = if (first) round else 0.dp, topEnd = if (first) round else 0.dp, bottomStart = if (last) round else 0.dp, bottomEnd = if (last) round else 0.dp)
@@ -247,7 +251,7 @@ private fun FileRow(record: TransferRecord, deskName: String, revision: Int, act
             .clip(shape)
             .background(t.surface)
             .border(1.dp, t.hairline, shape)
-            .combinedClickable(role = Role.Button, onLongClick = { menu = true }, onLongClickLabel = moreLabel) { if (preview.missing) menu = true else actions.onOpen(record) }
+            .combinedClickable(role = Role.Button, onLongClick = { menu = true }, onLongClickLabel = moreLabel) { if (preview.missing || preview.notAllowed) menu = true else actions.onOpen(record) }
             .semantics(mergeDescendants = true) { contentDescription = description }
             .heightIn(min = 64.dp)
             .padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
@@ -275,6 +279,7 @@ private fun FileRow(record: TransferRecord, deskName: String, revision: Int, act
             Text(record.name, fontFamily = MonoFamily, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis)
             Text(
                 if (preview.missing) stringResource(R.string.transfers_missing)
+                else if (preview.notAllowed) stringResource(R.string.transfers_not_allowed)
                 else stringResource(if (record.sent) R.string.files_sent_meta else R.string.files_received_meta, DateUtils.getRelativeTimeSpanString(record.time, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(), size),
                 fontSize = 12.sp, lineHeight = 16.sp,
                 color = if (preview.missing) t.red else t.textDim,
@@ -285,7 +290,7 @@ private fun FileRow(record: TransferRecord, deskName: String, revision: Int, act
                 Icon(painterResource(R.drawable.sym_more_vert), contentDescription = moreLabel, tint = t.textDim)
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                if (!preview.missing) {
+                if (!preview.missing && !preview.notAllowed) {
                     DropdownMenuItem(text = { Text(stringResource(R.string.transfers_share)) }, onClick = { menu = false; actions.onShare(record) })
                     DropdownMenuItem(text = { Text(stringResource(R.string.transfers_open_with)) }, onClick = { menu = false; actions.onOpenWith(record) })
                 }

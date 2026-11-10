@@ -206,8 +206,33 @@ object TransferHistory {
         runCatching {
             store(context).append(TransferRecord(UUID.randomUUID().toString(), deviceId, deviceName, name, size, sent, System.currentTimeMillis(), uri.toString(), mime))
         }
+        if (sent) runCatching { trimSentGrants(context) }
         revision++
     }
+
+    /**
+     * A sent file stays readable from the Files list through the persisted grant its send took; all but the newest
+     * [KEPT_SENT_GRANTS] sent files (and any send still to resume) give theirs back, so the app's folders keep theirs.
+     */
+    private fun trimSentGrants(context: Context) {
+        val resolver = context.contentResolver
+        val keep = store(context).all().filter { it.sent }.take(KEPT_SENT_GRANTS).map { it.uri }.toSet() +
+            resumeSources(context).all.values.filterIsInstance<String>()
+        val held = resolver.persistedUriPermissions.map {
+            HeldGrant(it.uri.toString(), android.provider.DocumentsContract.isTreeUri(it.uri), it.isWritePermission)
+        }
+        for (uri in grantsToRelease(held, keep)) {
+            runCatching { resolver.releasePersistableUriPermission(Uri.parse(uri), android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        }
+    }
+
+    data class HeldGrant(val uri: String, val tree: Boolean, val write: Boolean)
+
+    /** Read-only grants on single files that no kept send needs. Folder (tree) and writable grants are never touched. */
+    fun grantsToRelease(held: List<HeldGrant>, keep: Set<String>): List<String> =
+        held.filter { !it.tree && !it.write && it.uri !in keep }.map { it.uri }
+
+    const val KEPT_SENT_GRANTS = 100
 
     /** Something a screen shows changed without a history row (a file kept for a retry). */
     fun changed() {

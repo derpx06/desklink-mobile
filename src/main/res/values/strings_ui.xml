@@ -317,6 +317,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="transfers_item_received">%1$s, %2$s, received from %3$s %4$s</string>
     <string name="transfers_item_sent">%1$s, %2$s, sent to %3$s %4$s</string>
     <string name="transfers_missing">File moved or deleted</string>
+    <string name="transfers_not_allowed">Still on this phone. DeskLink can no longer open it</string>
     <string name="transfers_more">More options for %1$s</string>
     <string name="transfers_share">Share</string>
     <string name="transfers_open_with">Open with</string>

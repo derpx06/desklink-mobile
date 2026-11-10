@@ -32,6 +32,8 @@ data class FilePreview(
     val loading: Boolean = true,
     /** The file can no longer be opened (moved, deleted, or its permission ended). */
     val missing: Boolean = false,
+    /** Still there, but the app that shared it gave only a passing permission: nothing to show or open from here. */
+    val notAllowed: Boolean = false,
     val bitmap: Bitmap? = null,
     val durationMs: Long? = null,
 )
@@ -47,7 +49,11 @@ object Thumbnails {
 
     suspend fun load(context: Context, record: TransferRecord, sizePx: Int): FilePreview = withContext(Dispatchers.IO) {
         val uri = Uri.parse(record.uri)
-        if (!exists(context, uri)) return@withContext FilePreview(loading = false, missing = true)
+        when (access(context, uri)) {
+            Access.GONE -> return@withContext FilePreview(loading = false, missing = true)
+            Access.NOT_ALLOWED -> return@withContext FilePreview(loading = false, notAllowed = true)
+            Access.OPEN -> {}
+        }
         val key = "${record.uri}|${record.size}|${modified(context, uri, record.time)}|$sizePx"
         cache.get(key)?.let { return@withContext it }
         val preview = runCatching {
@@ -62,9 +68,23 @@ object Thumbnails {
         preview
     }
 
-    fun exists(context: Context, uri: Uri): Boolean =
-        if (uri.scheme == "file") File(uri.path.orEmpty()).isFile
-        else runCatching { context.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }.getOrDefault(false)
+    enum class Access { OPEN, GONE, NOT_ALLOWED }
+
+    /** A refused read is not a missing file: a share's permission ends while the file stays where it was. */
+    fun access(context: Context, uri: Uri): Access =
+        if (uri.scheme == "file") {
+            if (File(uri.path.orEmpty()).isFile) Access.OPEN else Access.GONE
+        } else {
+            access { context.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }
+        }
+
+    fun access(open: () -> Boolean): Access = try {
+        if (open()) Access.OPEN else Access.GONE
+    } catch (_: SecurityException) {
+        Access.NOT_ALLOWED
+    } catch (_: Exception) {
+        Access.GONE
+    }
 
     private fun modified(context: Context, uri: Uri, fallback: Long): Long =
         if (uri.scheme == "file") File(uri.path.orEmpty()).lastModified()
