@@ -686,7 +686,7 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
         Q(PaletteModel.Action.SEND_LINK, R.drawable.sym_link, stringResource(R.string.home_send_link)) { gate(onSendLink) },
         Q(PaletteModel.Action.RING, R.drawable.sym_vibration, stringResource(R.string.home_ring_desk)) { gate(actions.onRing) },
         Q(PaletteModel.Action.LOCK, R.drawable.sym_lock, stringResource(R.string.home_lock_desk)) { gate(actions.onLock) },
-        Q(PaletteModel.Action.SHARE_SCREEN, R.drawable.sym_mobile_screen_share, stringResource(if (sharing) R.string.home_stop_sharing else R.string.home_share_screen)) { gate(actions.onShareScreen) },
+        Q(PaletteModel.Action.SHARE_SCREEN, R.drawable.sym_mobile_screen_share, stringResource(if (sharing) R.string.home_stop_sharing else R.string.home_share_screen)) { if (sharing) actions.onShareScreen() else gate(actions.onShareScreen) },
         Q(PaletteModel.Action.PING, R.drawable.sym_waving_hand, stringResource(R.string.home_ping_desk)) { gate(actions.onPing) },
         Q(PaletteModel.Action.UNLOCK, R.drawable.sym_lock_open, stringResource(R.string.home_tile_unlock)) { actions.onUnlockDesk() },
     )

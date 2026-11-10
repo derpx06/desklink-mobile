@@ -137,6 +137,9 @@ class PaletteModelTest {
         assertEquals(Blocker.UPDATE, HomeDerive.blocker(s, Action.SEND_FILES))
         assertTrue(HomeDerive.usable(state(DeviceConnection.LOCAL)))
         assertEquals(Blocker.CONNECTING, HomeDerive.blocker(state(DeviceConnection.CONNECTING), Action.PING))
+        val sharing = state(DeviceConnection.OFFLINE).copy(live = org.desklink.mobile.ui.compose.screen.home.LiveSessions(phoneScreen = true))
+        assertEquals("stopping this phone's share is local", null, HomeDerive.blocker(sharing, Action.SHARE_SCREEN))
+        assertEquals(Blocker.OFFLINE, HomeDerive.blocker(sharing, Action.PING))
     }
 
     @Test

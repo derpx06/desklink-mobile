@@ -80,6 +80,8 @@ object HomeDerive {
             PaletteModel.Action.NEW_TERMINAL -> true
             else -> return null
         }
+        // Stopping this phone's own screen share is local (it ends the capture here): it works with the link down too.
+        if (action == PaletteModel.Action.SHARE_SCREEN && s.live.phoneScreen) return null
         whyNot(s)?.let { return blocker(it) }
         if (offered) return null
         return if (action == PaletteModel.Action.UNLOCK) s.unlockBlocker else o.why[action] ?: Blocker.DESK_OFF
