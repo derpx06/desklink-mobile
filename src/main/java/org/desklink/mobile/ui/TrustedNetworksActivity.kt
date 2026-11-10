@@ -60,7 +60,8 @@ class TrustedNetworksActivity : BaseActivity<TrustedNetworkListBinding>() {
                 PermissionsAlertDialogFragment.Builder()
                     .setTitle(R.string.location_permission_needed_title)
                     .setMessage(R.string.location_permission_needed_desc)
-                    .setPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                    // Android 12+ ignores a request for fine location that does not also ask for coarse.
+                    .setPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
                     .setRequestCode(0)
                     .create().show(supportFragmentManager, null)
             }
