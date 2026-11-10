@@ -105,6 +105,7 @@ class PermissionsSetupTest {
             row("accessibility", relevant = false),
         )
         assertEquals(listOf("notification_access", "battery", "oem"), specialSteps(rows))
+        assertEquals("the OEM page, once opened, is not walked to again", listOf("notification_access", "battery"), specialSteps(rows, oemVisited = true))
         val steps = specialSteps(rows)
         // Notification access granted while the walk was on: the battery step is next.
         val after = rows.map { if (it.id == "notification_access") row("notification_access", granted = true) else it }

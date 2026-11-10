@@ -383,20 +383,31 @@ internal class PermissionRow(
 fun needsOemBackgroundSetting(manufacturer: String): Boolean =
     manufacturer.lowercase() in setOf("oppo", "realme", "oneplus", "xiaomi", "redmi", "poco", "vivo", "iqoo", "huawei", "honor", "meizu", "asus", "tecno", "infinix")
 
-/** What a permission button does: asks (or explains first) and, once answered, refreshes [asked] so rows read the new state. */
-internal class PermissionAsker(val ask: (Array<String>) -> Unit, val asked: Int)
+/**
+ * What a permission button does: [request] asks (true when the system request was launched) and, once it is answered,
+ * [asked] moves on so rows read the new state. [ask] is the same for buttons that do not need the answer.
+ */
+internal class PermissionAsker(val request: (Array<String>) -> Boolean, val asked: Int) {
+    val ask: (Array<String>) -> Unit = { request(it) }
+}
+
+/** Set once the OEM background setting was opened: "Allow all" no longer walks to it every time (its row stays). */
+internal const val KEY_OEM_VISITED = "oem_background_visited"
 
 /** The launchers behind every "Allow" button. Nothing is asked until [PermissionAsker.ask] is called from a tap. */
 @Composable
 internal fun rememberPermissionAsker(): PermissionAsker {
     val context = LocalContext.current
     var asked by remember { mutableIntStateOf(0) }
-    // Android 10 also wants a folder chosen by hand before received files can be written.
+    // Android 10 also wants a folder chosen by hand before received files can be written. The answer counts only once the
+    // folder is chosen (or not), so "Allow all" does not put its next dialog up under the folder picker.
     val folder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) org.desklink.mobile.plugins.share.ShareDestination.saveStorageLocationPreference(context, uri)
+        asked++
     }
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        asked++
+        val pickFolder = Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && result[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true
+        if (!pickFolder) asked++
         org.desklink.mobile.helpers.PermissionRecovery.onResult(context, result.values.any { it })
         if (result.values.any { it }) {
             // Plugins that waited for the permission (Share, Find my phone…) load now.
@@ -404,7 +415,7 @@ internal fun rememberPermissionAsker(): PermissionAsker {
                 org.desklink.mobile.DeskLinkApplication.getInstance().devices.values.forEach(org.desklink.mobile.Device::reloadPluginsFromSettings)
             }
         }
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && result[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true) folder.launch(null)
+        if (pickFolder) folder.launch(null)
     }
     return PermissionAsker({ permissions -> org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(context, permissions, request::launch) }, asked)
 }
@@ -530,6 +541,7 @@ internal fun permissionRows(
                 unknown = true,
                 id = "oem",
                 allow = {
+                    prefs.edit { putBoolean(KEY_OEM_VISITED, true) }
                     // App info (Battery usage → Allow background activity) underneath, and on
                     // ColorOS its auto-launch list on top; back from that lands on app info.
                     runCatching { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))) }

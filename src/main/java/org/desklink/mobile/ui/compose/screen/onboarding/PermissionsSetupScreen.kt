@@ -57,6 +57,7 @@ import org.desklink.mobile.ui.compose.components.DialogAction
 import org.desklink.mobile.ui.compose.components.GroupRow
 import org.desklink.mobile.ui.compose.components.RowGroup
 import org.desklink.mobile.ui.compose.components.SectionLabel
+import org.desklink.mobile.ui.compose.screen.settings.KEY_OEM_VISITED
 import org.desklink.mobile.ui.compose.screen.settings.PermissionAsker
 import org.desklink.mobile.ui.compose.screen.settings.PermissionNeeds
 import org.desklink.mobile.ui.compose.screen.settings.PermissionRow
@@ -78,8 +79,8 @@ internal fun allowAllRequest(rows: List<PermissionRow>): List<String> =
     checklistRows(rows).filter { !it.granted && !it.blocked }.flatMap { it.permissions }.distinct()
 
 /** Then the special accesses, one system page each, in list order (notification access, battery, the OEM's background setting). */
-internal fun specialSteps(rows: List<PermissionRow>): List<String> =
-    checklistRows(rows).filter { it.permissions.isEmpty() && !it.granted }.map { it.id }
+internal fun specialSteps(rows: List<PermissionRow>, oemVisited: Boolean = false): List<String> =
+    checklistRows(rows).filter { it.permissions.isEmpty() && !it.granted && !(oemVisited && it.id == "oem") }.map { it.id }
 
 /** The step to show now: the first of [steps] whose row is still not granted (one granted meanwhile is passed over). */
 internal fun currentStep(steps: List<String>, rows: List<PermissionRow>): PermissionRow? =
@@ -129,6 +130,10 @@ internal fun rememberAllowAll(rows: List<PermissionRow>, asker: PermissionAsker)
     var steps by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var asking by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(asker.asked) { if (asker.asked > 0) asking = false }
+    // Back in front means no system request is up (also after a restart that saved asking = true with its request lost).
+    val resumed = rememberResumeTick()
+    LaunchedEffect(resumed) { asking = false }
+    val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(LocalContext.current)
     val step = if (asking) null else currentStep(steps, rows)
     if (step != null) {
         val rest = steps.dropWhile { it != step.id }.drop(1)
@@ -141,12 +146,10 @@ internal fun rememberAllowAll(rows: List<PermissionRow>, asker: PermissionAsker)
         )
     }
     return {
-        steps = specialSteps(rows)
+        steps = specialSteps(rows, prefs.getBoolean(KEY_OEM_VISITED, false))
         val request = allowAllRequest(rows)
-        if (request.isNotEmpty()) {
-            asking = true
-            asker.ask(request.toTypedArray())
-        }
+        // Waits for the answer only when a request is really up: otherwise the walk starts at once.
+        if (request.isNotEmpty()) asking = asker.request(request.toTypedArray())
     }
 }
 
@@ -204,7 +207,8 @@ internal fun finishSetupRows(rows: List<PermissionRow>): List<PermissionRow> = c
 internal fun FinishSetupCard(rows: List<PermissionRow>, expanded: Boolean, onExpanded: (Boolean) -> Unit, onAllowAll: () -> Unit) {
     val t = tokens
     val missing = finishSetupRows(rows)
-    val left = checklistCounted(rows).count { !it.granted }
+    // The number is the rows listed, so it never reads "5 left" over 6 rows.
+    val left = missing.size
     val shape = org.desklink.mobile.ui.compose.DeskLinkShape.group
     val state = stringResource(if (expanded) R.string.home_setup_expanded else R.string.home_setup_collapsed)
     Column(Modifier.fillMaxWidth().clip(shape).background(t.surface).border(1.dp, t.amber.copy(alpha = 0.5f), shape)) {
