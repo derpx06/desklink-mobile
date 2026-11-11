@@ -126,6 +126,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                     closed = done;
                 }
             }
+            close(); // a cancel leaves the loop with files still listed
 
             if (isCancelled()) {
                 uploadNotification.cancel();
@@ -136,6 +137,9 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
                 reportResult(null);
             }
         } catch (RuntimeException e) {
+            // First: from here on [networkPacketList] is only read (an add after this goes to a new job, it is not
+            // accepted and then released below), so the loops need no lock.
+            close();
             if (lastFailure instanceof org.desklink.mobile.webrtc.TransferResumingException) {
                 // Not failed: the file is kept and resumes by itself when the desk is back.
                 TransferProgress.resuming(getId());
@@ -173,9 +177,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
             reportError(e);
         } finally {
             isRunning = false;
-            synchronized (lock) {
-                closed = true;
-            }
+            close();
 
             for (NetworkPacket networkPacket : networkPacketList) {
                 if (isCancelled()) {
@@ -220,6 +222,12 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
         uploadNotification.show();
     }
 
+    private void close() {
+        synchronized (lock) {
+            closed = true;
+        }
+    }
+
     /** False when the job has already stopped taking files (it is finishing): the caller starts a new job. */
     boolean addNetworkPacket(@NonNull NetworkPacket networkPacket) {
         synchronized (lock) {
@@ -243,6 +251,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
         super.cancel();
         NetworkPacket packet;
         synchronized (lock) {
+            closed = true;
             packet = currentNetworkPacket;
         }
         if (packet != null) {

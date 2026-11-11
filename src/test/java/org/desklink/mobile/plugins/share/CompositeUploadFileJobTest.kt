@@ -85,6 +85,40 @@ class CompositeUploadFileJobTest {
         assertFalse(job.addNetworkPacket(NetworkPacket("desklink.share.request")))
     }
 
+    /**
+     * A share arriving while a failed job is in its catch was accepted, then released in `finally` and never sent (and an add
+     * during the failure loop was a ConcurrentModificationException). The job closes before it handles the failure.
+     */
+    @Test
+    fun aFileAddedWhileTheJobFailsIsRefusedSoItGoesToANewJob() {
+        ShareQueue.forgetDevice(app, "desk")
+        lateinit var job: CompositeUploadFileJob
+        var failed = false
+        var accepted: Boolean? = null
+        val device = mockk<Device>(relaxed = true) {
+            every { context } answers {
+                if (failed && accepted == null) accepted = job.addNetworkPacket(NetworkPacket("desklink.share.request"))
+                app
+            }
+            every { deviceId } returns "desk"
+            every { name } returns "Desk"
+            every { sendPacketBlocking(any(), any(), any()) } answers {
+                secondArg<Device.SendPacketStatusCallback>().onFailure(IllegalStateException("DeskLink WebRTC file transport is not ready"))
+                failed = true
+                false
+            }
+        }
+        val callback = object : BackgroundJob.Callback<Void?> {
+            override fun onResult(job: BackgroundJob<*, *>, result: Void?) = Unit
+            override fun onError(job: BackgroundJob<*, *>, error: Throwable) = Unit
+        }
+        job = CompositeUploadFileJob(device, callback)
+        job.setBackgroundJobHandler(mockk<BackgroundJobHandler>(relaxed = true))
+        job.addNetworkPacket(NetworkPacket("desklink.share.request").apply { this["filename"] = "f1" })
+        job.run()
+        assertEquals(false, accepted)
+    }
+
     @Test
     fun theThirdNotReadyInARowGivesUpWithOneCard() {
         ShareQueue.forgetDevice(app, "desk")
