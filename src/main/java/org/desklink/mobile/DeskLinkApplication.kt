@@ -434,12 +434,14 @@ class DeskLinkApplication : Application() {
         Log.d("DeskLink", "Loading device $it")
         try {
             val device = Device(applicationContext, it)
-            val now = Date()
+            // Outside its validity window is logged, never a reason to unpair: after a battery drain or a
+            // hand-set date the phone's clock can sit before the desk's first run, and the pairing (pinned to
+            // this exact certificate) was deleted for good.
             val x509Cert = device.certificate as X509Certificate
-            if (now < x509Cert.notBefore) {
-                throw CertificateException("Certificate not effective yet: " + x509Cert.notBefore)
-            } else if (now > x509Cert.notAfter) {
-                throw CertificateException("Certificate already expired: " + x509Cert.notAfter)
+            val now = Date()
+            if (now < x509Cert.notBefore || now > x509Cert.notAfter) {
+                Log.w("DeskLink", "Remembered device $it: certificate valid ${x509Cert.notBefore}..${x509Cert.notAfter}, " +
+                    "outside the phone's clock; kept")
             }
             devices[it] = device
             device.addPairingCallback(devicePairingCallback)

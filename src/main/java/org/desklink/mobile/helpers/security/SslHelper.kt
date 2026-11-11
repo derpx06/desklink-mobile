@@ -86,10 +86,12 @@ object SslHelper {
                 } else if (cert.notAfter.time < currDate.time) {
                     Log.e(LOG_TAG, "The certificate expired: " + cert.notAfter)
                     needsToGenerateCertificate = true
-                } else if (cert.notBefore.time > currDate.time) {
-                    Log.e(LOG_TAG, "The certificate is not effective yet: " + cert.notBefore)
-                    needsToGenerateCertificate = true
                 } else {
+                    // A notBefore in the future means the clock is wrong (it is set a year back at creation): a new
+                    // certificate would make every paired desk refuse this phone.
+                    if (cert.notBefore.time > currDate.time) {
+                        Log.w(LOG_TAG, "The certificate is not effective yet by this clock: " + cert.notBefore)
+                    }
                     certificate = cert
                 }
             } catch (e: Exception) {
