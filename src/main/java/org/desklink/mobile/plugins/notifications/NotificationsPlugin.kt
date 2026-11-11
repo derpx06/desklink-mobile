@@ -313,7 +313,19 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     // isPreexisting is true for notifications that we are sending in response to a request command
     // and that we want to send with the "silent" flag set
-    private fun sendNotification(
+    /**
+     * A single malformed third-party notification (extras that throw while read: MessagingStyle, a bad parcelable) is
+     * skipped, never fatal: two of the callers run on the main looper with nothing around them.
+     */
+    private fun sendNotification(statusBarNotification: StatusBarNotification, isPreexisting: Boolean) {
+        try {
+            mirrorNotification(statusBarNotification, isPreexisting)
+        } catch (error: Exception) {
+            Log.w(TAG, "Skipping notification (${error.javaClass.simpleName})")
+        }
+    }
+
+    private fun mirrorNotification(
         statusBarNotification: StatusBarNotification,
         isPreexisting: Boolean
     ) {
@@ -602,13 +614,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             sendSnapshot(ids)
         }
         for (notification in mirrored) {
-            // A single malformed third-party notification must not prevent
-            // the rest of the active notification set from being mirrored.
-            try {
-                sendNotification(notification, true)
-            } catch (error: Exception) {
-                Log.w(TAG, "Skipping notification during resync (${error.javaClass.simpleName})")
-            }
+            sendNotification(notification, true)
         }
     }
 
