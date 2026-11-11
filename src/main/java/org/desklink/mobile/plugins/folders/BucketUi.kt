@@ -207,9 +207,10 @@ class BucketUi(
             selected = emptySet()
         }
         val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-            val path = photo ?: return@rememberLauncherForActivityResult
+            // Not `path`: that is the folder the photo goes into.
+            val shot = photo ?: return@rememberLauncherForActivityResult
             photo = null
-            val file = File(path)
+            val file = File(shot)
             if (ok && file.length() > 0) {
                 BucketEngine.add(deviceId, listOf(Uri.fromFile(file)), path) { r -> file.delete(); report(r) }
             } else {
