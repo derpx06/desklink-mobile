@@ -82,11 +82,16 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
             .map { it.toUiModel() }
     }
 
+    private var sharing = false
+
     private fun deviceClicked(
         device: Device,
         intentHasUrl: Boolean,
         intent: Intent
     ) {
+        // A second tap while the first share is still being read must not send it twice.
+        if (sharing) return
+        sharing = true
         val plugin: SharePlugin? =
             DeskLinkApplication.getInstance().getDevicePlugin(
                 deviceId = device.deviceId,
@@ -98,8 +103,18 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
                 device = device,
                 url = intent.getStringExtra(Intent.EXTRA_TEXT)
             )
-        } else {
-            plugin?.share(intent)
+        } else if (plugin != null) {
+            // Off the main thread: each shared item is opened, queried and held (a cloud item is downloaded by its
+            // provider), up to a hundred of them, which was an ANR. The activity stays until the reads are done: its
+            // read grant on the items ends with it.
+            org.desklink.mobile.helpers.ThreadHelper.execute {
+                try {
+                    plugin.share(intent)
+                } finally {
+                    runOnUiThread { finish() }
+                }
+            }
+            return
         }
         finish()
     }
