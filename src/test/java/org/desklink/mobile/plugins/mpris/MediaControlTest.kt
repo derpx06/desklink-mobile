@@ -31,6 +31,16 @@ class MediaControlTest {
         assertNull(MediaControl.pickPlayer("Spotify", emptyList(), playing = null))
     }
 
+    /** F9: an idle player sorted first ("Chrome") must not hide the paused one the desk reports. */
+    @Test
+    fun withNothingPlayingTheDesksReportedPlayerComesBeforeTheFirst() {
+        val list = listOf("Chrome", "Chromium")
+        assertEquals("Chromium", MediaControl.pickPlayer(null, list, playing = null, reported = "Chromium"))
+        assertEquals("Chrome", MediaControl.pickPlayer("Chrome", list, playing = null, reported = "Chromium"))
+        assertEquals("Chrome", MediaControl.pickPlayer(null, list, playing = "Chrome", reported = "Chromium"))
+        assertEquals("Chrome", MediaControl.pickPlayer(null, list, playing = null, reported = "gone"))
+    }
+
     @Test
     fun thePositionAdvancesOnlyWhilePlayingAndStaysInTheTrack() {
         assertEquals(12_000L, MediaControl.position(10_000, lastPositionAt = 1_000, playing = true, lengthMs = 200_000, now = 3_000))

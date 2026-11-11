@@ -48,4 +48,13 @@ class ViewResumeTest {
         assertTrue(Regex("""finally\s*\{[^}]*resumeScreen\.set\(false\)""").containsMatchIn(tail))
         assertEquals(1, Regex("""synchronized\(lock\)""").findAll(stop).count())
     }
+
+    /** F7: the desk sends nothing back for the phone's own Release, so ending the view here must end it in the UI. */
+    @Test
+    fun endingTheViewHereClearsTheLiveViewAndRefreshesItsSurfaces() {
+        val stop = source.substringAfter("fun stopRemoteSession()").substringBefore("override fun onControlPacket")
+        val now = stop.substringBefore("remoteActionExecutor.execute")
+        assertTrue("on the caller's thread", now.contains("getPlugin(ScreenControlPlugin::class.java)?.onRemoteSessionEnded()"))
+        assertTrue("Home and the live notification redraw", now.contains("publish("))
+    }
 }

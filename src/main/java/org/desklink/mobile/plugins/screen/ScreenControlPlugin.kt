@@ -116,6 +116,9 @@ class ScreenControlPlugin : Plugin() {
     /** Attaches a native WebRTC renderer to the current remote video track. */
     fun attachRemoteVideoSink(sink: VideoSink) {
         synchronized(remoteVideoLock) {
+            // Attached twice (it was, on every open), a second forwarder replaced the first in the map while the
+            // first stayed on the track: each frame drawn twice, and the first left feeding a released renderer.
+            if (remoteVideoSinks.containsKey(sink)) return
             val forwardingSink = SizeTrackingVideoSink(sink, ::noteRemoteFrame)
             remoteVideoSinks[sink] = forwardingSink
             Log.i(TAG, "Renderer attached; desktop track ${if (remoteVideoTrack == null) "not yet installed" else "present"}")

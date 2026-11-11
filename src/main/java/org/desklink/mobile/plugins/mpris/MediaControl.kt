@@ -12,12 +12,17 @@ object MediaControl {
 
     /**
      * Which of the desk's players a tap goes to: the one the person picked while it still exists,
-     * else the playing one, else the first. Null with no list yet: the request then names no
+     * else the playing one, else the one the desk last reported (its active player, the only one
+     * it sends the state of), else the first. Null with no list yet: the request then names no
      * player and the desk picks its playing (or first) one.
+     *
+     * Not the first before the reported one: with a second, idle player listed ahead of a paused
+     * browser, the card showed that player's bare name twice, 0:00 / -:--, and Play (F9).
      */
-    fun pickPlayer(remembered: String?, playerList: List<String>, playing: String?): String? = when {
+    fun pickPlayer(remembered: String?, playerList: List<String>, playing: String?, reported: String? = null): String? = when {
         remembered != null && remembered in playerList -> remembered
         playing != null && playing in playerList -> playing
+        reported != null && reported in playerList -> reported
         else -> playerList.firstOrNull()
     }
 

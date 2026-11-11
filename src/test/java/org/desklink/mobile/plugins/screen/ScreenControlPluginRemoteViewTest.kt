@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.desklink.mobile.Device
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -77,6 +78,26 @@ class ScreenControlPluginRemoteViewTest {
 
         assertEquals(0, plugin.remoteScreenWidth)
         assertFalse(plugin.remoteControlEnabled)
+    }
+
+    /** The view attached its renderer twice per open: the first forwarder stayed on the track for good. */
+    @Test
+    fun `a renderer attached twice is on the track once and leaves it on detach`() {
+        val track = mockk<org.webrtc.VideoTrack>(relaxed = true)
+        every { track.id() } returns "desk"
+        val renderer = mockk<org.webrtc.VideoSink>(relaxed = true)
+        plugin.onRemoteVideoTrack(track)
+
+        plugin.attachRemoteVideoSink(renderer)
+        plugin.attachRemoteVideoSink(renderer)
+        verify(exactly = 1) { track.addSink(any()) }
+
+        plugin.detachRemoteVideoSink(renderer)
+        val added = mutableListOf<org.webrtc.VideoSink>()
+        val removed = mutableListOf<org.webrtc.VideoSink>()
+        verify { track.addSink(capture(added)) }
+        verify { track.removeSink(capture(removed)) }
+        assertEquals("nothing left feeding a released renderer", added.toSet(), removed.toSet())
     }
 
     @Test

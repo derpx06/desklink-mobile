@@ -774,6 +774,11 @@ class WebRtcSessionCoordinator(
 
     fun stopRemoteSession() {
         resumeScreen.set(false)
+        // The desk answers a Release with nothing, so the view ends here, at once and on the caller's thread (a
+        // view opened right after must not be ended by this). Left live, Home and the live notification kept
+        // "You're viewing the desk screen" after End, Back or the background grace had ended it on the desk (F7).
+        device.getPlugin(ScreenControlPlugin::class.java)?.onRemoteSessionEnded()
+        publish("RemoteSessionStopped", null)
         remoteActionExecutor.execute {
             synchronized(lock) {
               try {

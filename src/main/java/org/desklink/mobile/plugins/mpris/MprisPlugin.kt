@@ -212,7 +212,10 @@ class MprisPlugin : Plugin() {
         private set
 
     /** The player every control goes to; see [MediaControl.pickPlayer]. */
-    fun currentPlayerName(): String? = MediaControl.pickPlayer(selectedPlayer, playerList, playingPlayer?.playerName)
+    fun currentPlayerName(): String? = MediaControl.pickPlayer(selectedPlayer, playerList, playingPlayer?.playerName, reportedPlayer)
+
+    /** The player the desk last sent the state of: its active one. */
+    @Volatile private var reportedPlayer: String? = null
 
     fun currentPlayer(): MprisPlayer? = currentPlayerName()?.let { players[it] }
 
@@ -368,6 +371,7 @@ class MprisPlugin : Plugin() {
         if (np.has("player")) {
             val playerStatus = players[np.getString("player")]
             if (playerStatus != null) {
+                reportedPlayer = playerStatus.playerName
                 val wasPlaying = playerStatus.isPlaying
                 val previousTitle = playerStatus.title
                 //Note: title, artist and album will not be available for all desktop clients
