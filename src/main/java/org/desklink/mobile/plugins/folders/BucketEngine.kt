@@ -97,12 +97,6 @@ object BucketEngine {
     const val OFFER_LAPSES_MS = 10 * 60_000L
     /** A change is synced once the folder has been quiet this long. */
     const val SETTLE_MS = 2_000L
-    /**
-     * The backstop rescans (the tree's ContentObserver marks a change dirty at once, so these only catch a provider that does not
-     * report): every ten minutes while the screen is on, fifteen while it is off.
-     */
-    const val RESCAN_SCREEN_ON_MS = 10 * 60_000L
-    const val RESCAN_SCREEN_OFF_MS = 15 * 60_000L
     /** Packets a minute from one desk (the desk's own bound). */
     const val MAX_PACKETS_PER_MINUTE = 1200
     /** A listing that failed, or a scan that lost a fifth of the files: looked at again after this long. */
@@ -130,6 +124,8 @@ object BucketEngine {
         var phase = Phase.WAITING
         var dirtyAt: Long? = null
         var scannedAt: Long? = null
+        /** Scans in a row that found nothing new (see [BucketRescan]). */
+        var quietScans = 0
         var onDesk = true
         var confirmedEmpty = false
         /** The files a scan found missing in one go, until a second scan names the same ones. */
@@ -194,6 +190,8 @@ object BucketEngine {
     /** P4: files this phone asked for: (device, path) → entry. */
     private val wanted = HashMap<Pair<String, String>, Entry>()
     private val cancelAdding = AtomicBoolean(false)
+    /** The screen at the last tick: coming on starts the quick rescans again. */
+    private var screenWasOn = true
 
     private val _views = MutableStateFlow<Map<String, BucketView>>(emptyMap())
     val views: StateFlow<Map<String, BucketView>> = _views
@@ -1105,12 +1103,19 @@ object BucketEngine {
         offers.entries.removeAll { now - it.value > OFFER_LAPSES_MS }
         asked.entries.removeAll { (_, v) -> (now - v.second > OFFER_LAPSES_MS).also { if (it) release(v.first) } }
         val screenOn = app.getSystemService(PowerManager::class.java)?.isInteractive != false
+        if (screenOn && !screenWasOn) buckets.values.forEach { it.quietScans = 0 }
+        screenWasOn = screenOn
         var changed = offers.isNotEmpty() || asked.isNotEmpty()
         for (live in buckets.values) {
             if (live.deviceId !in ready || !live.onDesk) continue
-            val every = if (screenOn) RESCAN_SCREEN_ON_MS else RESCAN_SCREEN_OFF_MS
+            val every = BucketRescan.every(screenOn, live.quietScans)
             val due = live.dirtyAt?.let { now - it >= SETTLE_MS } == true || live.scannedAt?.let { now - it >= every } != false
-            if (due) { rescan(live); changed = true }
+            // A scan that found nothing and left what is shown as it was publishes nothing (the quick rescans stay cheap).
+            if (due) {
+                val shown = live.phase to live.notSynced
+                rescan(live)
+                if (live.quietScans == 0 || shown != (live.phase to live.notSynced)) changed = true
+            }
             // A request nothing has been heard of for two minutes is lost: freed and asked for again (or given up).
             // (Never while the person has paused the sync, and never for a receive that is live: the transfer layer has no deadline.)
             val quiet = if (live.userPaused) emptyList() else FetchTracker.silent(live.outstanding - live.receiving - live.tracks.keys, live.requestedAt, live.tracks.mapValues { it.value.at }, now)
@@ -1196,6 +1201,7 @@ object BucketEngine {
         live.shrinkSeen = null
         val before = live.manifest.filterValues { !it.deleted }.keys
         val changed = FolderSync.applyScan(Side.PHONE, live.manifest, stats, { path -> found[path]?.let(tree::sha256) }, System.currentTimeMillis(), keep)
+        live.quietScans = if (changed || settling.isNotEmpty()) 0 else live.quietScans + 1
         live.manifest.filterValues { !it.deleted }.keys.filter { it !in before && it !in live.from }.forEach { live.from[it] = Side.PHONE }
         live.from.keys.retainAll(live.manifest.keys)
         live.conflicts.retainAll(found.keys)

@@ -11,6 +11,22 @@ object BucketHandshake {
     fun resendOffer(asked: Boolean, bucketExists: Boolean): Boolean = asked && !bucketExists
 }
 
+/**
+ * How long after its last scan a Bucket is scanned again. The tree's ContentObserver hears only changes made through SAF:
+ * ExternalStorageProvider never reports a file another app writes into the folder (a file manager, a download), and with no storage
+ * permission (scoped storage) the app cannot watch the path itself. So while the screen is on (and the desk is feature-ready: only
+ * then is a Bucket scanned) it looks again after 5 s, doubling for each scan in a row that found nothing new, up to 30 s; a change,
+ * or the screen coming on, starts it at 5 s again. Screen off: every 15 minutes.
+ */
+object BucketRescan {
+    const val QUICK_MS = 5_000L
+    const val QUICK_MAX_MS = 30_000L
+    const val SCREEN_OFF_MS = 15 * 60_000L
+
+    fun every(screenOn: Boolean, quietScans: Int): Long =
+        if (!screenOn) SCREEN_OFF_MS else minOf(QUICK_MS shl quietScans.coerceIn(0, 3), QUICK_MAX_MS)
+}
+
 /** "Fix" on a Bucket that is held because its folder is gone or its grant was revoked. */
 object BucketFix {
     fun offered(phase: Phase): Boolean = phase == Phase.HELD_EMPTY || phase == Phase.NO_ACCESS

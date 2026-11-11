@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package org.desklink.mobile.plugins.folders
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -44,5 +45,22 @@ class BucketFixFolderTest {
         assertTrue(BucketFix.sameTree(old, tree("primary:Documents/DeskLink Bucket")))
         assertFalse(BucketFix.sameTree(old, tree("primary:Download")))
         assertTrue("no record of the old one: nothing to compare", BucketFix.sameTree(null, tree("primary:Download")))
+    }
+}
+
+class BucketRescanTest {
+    @Test
+    fun aFileAnotherAppWritesIsSeenWithinSecondsWhileTheScreenIsOnAndTheRescansBackOffWhenNothingChanges() {
+        val on = (0..6).map { BucketRescan.every(screenOn = true, quietScans = it) }
+        assertEquals(listOf(5_000L, 10_000L, 20_000L, 30_000L, 30_000L, 30_000L, 30_000L), on)
+        // Never a tight loop, never past half a minute while the person is using the phone.
+        assertTrue(on.all { it >= BucketRescan.QUICK_MS && it <= BucketRescan.QUICK_MAX_MS })
+        assertEquals(30_000L, BucketRescan.every(screenOn = true, quietScans = Int.MAX_VALUE))
+    }
+
+    @Test
+    fun withTheScreenOffOnlyTheBackstopRuns() {
+        assertEquals(15 * 60_000L, BucketRescan.every(screenOn = false, quietScans = 0))
+        assertEquals(15 * 60_000L, BucketRescan.every(screenOn = false, quietScans = 9))
     }
 }
