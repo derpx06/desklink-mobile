@@ -324,4 +324,16 @@ class TerminalScreenTest {
                 "20494e53455254202d2d1b5b313b36481b5b6d1b3e1b5b3f316c1b5b3f323030346c"
         const val SNAPSHOT_WIDE = "1b631b5b3f3235681b5b6d1b5b481b5b4ae697a5e69cace8aa9e206f6b0d0a1b3e1b5b3f316c1b5b3f323030346c"
     }
+
+    /** `ESC[9999S` inside left/right margins was 9999 block copies of the region (24 s here); more than the rows scrolls no further. */
+    @Test
+    fun aHugeScrollUpIsClampedToTheScreen() {
+        val s = screen(rows = 200, cols = 500)
+        s.feed("\u001b[?69h\u001b[2;499s\u001b[2;199r\u001b[5;3Hkept?")
+        val started = System.nanoTime()
+        repeat(3) { s.feed("\u001b[9999S") }
+        val ms = (System.nanoTime() - started) / 1_000_000
+        assertTrue("took $ms ms", ms < 2000)
+        assertFalse(s.text().contains("kept?"))
+    }
 }

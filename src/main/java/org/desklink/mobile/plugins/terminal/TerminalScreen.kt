@@ -205,6 +205,16 @@ class TerminalScreen(
                                 if (!quiet) reply(("\u001b[?2026;" + (if (syncing) 1 else 2) + "\$y").toByteArray())
                             }
                             c == 'u'.code && (params.startsWith("=") || params.startsWith("<")) -> Unit
+                            // Scroll up (SU): Termux runs it as that many single-line scrolls (up to 9999), each a
+                            // copy of the whole scroll region - `ESC[9999S` in a large window held the lock for
+                            // seconds. More than the rows on screen scrolls no further.
+                            c == 'S'.code && params.isNotEmpty() && params.all { it in '0'..'9' } -> {
+                                content()
+                                val count = params.toIntOrNull()?.coerceAtMost(emulator.mRows) ?: emulator.mRows
+                                put(ESC); put('['.code.toByte())
+                                for (ch in count.toString()) put(ch.code.toByte())
+                                put(b)
+                            }
                             // Colon-separated SGR (`38:2::r:g:b`, `4:3`), which Termux prints as text.
                             c == 'm'.code && ':' in params -> {
                                 content()
