@@ -41,6 +41,8 @@ import java.util.List;
  */
 public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
     private boolean isRunning;
+    /** Set (under [lock]) once the job has stopped taking files: an append after that would never be sent. */
+    private boolean closed;
     private final Handler handler;
     private String currentFileName;
     private int currentFileNum;
@@ -87,6 +89,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
 
         synchronized (lock) {
             done = networkPacketList.isEmpty();
+            closed = done;
         }
 
         try {
@@ -120,6 +123,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
 
                 synchronized (lock) {
                     done = networkPacketList.isEmpty();
+                    closed = done;
                 }
             }
 
@@ -169,6 +173,9 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
             reportError(e);
         } finally {
             isRunning = false;
+            synchronized (lock) {
+                closed = true;
+            }
 
             for (NetworkPacket networkPacket : networkPacketList) {
                 if (isCancelled()) {
@@ -213,8 +220,10 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
         uploadNotification.show();
     }
 
-    void addNetworkPacket(@NonNull NetworkPacket networkPacket) {
+    /** False when the job has already stopped taking files (it is finishing): the caller starts a new job. */
+    boolean addNetworkPacket(@NonNull NetworkPacket networkPacket) {
         synchronized (lock) {
+            if (closed) return false;
             networkPacketList.add(networkPacket);
 
             totalNumFiles++;
@@ -226,6 +235,7 @@ public class CompositeUploadFileJob extends BackgroundJob<Device, Void> {
             uploadNotification.setTitle(getDevice().getContext().getResources()
                     .getQuantityString(R.plurals.outgoing_file_title, totalNumFiles, totalNumFiles, getDevice().getName()));
         }
+        return true;
     }
 
     @Override

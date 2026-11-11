@@ -327,7 +327,11 @@ public class SharePlugin extends Plugin {
 
             if (np != null) {
                 TransferHistory.rememberSource(np, uri);
-                job.addNetworkPacket(np);
+                // The running job may be finishing (its list ran empty, its result not yet posted): it would drop the file.
+                if (!job.addNetworkPacket(np)) {
+                    job = new CompositeUploadFileJob(getDevice(), this.receiveFileJobCallback);
+                    job.addNetworkPacket(np);
+                }
             } else {
                 ShareQueue.remove(context, device.getDeviceId(), uri.toString());
                 // Remembered per file, announced once below (a queue left from before a reboot would otherwise post one each).

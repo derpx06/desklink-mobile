@@ -11,6 +11,7 @@ import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.async.BackgroundJob
 import org.desklink.mobile.async.BackgroundJobHandler
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -75,6 +76,13 @@ class CompositeUploadFileJobTest {
         val (_, sent) = run(null)
         assertEquals(3, sent)
         assertTrue(ShareQueue.pending(app, "desk").isEmpty())
+    }
+
+    /** A file appended after the job ran its list empty was released and never sent: it must go to a new job. */
+    @Test
+    fun aJobThatHasFinishedTakesNoMoreFiles() {
+        val (job, _) = run(null)
+        assertFalse(job.addNetworkPacket(NetworkPacket("desklink.share.request")))
     }
 
     @Test
