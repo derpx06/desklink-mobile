@@ -197,7 +197,7 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     //They received my UDP broadcast and are connecting to me. The first thing they send should be their identity packet.
     @WorkerThread
-    private void tcpPacketReceived(Socket socket) throws IOException, CertificateException {
+    private void tcpPacketReceived(Socket socket, java.util.concurrent.Future<?> deadline) throws IOException, CertificateException {
 
         InetAddress address = socket.getInetAddress();
 
@@ -236,6 +236,7 @@ public class LanLinkProvider extends BaseLinkProvider {
         // W18: a bulk-transfer lane from a paired computer takes this connection over; it never becomes a link and never reaches the
         // dispatcher. It has its own limits (paired only, a one-time token, two per peer, handshake caps, a 3 s clock, a first line of 4 KiB).
         if (org.desklink.mobile.webrtc.FileLaneProtocol.INSTANCE.parseFirst(message) != null) {
+            deadline.cancel(false); // the lane has its own 3 s clock, then carries a transfer
             org.desklink.mobile.webrtc.RealFileLanes.Companion.accept(context, socket, message);
             return;
         }
@@ -508,7 +509,7 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     /**
      * Called when a new 'identity' packet is received. Those are passed here by
-     * {@link #tcpPacketReceived(Socket)} and {@link #udpPacketReceived(DatagramPacket)}.
+     * {@link #tcpPacketReceived(Socket, java.util.concurrent.Future)} and {@link #udpPacketReceived(DatagramPacket)}.
      * Should be called on a new thread since it blocks until the handshake is completed.
      *
      * @param identityPacket    identity of a remote device
@@ -718,6 +719,20 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     /** Incoming connections being looked at at once (handshake, or a fast lane that took one over). */
     static final int MAX_INCOMING_HANDSHAKES = 32;
+    /** From accept to a link (or a lane taking the connection over). */
+    static final long HANDSHAKE_DEADLINE_MS = 15_000;
+    private static final java.util.concurrent.ScheduledThreadPoolExecutor HANDSHAKE_WATCHDOG = newWatchdog();
+
+    private static java.util.concurrent.ScheduledThreadPoolExecutor newWatchdog() {
+        java.util.concurrent.ScheduledThreadPoolExecutor watchdog = new java.util.concurrent.ScheduledThreadPoolExecutor(1, r -> {
+            Thread thread = new Thread(r, "DeskLink-handshake-watchdog");
+            thread.setDaemon(true);
+            return thread;
+        });
+        watchdog.setRemoveOnCancelPolicy(true);
+        return watchdog;
+    }
+
     private final java.util.concurrent.Semaphore incomingHandshakes = new java.util.concurrent.Semaphore(MAX_INCOMING_HANDSHAKES);
 
     private void setupTcpListener() {
@@ -741,12 +756,16 @@ public class LanLinkProvider extends BaseLinkProvider {
                     try {
                         configureSocket(socket);
                         ThreadHelper.execute(() -> {
+                            // 5 s per read is no bound on a peer that drips a byte every 4: the whole handshake gets one.
+                            java.util.concurrent.Future<?> deadline =
+                                    HANDSHAKE_WATCHDOG.schedule(() -> closeQuietly(socket), HANDSHAKE_DEADLINE_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
                             try {
-                                tcpPacketReceived(socket);
+                                tcpPacketReceived(socket, deadline);
                             } catch (Exception e) { // anything a stranger's first packet provokes closes its socket
                                 try { socket.close(); } catch (IOException ignored) { }
                                 Log.e("LanLinkProvider", "Exception receiving incoming TCP connection", e);
                             } finally {
+                                deadline.cancel(false);
                                 incomingHandshakes.release();
                             }
                         });
@@ -756,6 +775,7 @@ public class LanLinkProvider extends BaseLinkProvider {
                         throw e;
                     }
                 } catch (Exception e) {
+                    if (tcpServer.isClosed()) break;
                     Log.e("LanLinkProvider", "TcpReceive exception", e);
                     // Out of file descriptors and the like: accept() fails at once every time; do not spin.
                     try { Thread.sleep(200); } catch (InterruptedException ignored) { }
