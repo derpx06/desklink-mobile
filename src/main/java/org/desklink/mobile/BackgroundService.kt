@@ -576,8 +576,12 @@ class BackgroundService : Service() {
             // is the person's own start and clears this.
             Log.w(LOG_TAG, "Safe mode after repeated crashes: the service stays down")
             runCatching { org.desklink.mobile.helpers.CrashReporter.offerPendingReport(this) }
-            startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
-            stopForeground(STOP_FOREGROUND_REMOVE)
+            // A sticky restart after the crashes can be a background start, where startForeground is refused
+            // (ForegroundServiceStartNotAllowedException): that must not be the next crash.
+            runCatching {
+                startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification())
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            }.onFailure { Log.w(LOG_TAG, "Couldn't startForeground in safe mode", it) }
             stopSelf()
             return START_NOT_STICKY
         }

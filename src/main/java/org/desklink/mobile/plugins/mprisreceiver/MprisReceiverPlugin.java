@@ -34,7 +34,6 @@ import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -121,6 +120,20 @@ public class MprisReceiverPlugin extends Plugin {
             manager.removeOnActiveSessionsChangedListener(mediaSessionChangeListener);
             mediaSessionChangeListener = null;
         }
+        // A callback left registered keeps this dead plugin alive and keeps sending the desk media after it is off,
+        // one more set per reconnect.
+        dropPlayers();
+    }
+
+    /** Unregisters every player's callback and forgets the players. */
+    private void dropPlayers() {
+        if (players == null || playerCbs == null) return;
+        for (MprisReceiverPlayer p : players.values()) {
+            MprisReceiverCallback cb = playerCbs.get(p.getName());
+            if (cb != null) p.getController().unregisterCallback(cb);
+        }
+        playerCbs.clear();
+        players.clear();
     }
 
     private void createPlayers(List<MediaController> sessions) {
@@ -243,13 +256,7 @@ public class MprisReceiverPlugin extends Plugin {
                 return;
             }
 
-            // Make a copy to avoid ConcurrentModificationException
-            ArrayList<MprisReceiverPlayer> playersCopy = new ArrayList<>(players.values());
-            for (MprisReceiverPlayer p : playersCopy) {
-                p.getController().unregisterCallback(Objects.requireNonNull(playerCbs.get(p.getName())));
-            }
-            playerCbs.clear();
-            players.clear();
+            dropPlayers();
 
             createPlayers(controllers);
             sendFullState();
@@ -263,6 +270,10 @@ public class MprisReceiverPlugin extends Plugin {
 
         MprisReceiverPlayer player = new MprisReceiverPlayer(controller, AppsHelper.appNameLookup(context, controller.getPackageName()));
         MprisReceiverCallback cb = new MprisReceiverCallback(this, player);
+        // Two sessions of one app share a name: the one replaced must not stay registered.
+        MprisReceiverPlayer replaced = players.get(player.getName());
+        MprisReceiverCallback replacedCb = playerCbs.get(player.getName());
+        if (replaced != null && replacedCb != null) replaced.getController().unregisterCallback(replacedCb);
         controller.registerCallback(cb, new Handler(Looper.getMainLooper()));
         playerCbs.put(player.getName(), cb);
         players.put(player.getName(), player);

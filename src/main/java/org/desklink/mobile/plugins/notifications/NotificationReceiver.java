@@ -68,7 +68,9 @@ public class NotificationReceiver extends NotificationListenerService {
     }
 
     public void addListener(NotificationListener listener) {
-        listeners.add(listener);
+        // Once: MprisMediaSession (a singleton) adds itself on every MPRIS plugin start and never left, so each
+        // reconnect added another copy that ran every notification callback again on the main thread.
+        if (!listeners.contains(listener)) listeners.add(listener);
     }
 
     public void removeListener(NotificationListener listener) {

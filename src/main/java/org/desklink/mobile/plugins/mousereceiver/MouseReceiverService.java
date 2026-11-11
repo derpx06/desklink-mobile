@@ -342,7 +342,8 @@ public class MouseReceiverService extends AccessibilityService {
         float dy = pendingScrollY * SCROLL_PIXELS_PER_UNIT;
         pendingScrollX = 0;
         pendingScrollY = 0;
-        if (dx == 0 && dy == 0) return;
+        // A wheel event between onCreate (instance) and onServiceConnected (windowManager) is dropped, not an NPE.
+        if ((dx == 0 && dy == 0) || windowManager == null) return;
         DisplayMetrics metrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getRealMetrics(metrics);
         float startX = clamp(getX(), 1, metrics.widthPixels - 2);

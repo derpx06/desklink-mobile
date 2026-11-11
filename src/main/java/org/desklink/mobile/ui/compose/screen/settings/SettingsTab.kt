@@ -963,11 +963,14 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
     val context = LocalContext.current
     val failed = stringResource(R.string.export_logs_failed)
     val exportLogs = rememberLauncherForActivityResult(CreateFileResultContract()) { uri: Uri? ->
-        val output = uri?.let { context.contentResolver.openOutputStream(it) } ?: return@rememberLauncherForActivityResult
+        uri ?: return@rememberLauncherForActivityResult
         CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
+            // Opened here, inside the catch: a provider that refuses the file was a crash on the main thread, and a
+            // failed exec left the stream open.
             val ok = runCatching {
-                val process = Runtime.getRuntime().exec(org.desklink.mobile.helpers.LogExport.command())
+                val output = context.contentResolver.openOutputStream(uri) ?: error("no stream")
                 output.use {
+                    val process = Runtime.getRuntime().exec(org.desklink.mobile.helpers.LogExport.command())
                     org.desklink.mobile.helpers.LogExport.export(
                         "DeskLink ${BuildConfig.VERSION_NAME}\nAndroid ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})",
                         InputStreamReader(process.inputStream, Charsets.UTF_8).buffered().lineSequence(), it,

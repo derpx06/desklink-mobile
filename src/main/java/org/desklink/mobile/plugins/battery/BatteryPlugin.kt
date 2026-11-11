@@ -110,7 +110,8 @@ class BatteryPlugin : Plugin() {
             val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
             val plugged = batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
 
-            val currentCharge = level * 100 / scale
+            // Some builds report a scale of 0: a percentage then, not a division by zero on the main thread.
+            val currentCharge = if (scale > 0) level * 100 / scale else level
             val isCharging = 0 != plugged
             val chargeTime = chargeTimeRemaining(isCharging, rawChargeTimeRemaining(context))
 
