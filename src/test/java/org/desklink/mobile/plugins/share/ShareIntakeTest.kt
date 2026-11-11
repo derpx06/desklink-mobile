@@ -41,6 +41,14 @@ class ShareIntakeTest {
     }
 
     @Test
+    fun aStreamOfTheWrongTypeIsNothingNotACrash() {
+        val single = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, "content://other.app/1")
+        assertTrue(ShareIntake.forBucket(app, single).isEmpty)
+        val multi = Intent(Intent.ACTION_SEND_MULTIPLE).putStringArrayListExtra(Intent.EXTRA_STREAM, arrayListOf("content://other.app/1"))
+        assertTrue(ShareIntake.forBucket(app, multi).isEmpty)
+    }
+
+    @Test
     fun aNotesShareNeedsSomethingInIt() {
         assertNull(ShareIntake.forNotes(Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, "  ")))
         assertNull(ShareIntake.forNotes(Intent("other").putExtra(Intent.EXTRA_TEXT, "hi")))

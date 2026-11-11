@@ -11,6 +11,7 @@ import org.desklink.mobile.ui.compose.components.DialogAction
 import org.desklink.mobile.ui.surfaces.DeskSurfaces
 import org.desklink.mobile.ui.compose.components.DeskDialog
 import org.desklink.mobile.extensions.isReadable
+import org.desklink.mobile.extensions.getParcelableCompat
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -1521,8 +1522,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         @JvmStatic
         fun isClipboardTileLongPress(intent: Intent): Boolean {
             if (intent.action != "android.service.quicksettings.action.QS_TILE_PREFERENCES") return false
-            @Suppress("DEPRECATION")
-            val tile = intent.getParcelableExtra<android.content.ComponentName>(Intent.EXTRA_COMPONENT_NAME)
+            // Typed: any app can send this action, with anything under the key.
+            val tile = runCatching { intent.getParcelableCompat<android.content.ComponentName>(Intent.EXTRA_COMPONENT_NAME) }.getOrNull()
             return tile?.className == org.desklink.mobile.plugins.clipboard.ClipboardTileService::class.java.name
         }
         /** Launcher shortcuts (res/xml/shortcuts.xml). */
