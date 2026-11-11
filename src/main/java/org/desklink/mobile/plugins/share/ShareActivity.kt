@@ -107,11 +107,18 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
             // Off the main thread: each shared item is opened, queried and held (a cloud item is downloaded by its
             // provider), up to a hundred of them, which was an ANR. The activity stays until the reads are done: its
             // read grant on the items ends with it.
+            sendingNow = true
+            live = java.lang.ref.WeakReference(this)
+            val main = android.os.Handler(android.os.Looper.getMainLooper())
             org.desklink.mobile.helpers.ThreadHelper.execute {
                 try {
                     plugin.share(intent)
                 } finally {
-                    runOnUiThread { finish() }
+                    // The live instance: a rotation meanwhile replaced the one that was tapped.
+                    main.post {
+                        sendingNow = false
+                        live?.get()?.finish()
+                    }
                 }
             }
             return
@@ -147,6 +154,12 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!intent.isReadable()) return finish()
+        // Recreated (a rotation) while the share is read: not again; and if it was done meanwhile, nothing is left to do.
+        if (savedInstanceState?.getBoolean(KEY_SHARING) == true) {
+            if (!sendingNow) return finish()
+            sharing = true
+            live = java.lang.ref.WeakReference(this)
+        }
 
         mSharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
 
@@ -233,7 +246,17 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
         super.onStop()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_SHARING, sharing)
+    }
+
     companion object {
+        private const val KEY_SHARING = "sharing"
+        /** A share is being read (main thread only). */
+        private var sendingNow = false
+        /** The instance showing now, which finishes when the reads are done. */
+        private var live: java.lang.ref.WeakReference<ShareActivity>? = null
         private const val KEY_UNREACHABLE_URL_LIST = "key_unreachable_url_list"
     }
 }
