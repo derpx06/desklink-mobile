@@ -156,6 +156,9 @@ public class LanLink extends BaseLink {
                     Log.i("LanLink", "Socket closed and there's no new socket, disconnecting device");
                     getLinkProvider().onConnectionLost(LanLink.this);
                 }
+                // Nothing reads this socket any more. A session kept after a bootstrap loss (WebRTC still up) never
+                // closed it, so every idle timeout left an SSLSocket open until GC.
+                try { newSocket.close(); } catch (IOException ignored) {}
             }
         });
 

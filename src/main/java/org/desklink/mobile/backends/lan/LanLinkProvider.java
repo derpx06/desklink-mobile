@@ -620,6 +620,7 @@ public class LanLinkProvider extends BaseLinkProvider {
         if (link != null) {
             if (!link.getDeviceInfo().certificate.equals(deviceInfo.certificate)) {
                 Log.e("LanLinkProvider", "LanLink was asked to replace a socket but the certificate doesn't match, aborting");
+                closeQuietly(socket);
                 return;
             }
             // Update existing link
@@ -715,6 +716,10 @@ public class LanLinkProvider extends BaseLinkProvider {
         });
     }
 
+    /** Incoming connections being looked at at once (handshake, or a fast lane that took one over). */
+    static final int MAX_INCOMING_HANDSHAKES = 32;
+    private final java.util.concurrent.Semaphore incomingHandshakes = new java.util.concurrent.Semaphore(MAX_INCOMING_HANDSHAKES);
+
     private void setupTcpListener() {
         try {
             tcpServer = openServerSocketOnFreePort(MIN_PORT);
@@ -727,17 +732,33 @@ public class LanLinkProvider extends BaseLinkProvider {
             while (listening) {
                 try {
                     Socket socket = tcpServer.accept();
-                    configureSocket(socket);
-                    ThreadHelper.execute(() -> {
-                        try {
-                            tcpPacketReceived(socket);
-                        } catch (Exception e) { // anything a stranger's first packet provokes closes its socket
-                            try { socket.close(); } catch (IOException ignored) { }
-                            Log.e("LanLinkProvider", "Exception receiving incoming TCP connection", e);
-                        }
-                    });
+                    // Anyone on the LAN can open this port: at capacity a connection is refused, not given a thread
+                    // (each one could drip its identity at 5 s a byte, and a thread per connection ran out of memory).
+                    if (!incomingHandshakes.tryAcquire()) {
+                        closeQuietly(socket);
+                        continue;
+                    }
+                    try {
+                        configureSocket(socket);
+                        ThreadHelper.execute(() -> {
+                            try {
+                                tcpPacketReceived(socket);
+                            } catch (Exception e) { // anything a stranger's first packet provokes closes its socket
+                                try { socket.close(); } catch (IOException ignored) { }
+                                Log.e("LanLinkProvider", "Exception receiving incoming TCP connection", e);
+                            } finally {
+                                incomingHandshakes.release();
+                            }
+                        });
+                    } catch (Throwable e) {
+                        incomingHandshakes.release();
+                        closeQuietly(socket);
+                        throw e;
+                    }
                 } catch (Exception e) {
                     Log.e("LanLinkProvider", "TcpReceive exception", e);
+                    // Out of file descriptors and the like: accept() fails at once every time; do not spin.
+                    try { Thread.sleep(200); } catch (InterruptedException ignored) { }
                 }
             }
             Log.w("TcpListener", "Stopping TCP listener");
