@@ -88,6 +88,8 @@ public class FindMyPhonePlugin extends Plugin {
     public void onDestroy() {
         stopPlaying();
         stopFlashing();
+        // An ongoing "Found it" must not outlive the ring it stops.
+        if (notificationManager != null) hideNotification();
         audioManager = null;
         flashlightManager = null;
     }

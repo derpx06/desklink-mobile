@@ -32,4 +32,17 @@ class FindMyPhonePluginTest {
         plugin.startPlaying() // a second ring tries again
         plugin.onDestroy()
     }
+
+    @Test
+    fun aRingEndedByTheLinkGoingTakesItsNotificationWithIt() {
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        val plugin = FindMyPhonePlugin()
+        plugin.setContext(app, mockk<Device>(relaxed = true) { every { deviceId } returns "d" })
+        assertTrue(plugin.onCreate())
+        plugin.onPacketReceived(org.desklink.mobile.NetworkPacket("desklink.findmyphone.request"))
+        val notifications = org.robolectric.Shadows.shadowOf(app.getSystemService(android.app.NotificationManager::class.java))
+        assertTrue("the ring posted its Found it notification", notifications.allNotifications.isNotEmpty())
+        plugin.onDestroy()
+        assertTrue("no ongoing Found it left with nothing ringing", notifications.allNotifications.isEmpty())
+    }
 }
