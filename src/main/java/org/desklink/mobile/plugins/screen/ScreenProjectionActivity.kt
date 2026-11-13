@@ -12,6 +12,8 @@ class ScreenProjectionActivity : Activity() {
         super.onCreate(savedInstanceState)
         getSystemService(android.app.NotificationManager::class.java)
             ?.cancel(ScreenControlPlugin.PROMPT_NOTIFICATION_ID)
+        // Recreated (a rotation under the system prompt): the first prompt is still up and its answer comes here.
+        if (savedInstanceState != null) return
         val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         // The whole display, never "share one app": a remote view of a single
         // app cannot show the launcher, the shade or the app switcher, and
