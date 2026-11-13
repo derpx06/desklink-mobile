@@ -160,7 +160,7 @@ class Device : PacketReceiver {
         return true
     }
     // Feature packets waiting for the WebRTC transport; see sendPacketBlocking.
-    private val pendingFeaturePackets = BoundedPendingQueue<QueuedFeature>(256)
+    private val pendingFeaturePackets = BoundedPendingQueue<QueuedFeature>(PENDING_FEATURE_LIMIT)
 
     private class QueuedFeature(
         val packet: NetworkPacket,
@@ -1686,6 +1686,9 @@ internal fun expiredUserActions(callbacks: Collection<Device.SendPacketStatusCal
 
 /** Queued features older than this are failed, not sent. Matches the desktop. */
 internal const val PENDING_FEATURE_MAX_AGE_MS = 30_000L
+
+/** Feature packets held for the WebRTC transport at most (the desk holds 64). */
+internal const val PENDING_FEATURE_LIMIT = 256
 
 /** At most one "not sent" notice this often. */
 internal const val NOT_SENT_TOAST_INTERVAL_MS = 5_000L
