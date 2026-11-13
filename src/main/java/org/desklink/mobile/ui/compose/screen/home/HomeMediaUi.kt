@@ -432,19 +432,36 @@ private fun SeekBar(media: HomeMedia, palette: MediaPalette, onSeek: (Long) -> U
     val position = MediaControl.position(media.positionMs, media.positionAt, media.reportedPlaying, media.lengthMs, now)
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableFloatStateOf(0f) }
+    var lastSentAt by remember { mutableLongStateOf(0L) }
     val length = media.lengthMs.coerceAtLeast(0)
     val shown = if (dragging) (dragValue * length).toLong() else position
     val label = stringResource(R.string.home_media_position)
     val value = stringResource(R.string.home_media_position_value, MediaControl.clock(shown), MediaControl.clock(length))
-    Column(Modifier.fillMaxWidth()) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val canSeek = media.canSeek && length > 0
+    // Dimmed, never gone: a tap says why it does not seek (a live stream, a player that refuses).
+    val why = stringResource(if (length <= 0) R.string.home_media_seek_live else R.string.home_media_seek_refused)
+    Column(Modifier.fillMaxWidth().then(
+        if (canSeek || media.stale) Modifier
+        else Modifier.clickable { android.widget.Toast.makeText(context, why, android.widget.Toast.LENGTH_SHORT).show() },
+    )) {
         ThinSlider(
             value = if (length > 0) (shown.toFloat() / length).coerceIn(0f, 1f) else 0f,
             onValueChange = {
                 dragging = true
                 dragValue = it
+                // A drag seeks live, five times a second at most; the release always sends its final value.
+                val at = System.currentTimeMillis()
+                if (length > 0 && MediaControl.dragDue(lastSentAt, at)) {
+                    lastSentAt = at
+                    onSeek((it * length).toLong())
+                }
             },
             onValueChangeFinished = {
-                if (dragging && length > 0) onSeek((dragValue * length).toLong())
+                if (dragging && length > 0) {
+                    lastSentAt = System.currentTimeMillis()
+                    onSeek((dragValue * length).toLong())
+                }
                 dragging = false
             },
             enabled = media.canSeek && length > 0,

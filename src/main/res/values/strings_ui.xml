@@ -393,6 +393,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_media_open">Open the player</string>
     <string name="home_media_position">Position</string>
     <string name="home_media_position_value">%1$s of %2$s</string>
+    <string name="home_media_seek_live">Can\'t seek: this has no fixed length (a live stream)</string>
+    <string name="home_media_seek_refused">Can\'t seek: this player does not allow it</string>
     <string name="home_media_player">Player</string>
     <string name="home_media_close">Close the player</string>
 

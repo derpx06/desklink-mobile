@@ -80,6 +80,9 @@ class MprisPlugin : Plugin() {
             internal set
         var lastPositionTime: Long
             internal set
+        /** When the person last sought; the desk's reports of the old position are ignored for a moment. */
+        var seekHeldAt: Long = 0
+            internal set
         var isPlayAllowed: Boolean = true
             internal set
         var isPauseAllowed: Boolean = true
@@ -186,6 +189,7 @@ class MprisPlugin : Plugin() {
 
                 lastPosition = position.toLong()
                 lastPositionTime = System.currentTimeMillis()
+                seekHeldAt = lastPositionTime
             }
         }
 
@@ -255,12 +259,17 @@ class MprisPlugin : Plugin() {
     fun previous() = request { this["action"] = "Previous" }
 
     fun seekTo(positionMs: Long) {
-        currentPlayer()?.let {
-            it.lastPosition = positionMs
+        val player = currentPlayer()
+        // A player that does not seek, or a stream with no length, is never sent a request.
+        if (player != null && (!player.seekAllowed || player.length <= 0)) return
+        val target = if (player != null) positionMs.coerceIn(0, player.length) else positionMs.coerceAtLeast(0)
+        player?.let {
+            it.lastPosition = target
             it.lastPositionTime = System.currentTimeMillis()
+            it.seekHeldAt = it.lastPositionTime
         }
         revision++
-        request { this["SetPosition"] = positionMs }
+        request { this["SetPosition"] = target }
     }
 
     fun setVolume(volume: Int) {
@@ -392,7 +401,7 @@ class MprisPlugin : Plugin() {
                 }
                 playerStatus.volume = np.getInt("volume", playerStatus.volume)
                 playerStatus.length = np.getLong("length", playerStatus.length)
-                if (np.has("pos")) {
+                if (np.has("pos") && !MediaControl.isHeld(playerStatus.seekHeldAt, System.currentTimeMillis())) {
                     playerStatus.lastPosition = np.getLong("pos", playerStatus.lastPosition)
                     playerStatus.lastPositionTime = System.currentTimeMillis()
                 }
