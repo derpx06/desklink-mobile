@@ -610,6 +610,13 @@ public class LanLinkProvider extends BaseLinkProvider {
     @WorkerThread
     private void addOrUpdateLink(SSLSocket socket, DeviceInfo deviceInfo, boolean weDialed) throws IOException {
         LanLink link = visibleDevices.get(deviceInfo.id);
+        // Checked before the link race hears of it: a socket that is refused must not become the
+        // "kept" link that a genuine one arriving within the second would then lose to.
+        if (link != null && !link.getDeviceInfo().certificate.equals(deviceInfo.certificate)) {
+            Log.e("LanLinkProvider", "LanLink was asked to replace a socket but the certificate doesn't match, aborting");
+            closeQuietly(socket);
+            return;
+        }
         // An inbound dial and our own redial within a second are one reconnection: both sides keep
         // the link dialed by the lower device id, so neither closes the socket the other kept.
         if (link != null && !linkRace.arrive(deviceInfo.id, DeviceHelper.getDeviceId(context), weDialed, android.os.SystemClock.elapsedRealtime())) {
@@ -619,11 +626,6 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
         if (link == null) linkRace.arrive(deviceInfo.id, DeviceHelper.getDeviceId(context), weDialed, android.os.SystemClock.elapsedRealtime());
         if (link != null) {
-            if (!link.getDeviceInfo().certificate.equals(deviceInfo.certificate)) {
-                Log.e("LanLinkProvider", "LanLink was asked to replace a socket but the certificate doesn't match, aborting");
-                closeQuietly(socket);
-                return;
-            }
             // Update existing link
             Log.d("DeskLink/LanLinkProvider", "Reusing same link for device " + deviceInfo.id);
             link.reset(socket, deviceInfo);
