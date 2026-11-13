@@ -37,22 +37,64 @@ class ScreenQualityTest {
     }
 
     @Test
-    fun theLastFrameIsRedeliveredOnceWhenMotionStops() {
+    fun aStillPictureIsRedeliveredSeveralTimesWhenMotionStops() {
         val pending = mutableListOf<Runnable>()
         var forced = 0
         lateinit var refinement: StaticRefinement
         refinement = StaticRefinement(
             100,
+            repeats = 3,
             schedule = { task, _ -> pending += task },
             cancel = { task -> pending.remove(task) },
             force = { forced++; refinement.onFrame() }, // the capture delivers the frame again
         )
         repeat(5) { refinement.onFrame() } // motion: only the latest deadline is pending
         assertEquals(1, pending.size)
-        pending.removeAt(0).run()
-        assertEquals(1, forced)
-        // The re-delivered frame does not schedule another.
-        assertTrue(pending.isEmpty())
+        while (pending.isNotEmpty()) pending.removeAt(0).run()
+        assertEquals(3, forced)
+        // New motion starts the count again.
+        refinement.onFrame()
+        while (pending.isNotEmpty()) pending.removeAt(0).run()
+        assertEquals(6, forced)
+    }
+
+    /** libwebrtc's frame-rate limiter drops a frame whose timestamp is not new: a re-delivery gets a fresh one. */
+    @Test
+    fun aRedeliveredFrameReachesLibwebrtcWithANewerTimestamp() {
+        val seen = mutableListOf<Long>()
+        val target = object : org.webrtc.CapturerObserver {
+            override fun onCapturerStarted(success: Boolean) = Unit
+            override fun onCapturerStopped() = Unit
+            override fun onFrameCaptured(frame: org.webrtc.VideoFrame) { seen += frame.timestampNs }
+        }
+        var now = 5_000L
+        val observer = RefiningCapturerObserver(target, StaticRefinement(100, 0, { _, _ -> }, { }, { }), nowNs = { now })
+        val buffer = object : org.webrtc.VideoFrame.Buffer {
+            override fun getWidth() = 16
+            override fun getHeight() = 16
+            override fun toI420(): org.webrtc.VideoFrame.I420Buffer? = null
+            override fun retain() = Unit
+            override fun release() = Unit
+            override fun cropAndScale(x: Int, y: Int, w: Int, h: Int, sw: Int, sh: Int): org.webrtc.VideoFrame.Buffer = this
+        }
+        observer.onFrameCaptured(org.webrtc.VideoFrame(buffer, 0, 1_000L))
+        observer.onFrameCaptured(org.webrtc.VideoFrame(buffer, 0, 1_000L)) // forceFrame: same timestamp
+        now = 500L // a clock behind the last stamp still moves forward
+        observer.onFrameCaptured(org.webrtc.VideoFrame(buffer, 0, 1_000L))
+        observer.onFrameCaptured(org.webrtc.VideoFrame(buffer, 0, 9_000L)) // a real new frame keeps its own
+        assertEquals(listOf(1_000L, 5_000L, 5_001L, 9_000L), seen)
+    }
+
+    @Test
+    fun theScreenGoesAtTheDisplayRateOnTheLanAndAtMost30Elsewhere() {
+        assertEquals(60, phoneScreenFps(120f))
+        assertEquals(60, phoneScreenFps(60f))
+        assertEquals(30, phoneScreenFps(50f))
+        assertEquals(60, screenMaxFramerate(60, lan = true))
+        assertEquals(30, screenMaxFramerate(60, lan = false))
+        assertEquals(30, screenMaxFramerate(30, lan = true))
+        assertEquals(8_000_000, startScreenBitrate(lan = true))
+        assertEquals(2_500_000, startScreenBitrate(lan = false))
     }
 
     @Test

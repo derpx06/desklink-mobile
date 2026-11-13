@@ -360,7 +360,11 @@ class WebRtcSessionCoordinator(
                 permissionData,
                 width = display.widthPixels,
                 height = display.heightPixels,
-                fps = 30,
+                // 30 made every scroll judder on a 60/120 Hz panel; off the LAN the sender caps it at 30.
+                fps = phoneScreenFps(
+                    context.getSystemService(android.hardware.display.DisplayManager::class.java)
+                        ?.getDisplay(android.view.Display.DEFAULT_DISPLAY)?.refreshRate ?: 60f,
+                ),
             )
             val remoteSessionId = remoteSession.markScreenReady(WebRtcScreenDirection.PHONE_TO_DESKTOP)
             val rotation = geometry.third

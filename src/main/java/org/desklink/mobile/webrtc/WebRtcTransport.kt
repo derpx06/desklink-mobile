@@ -91,6 +91,22 @@ internal fun screenDegradationPreference(controlled: Boolean, lan: Boolean = fal
     if (controlled && !lan) RtpParameters.DegradationPreference.BALANCED
     else RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
 
+/**
+ * The frame rate the screen is sent at: the display's (60 on a 60 Hz-or-faster panel) on the LAN,
+ * at most 30 elsewhere. libwebrtc's frame-rate limiter holds the capture to this.
+ */
+internal fun screenMaxFramerate(displayFps: Int, lan: Boolean): Int = if (lan) displayFps else minOf(displayFps, 30)
+
+/** The display rate a share is captured at: 60 when the panel runs at 60 Hz or more, else 30. */
+internal fun phoneScreenFps(refreshHz: Float): Int = if (refreshHz >= 59f) 60 else 30
+
+/**
+ * Where congestion control starts when a share begins (it resets the estimate). The pacer sends at
+ * 2.5x the estimate, so at 2.5 Mbps a 150 KB keyframe of a 1080p-class screen took ~200 ms to
+ * leave the phone; on the LAN it starts at 8 Mbps (~60 ms) and probes up from there.
+ */
+internal fun startScreenBitrate(lan: Boolean): Int = if (lan) 8_000_000 else 2_500_000
+
 /** The screen's bitrate ceiling: ~16 Mbps on the LAN, 8 elsewhere; congestion control backs off below it. */
 internal fun maxScreenBitrate(lan: Boolean): Int = if (lan) 16_000_000 else 8_000_000
 
@@ -634,6 +650,7 @@ class WebRtcTransport(
             val handler = helper.handler
             refinement = StaticRefinement(
                 REFINE_AFTER_MS,
+                REFINE_REPEATS,
                 schedule = { task, delay -> handler.postDelayed(task, delay) },
                 cancel = { task -> handler.removeCallbacks(task) },
                 force = { runCatching { helper.forceFrame() } },
@@ -908,13 +925,13 @@ class WebRtcTransport(
     @Synchronized
     private fun configureScreenSender(fps: Int) {
         val max = maxScreenBitrate(onLan)
-        runCatching { peer.setBitrate(MIN_SCREEN_BITRATE, START_SCREEN_BITRATE, max) }
+        runCatching { peer.setBitrate(MIN_SCREEN_BITRATE, startScreenBitrate(onLan), max) }
         updateScreenSender { parameters ->
             parameters.degradationPreference = screenDegradationPreference(screenControlled, onLan)
             parameters.encodings.forEach { encoding ->
                 encoding.minBitrateBps = MIN_SCREEN_BITRATE
                 encoding.maxBitrateBps = max
-                encoding.maxFramerate = fps
+                encoding.maxFramerate = screenMaxFramerate(fps, onLan)
             }
         }
     }
@@ -1110,9 +1127,10 @@ class WebRtcTransport(
     private companion object {
         const val TAG = "DeskLink/WebRTC"
         const val MIN_SCREEN_BITRATE = 300_000
-        /** How long after the last frame the capture re-delivers it, once, for refinement. */
+        /** How long after the last frame (and between repeats) the capture re-delivers it for refinement. */
         const val REFINE_AFTER_MS = 100L
-        const val START_SCREEN_BITRATE = 2_500_000
+        /** Repeats of a still picture: about half a second of refinement after every movement. */
+        const val REFINE_REPEATS = 5
     }
 }
 
