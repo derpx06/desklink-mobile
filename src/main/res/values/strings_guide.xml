@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- First run "at a glance", the tour and the Get started guide. The glance and tour lines are the desk's words too
      (DeskLink src/window/onboarding.rs): change both apps together. -->
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- At a glance: the very first screen -->
     <string name="ob_glance_kicker">Welcome to DeskLink</string>
     <string name="ob_glance_title">Your phone and computer, together</string>
