@@ -110,10 +110,46 @@ class InputDevicesReceiverPlugin : Plugin() {
         when (np.type) {
             DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST -> onEnter(np)
             DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST -> onMotion(np)
+            DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST -> onAsked(np)
             else -> return false
         }
         return true
     }
+
+    /**
+     * The desk asks this phone to turn Glide on (its person pressed "Ask on phone"): a prompt here, never a flipped switch. The
+     * person turns it on (and the accessibility service) on the Control page the notification opens.
+     */
+    private fun onAsked(np: NetworkPacket) {
+        if (!asks.allow(np.type)) return
+        val prompt = Glide.promptFor(Glide.asksToTurnOn(runCatching { np.getJSONObject("set") }.getOrNull()),
+            Glide.allowed(context, device.deviceId), MouseReceiverService.instance != null)
+        if (prompt == Glide.Prompt.NONE) return reportAllowed()
+        val open = android.app.PendingIntent.getActivity(
+            context, "glide-ask-${device.deviceId}".hashCode(),
+            android.content.Intent(context, org.desklink.mobile.ui.MainActivity::class.java)
+                .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_SETTINGS_PAGE, org.desklink.mobile.ui.compose.screen.settings.SettingsPage.CONTROL.route)
+                .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_DEVICE_ID, device.deviceId)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+        )
+        val (title, text) = askWords(context, prompt, device.name)
+        val notification = androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(open)
+            .addAction(0, context.getString(R.string.glide_ask_action), open)
+            .setAutoCancel(true)
+            .build()
+        @android.annotation.SuppressLint("MissingPermission")
+        fun post() = androidx.core.app.NotificationManagerCompat.from(context).notify("glide-ask-${device.deviceId}", ASK_NOTICE_ID, notification)
+        runCatching { post() }
+    }
+
+    /** At most one prompt every few seconds per desk, whatever the desk sends. */
+    private val asks = RateLimiter(1, 5_000, TAG)
 
     /** G1. */
     private fun onEnter(np: NetworkPacket) {
@@ -170,11 +206,24 @@ class InputDevicesReceiverPlugin : Plugin() {
         }
     }
 
-    override val supportedPacketTypes: Array<String> = arrayOf(DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST, DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST)
+    override val supportedPacketTypes: Array<String> = arrayOf(
+        DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST,
+        DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES_REQUEST,
+        // The desk asking for Glide to be turned on here: a prompt (onAsked), never a switch flipped for the person.
+        DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST,
+    )
     override val outgoingPacketTypes: Array<String> = arrayOf(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES)
 
     companion object {
         private const val TAG = "DeskLink/Glide"
+        private const val ASK_NOTICE_ID = 4417
+
+        /** The prompt's title and text: "<computer> wants to use Glide. Turn on?" and what to do. */
+        @JvmStatic
+        fun askWords(context: android.content.Context, prompt: Glide.Prompt, desk: String): Pair<String, String> = when (prompt) {
+            Glide.Prompt.ACCESSIBILITY -> context.getString(R.string.glide_ask_title, desk) to context.getString(R.string.settings_glide_accessibility, desk)
+            else -> context.getString(R.string.glide_ask_title, desk) to context.getString(R.string.glide_ask_text, desk)
+        }
 
         /** A state report (never a command): `entered` is only ever said together with `allowed`. Shared fixture glide_bodies.json. */
         @JvmStatic
