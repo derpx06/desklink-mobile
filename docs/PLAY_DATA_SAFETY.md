@@ -3,6 +3,11 @@
 Answers for the Play Console forms for DeskLink 1.3.0 (`org.desklink.mobile`).
 They follow `PRIVACY.md`; if the app or the relay changes, update both.
 
+**1.3.0 ships with the relay off** (`RELAY_ENABLED` false in `build.gradle.kts`): no relay
+connection and no TURN, so the relay and Cloudflare TURN parts below do not happen in this
+release. The owner should decide whether to answer the forms for the LAN-only build before
+submitting.
+
 **Before submitting, the owner must confirm one fact:** that the deployed relay keeps
 IP addresses and certificate fingerprints only in memory for the life of a
 connection (no logs, no database). The answers below assume it does. If the relay
@@ -42,7 +47,7 @@ The two ML Kit rows apply only to a build made with `-Pdesklink.ocr=true`; the d
 
 | Data type | Collected | Shared | Ephemeral | Required | Purpose |
 |---|---|---|---|---|---|
-| Device or other IDs (device certificate fingerprint, IP address) | Yes | No (Cloudflare acts as a service provider for TURN) | Yes | No: only when the relay is used; it can be turned off in Settings | App functionality |
+| Device or other IDs (device certificate fingerprint, IP address) | Yes | No (Cloudflare acts as a service provider for TURN) | Yes | No: only when the relay is used (a build with RELAY_ENABLED on; there is no setting) | App functionality |
 | Device or other IDs (ML Kit installation identifier) | Yes (by Google's ML Kit library) | Yes, with Google | No | Yes while text recognition is in the app | Analytics / app functionality |
 | App info and performance (ML Kit usage and performance metrics) | Yes (by Google's ML Kit library) | Yes, with Google | No | Yes while text recognition is in the app | Analytics |
 

@@ -7,6 +7,7 @@
 package org.desklink.mobile.ui.compose.extensions.device
 
 import org.desklink.mobile.webrtc.WebRtcConnectionPath
+import org.desklink.mobile.webrtc.shown
 
 import org.desklink.mobile.Device
 import org.desklink.mobile.PairingHandler
@@ -24,7 +25,7 @@ fun Device.toUiModel(): DeviceUiModel {
         summaryRes = if (compareProtocolVersion() > 0) R.string.protocol_version_newer else 0,
         isReachable = isReachable,
         isPaired = isPaired,
-        connection = deviceConnection(isReachable, hasActiveWebRtcFeatureTransport, connectionPath, webRtcUnavailable),
+        connection = deviceConnection(isReachable, hasActiveWebRtcFeatureTransport, connectionPath.shown(), webRtcUnavailable),
         batteryPercent = battery?.currentCharge,
         charging = battery?.isCharging == true,
         wantsToPair = pairStatus == PairingHandler.PairState.RequestedByPeer,

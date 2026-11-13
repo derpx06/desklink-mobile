@@ -58,7 +58,6 @@ import org.apache.commons.io.IOUtils
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.BuildConfig
 import org.desklink.mobile.R
-import org.desklink.mobile.backends.relay.RelaySettings
 import org.desklink.mobile.helpers.CreateFileParams
 import org.desklink.mobile.helpers.CreateFileResultContract
 import org.desklink.mobile.helpers.DeviceHelper
@@ -986,8 +985,6 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
     }
     val customDevices = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { changed() }
     val waiting = waitingPermissions(context, desk?.name ?: stringResource(R.string.settings_your_computer), desk?.pluginPermissions?.size ?: 0)
-    val configured = RelaySettings.configured(context)
-    val relayOn = configured && prefs.getBoolean(RelaySettings.KEY_ENABLED, true)
     val stopped by org.desklink.mobile.helpers.Guarded.stopped.collectAsState()
     if (stopped.isNotEmpty()) {
         // A feature threw and was caught (its report is kept): one tap reloads what is turned on.
@@ -1000,32 +997,10 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
             ) { Chevron() }
         }
     }
-    SectionLabel(stringResource(R.string.settings_category_away))
-    RowGroup {
-        // Without a relay address the switch has nothing to turn on: say so, and wait for one.
-        GroupRow(
-            stringResource(R.string.settings_phone_relay),
-            icon = R.drawable.sym_public,
-            subtitle = if (!configured) {
-                stringResource(R.string.settings_relay_not_set_up)
-            } else {
-                listOfNotNull(stringResource(R.string.settings_reach_anywhere_summary), relayStatusText().takeIf { relayOn }).joinToString(" · ")
-            },
-            checked = relayOn,
-            enabled = configured,
-            onClick = {
-                prefs.edit { putBoolean(RelaySettings.KEY_ENABLED, !relayOn) }
-                relaySettingChanged()
-                changed()
-            },
-        )
-        if (desk != null && desk.remote?.relayConfigured == true) {
-            DeskSwitch(desk, actions, DeskSettingsPlugin.RELAY, stringResource(R.string.settings_desk_relay, desk.name), R.drawable.sym_public, stringResource(R.string.settings_reach_anywhere_summary), desk.remote.relay)
-        }
-        GroupRow(stringResource(R.string.setting_advanced_network), icon = R.drawable.sym_tune, subtitle = stringResource(R.string.setting_advanced_network_summary), onClick = { onOpen(SettingsPage.NETWORK) }) { Chevron() }
-    }
+    // No relay rows, ever: BuildConfig.RELAY_ENABLED is the only control for the relay and TURN.
     SectionLabel(stringResource(R.string.settings_category_connection))
     RowGroup {
+        GroupRow(stringResource(R.string.setting_advanced_network), icon = R.drawable.sym_tune, subtitle = stringResource(R.string.setting_advanced_network_summary), onClick = { onOpen(SettingsPage.NETWORK) }) { Chevron() }
         GroupRow(stringResource(R.string.trusted_networks), icon = R.drawable.sym_public, subtitle = stringResource(R.string.trusted_networks_desc), onClick = { trustedNetworks.launch(Intent(context, TrustedNetworksActivity::class.java)) })
         GroupRow(
             stringResource(R.string.custom_device_list),
@@ -1054,15 +1029,6 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
     if (BuildConfig.DEBUG) {
         SectionLabel(stringResource(R.string.settings_category_debug))
         RowGroup {
-            for ((key, title, summary) in listOf(
-                Triple(RelaySettings.KEY_FORCE_RELAY, R.string.setting_relay_force_relay, R.string.setting_relay_force_relay_description),
-                Triple(RelaySettings.KEY_FORCE_TURN, R.string.setting_relay_force_turn, R.string.setting_relay_force_turn_description),
-            )) {
-                GroupRow(stringResource(title), subtitle = stringResource(summary), checked = prefs.getBoolean(key, false), onClick = {
-                    prefs.edit { putBoolean(key, !prefs.getBoolean(key, false)) }
-                    changed()
-                })
-            }
             // Files, Notes and Terminals keep the window secure; this lets `adb exec-out screencap` see them. Off by default, never in release.
             // (a local, like the other debug rows: the parity tests list the rows every build has, and debug builds have more)
             val allowTitle = stringResource(R.string.setting_debug_allow_screenshots)

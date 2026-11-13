@@ -345,18 +345,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="setting_webrtc_transport">WebRTC transport</string>
     <string name="setting_webrtc_stun_servers">STUN servers</string>
     <string name="setting_webrtc_stun_servers_description">Optional comma-separated stun:// server URIs. No server is configured by default.</string>
-    <string name="setting_webrtc_turn_servers">TURN servers</string>
-    <string name="setting_webrtc_turn_servers_description">Optional comma-separated turn:// or turns:// URIs with temporary credentials. DeskLink does not provide a relay.</string>
-    <string name="setting_relay_url">Relay server URL</string>
-    <string name="setting_relay_url_default">Built-in default (%1$s)</string>
-    <string name="setting_relay_use_turn">Use TURN relay when a direct path fails</string>
-    <string name="setting_relay_force_relay">Force relay (ignore LAN)</string>
-    <string name="setting_relay_force_relay_description">Debug builds only. Takes effect when DeskLink restarts.</string>
-    <string name="setting_relay_force_turn">Force TURN</string>
-    <string name="setting_relay_force_turn_description">Debug builds only. Relay-only ICE for the next WebRTC connection.</string>
-    <string name="relay_status_connecting">Connecting…</string>
-    <string name="relay_status_unavailable">Remote server unavailable</string>
-    <string name="relay_status_update_required">Update DeskLink to connect away from home</string>
 
     <string name="receive_notifications_permission_explanation">Notifications need to be allowed to receive them from other devices</string>
     <string name="findmyphone_notifications_explanation">The notifications permission is needed so the phone can ring when the app is in the background</string>
@@ -447,7 +435,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="crash_report_text">Tap to share the crash report. It stays on this phone unless you share it.</string>
     <string name="crash_report_share">Share crash report</string>
     <string name="privacy_policy">Privacy policy</string>
-    <string name="privacy_policy_summary">What DeskLink accesses and what the relay sees</string>
+    <string name="privacy_policy_summary">What DeskLink accesses and what it shares</string>
     <string name="privacy_policy_url" translatable="false">https://github.com/derpx06/desklink-mobile/blob/master/PRIVACY.md</string>
     <string name="mouse_receiver_service_description">Lets your paired computer control this phone while you share its screen: taps, swipes, typing, and back, home, recents and lock, and, when you turn on "Let your computer control this phone", its pointer and keyboard. DeskLink acts only on input you send from your own computer, and does not collect or share data through this service.</string>
 </resources>

@@ -64,8 +64,6 @@ object SettingsIndex {
         Row(SettingsPage.PRIVACY, R.string.settings_unpair_row, keywords = R.string.kw_settings_unpair_row),
         Row(SettingsPage.APPEARANCE, R.string.settings_theme, keywords = R.string.kw_settings_theme),
         Row(SettingsPage.APPEARANCE, R.string.setting_dynamic_colors, R.string.settings_dynamic_colors_summary, keywords = R.string.kw_setting_dynamic_colors),
-        Row(SettingsPage.ADVANCED, R.string.settings_phone_relay, keywords = R.string.kw_settings_phone_relay),
-        Row(SettingsPage.ADVANCED, R.string.settings_desk_relay, R.string.settings_reach_anywhere_summary, needsDesk = true, keywords = R.string.kw_settings_desk_relay),
         Row(SettingsPage.ADVANCED, R.string.setting_advanced_network, R.string.setting_advanced_network_summary, keywords = R.string.kw_setting_advanced_network),
         Row(SettingsPage.ADVANCED, R.string.trusted_networks, R.string.trusted_networks_desc, keywords = R.string.kw_trusted_networks),
         Row(SettingsPage.ADVANCED, R.string.custom_device_list, R.string.custom_devices_settings_summary, keywords = R.string.kw_custom_device_list),

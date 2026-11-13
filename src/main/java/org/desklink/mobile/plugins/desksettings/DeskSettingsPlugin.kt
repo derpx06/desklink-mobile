@@ -83,7 +83,7 @@ class DeskSettingsPlugin : Plugin() {
 
     /** Asks the desk to change [key]; the screen follows the desk's reply, not the request. */
     fun set(key: String, value: Boolean) {
-        val packet = requestPacket(key, value, settings?.relayConfigured == true) ?: return
+        val packet = requestPacket(key, value) ?: return
         pending = pending + (key to value)
         org.desklink.mobile.ui.surfaces.DeskSurfaces.refresh(context)
         device.sendPacket(packet, object : org.desklink.mobile.UserActionCallback() {
@@ -104,8 +104,11 @@ class DeskSettingsPlugin : Plugin() {
         const val RELAY = "relay"
         const val COMMAND_ALERTS = "commandAlerts"
 
-        /** What the phone may change; `unlockNearby` is the desk's alone. */
-        val SETTABLE = setOf(KEEP_AWAKE, CLIPBOARD, NOTIFICATIONS, RELAY, COMMAND_ALERTS)
+        /**
+         * What the phone may change; `unlockNearby` is the desk's alone, and `relay` is no one's: the relay follows the
+         * RELAY_ENABLED constant in each app (the desk still reports it, derived, for older builds).
+         */
+        val SETTABLE = setOf(KEEP_AWAKE, CLIPBOARD, NOTIFICATIONS, COMMAND_ALERTS)
 
         /** A report with any key missing is ignored: the desk always sends all of them. */
         fun parse(np: NetworkPacket): DeskSettingsState? {
@@ -134,8 +137,8 @@ class DeskSettingsPlugin : Plugin() {
         fun shown(key: String, reported: Boolean, pending: Map<String, Boolean>): Boolean = pending[key] ?: reported
 
         /** `{set: {key: value}}`, or null for a key the desk would ignore. */
-        fun requestPacket(key: String, value: Boolean, relayConfigured: Boolean): NetworkPacket? {
-            if (key !in SETTABLE || (key == RELAY && !relayConfigured)) return null
+        fun requestPacket(key: String, value: Boolean): NetworkPacket? {
+            if (key !in SETTABLE) return null
             return NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST).apply {
                 this["set"] = JSONObject().put(key, value)
             }

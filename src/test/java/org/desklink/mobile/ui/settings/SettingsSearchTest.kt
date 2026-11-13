@@ -67,7 +67,7 @@ class SettingsSearchTest {
             "settings_desk_shows_notifications", "settings_command_alerts", "settings_phone_clipboard", "settings_desk_clipboard", "home_send_clipboard",
             "settings_calls_on", "settings_desk_sound", "settings_phone_media", "settings_glide", "settings_bucket_with", "settings_downloads_folder",
             "settings_contacts_share", "settings_session_password", "settings_unlock_nearby", "device_encryption", "settings_unpair_row",
-            "settings_theme", "setting_dynamic_colors", "settings_desk_relay", "setting_advanced_network", "trusted_networks", "settings_permissions", "about",
+            "settings_theme", "setting_dynamic_colors", "setting_advanced_network", "trusted_networks", "settings_permissions", "about",
         ).forEach { assertTrue("$it is searchable", it in all) }
     }
 
@@ -83,9 +83,20 @@ class SettingsSearchTest {
     @Test fun rowsThatExistOnlyWithAComputerAreNotSearchableWithout() {
         fun titles(hasDesk: Boolean) = groups.values.flatMap { SettingsPage.valueOf(it).let { page -> SettingsIndex.rowsFor(page, hasDesk) } }.map { it.title }
         val keepAwake = org.desklink.mobile.R.string.settings_keep_awake
-        val deskRelay = org.desklink.mobile.R.string.settings_desk_relay
-        assertTrue(keepAwake in titles(true) && deskRelay in titles(true))
-        assertTrue(keepAwake !in titles(false) && deskRelay !in titles(false))
+        assertTrue(keepAwake in titles(true))
+        assertTrue(keepAwake !in titles(false))
         assertTrue("phone-only rows stay", org.desklink.mobile.R.string.settings_phone_name in titles(false))
+    }
+
+    /**
+     * No build has a row that turns the relay or TURN on or off, or sets their servers: BuildConfig.RELAY_ENABLED in code is
+     * the only control. Read from the settings sources, so it holds whatever the switch is set to.
+     */
+    @Test fun noSettingsRowControlsTheRelayOrTurn() {
+        val ui = root.resolve("java/org/desklink/mobile/ui").walk().filter { it.extension == "kt" }.map { it.readText() }.joinToString("\n")
+        for (key in listOf("RelaySettings.KEY_ENABLED", "RelaySettings.KEY_URL", "RelaySettings.KEY_USE_TURN", "RelaySettings.KEY_FORCE", "KEY_WEBRTC_TURN_SERVERS_PREFERENCE", "DeskSettingsPlugin.RELAY")) {
+            assertTrue("$key is not touched by the UI", key !in ui)
+        }
+        for (page in groups.keys) assertTrue("$page has no relay row", rowsOf(page).none { "relay" in it || "use_turn" in it || "turn_servers" in it })
     }
 }

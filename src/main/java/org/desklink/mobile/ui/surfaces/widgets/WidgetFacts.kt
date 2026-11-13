@@ -21,6 +21,7 @@ import org.desklink.mobile.plugins.share.SharePlugin
 import org.desklink.mobile.ui.compose.extensions.device.toUiModel
 import org.desklink.mobile.ui.surfaces.DeskSurfaces
 import java.util.concurrent.ConcurrentHashMap
+import org.desklink.mobile.webrtc.shown
 
 /**
  * Reads [ComputerFacts] from the live objects, the same way Home does. Nothing here is cached
@@ -41,7 +42,7 @@ object WidgetFacts {
             id = id,
             name = device.name,
             connection = ui.connection,
-            path = device.connectionPath,
+            path = device.connectionPath.shown(),
             ready = ready,
             updateNeeded = !ready && DeviceInfo.versionsSkew(BuildConfig.VERSION_NAME, device.deviceInfo.appVersion),
             batteryPercent = ui.batteryPercent.takeIf { ready },

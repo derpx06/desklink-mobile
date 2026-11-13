@@ -3,8 +3,7 @@
 DeskLink connects your Android phone and your Linux computer: shared terminals
 (with one-tap Claude Code and Codex), control of the computer from the phone,
 the phone's screen on the computer, notifications with replies, clipboard, and
-files. It works on the same Wi-Fi and, through the DeskLink relay, away from
-home. There is no account.
+files. It works on the same Wi-Fi. There is no account.
 
 Install: GitHub Releases (signed APK), Google Play, or F-Droid. Release and
 signing notes are in `docs/RELEASE.md`; the privacy policy is `PRIVACY.md`.
@@ -19,10 +18,14 @@ channels; until the handover completes they are queued, never sent over the
 bootstrap link. File bytes only ever travel on the bounded WebRTC file-data
 channel.
 
-Away from home, the phone and computer meet at the DeskLink relay and run an
+**Off in 1.3** (a LAN-only release): `RELAY_ENABLED` in `build.gradle.kts` is
+`false`. That constant is the only control: there is no setting to turn the
+relay or TURN on or off, and the relay address comes from the build
+(`DESKLINK_RELAY_URL`). When it is on: away from home, the phone and computer
+meet at the DeskLink relay and run an
 end-to-end encrypted bootstrap link through it (the relay sees IP addresses,
 certificate fingerprints and timing, never content); media goes direct or
-through TURN when the "Use TURN" setting allows. Spec: `docs/RELAY.md` in the
+through the relay's TURN. Spec: `docs/RELAY.md` in the
 workspace, relay server in the desktop repository's `relay/`.
 
 The inactive compatibility module documents the legacy KDE Connect-compatible
@@ -30,7 +33,7 @@ protocol v8; it is not advertised or transmitted by the active path.
 
 ## Current support
 
-- Same-LAN discovery, QR pairing, and the relay for other networks.
+- Same-LAN discovery and QR pairing (the relay for other networks is off in 1.3).
 - Shared terminals with one-tap Claude Code/Codex, dictation and full screen;
   an optional per-computer session password.
 - Remote control of the computer (view and control its screen) and the phone's

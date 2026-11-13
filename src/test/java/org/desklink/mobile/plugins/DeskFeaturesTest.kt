@@ -46,17 +46,17 @@ class DeskFeaturesTest {
 
     @Test
     fun aSwitchSendsOneKeyUnderSet() {
-        val packet = DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.KEEP_AWAKE, true, relayConfigured = false)!!
+        val packet = DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.KEEP_AWAKE, true)!!
         assertEquals(DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST, packet.type)
         val set = packet.getJSONObject("set")!!
         assertEquals(1, set.length())
         assertTrue(set.getBoolean("keepAwake"))
-        assertNotNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.COMMAND_ALERTS, false, relayConfigured = false))
+        assertNotNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.COMMAND_ALERTS, false))
         // The desk's own: never asked for from here.
-        assertNull(DeskSettingsPlugin.requestPacket("unlockNearby", true, relayConfigured = true))
-        // No relay at the desk: nothing to turn on.
-        assertNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.RELAY, true, relayConfigured = false))
-        assertNotNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.RELAY, true, relayConfigured = true))
+        assertNull(DeskSettingsPlugin.requestPacket("unlockNearby", true))
+        // The relay is never switched from here: RELAY_ENABLED in code is its only control.
+        assertNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.RELAY, true))
+        assertNull(DeskSettingsPlugin.requestPacket(DeskSettingsPlugin.RELAY, false))
     }
 
     @Test

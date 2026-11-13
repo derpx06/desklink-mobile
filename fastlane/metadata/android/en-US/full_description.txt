@@ -1,8 +1,8 @@
-DeskLink connects your Android phone to your Linux computer. Pair once by scanning a QR code, and the two work together at home or away from it. No account, no ads, no tracking.
+DeskLink connects your Android phone to your Linux computer. Pair once by scanning a QR code, and the two work together over your Wi-Fi. No account, no ads, no tracking.
 
 <b>Shared terminals</b>
 - Open terminals that run on your computer and pick them up on your phone, or start one on the phone and keep typing at your desk.
-- One tap starts Claude Code or Codex in a terminal on your computer, so you can keep an eye on an agent from anywhere.
+- One tap starts Claude Code or Codex in a terminal on your computer, so you can keep an eye on an agent from your phone.
 - Dictate into the terminal with your phone's speech recognizer.
 
 <b>Remote control and screens</b>
@@ -18,9 +18,8 @@ DeskLink connects your Android phone to your Linux computer. Pair once by scanni
 - The computer's pointer and keyboard can carry on onto the phone's screen, and the phone can take a photo, a scan or a QR text into whatever you are doing on the computer.
 - Battery level, find my phone, lock and unlock the computer from your phone.
 
-<b>Works anywhere, privately</b>
+<b>Private by design</b>
 - On the same Wi-Fi, the devices talk directly over an encrypted connection.
-- Away from home, they find each other through the DeskLink relay. The connection setup is end-to-end encrypted: the relay sees IP addresses and device fingerprints, never your content.
 - No account and no sign-up. Pairing keys stay on your devices.
 
 DeskLink needs the DeskLink desktop app on your Linux computer.
