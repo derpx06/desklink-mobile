@@ -121,11 +121,8 @@ class WebRtcEnvelopeTest {
 
     @Test
     fun fixtureParsesAndValidatesBinding() {
-        val fixture = WebRtcEnvelope.fromJson(
-            """
-            {"protocolVersion":1,"messageId":"00000000-0000-4000-8000-000000000001","deviceId":"phone-test-device","sessionId":12,"connectionGeneration":4,"channel":"desklink-events-v1","messageType":"clipboard.update","timestamp":1780000000000,"flags":0,"payloadLength":5,"payloadBase64":"aGVsbG8="}
-            """.trimIndent(),
-        )
+        // The shared fixture (the desk's testdata/envelope.json, byte for byte), not a pasted copy.
+        val fixture = WebRtcEnvelope.fromJson(javaClass.getResourceAsStream("/webrtc_v1/envelope.json")!!.bufferedReader().readText())
         assertEquals("desklink-events-v1", fixture.channel)
         assertArrayEquals("hello".toByteArray(), fixture.validate("phone-test-device", 12, 4))
     }
