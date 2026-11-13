@@ -56,7 +56,11 @@ class RingDeskTileService : DeskTileService(TileKind.RING) {
 class KeepAwakeTileService : DeskTileService(TileKind.KEEP_AWAKE) {
     override fun onClick() {
         super.onClick()
-        DeskSurfaces.perform(this, DeskSurfaces.Action.KEEP_AWAKE)
-        render(this, TileKind.KEEP_AWAKE)
+        // Anyone holding a locked phone could otherwise stop the desk from idling into its own lock.
+        val toggle = Runnable {
+            DeskSurfaces.perform(this, DeskSurfaces.Action.KEEP_AWAKE)
+            render(this, TileKind.KEEP_AWAKE)
+        }
+        if (isLocked) unlockAndRun(toggle) else toggle.run()
     }
 }
