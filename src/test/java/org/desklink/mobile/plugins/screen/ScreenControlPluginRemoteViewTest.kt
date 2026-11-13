@@ -44,6 +44,35 @@ class ScreenControlPluginRemoteViewTest {
         assertFalse("a grant clears it", plugin.remoteControlRefused)
     }
 
+    /**
+     * The owner's report: no keyboard when clicking a laptop text field. The desk's reports arrived
+     * (`Desk text focus: editable=true` again and again), but the plugin kept a Boolean: a second
+     * `true` changed no state, so the screen never raised the keyboard after Back put it away.
+     */
+    @Test
+    fun `every editable report raises the keyboard again and a non-editable one drops it`() {
+        val keyboard = { input: Boolean ->
+            org.desklink.mobile.plugins.mousepad.MousePadActivity.keyboardForTextFocus(plugin.desktopTextFocus, input, true)
+        }
+        assertNull("nothing reported yet", keyboard(true))
+        plugin.onDesktopTextFocus(true)
+        val first = plugin.desktopTextFocus
+        assertEquals(true, keyboard(true))
+        plugin.onDesktopTextFocus(true)
+        assertTrue("a repeated report is a new value, so the screen reacts again", first != plugin.desktopTextFocus)
+        assertEquals(true, keyboard(true))
+        plugin.onDesktopTextFocus(false)
+        assertEquals(false, keyboard(true))
+        assertNull("without control nothing is typed: the keyboard is left alone", keyboard(false))
+        assertNull(
+            "the setting off",
+            org.desklink.mobile.plugins.mousepad.MousePadActivity.keyboardForTextFocus(plugin.desktopTextFocus, true, false),
+        )
+        plugin.onDesktopTextFocus(true)
+        plugin.onRemoteScreenRequesting()
+        assertNull("a new view forgets the last view's focus", keyboard(true))
+    }
+
     @Test
     fun `no geometry is known until the desktop reports it`() {
         assertEquals(0, plugin.remoteScreenWidth)

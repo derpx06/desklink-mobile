@@ -326,10 +326,11 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
         HiddenKeyboard()
         // A text input on the desktop took focus: up comes the keyboard, the
         // way it does for the phone's own fields — and down when it leaves.
-        val textFocused = plugin?.desktopTextFocused == true
+        val textFocus = plugin?.desktopTextFocus
         val input = controlInputEnabled(controlEnabled, controlMode)
-        LaunchedEffect(textFocused, input) {
-            if (input && autoKeyboard) setKeyboardShown(textFocused)
+        // Keyed on the report itself, not its Boolean: each report runs this again.
+        LaunchedEffect(textFocus, input) {
+            keyboardForTextFocus(textFocus, input, autoKeyboard)?.let(::setKeyboardShown)
         }
         // View sends nothing: the keyboard goes away and what is still typed is dropped.
         LaunchedEffect(input) {
@@ -1049,6 +1050,17 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
     enum class BackgroundAction { NONE, END_NOW, END_AFTER_GRACE }
 
     companion object {
+        /**
+         * What a desktop text-focus report does to the keyboard while control is held: up for a
+         * text field (every report, also after Back put it away), down for anything else; nothing
+         * without input or before any report. Null: leave it as it is.
+         */
+        fun keyboardForTextFocus(
+            focus: org.desklink.mobile.plugins.screen.DesktopTextFocus?,
+            input: Boolean,
+            autoKeyboard: Boolean,
+        ): Boolean? = focus?.takeIf { input && autoKeyboard && it.serial > 0 }?.editable
+
         /** A view of the desk left running behind another app ends after this long. */
         const val BACKGROUND_GRACE_MS = 60_000L
 

@@ -1969,7 +1969,7 @@ class WebRtcSessionCoordinator(
             WebRtcRemoteSessionControlKind.INPUT_FOCUS -> {
                 Log.i(TAG, "Desk text focus: editable=${message.editable}")
                 device.getPlugin(ScreenControlPlugin::class.java)
-                    ?.desktopTextFocused = message.editable == true
+                    ?.onDesktopTextFocus(message.editable == true)
             }
             WebRtcRemoteSessionControlKind.VIEW_DENIED,
             WebRtcRemoteSessionControlKind.SCREEN_ERROR -> {

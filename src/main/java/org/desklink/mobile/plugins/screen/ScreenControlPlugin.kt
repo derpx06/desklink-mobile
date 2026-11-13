@@ -48,9 +48,17 @@ class ScreenControlPlugin : Plugin() {
     /** F2: the desk could not add a display; a one-off notice for the screen (then cleared). */
     var extendNotice by mutableStateOf<String?>(null)
 
-    /** The desktop reports a text input has keyboard focus: the remote
-     * screen raises the phone keyboard, and drops it when this clears. */
-    var desktopTextFocused by mutableStateOf(false)
+    /** The desktop's latest text-focus report: the remote screen raises the
+     * phone keyboard for an editable one and drops it for one that is not.
+     * Every report is a new value, so a second "editable" (another field, or a
+     * click into the same one after Back put the keyboard away) raises the
+     * keyboard again: a plain Boolean stayed `true` and nothing reacted. */
+    var desktopTextFocus by mutableStateOf(DesktopTextFocus())
+        private set
+
+    fun onDesktopTextFocus(editable: Boolean) {
+        desktopTextFocus = desktopTextFocus.next(editable)
+    }
 
     /** The desktop's own coordinate space (its `screen-ready`), which input must
      * be mapped into. Zero until the desktop has reported it. */
@@ -296,7 +304,7 @@ class ScreenControlPlugin : Plugin() {
     private fun resetView() {
         remoteControlRefused = false
         controlDenial = null
-        desktopTextFocused = false
+        desktopTextFocus = DesktopTextFocus()
         frameSeen.set(false)
         remoteLive = false
         remoteScreenWidth = 0
@@ -504,4 +512,9 @@ class ScreenControlPlugin : Plugin() {
             }
         }
     }
+}
+
+/** One text-focus report from the desktop; [serial] tells repeated reports apart. */
+data class DesktopTextFocus(val editable: Boolean = false, val serial: Int = 0) {
+    fun next(editable: Boolean) = DesktopTextFocus(editable, serial + 1)
 }
