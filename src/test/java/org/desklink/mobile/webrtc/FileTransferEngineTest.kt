@@ -635,10 +635,12 @@ class FileTransferEngineTest {
         val h = harness(bytes)
         var full = true
         h.writeHook = { frame, raf ->
-            if (full && frame.blockIndex == 2) throw IOException("write failed: ENOSPC (No space left on device)")
+            if (full && frame.blockIndex == 2) {
+                h.freeSpace = 0
+                throw IOException("write failed: ENOSPC (No space left on device)")
+            }
             frame.writeTo(raf)
         }
-        h.freeSpace = 0
         h.run()
         assertEquals(FileCodes.STORAGE_FULL, h.receivedByDesk.last { it.action == WebRtcFileAction.PAUSE }.reason)
         assertEquals("paused, not failed", emptyList<Any>(), h.receiverOutcomes)
@@ -660,6 +662,29 @@ class FileTransferEngineTest {
         val resume = h.receivedByDesk.last { it.action == WebRtcFileAction.RESUME }
         assertEquals(2, resume.resumeBlock)
         assertEquals(1, resume.pass)
+    }
+
+    @Test
+    fun aBlockThatWouldEatTheReservePausesBeforeAnythingIsWritten() {
+        val bytes = data(3 * FileV2.BLOCK_BYTES)
+        val h = harness(bytes)
+        // Room for one block and the reserve: the second block must not be written into the last 16 MiB.
+        h.freeSpace = FileV2.BLOCK_BYTES + FileReceiver.MIN_FREE_BYTES
+        h.writeHook = { frame, raf ->
+            frame.writeTo(raf)
+            if (frame.lastOfBlock) h.freeSpace -= FileV2.BLOCK_BYTES
+        }
+        h.run()
+        assertEquals(FileCodes.STORAGE_FULL, h.receivedByDesk.last { it.action == WebRtcFileAction.PAUSE }.reason)
+        assertEquals(FileCodes.STORAGE_FULL, h.receiver!!.isPaused)
+        assertEquals("paused, not failed", emptyList<Any>(), h.receiverOutcomes)
+        // Space frees up: it carries on from the verified block.
+        h.freeSpace = 1L shl 30
+        h.now += FileV2.STORAGE_RETRY_MS
+        h.receiver!!.tick(h.now)
+        h.pump()
+        assertEquals(h.sha(bytes), h.deliveredSha)
+        assertEquals(1, h.receivedByDesk.last { it.action == WebRtcFileAction.RESUME }.resumeBlock)
     }
 
     @Test

@@ -314,6 +314,13 @@ class FileReceiver(
             noProgress = false
             send(control(WebRtcFileAction.RESUME))
         }
+        // A new block only with room for it and the reserve: waiting for ENOSPC filled the phone's storage to the last byte.
+        if (frame.offset % FileV2.BLOCK_BYTES == 0L &&
+            freeSpace() < minOf(FileV2.BLOCK_BYTES.toLong(), totalSize - frame.offset) + MIN_FREE_BYTES
+        ) {
+            maybeCheckpoint(force = true)
+            return pause(FileCodes.STORAGE_FULL)
+        }
         val t0 = System.nanoTime()
         try {
             writeFrame(frame, requireNotNull(file))
