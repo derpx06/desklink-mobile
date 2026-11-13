@@ -679,7 +679,7 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
             subtitle = when {
                 !desk.glideOn -> stringResource(R.string.settings_glide_off, desk.name)
                 !desk.accessibilityOn -> stringResource(R.string.settings_glide_accessibility, desk.name)
-                else -> stringResource(R.string.settings_glide_on)
+                else -> stringResource(R.string.settings_glide_on, desk.name)
             },
             checked = desk.glideOn,
             onClick = {

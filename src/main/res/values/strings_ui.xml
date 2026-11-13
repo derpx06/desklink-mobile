@@ -594,7 +594,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_glide">Let %1$s control this phone</string>
     <string name="settings_glide_title">Glide</string>
     <string name="settings_glide_explain">Move %1$s\'s mouse past its screen edge and it carries on here: its pointer and keyboard control this phone, as if the two screens were side by side.</string>
-    <string name="settings_glide_on">Its pointer and keyboard continue here across the screen edge</string>
+    <string name="settings_glide_on">On here. Turn on Glide on %1$s too, then move its pointer past the screen edge</string>
+    <string name="glide_ask_title">%1$s wants to use Glide. Turn on?</string>
+    <string name="glide_ask_text">Turn on “Let %1$s control this phone” so its mouse and keyboard can continue here. You decide: tap to open the switch.</string>
+    <string name="glide_ask_action">Turn on…</string>
     <string name="settings_glide_off">Off. Move %1$s\'s pointer past its screen edge onto this phone</string>
     <string name="settings_glide_accessibility">Turn on DeskLink\'s accessibility service so %1$s can point and type here</string>
     <!-- F8b: Bucket progress -->
