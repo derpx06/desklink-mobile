@@ -1617,6 +1617,7 @@ class WebRtcSessionCoordinator(
                 // The requester hears. A desk asking to hear the phone is the only request it may send;
                 // the desk's own sound is asked for by this phone.
                 if (session.direction != WebRtcRemoteSessionControlMessage.PHONE_TO_DESK ||
+                    source !in WebRtcRemoteSessionControlMessage.AUDIO_SOURCES ||
                     (source == "system" && android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q)
                 ) {
                     sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = "unsupported")
