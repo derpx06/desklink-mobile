@@ -466,7 +466,11 @@ fun PairCodeScreen(state: PairCodeState, onCancel: () -> Unit, onMatch: () -> Un
                         .clearAndSetSemantics { contentDescription = description },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(code.chunked(3).joinToString(" "), fontFamily = MonoFamily, fontWeight = FontWeight.SemiBold, fontSize = 42.sp, letterSpacing = 4.sp)
+                    // Left to right in every language: right to left showed "482 913" as "913 482", which the computer does not show.
+                    Text(
+                        code.chunked(3).joinToString(" "), fontFamily = MonoFamily, fontWeight = FontWeight.SemiBold, fontSize = 42.sp, letterSpacing = 4.sp,
+                        style = androidx.compose.material3.LocalTextStyle.current.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr),
+                    )
                 }
             }
             when (state.stage) {

@@ -99,8 +99,8 @@ abstract class ComponentShots : ShotTest() {
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 QuickActionTile(R.drawable.sym_link, "Send a link", {}, Modifier.weight(1f))
-                QuickActionTile(R.drawable.sym_vibration, "Ring desk", {}, Modifier.weight(1f))
-                QuickActionTile(R.drawable.sym_lock, "Lock desk", {}, Modifier.weight(1f))
+                QuickActionTile(R.drawable.sym_vibration, "Ring computer", {}, Modifier.weight(1f))
+                QuickActionTile(R.drawable.sym_lock, "Lock computer", {}, Modifier.weight(1f))
                 QuickActionTile(R.drawable.sym_lock_open, "Unlock arch-desk", {}, Modifier.weight(1f), enabled = false)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

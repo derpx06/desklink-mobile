@@ -339,7 +339,7 @@ fun TerminalsContent(
             )
         }
         when (panel) {
-            TerminalsPanel.UNAVAILABLE -> Notice(R.drawable.sym_terminal, stringResource(R.string.terminal_section), stringResource(R.string.terminals_unavailable))
+            TerminalsPanel.UNAVAILABLE -> Notice(R.drawable.sym_terminal, stringResource(R.string.terminal_section), stringResource(R.string.terminals_unavailable, deskName))
             TerminalsPanel.GATE -> Notice(
                 R.drawable.sym_lock, stringResource(R.string.terminal_locked_title), stringResource(R.string.terminals_gate_message),
                 action = stringResource(R.string.terminals_unlock), onAction = actions.onUnlock,

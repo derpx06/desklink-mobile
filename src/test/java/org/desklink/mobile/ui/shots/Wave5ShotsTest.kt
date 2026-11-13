@@ -91,7 +91,7 @@ abstract class Wave5Shots : ShotTest() {
     }
 
     @Test fun dialogInfoOnly() = shoot("w5-dialog-info") {
-        Backdrop { DeskDialogCard("Sharing $desk's screen", DialogAction("OK") {}, null) { Text("Open Desk screen from the Control tile to see and control it from here.") } }
+        Backdrop { DeskDialogCard("Sharing $desk's screen", DialogAction("OK") {}, null) { Text("Open Desk screen on Home to see and control it from here.") } }
     }
 
     @Test fun subPage() = shoot("w5-subpage") {

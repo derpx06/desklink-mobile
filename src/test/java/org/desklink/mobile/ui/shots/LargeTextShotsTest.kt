@@ -34,3 +34,21 @@ class LargeTextWave5Shots : Wave5Shots() {
     override val form = "large"
     @Before fun fontScale() = RuntimeEnvironment.setFontScale(1.3f)
 }
+
+/** Right to left: where a chevron, a progress bar or a padding is mirrored wrongly or a row's parts trade places. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "ldrtl-w360dp-h640dp-xhdpi")
+class RtlScreenShots : ScreenShots() {
+    override val form = "rtl"
+    override val rtl = true
+}
+
+/** First run right to left, where the code to compare must still read as the computer shows it. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "ldrtl-w360dp-h640dp-xhdpi")
+class RtlFirstRunShots : FirstRunShots() {
+    override val form = "rtl"
+    override val rtl = true
+}

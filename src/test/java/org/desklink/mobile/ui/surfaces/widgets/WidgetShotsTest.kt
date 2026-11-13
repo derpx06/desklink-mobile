@@ -189,7 +189,7 @@ abstract class WidgetShots {
         assertEquals("Ring arch-desk, unavailable. Offline", find(off, org.desklink.mobile.R.id.act_ring).contentDescription)
         val none = QuickActionsWidget().render(base, null, SizeF(250f, 110f)).apply(base, FrameLayout(base))
         assertEquals("Open DeskLink. No computer paired. Tap to pair a computer", find(none, org.desklink.mobile.R.id.w_header).contentDescription)
-        assertEquals("Lock desk, unavailable. No computer paired", find(none, org.desklink.mobile.R.id.act_lock).contentDescription)
+        assertEquals("Lock computer, unavailable. No computer paired", find(none, org.desklink.mobile.R.id.act_lock).contentDescription)
         val status = ComputerStatusWidget().render(base, live.copy(charging = true), SizeF(110f, 40f)).apply(base, FrameLayout(base))
         assertTrue(status.contentDescription.toString().startsWith("Open arch-desk in DeskLink. Connected over Wi‑Fi. Battery 84%, charging"))
         val term = TerminalsWidget().render(base, live, SizeF(110f, 40f)).apply(base, FrameLayout(base))
