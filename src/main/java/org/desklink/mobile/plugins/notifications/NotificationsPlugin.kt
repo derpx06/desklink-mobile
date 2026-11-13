@@ -59,7 +59,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private val notificationDeliveryLock = Any()
     private val postedNotifications = mutableSetOf<String>()
     private val pendingIntents = PendingReplies<RepliableNotification>(MAX_PENDING_REPLIES)
-    private val pendingActions = PendingActions<Notification.Action>()
+    private val pendingActions = PendingActions<Pair<String, Notification.Action>>()
     private var serviceReady = false
     private lateinit var sharedPreferences: SharedPreferences
     private val keyguardManager: KeyguardManager by lazy { context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
@@ -349,7 +349,9 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         val isConversation = messagingStyle != null
         val isGroupConversation = isConversation && messagingStyle.isGroupConversation() && messagingStyle.conversationTitle != null
 
-        np["actions"] = extractActions(notification, key)
+        // Android 15+ redacts a sensitive notification (a one-time code) for a listener: its text replaced, every button blanked.
+        val redacted = extractText(notification) == redactedMessage
+        np["actions"] = extractActions(notification, key, redacted)
 
         np["id"] = key
         np["isClearable"] = statusBarNotification.isClearable
@@ -367,7 +369,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             np["title"] = shown?.let { extractStringFromExtra(it.extras, NotificationCompat.EXTRA_TITLE) } ?: (appName ?: packageName)
             np["text"] = shown?.let { extractText(it) } ?: context.getString(R.string.notification_private_hidden)
         } else if (!appDatabase.getPrivacy(packageName, AppDatabase.PrivacyOptions.BLOCK_CONTENTS)) {
-            val rn = extractRepliableNotification(statusBarNotification)
+            val rn = extractRepliableNotification(statusBarNotification).takeUnless { redacted }
             if (rn != null) {
                 np["requestReplyId"] = rn.id
                 pendingIntents.put(key, rn.id, rn)
@@ -453,31 +455,37 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         return Pair(sender, content)
     }
 
-    private fun extractActions(notification: Notification, key: String): JSONArray? {
-        val notiActions = notification.actions
-        if (notiActions.isNullOrEmpty()) {
-            pendingActions.remove(key) // an update that dropped its buttons keeps none of the old ones
-            return null
-        }
-
-        val jsonArray = JSONArray()
-        val kept = mutableListOf<Notification.Action>()
-        for (action in notiActions) {
-            val title = action.title
-                ?: continue
-
-            // Check whether it is a reply action. We have special treatment for them
-            if (action.remoteInputs?.isNotEmpty() == true) {
-                continue
-            }
-
-            jsonArray.put(title.toString())
-            kept += action
-        }
-        // An update replaces the actions of the key, it does not add to them.
+    private fun extractActions(notification: Notification, key: String, redacted: Boolean): JSONArray? {
+        val kept = PendingActions.sendable(
+            notification.actions.orEmpty().filterNotNull(), redacted, { it.title },
+            { it.actionIntent != null && it.remoteInputs.isNullOrEmpty() }, // a reply action goes as requestReplyId
+        )
+        // An update replaces the actions of the key, it does not add to them (none left keeps none of the old ones).
         pendingActions.replace(key, kept)
+        return if (kept.isEmpty()) null else JSONArray(kept.map { it.first })
+    }
 
-        return jsonArray
+    /** Android's own text for a redacted notification ("Sensitive notification content hidden"), in the phone's language. */
+    private val redactedMessage: String by lazy {
+        val res = Resources.getSystem()
+        @android.annotation.SuppressLint("DiscouragedApi") // an internal resource: it has no R constant to use instead
+        val id = res.getIdentifier("redacted_notification_message", "string", "android")
+        if (id != 0) runCatching { res.getString(id) }.getOrNull() ?: REDACTED_MESSAGE else REDACTED_MESSAGE
+    }
+
+    /**
+     * Sent as DeskLink, which is in the background when the desk asks: since Android 14 an app's activity intent sent by another
+     * app starts only if the sender opts in to lending its own background-start privilege.
+     */
+    @Suppress("DEPRECATION") // MODE_BACKGROUND_ACTIVITY_START_ALLOWED is what Android 14 and 15 take
+    private fun sendFromBackground(intent: PendingIntent, fillIn: Intent? = null) {
+        val options = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            android.app.ActivityOptions.makeBasic().setPendingIntentBackgroundActivityStartMode(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                else android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+            ).toBundle()
+        } else null
+        intent.send(context, 0, fillIn, null, null, null, options)
     }
 
     private fun extractConversation(messagingStyle: NotificationCompat.MessagingStyle?): JSONArray {
@@ -515,7 +523,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         RemoteInput.addResultsToIntent(remoteInputs, localIntent, localBundle)
 
         try {
-            repliableNotification.pendingIntent.send(context, 0, localIntent)
+            sendFromBackground(repliableNotification.pendingIntent, localIntent)
         } catch (e: PendingIntent.CanceledException) {
             Log.e(TAG, "replyToNotification error (" + e.javaClass.getSimpleName() + ")")
         }
@@ -655,15 +663,17 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
     private fun triggerNotificationAction(np: NetworkPacket) {
         val key = np.getString("key")
-        val title = np.getString("action")
-        val intent: PendingIntent? = pendingActions.find(key) { it.title?.toString() == title }?.actionIntent
-
-        if (intent != null) {
-            try {
-                intent.send()
-            } catch (e: PendingIntent.CanceledException) {
-                Log.e(TAG, "Triggering action failed", e)
-            }
+        val label = PendingActions.label(np.getStringOrNull("action"))
+        // Found by the label this phone sent for this key (unique per notification; see PendingActions.sendable).
+        val intent = pendingActions.find(key) { it.first == label }?.second?.actionIntent
+        if (intent == null) {
+            Log.w(TAG, "Notification action not found (the notification was updated or removed)")
+            return
+        }
+        try {
+            sendFromBackground(intent)
+        } catch (e: PendingIntent.CanceledException) {
+            Log.w(TAG, "Notification action failed: its app cancelled it", e)
         }
     }
 
@@ -740,6 +750,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         const val MAX_PENDING_REPLIES = 200
         const val PREF_NOTIFICATION_SCREEN_OFF = "pref_notification_screen_off"
         private const val NOTIFICATION_SYNC_DELAY_MS = 50L
+        /** `android:string/redacted_notification_message` in English, when the phone's own copy cannot be read. */
+        private const val REDACTED_MESSAGE = "Sensitive notification content hidden"
 
         private const val TAG = "DeskLink/NotificationsPlugin"
 

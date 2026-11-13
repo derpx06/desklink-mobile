@@ -27,4 +27,30 @@ class PendingActionsTest {
         actions.remove("n")
         assertNull(actions.find("n") { true })
     }
+
+    private data class A(val title: String?, val usable: Boolean = true)
+
+    private fun sendable(vararg actions: A, redacted: Boolean = false) =
+        PendingActions.sendable(actions.toList(), redacted, { it.title }, { it.usable }).map { it.first }
+
+    @Test
+    fun onlyButtonsWithALabelAnIntentAndADistinctLabelAreSent() {
+        // Android 15's redaction blanks every title: those were the empty buttons on the desk.
+        assertEquals(emptyList<String>(), sendable(A(""), A(""), A("")))
+        assertEquals(listOf("Archive", "Mark read"), sendable(A(" Archive\n"), A(null), A("  "), A("Reply", usable = false), A("Mark read"), A("Archive")))
+    }
+
+    @Test
+    fun aRedactedNotificationSendsNoButtonsEvenWithLabels() {
+        assertEquals(emptyList<String>(), sendable(A("Archive"), A("Delete"), redacted = true))
+    }
+
+    @Test
+    fun aPressIsFoundByTheLabelAsTheDeskSendsItBack() {
+        val actions = PendingActions<Pair<String, A>>()
+        actions.replace("n", PendingActions.sendable(listOf(A(" Archive "), A("Delete")), false, { it.title }, { it.usable }))
+        // The desk strips control characters and trims what it sends.
+        assertEquals(" Archive ", actions.find("n") { it.first == PendingActions.label("Archive ") }?.second?.title)
+        assertNull(actions.find("n") { it.first == PendingActions.label("") })
+    }
 }
