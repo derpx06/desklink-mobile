@@ -40,3 +40,9 @@ class LargeTextWave5Shots : Wave5Shots() {
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "ldrtl-w360dp-h640dp-xhdpi")
 class RtlScreenShots : ScreenShots() { override val form = "rtl" }
+
+/** First run right to left, where the code to compare must still read as the computer shows it. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "ldrtl-w360dp-h640dp-xhdpi")
+class RtlFirstRunShots : FirstRunShots() { override val form = "rtl" }
