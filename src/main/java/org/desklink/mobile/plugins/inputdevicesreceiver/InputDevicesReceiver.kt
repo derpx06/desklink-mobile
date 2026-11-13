@@ -69,8 +69,14 @@ class InputDevicesReceiverPlugin : Plugin() {
      * could be taken. Sent on every feature-ready and whenever the switch or the service changes.
      */
     fun reportAllowed() {
-        device.sendPacket(statePacket(glideAllowed(), entered = false))
+        val ready = glideAllowed()
+        // Locked: not now, and why (the desk says "Unlock <phone> to use Glide"); allowed again once unlocked (USER_PRESENT).
+        val locked = ready && locked()
+        device.sendPacket(statePacket(ready && !locked, entered = false, reason = if (locked) REASON_LOCKED else null))
     }
+
+    /** No glide over the lock screen: the desk's pointer would reach its shade, tiles and notifications. */
+    private fun locked() = org.desklink.mobile.helpers.LockedActions.isLocked(context)
 
     override fun onFeatureReady() = reportAllowed()
 
@@ -164,8 +170,8 @@ class InputDevicesReceiverPlugin : Plugin() {
         val deltay = np.getDouble("deltay", 0.0)
         val length = np.getDouble("edgeLength", 0.0).takeIf { it > 0 && it <= Glide.MAX_DESK_PX }
         // Not allowed, no accessibility service, a dark screen (nobody to see the pointer), or a nonsense edge: hand it straight back (G5).
-        if (!Glide.validEdge(edge) || !Glide.allowed(context, device.deviceId) || MouseReceiverService.instance == null || !screenIsOn()) {
-            Log.i(TAG, "Glide refused (allowed=${Glide.allowed(context, device.deviceId)}, service=${MouseReceiverService.instance != null})")
+        if (!Glide.validEdge(edge) || !Glide.allowed(context, device.deviceId) || MouseReceiverService.instance == null || !screenIsOn() || locked()) {
+            Log.i(TAG, "Glide refused (allowed=${Glide.allowed(context, device.deviceId)}, service=${MouseReceiverService.instance != null}, locked=${locked()})")
             sendRelease(0, deltay.coerceIn(-Glide.MAX_DESK_PX, Glide.MAX_DESK_PX).toInt())
             // And the reason as state, so the desk stops arming the edge for nothing.
             reportAllowed()
@@ -192,13 +198,24 @@ class InputDevicesReceiverPlugin : Plugin() {
 
     private fun screenIsOn() = context.getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
 
+    private var lockCheckedAt = -LOCK_CHECK_MS
+
     /** G2 motion: hand back once the pointer reaches the edge it came in by. */
     private fun onMotion(np: NetworkPacket) {
         if (!Glide.isGliding(device.deviceId)) return
         // The accessibility service was switched off or killed mid-glide: nothing can show or move the pointer, so
         // the desk gets it back now rather than typing into the void.
         if (MouseReceiverService.instance == null) return stop(release = true)
-        Glide.lastPacketAt = SystemClock.elapsedRealtime()
+        // The phone locked mid-glide (the screen-off path covers the usual case): the pointer goes back. Looked at twice a second.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lockCheckedAt >= LOCK_CHECK_MS) {
+            lockCheckedAt = now
+            if (locked()) {
+                stop(release = true)
+                return reportAllowed()
+            }
+        }
+        Glide.lastPacketAt = now
         if (!np.has("dx") || np.getBoolean("scroll", false)) return
         Glide.release(Glide.enterEdge, Cursor.x, Cursor.y, Glide.edgeLength, metrics.widthPixels, metrics.heightPixels)?.let { (dx, dy) ->
             sendRelease(dx, dy)
@@ -217,6 +234,10 @@ class InputDevicesReceiverPlugin : Plugin() {
     companion object {
         private const val TAG = "DeskLink/Glide"
         private const val ASK_NOTICE_ID = 4417
+        private const val LOCK_CHECK_MS = 500L
+
+        /** `reason` of an `allowed: false` report: the phone is locked (glide_bodies.json). */
+        const val REASON_LOCKED = "locked"
 
         /** The prompt's title and text: "<computer> wants to use Glide. Turn on?" and what to do. */
         @JvmStatic
@@ -227,10 +248,12 @@ class InputDevicesReceiverPlugin : Plugin() {
 
         /** A state report (never a command): `entered` is only ever said together with `allowed`. Shared fixture glide_bodies.json. */
         @JvmStatic
-        fun statePacket(allowed: Boolean, entered: Boolean): NetworkPacket =
+        @JvmOverloads
+        fun statePacket(allowed: Boolean, entered: Boolean, reason: String? = null): NetworkPacket =
             NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES).apply {
                 this["allowed"] = allowed
                 if (entered && allowed) this["entered"] = true
+                if (!allowed && reason != null) this["reason"] = reason
             }
 
         /** The pointer reached the edge it came in by: where the desk's pointer goes on. */

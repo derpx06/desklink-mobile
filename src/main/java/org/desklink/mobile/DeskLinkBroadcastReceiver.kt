@@ -61,6 +61,11 @@ class DeskLinkBroadcastReceiver : BroadcastReceiver() {
                 org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { DeskLinkApplication.getInstance().onScreenOff() } }
             }
 
+            // Unlocked: Glide may be taken again, and the desks that heard "locked" hear so.
+            Intent.ACTION_USER_PRESENT -> org.desklink.mobile.helpers.ThreadHelper.execute {
+                runCatching { org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.reportAllowedToAll() }
+            }
+
             else -> Log.i("BroadcastReceiver", "Ignoring broadcast event: ${intent.action}")
         }
     }

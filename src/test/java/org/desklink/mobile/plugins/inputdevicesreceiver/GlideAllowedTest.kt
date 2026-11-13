@@ -106,4 +106,52 @@ class GlideAllowedTest {
         p.onPacketReceived(enter())
         assertTrue(sent.none { it.getBoolean("entered", false) })
     }
+
+    private fun keyguard(locked: Boolean) =
+        org.robolectric.Shadows.shadowOf(app.getSystemService(android.app.KeyguardManager::class.java)).setKeyguardLocked(locked)
+
+    @Test
+    fun aLockedPhoneRefusesAnEnterAndSaysItIsLocked() {
+        Glide.setAllowed(app, "desk-1", true)
+        val service = org.robolectric.Robolectric.setupService(org.desklink.mobile.plugins.mousereceiver.MouseReceiverService::class.java)
+        try {
+            keyguard(true)
+            val p = plugin()
+            p.onPacketReceived(enter())
+            assertNull("no glide over the lock screen", Glide.activeDesk)
+            assertTrue(sent.any { it.has("releaseDeltax") })
+            val state = sent.last { it.has("allowed") }
+            assertEquals(false, state.getBoolean("allowed", true))
+            assertEquals("locked", state.getString("reason", ""))
+            // Unlocked: allowed again, and no reason.
+            keyguard(false)
+            sent.clear()
+            p.reportAllowed()
+            assertEquals(true, sent.single().getBoolean("allowed", false))
+            assertFalse(sent.single().has("reason"))
+        } finally {
+            keyguard(false)
+            service.onDestroy()
+        }
+    }
+
+    @Test
+    fun aPhoneThatLocksMidGlideGivesThePointerBack() {
+        Glide.setAllowed(app, "desk-1", true)
+        val service = org.robolectric.Robolectric.setupService(org.desklink.mobile.plugins.mousereceiver.MouseReceiverService::class.java)
+        try {
+            val p = plugin()
+            p.onPacketReceived(enter())
+            assertEquals("desk-1", Glide.activeDesk)
+            keyguard(true)
+            sent.clear()
+            p.onPacketReceived(NetworkPacket(DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST).apply { this["dx"] = 1.0; this["dy"] = 0.0 })
+            assertNull("the glide ended", Glide.activeDesk)
+            assertTrue("the desk got its pointer back", sent.any { it.has("releaseDeltax") })
+            assertEquals("locked", sent.last { it.has("allowed") }.getString("reason", ""))
+        } finally {
+            keyguard(false)
+            service.onDestroy()
+        }
+    }
 }

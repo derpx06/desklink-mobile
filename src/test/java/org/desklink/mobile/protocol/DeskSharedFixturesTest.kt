@@ -35,6 +35,7 @@ class DeskSharedFixturesTest {
             "allowed and entered" to InputDevicesReceiverPlugin.statePacket(true, true),
             "allowed off" to InputDevicesReceiverPlugin.statePacket(false, false),
             "entered needs allowed" to InputDevicesReceiverPlugin.statePacket(false, true),
+            "locked" to InputDevicesReceiverPlugin.statePacket(false, false, InputDevicesReceiverPlugin.REASON_LOCKED),
         )
         for (case in cases(fixture("glide_bodies"))) {
             val expected = ours[case.getString("name")] ?: continue
@@ -43,6 +44,7 @@ class DeskSharedFixturesTest {
             assertEquals(case.getString("name"), body.optBoolean("allowed"), expected.getBoolean("allowed", !body.optBoolean("allowed")))
             if (case.getString("name") == "entered needs allowed") assertTrue("entered never without allowed", !expected.has("entered"))
             else assertEquals(case.getString("name"), body.has("entered"), expected.has("entered"))
+            assertEquals(case.getString("name"), body.optString("reason"), expected.getString("reason", ""))
         }
         val release = cases(fixture("glide_bodies")).first { it.getString("name") == "release beats allowed" }.getJSONObject("body")
         val sent = InputDevicesReceiverPlugin.releasePacket(release.getInt("releaseDeltax"), release.getInt("releaseDeltay"))
