@@ -1699,7 +1699,9 @@ class WebRtcSessionCoordinator(
             sendAudioLocked(WebRtcRemoteSessionControlKind.AUDIO_DENIED, session, reason = "busy")
             return false
         }
-        if (session.source == "system") requireNotNull(projection) { "phone sound needs a projection" }
+        // A microphone start for a session the desk has since replaced with one for phone sound: a refusal, never a throw
+        // out of the service's onStartCommand (that killed the app).
+        if (session.source == "system" && projection == null) return false
         val active = transport ?: return false
         PhoneAudioEngine.muted = false
         active.restartRecording {
