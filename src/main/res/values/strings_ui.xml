@@ -262,7 +262,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="accessibility_setup_ask">%1$s wants to control this phone</string>
     <string name="accessibility_setup_ask_text">Tap to turn on DeskLink in Accessibility</string>
     <string name="settings_desk_notifications_summary">Reply from the computer</string>
-    <string name="settings_relay_not_set_up">Not set up yet. Add a relay address in Settings → Advanced → Network</string>
+    <string name="settings_relay_not_set_up">Not set up yet. Add a relay address under Advanced network.</string>
     <string name="settings_reach_anywhere_summary">Keeps working off Wi‑Fi, through an encrypted relay</string>
     <string name="settings_paired_key">Paired · key %1$s</string>
 
@@ -752,15 +752,15 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="files_save_failed_notification">%1$s arrived but could not be saved. It is kept: open Files to try again.</string>
     <string name="files_saved_in">Received files go to %1$s</string>
     <string name="files_saved_in_downloads">the Downloads folder</string>
-    <string name="files_unsaved_title">%1$s could not be saved</string>
+    <string name="files_unsaved_title">%1$s couldn\'t be saved</string>
     <string name="files_unsaved_body">It arrived whole and is kept on this phone. Check there is room, then try again.</string>
     <string name="files_unsaved_retry">Try again</string>
     <string name="files_unsaved_discard">Delete</string>
     <string name="files_unsaved_done">Saved %1$s</string>
     <string name="home_more_actions">More actions</string>
     <!-- W5: Settings, grouped by feature in the desk's order -->
-    <string name="sg_connection_summary">This phone\'s name, %1$s, connecting</string>
-    <string name="sg_notifications_summary">Phone notifications, %1$s\'s here, ring sound</string>
+    <string name="sg_connection_summary">This phone\'s name and how it reaches %1$s</string>
+    <string name="sg_notifications_summary">Shared both ways with %1$s, and the ring sound</string>
     <string name="sg_clipboard">Clipboard</string>
     <string name="sg_clipboard_summary">Share copies with %1$s</string>
     <string name="sg_calls">Calls</string>
@@ -958,8 +958,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_tile_clipboard">Clipboard</string>
     <string name="home_tile_unlock">Unlock desk</string>
     <string name="home_tile_clipboard_hint">Send what you copied</string>
-    <string name="home_tile_clipboard_preview">“%1$s”</string>
-    <string name="home_tile_clipboard_off">Sharing is off</string>
+    <string name="home_tile_clipboard_preview">Clipboard: “%1$s”</string>
+    <string name="home_tile_clipboard_off">Clipboard sharing is off</string>
     <string name="home_tile_screen_hint">See and control it</string>
     <string name="home_tile_ring_hint">Make it ring</string>
     <string name="home_tile_lock_hint">Lock its screen</string>

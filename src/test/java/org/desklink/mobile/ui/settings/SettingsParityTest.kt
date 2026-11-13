@@ -99,7 +99,7 @@ class SettingsParityTest {
         assertEquals(
             listOf(
                 "Something stopped. Tap to restart", "Use the relay from this phone", "Reach <computer> from anywhere", "Advanced network",
-                "Trusted networks", "Add devices by IP", "Permissions", "Quick Settings tiles", "Export DeskLink logs", "About",
+                "Trusted networks", "Add a computer by address", "Permissions", "Quick Settings tiles", "Export DeskLink logs", "About",
             ),
             rows("AdvancedGroup").filter { it != "Style" },
         )
