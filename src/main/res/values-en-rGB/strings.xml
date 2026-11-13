@@ -49,8 +49,8 @@
   <string name="error_timed_out">Timed out</string>
   <string name="error_canceled_by_user">Cancelled by user</string>
   <string name="error_canceled_by_other_peer">Cancelled by other peer</string>
-  <string name="my_device_fingerprint">SHA256 fingerprint of your device certificate is:</string>
-  <string name="remote_device_fingerprint">SHA256 fingerprint of remote device certificate is:</string>
+  <string name="my_device_fingerprint">This phone’s security code:</string>
+  <string name="remote_device_fingerprint">The computer’s security code:</string>
   <string name="pair_requested">Pair requested</string>
   <string name="pairing_request_from">Pairing request from \'%1s\'</string>
   <plurals name="incoming_file_title">
@@ -74,16 +74,16 @@
     <item quantity="other">Received %2$d files from %1$s</item>
   </plurals>
   <plurals name="received_files_fail_title">
-    <item quantity="one">Failed receiving file from %1$s</item>
-    <item quantity="other">Failed receiving %2$d of %3$d files from %1$s</item>
+    <item quantity="one">Couldn\'t receive the file from %1$s</item>
+    <item quantity="other">Couldn\'t receive %2$d of %3$d files from %1$s</item>
   </plurals>
   <plurals name="sent_files_title">
     <item quantity="one">Sent file to %1$s</item>
     <item quantity="other">Sent %2$d files to %1$s</item>
   </plurals>
   <plurals name="send_files_fail_title">
-    <item quantity="one">Failed sending file to %1$s</item>
-    <item quantity="other">Failed sending %2$d of %3$d files to %1$s</item>
+    <item quantity="one">Couldn\'t send the file to %1$s</item>
+    <item quantity="other">Couldn\'t send %2$d of %3$d files to %1$s</item>
   </plurals>
   <string name="tap_to_open">Tap to open</string>
   <string name="received_file_text">Tap to open \'%1s\'</string>
@@ -100,8 +100,8 @@
   <string name="mpris_notifications_explanation">The notifications permission is needed to show remote media in the notifications drawer</string>
   <string name="share_to">Share to…</string>
   <string name="unreachable_device_url_share_text">URLs shared to an unreachable device will be delivered to it once it becomes reachable.\n\n</string>
-  <string name="protocol_version_newer">This device uses a newer protocol version</string>
-  <string name="invalid_device_name">Invalid device name</string>
+  <string name="protocol_version_newer">This computer has a newer DeskLink. Update DeskLink on this phone.</string>
+  <string name="invalid_device_name">Enter a name for this phone</string>
   <string name="shareplugin_text_saved">Received text, saved to clipboard</string>
   <string name="custom_devices_settings">Custom device list</string>
   <string name="custom_device_list">Add a computer by address</string>
@@ -115,11 +115,11 @@
   <string name="filter_apps_info">Notifications will be synchronised for the selected apps.</string>
   <string name="show_notification_if_screen_off">Send notifications only if the screen is off</string>
   <string name="add_device_dialog_title">Add device</string>
-  <string name="add_device_hint">Hostname or IP address</string>
+  <string name="add_device_hint">Computer’s address</string>
   <string name="send_files">Send files</string>
   <string name="block_notification_contents">Block notification contents</string>
   <string name="block_notification_images">Block notification images</string>
-  <string name="device_rename_title">Rename device</string>
+  <string name="device_rename_title">Rename this phone</string>
   <string name="device_rename_confirm">Rename</string>
   <string name="refresh">Refresh</string>
   <string name="no_file_browser">There are no file browsers installed.</string>
@@ -128,8 +128,8 @@
   <string name="findmyphone_title_tv">Find my TV</string>
   <string name="findmyphone_description">Rings this device so you can find it</string>
   <string name="findmyphone_found">Found it</string>
-  <string name="permission_explanation">This plugin needs permissions to work</string>
-  <string name="optional_permission_explanation">You need to grant extra permissions to enable all functions</string>
+  <string name="permission_explanation">This feature needs permission to work</string>
+  <string name="optional_permission_explanation">Allow a few more things to use every feature</string>
   <string name="share_optional_permission_explanation">To receive files you need to allow storage access</string>
   <string name="share_notifications_explanation">To see the progress when sending and receiving files you need to allow notifications</string>
   <string name="contacts_permission_explanation">To share your contacts book with the desktop, you need to give contacts permission</string>
@@ -142,8 +142,8 @@
   <string name="pref_plugin_findremotedevice_desc">Ring your remote device</string>
   <string name="ring">Ring</string>
   <string name="all">All</string>
-  <string name="setting_persistent_notification_oreo">Persistent notification</string>
-  <string name="setting_persistent_notification_description">Tap to enable/disable in Notification settings</string>
+  <string name="setting_persistent_notification_oreo">Always-on notification</string>
+  <string name="setting_persistent_notification_description">DeskLink shows it to keep working in the background. Tap to hide or show it</string>
   <string name="extra_options">Extra options</string>
   <string name="privacy_options">Privacy options</string>
   <string name="set_privacy_options">Set your privacy options</string>
@@ -193,4 +193,5 @@
   <string name="findmyphone_notifications_explanation">The notifications permission is needed so the phone can ring when the app is in the background</string>
   <string name="mpris_keepwatching">Continue playing</string>
   <string name="notification_channel_keepwatching">Continue playing</string>
+    <string name="sum_about">Version, licences and credits</string>
 </resources>
