@@ -934,7 +934,7 @@ public class LanLinkProvider extends BaseLinkProvider {
         visibleDevices.clear();
         dialBackoff.reset();
 
-        announceBurst(network);
+        announceBurst(network, true);
     }
 
     @Override
@@ -942,7 +942,9 @@ public class LanLinkProvider extends BaseLinkProvider {
         if (udpServer == null) {
             setupUdpListener();
         }
-        announceBurst(null);
+        // A screen-on or connectivity refresh re-announces only: restarting NSD resets its back-off
+        // and its radio work, and is for a network change (started if it is not running).
+        announceBurst(null, false);
     }
 
     // A single beacon is easily lost — UDP, a desktop listener not up yet, an
@@ -953,7 +955,7 @@ public class LanLinkProvider extends BaseLinkProvider {
     private final java.util.concurrent.atomic.AtomicLong burstGeneration =
             new java.util.concurrent.atomic.AtomicLong();
 
-    private void announceBurst(@Nullable Network network) {
+    private void announceBurst(@Nullable Network network, boolean restartDiscovery) {
         // Only the outbound churn is throttled.
         if (System.currentTimeMillis() < lastBroadcast + delayBetweenBroadcasts) {
             Log.i("LanLinkProvider", "announceBurst: relax cowboy");
@@ -961,7 +963,7 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
         lastBroadcast = System.currentTimeMillis();
         synchronized (mdnsDiscovery) {
-            mdnsDiscovery.stopDiscovering();
+            if (restartDiscovery) mdnsDiscovery.stopDiscovering();
             mdnsDiscovery.startDiscovering();
         }
         final long generation = burstGeneration.incrementAndGet();

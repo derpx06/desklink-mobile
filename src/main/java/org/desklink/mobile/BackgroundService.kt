@@ -658,6 +658,11 @@ class BackgroundService : Service() {
         @JvmStatic
         fun ForceRefreshConnections(context: Context) {
             Log.d(LOG_TAG, "ForceRefreshConnections")
+            // Already running (and so already foreground): no start command, no foreground notification churn.
+            instance?.let { service ->
+                service.refreshDiscovery()
+                return
+            }
             val intent = Intent(context, BackgroundService::class.java)
             intent.putExtra("refresh", true)
             ContextCompat.startForegroundService(context, intent)
