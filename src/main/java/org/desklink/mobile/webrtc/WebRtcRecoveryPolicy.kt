@@ -55,9 +55,14 @@ class WebRtcRecoveryPolicy(private val clock: () -> Long = { System.nanoTime() /
      */
     @Synchronized
     fun capAtLastRung() {
+        // The healthy-reset credit is kept: a restart request arriving after 60 s of healthy
+        // feature-ready must not lose the reset it earned.
+        if (readySince?.let { clock() - it >= HEALTHY_RESET_MS } == true) {
+            nextAttempt = 0
+            readySince = null
+        }
         nextAttempt = nextAttempt.coerceAtMost(DELAYS_MILLIS.size)
         scheduled = false
-        readySince = null
     }
 
     @Synchronized

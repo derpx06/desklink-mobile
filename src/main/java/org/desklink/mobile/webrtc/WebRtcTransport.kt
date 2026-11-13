@@ -448,8 +448,12 @@ class WebRtcTransport(
      * Control, events and liveness are all open: what this side's feature-ready waits for, as the
      * desk's does (`required_channels_open`). A feature or a probe sent before is lost.
      */
-    fun requiredChannelsOpen(): Boolean =
-        REQUIRED_LABELS.all { channels[it]?.state() == DataChannel.State.OPEN }
+    fun requiredChannelsOpen(): Boolean {
+        // An older desk has no liveness channel (the same test as livenessChannelUsable: it takes
+        // part in delta resync only if it has one); waiting for it would never send feature-ready.
+        val liveness = WebRtcFeatureProfile.peerAccepts(wireBinding.peerDeviceId, DeskLinkProtocol.PACKET_TYPE_SYNC_HAVE)
+        return requiredLabelsFor(liveness).all { channels[it]?.state() == DataChannel.State.OPEN }
+    }
 
     fun isReadyForPackets(): Boolean =
         state == TransportState.CONNECTED &&
@@ -1118,13 +1122,17 @@ class WebRtcTransport(
         override fun onSetFailure(error: String) = Unit
     }
 
-    private companion object {
-        const val TAG = "DeskLink/WebRTC"
+    companion object {
+        private const val TAG = "DeskLink/WebRTC"
         const val MIN_SCREEN_BITRATE = 300_000
         /** How long after the last frame the capture re-delivers it, once, for refinement. */
         const val REFINE_AFTER_MS = 100L
         const val START_SCREEN_BITRATE = 2_500_000
         val REQUIRED_LABELS = WebRtcChannel.REQUIRED.map { it.label }.toSet()
+
+        /** What feature-ready waits for: control and events, and liveness when the desk has that channel. */
+        internal fun requiredLabelsFor(peerHasLiveness: Boolean): Set<String> =
+            if (peerHasLiveness) REQUIRED_LABELS else REQUIRED_LABELS - WebRtcChannel.LIVENESS.label
     }
 }
 

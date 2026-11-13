@@ -642,7 +642,7 @@ class DeskLinkApplication : Application() {
             }
             device.setControlPacketHandler(coordinator)
             if (retainedBinding != null) {
-                coordinator.onBootstrapReconnected()
+                coordinator.onBootstrapReconnected(newLink = true)
             } else {
                 coordinator.beginIfSupported()
                 // A fresh path away from home: the phone offers if it initiates,

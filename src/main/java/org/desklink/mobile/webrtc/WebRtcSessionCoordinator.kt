@@ -227,7 +227,7 @@ class WebRtcSessionCoordinator(
      * remains blocked until the replacement peer reaches mutual
      * `feature-ready`.
      */
-    fun onBootstrapReconnected() {
+    fun onBootstrapReconnected(newLink: Boolean = false) {
         val binding = sessions.currentBinding(device.deviceId) ?: return
         val localDeviceId = DeviceHelper.getDeviceId(context)
         // The usual case: a LAN heartbeat while the peer is fine. Publishing it fired a device-list
@@ -257,7 +257,11 @@ class WebRtcSessionCoordinator(
                 if (closed || !sessions.isCurrent(binding)) return@synchronized
                 publish("BootstrapReconnected", "Replacing the stale WebRTC peer")
                 closeLocked()
-                resetLadder("new bootstrap link")
+                // Only a genuinely new or adopted socket is "a sign of the desk" that starts the
+                // ladder over. The 10 s heartbeat also lands here to replace a stalled attempt, and
+                // resetting then restarted every attempt at the first rung: with UDP blocked but TCP
+                // fine the phone rebuilt every ~20 s and never reached "unavailable".
+                if (shouldResetLadderOnBootstrap(newLink)) resetLadder("new bootstrap link")
                 recoveryInProgress = false
                 device.setWebRtcRecoveryPending(true)
                 startInitiatorLocked(binding, iceServers)
@@ -2824,6 +2828,9 @@ class WebRtcSessionCoordinator(
          * until feature-ready, so an attempt it started that stalled (ICE checking for ever, no
          * FAILED) blocked the heartbeat's replacement for good.
          */
+        @JvmStatic
+        fun shouldResetLadderOnBootstrap(newLink: Boolean): Boolean = newLink
+
         @JvmStatic
         fun negotiationInFlight(recoveryInProgress: Boolean, hasAttempt: Boolean, attemptAgeMs: Long): Boolean =
             if (hasAttempt) attemptAgeMs < ATTEMPT_STALL_MS else recoveryInProgress

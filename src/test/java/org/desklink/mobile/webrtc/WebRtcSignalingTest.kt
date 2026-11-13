@@ -120,4 +120,19 @@ class WebRtcSignalingTest {
         assertFalse(WebRtcSessionCoordinator.negotiationInFlight(true, true, stall))
         assertFalse(WebRtcSessionCoordinator.negotiationInFlight(false, true, stall))
     }
+
+    @Test
+    fun `only a new or adopted link resets the ladder, never the heartbeat`() {
+        assertFalse(WebRtcSessionCoordinator.shouldResetLadderOnBootstrap(false))
+        assertTrue(WebRtcSessionCoordinator.shouldResetLadderOnBootstrap(true))
+    }
+
+    @Test
+    fun `feature-ready waits for liveness only when the desk has that channel`() {
+        val withLiveness = WebRtcTransport.requiredLabelsFor(true)
+        val without = WebRtcTransport.requiredLabelsFor(false)
+        assertTrue(WebRtcChannel.LIVENESS.label in withLiveness)
+        assertFalse(WebRtcChannel.LIVENESS.label in without)
+        assertEquals(setOf(WebRtcChannel.CONTROL.label, WebRtcChannel.EVENTS.label), without)
+    }
 }

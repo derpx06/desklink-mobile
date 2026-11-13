@@ -39,6 +39,24 @@ class WebRtcRecoveryPolicyTest {
     }
 
     @Test
+    fun `a restart request keeps the healthy-reset credit`() {
+        var now = 0L
+        val policy = WebRtcRecoveryPolicy { now }
+        failures(policy, 4)
+        policy.markReady()
+        now += WebRtcRecoveryPolicy.HEALTHY_RESET_MS
+        policy.capAtLastRung()
+        assertEquals(250L, policy.claimDelayMillis())
+        // Less than a minute of health earns nothing.
+        val early = WebRtcRecoveryPolicy { now }
+        failures(early, 4)
+        early.markReady()
+        now += 1_000
+        early.capAtLastRung()
+        assertEquals(8_000L, early.claimDelayMillis())
+    }
+
+    @Test
     fun `restart requests that keep coming still reach the unavailable state`() {
         val policy = WebRtcRecoveryPolicy()
         // Each failed negotiation is answered by a restart request from the desk.
