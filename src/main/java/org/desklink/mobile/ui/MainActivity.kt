@@ -459,7 +459,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             qrFlow.succeeded(id) // a QR pairing that completed: leaving the scan screen must not take it back
             if (stack.any(::isPairingRoute)) settleAfterPairing()
             val name = paired.first { it.deviceId == id }.name
-            showMessage(getString(R.string.pair_paired_with, name))
+            showFix(getString(R.string.pair_paired_with, name), getString(R.string.guide_see_what)) { push(GUIDE) }
             // Queued, not pushed: a desk's prompt, the pairing screens or the first-share question may be in front right now.
             if (needsPermissionsChecklist(this, name)) FirstRun.setChecklistPending(defaultPrefs, true)
         } else if (selectedId !in ids) {
@@ -483,7 +483,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val paired = HomeModel.pairedDevices()
         LaunchedEffect(tick) { reconcile(paired) }
         val holder = rememberSaveableStateHolder()
-        ForgetLeftRoutes(stack.last(), holder, setOf(ONBOARDING))
+        ForgetLeftRoutes(stack.last(), holder, setOf(ONBOARDING, GUIDE))
         // A paired person never sees the tour, now or if they unpair later.
         LaunchedEffect(paired.isNotEmpty()) {
             if (paired.isNotEmpty()) {
@@ -555,14 +555,15 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     onFinish = { markOnboardingSeen(); startPairing(paired.size) },
                     onSkip = ::markOnboardingSeen,
                 )
-                else -> WelcomeScreen(onPair = { startPairing(paired.size) }, onSettings = { push(SETTINGS) })
+                else -> WelcomeScreen(onPair = { startPairing(paired.size) }, onSettings = { push(SETTINGS) }, onGuide = { push(GUIDE) })
             }
             route == ONBOARDING -> OnboardingRoute(
                 paired = device != null,
                 onFinish = { pop(); if (device == null) startPairing(paired.size) },
                 onSkip = ::pop,
             )
-            route == PERMISSIONS -> PermissionsChecklistRoute(device?.name ?: getString(R.string.settings_your_computer)) { resetTo(HOME) }
+            route == PERMISSIONS -> PermissionsChecklistRoute(device?.name ?: getString(R.string.settings_your_computer), onSeeWhatYouCanDo = { resetTo(HOME); push(GUIDE) }) { resetTo(HOME) }
+            route == GUIDE -> GuideRoute(device, paired)
             route == SETUP -> PermissionsSetupRoute {
                 FirstRun.markSetupDone(defaultPrefs)
                 setupDone = true
@@ -574,6 +575,55 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             route == SETTINGS -> SettingsContent(device)
             route.startsWith(VIEWER_PREFIX) -> ViewerRoute(route.removePrefix(VIEWER_PREFIX))
             else -> LaunchedEffect(route) { pop() }
+        }
+    }
+
+    // ---- get started guide ----------------------------------------------------------------------------------
+
+    /** "Get started": the same state and actions as Home, so a card says and does what Home's button would. */
+    @Composable
+    private fun GuideRoute(device: Device?, paired: List<Device>) {
+        @Suppress("UNUSED_VARIABLE") val refresh = tick
+        val state = device?.let { HomeModel.build(this, it, paired, emptyList()) }
+        val actions = androidx.compose.runtime.remember(device) {
+            device?.let { d -> homeActions(d) { showMessage(getString(R.string.home_share_screen_body, d.name)) } }
+        }
+        val resumed = org.desklink.mobile.ui.compose.screen.settings.rememberResumeTick()
+        val trouble = androidx.compose.runtime.remember(resumed, device?.name) {
+            permissionRows(this, device?.name ?: getString(R.string.settings_your_computer), request = {}).filter { it.id == "battery" || it.id == "oem" }
+        }
+        org.desklink.mobile.ui.compose.screen.guide.GuideScreen(
+            state = state,
+            onBack = ::pop,
+            onAction = { guideAction(it, device, actions, paired.size) },
+            onBlocked = { card, title, blocker -> if (device != null && card.blockedBy != null) explainBlocked(device, card.blockedBy, title, blocker) },
+            trouble = trouble,
+            tiles = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+        )
+    }
+
+    /** A guide card's button: every action goes where Home's button (or Settings' row) for it goes. */
+    private fun guideAction(action: org.desklink.mobile.ui.compose.screen.guide.GuideAction, device: Device?, actions: HomeActions?, pairedCount: Int) {
+        // A tab or a Settings page: the guide goes, so what it opened is on screen.
+        fun onTab(open: (HomeActions) -> Unit) = actions?.let { resetTo(HOME); open(it) } ?: startPairing(pairedCount)
+        when (action) {
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.PAIR -> if (device == null) startPairing(pairedCount) else push(SCAN)
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.SEND_FILE -> actions?.onSendFiles?.invoke() ?: startPairing(pairedCount)
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.SEND_CLIPBOARD -> actions?.onSendClipboard?.invoke() ?: startPairing(pairedCount)
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.DESK_SCREEN -> actions?.onDeskScreen?.invoke() ?: startPairing(pairedCount)
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.SHARE_SCREEN -> actions?.onShareScreen?.invoke() ?: startPairing(pairedCount)
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.RING -> actions?.onRing?.invoke() ?: startPairing(pairedCount)
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.LOCK -> actions?.onLock?.invoke() ?: startPairing(pairedCount)
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.NOTIFICATIONS -> onTab { it.onOpenSettings(SettingsPage.NOTIFICATIONS.route) }
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.GLIDE -> onTab { it.onOpenSettings(SettingsPage.CONTROL.route) }
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.TERMINALS -> onTab { it.onTerminals() }
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.NOTES -> onTab { it.onNewNote() }
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.TILES -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) offerTiles()
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.RETRY -> {
+                BackgroundService.ForceRefreshConnections(this)
+                showMessage(getString(R.string.home_looking_for, device?.name ?: getString(R.string.settings_your_computer)))
+            }
+            org.desklink.mobile.ui.compose.screen.guide.GuideAction.WIFI -> runCatching { startActivity(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS)) }
         }
     }
 
@@ -905,6 +955,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onBlocked = { action, title, blocker -> explainBlocked(device, action, title, blocker) },
             openComputersRequest = computersRequest,
             onComputersShown = { computersRequest = 0 },
+            onGuide = { push(GUIDE) },
         )
     }
 
@@ -1283,6 +1334,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         fun deskSet(key: String, on: Boolean) = device?.getPlugin(DeskSettingsPlugin::class.java)?.set(key, on)
         SettingsTab(
             desk = desk,
+            onGuide = { push(GUIDE) },
             route = nav.top(AppTab.SETTINGS),
             onOpen = { nav.push(AppTab.SETTINGS, it) },
             onBack = { nav.pop(AppTab.SETTINGS) },
@@ -1560,6 +1612,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         private const val ONBOARDING = "onboarding"
         private const val PERMISSIONS = "permissions"
         private const val SETUP = "setup"
+        private const val GUIDE = "guide"
         private const val VIEWER_PREFIX = "viewer/"
         private const val PAIR_PREFIX = "pair/"
         private fun pairRoute(id: String) = PAIR_PREFIX + id

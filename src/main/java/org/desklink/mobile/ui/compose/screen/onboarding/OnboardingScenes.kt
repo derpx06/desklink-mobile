@@ -360,40 +360,19 @@ private fun BoxScope.SceneShare(phase: () -> Float) {
     Chip(R.drawable.sym_download, stringResource(R.string.ob_chip_saved), phase, 0.4f, Modifier.align(Alignment.TopEnd).offset((-16).dp, 168.dp), Tone.Mint)
 }
 
-// ---- 5: private -----------------------------------------------------------------------------------------
+/** The scenes, each on its 328 x 350 canvas: the glance's welcome, then one per tour page. */
+enum class Scene { WELCOME, CONTROL, TERMINALS, SHARE }
 
+/** [scene] on its canvas. Decorative: the words beside it say everything it shows. */
 @Composable
-private fun BoxScope.ScenePrivate(phase: () -> Float) {
-    val t = tokens
-    Blob(t.accent, 0.45f, phase, 0f, Modifier.align(Alignment.TopStart).offset(60.dp, 40.dp))
-    Blob(t.mint, 0.35f, phase, 0.6f, Modifier.align(Alignment.BottomEnd).offset(40.dp, 60.dp))
-    Canvas(Modifier.fillMaxSize()) {
-        val c = Offset(size.width / 2, 168.dp.toPx())
-        for (i in 0..2) {
-            val q = frac(phase() + i / 3f)
-            drawCircle(t.accent.copy(alpha = 0.7f * (1 - q)), 75.dp.toPx() * (0.7f + 1.2f * q), c, style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
-        }
-    }
-    Box(
-        Modifier.align(Alignment.TopCenter).offset(y = 106.dp).size(124.dp).background(t.accentContainer, CircleShape).border(6.dp, t.surface, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) { Icon(painterResource(R.drawable.sym_encrypted), contentDescription = null, tint = t.onAccentContainer, modifier = Modifier.size(56.dp)) }
-    Chip(R.drawable.sym_encrypted, stringResource(R.string.ob_chip_encrypted), phase, 0.05f, Modifier.align(Alignment.TopStart).offset(14.dp, 24.dp), Tone.Mint)
-    Chip(R.drawable.sym_devices, stringResource(R.string.ob_chip_paired), phase, 0.2f, Modifier.align(Alignment.TopEnd).offset((-12).dp, 252.dp))
-    Chip(R.drawable.sym_person, stringResource(R.string.ob_chip_no_account), phase, 0.35f, Modifier.align(Alignment.BottomStart).offset(22.dp, (-20).dp))
-}
-
-/** The scene of tour page [page] (0..4) on its 328 x 350 canvas. Decorative: the page's words say everything it shows. */
-@Composable
-fun OnboardingScene(page: Int, still: Boolean, modifier: Modifier = Modifier) {
+fun OnboardingScene(scene: Scene, still: Boolean, modifier: Modifier = Modifier) {
     val phase = rememberScenePhase(still)
     Box(modifier.requiredSize(SceneWidth.dp, SceneHeight.dp)) {
-        when (page) {
-            0 -> SceneWelcome(phase)
-            1 -> SceneControl(phase)
-            2 -> SceneTerminals(phase, still)
-            3 -> SceneShare(phase)
-            else -> ScenePrivate(phase)
+        when (scene) {
+            Scene.WELCOME -> SceneWelcome(phase)
+            Scene.CONTROL -> SceneControl(phase)
+            Scene.TERMINALS -> SceneTerminals(phase, still)
+            Scene.SHARE -> SceneShare(phase)
         }
     }
 }
