@@ -32,6 +32,19 @@ object CallRequests {
     const val ERROR_PERMISSION = "permission"
     const val ERROR_NO_CALL = "no-call"
     const val ERROR_FAILED = "failed"
+    /** The desk asked to dial an emergency number: refused, the phone's own dialer is the way (mirrors the desk's list). */
+    const val ERROR_EMERGENCY = "emergency"
+
+    private val EMERGENCY = setOf(
+        "112", "911", "999", "000", "110", "119", "118", "122", "100", "101",
+        "102", "108", "115", "117", "113", "144", "155", "190", "199", "933",
+    )
+
+    /** An emergency number, bare or with a leading `+` or `00`, separators ignored. */
+    fun isEmergency(number: String): Boolean {
+        val digits = number.filter { it.isDigit() || it == '+' }.trimStart('+')
+        return digits.removePrefix("00") in EMERGENCY
+    }
 
     /** Runs [action]; null when done (the caller replies with a fresh snapshot), else the T2 error. */
     fun handle(action: String, number: String?, tracker: CallTracker, controls: CallControls, flags: CallFlags): String? = when (action) {
@@ -59,6 +72,7 @@ object CallRequests {
         "dial" -> {
             val dialable = CallTracker.dialable(number)
             when {
+                dialable != null && isEmergency(dialable) -> ERROR_EMERGENCY
                 !controls.canDial() -> ERROR_PERMISSION
                 dialable == null -> ERROR_FAILED
                 // The computer asks, the person on the phone decides: nothing is dialled from here.
