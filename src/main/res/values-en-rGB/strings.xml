@@ -104,7 +104,7 @@
   <string name="invalid_device_name">Invalid device name</string>
   <string name="shareplugin_text_saved">Received text, saved to clipboard</string>
   <string name="custom_devices_settings">Custom device list</string>
-  <string name="custom_device_list">Add devices by IP</string>
+  <string name="custom_device_list">Add a computer by address</string>
   <string name="custom_device_deleted">Custom device deleted</string>
   <string name="custom_device_fab_hint">Add a device</string>
   <string name="undo">Undo</string>
