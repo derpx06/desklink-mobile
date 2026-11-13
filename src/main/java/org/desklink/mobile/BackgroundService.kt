@@ -663,8 +663,16 @@ class BackgroundService : Service() {
 
         fun Start(context: Context) {
             Log.d(LOG_TAG, "Start")
-            val intent = Intent(context, BackgroundService::class.java)
-            ContextCompat.startForegroundService(context, intent)
+            startRefusable(context, Intent(context, BackgroundService::class.java))
+        }
+
+        /** Android 12+ refuses the start when the app is not in front at that instant (ForegroundServiceStartNotAllowedException): logged, the next start tries again. */
+        private fun startRefusable(context: Context, intent: Intent) {
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (e: IllegalStateException) {
+                Log.w(LOG_TAG, "Foreground start refused: ${e.javaClass.simpleName}")
+            }
         }
 
         @JvmStatic
@@ -677,7 +685,7 @@ class BackgroundService : Service() {
             }
             val intent = Intent(context, BackgroundService::class.java)
             intent.putExtra("refresh", true)
-            ContextCompat.startForegroundService(context, intent)
+            startRefusable(context, intent)
         }
     }
 }
