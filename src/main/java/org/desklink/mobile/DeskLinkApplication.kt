@@ -145,7 +145,8 @@ class DeskLinkApplication : Application() {
         listOf("stored_menu_selection", org.desklink.mobile.helpers.PerPeerState.LABELS).forEach { getSharedPreferences(it, MODE_PRIVATE) }
         step("Plugin table") { PluginFactory.initPluginInfo(this) }
         step("Notification channels") { NotificationHelper.initializeChannels(this) }
-        CrashReporter.offerPendingReport(this)
+        // Lists the crash folder (disk): off the main thread, after the channels it posts to exist.
+        ThreadHelper.execute { CrashReporter.offerPendingReport(this) }
         LifecycleHelper.initializeObserver()
         org.desklink.mobile.plugins.clipboard.ClipboardListener.followForeground(this)
         // Objects holding Compose state are made here, on the main thread before any composition,

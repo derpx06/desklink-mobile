@@ -12,7 +12,6 @@ import org.desklink.mobile.ui.compose.screen.onboarding.OnboardingScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsChecklistScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsSetupScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.FinishSetupCard
-import org.desklink.mobile.ui.compose.screen.onboarding.SplashScreen
 import org.desklink.mobile.ui.compose.screen.pairing.InstallLinkContent
 import org.desklink.mobile.ui.compose.screen.pairing.NearbyComputer
 import org.desklink.mobile.ui.compose.screen.pairing.PairCodeScreen
@@ -36,13 +35,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The first-run screens, light and dark: splash, the five tour pages, the permissions setup, welcome, scan, compare codes and the permissions checklist.
+ * The first-run screens, light and dark: the five tour pages, the permissions setup, welcome, scan, compare codes and the permissions checklist.
  * `./gradlew testDebugUnitTest --tests "*FirstRunShots*"`; images land in `~/.cache/android-ui/shots/` as `<form>-fr-<screen>-<theme>.png`.
  */
 abstract class FirstRunShots : ShotTest() {
     private fun tour(page: Int) = @Composable { OnboardingScreen(page, {}, paired = false, onFinish = {}, onSkip = {}) }
 
-    @Test fun splash() = shoot("fr-splash") { SplashScreen("arch-desk") }
     @Test fun tour1() = shoot("fr-tour-1", tour(0))
     @Test fun tour2() = shoot("fr-tour-2", tour(1))
     @Test fun tour3() = shoot("fr-tour-3", tour(2))

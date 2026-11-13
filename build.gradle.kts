@@ -172,6 +172,9 @@ dependencies {
     implementation(libs.androidx.media)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
+    // Installs src/main/baseline-prof.txt (the cold-start path, compiled ahead of time) on a sideloaded or F-Droid install too.
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.recyclerview)
     implementation(libs.androidx.documentfile)

@@ -21,6 +21,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,7 +30,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -76,7 +76,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.stringResource
@@ -152,7 +151,6 @@ import org.desklink.mobile.ui.compose.screen.settings.PermissionNeeds
 import org.desklink.mobile.ui.compose.screen.settings.permissionRows
 import org.desklink.mobile.ui.compose.screen.settings.rememberPermissionAsker
 import org.desklink.mobile.ui.compose.screen.settings.rememberResumeTick
-import org.desklink.mobile.ui.compose.screen.onboarding.SplashScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.needsPermissionsChecklist
 import org.desklink.mobile.ui.compose.screen.settings.DeskSettings
 import org.desklink.mobile.ui.compose.screen.settings.SettingsActions
@@ -225,6 +223,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private val selection: SharedPreferences by lazy { applicationContext.getSharedPreferences("stored_menu_selection", MODE_PRIVATE) } // the application context has the path cached (no main-thread disk check)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The launch splash (Theme.DeskLink.Starting): up from the tap, before this process draws anything.
+        val splash = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (!intent.isReadable()) return finish()
@@ -242,7 +242,21 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         notesEditing.value = savedInstanceState?.getString(STATE_NOTE)
         if (savedInstanceState == null) handleIntent(intent)
 
-        if (splashStartedAt < 0) splashStartedAt = SystemClock.elapsedRealtime()
+        // On a cold start it stays while the paired computer is looked for, [FirstRun.SPLASH_MAX_MS] at most, so Home does not
+        // open on "not connected" for a computer about to answer. Never on a rotation or a warm start.
+        if (savedInstanceState == null && coldStart) {
+            val until = SystemClock.elapsedRealtime() + FirstRun.SPLASH_MAX_MS
+            splash.setKeepOnScreenCondition {
+                val paired = HomeModel.pairedDevices()
+                val device = paired.firstOrNull { it.deviceId == selectedId } ?: paired.firstOrNull()
+                FirstRun.showSplash(true, device?.name, device?.isReachable == true, SystemClock.elapsedRealtime() >= until)
+            }
+        }
+        coldStart = false
+        // A short fade into the app ("Remove animations" makes it a cut: the animator scale is 0).
+        splash.setOnExitAnimationListener { view ->
+            view.view.animate().alpha(0f).setDuration(160).withEndAction(view::remove).start()
+        }
         setContent { DeskLinkTheme(this) { Root() } }
         if (BuildConfig.DEBUG && savedInstanceState == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) logFirstFrame()
 
@@ -469,7 +483,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val paired = HomeModel.pairedDevices()
         LaunchedEffect(tick) { reconcile(paired) }
         val holder = rememberSaveableStateHolder()
-        val splash = splashShowing(paired)
         ForgetLeftRoutes(stack.last(), holder, setOf(ONBOARDING))
         // A paired person never sees the tour, now or if they unpair later.
         LaunchedEffect(paired.isNotEmpty()) {
@@ -488,13 +501,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 targetState = stack.last(),
                 transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
                 label = "screen",
-                // Under the splash the screen is not read out: TalkBack would walk a screen nobody can see yet.
-                modifier = if (splash) Modifier.clearAndSetSemantics { } else Modifier,
             ) { route ->
                 holder.SaveableStateProvider(route) { Screen(route, paired) }
-            }
-            AnimatedVisibility(splash, enter = fadeIn(tween(0)), exit = fadeOut(tween(160))) {
-                SplashScreen(paired.firstOrNull { it.deviceId == selectedId }?.name ?: paired.firstOrNull()?.name.orEmpty())
             }
             // Above the tab bar when it is showing.
             // The design's inverse snackbar: its action is the opposite theme's accent (the app's accent is 1.7:1 on it).
@@ -503,26 +511,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (onTabs && !isWide()) 16.dp + TabBarHeight else 16.dp),
             )
         }
-    }
-
-    /**
-     * Whether the splash is up: the first thing on a cold start, while the paired computer is looked for ([FirstRun.showSplash]).
-     * Once gone it stays gone. The second counts from the process's first frame, so a rotation does not start it again.
-     */
-    @Composable
-    private fun splashShowing(paired: List<Device>): Boolean {
-        val remaining = remember { FirstRun.splashRemainingMs(splashStartedAt, SystemClock.elapsedRealtime()) }
-        var finished by rememberSaveable { mutableStateOf(!coldStart) }
-        var expired by remember { mutableStateOf(remaining <= 0L) }
-        LaunchedEffect(Unit) {
-            coldStart = false // consumed by this first composition: a recreated activity is not a cold start
-            delay(remaining)
-            expired = true
-        }
-        val device = paired.firstOrNull { it.deviceId == selectedId } ?: paired.firstOrNull()
-        val showing = !finished && FirstRun.showSplash(true, device?.name, device?.isReachable == true, expired)
-        LaunchedEffect(showing) { if (!showing) finished = true }
-        return showing
     }
 
     /** Back from the pairing screen is Cancel: it answers the computer that asked. */
@@ -1576,10 +1564,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         private const val PAIR_PREFIX = "pair/"
         private fun pairRoute(id: String) = PAIR_PREFIX + id
 
-        /** True until the first screen of this process has been composed: only then can the splash show. */
+        /** True until this process's first MainActivity is created: only then is the splash held. */
         @Volatile private var coldStart = true
-
-        /** When the process's first screen was composed ([SystemClock.elapsedRealtime]); -1 before. */
-        @Volatile private var splashStartedAt = -1L
     }
 }

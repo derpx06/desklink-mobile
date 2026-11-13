@@ -1,0 +1,26 @@
+# Hand-written Baseline Profile for the cold-start path (launcher icon -> Home). The libraries (Compose, AndroidX) ship
+# their own; these are DeskLink's classes. ProfileInstaller compiles them ahead of time on a sideloaded install too.
+# Regenerate with a Macrobenchmark BaselineProfileRule if the start-up path moves.
+
+# Application.onCreate: settings, keys and certificate, the plugin table, the remembered computers.
+HSPLorg/desklink/mobile/DeskLinkApplication**;->**(**)**
+HSPLorg/desklink/mobile/Device;->**(**)**
+HSPLorg/desklink/mobile/Device$**;->**(**)**
+HSPLorg/desklink/mobile/DeviceInfo**;->**(**)**
+HSPLorg/desklink/mobile/PairingHandler**;->**(**)**
+HSPLorg/desklink/mobile/helpers/**;->**(**)**
+HSPLorg/desklink/mobile/session/**;->**(**)**
+HSPLorg/desklink/mobile/plugins/PluginFactory**;->**(**)**
+HSPLorg/desklink/mobile/plugins/Plugin;->**(**)**
+# Every plugin is instantiated once for the plugin table.
+Lorg/desklink/mobile/plugins/**;
+
+# MainActivity and the first screen: theme, Home, the tab bar and shared components.
+HSPLorg/desklink/mobile/ui/MainActivity**;->**(**)**
+HSPLorg/desklink/mobile/ui/ThemeUtil**;->**(**)**
+HSPLorg/desklink/mobile/ui/compose/DeskLinkTheme**;->**(**)**
+HSPLorg/desklink/mobile/ui/compose/components/**;->**(**)**
+HSPLorg/desklink/mobile/ui/compose/model/**;->**(**)**
+HSPLorg/desklink/mobile/ui/compose/screen/home/**;->**(**)**
+HSPLorg/desklink/mobile/ui/compose/screen/onboarding/**;->**(**)**
+HSPLorg/desklink/mobile/ui/compose/shell/**;->**(**)**
