@@ -73,7 +73,7 @@ class Wave5BehaviourTest {
         val log = mutableListOf<String>()
         desk(granted = true, log = log)
         compose.onNodeWithContentDescription("Edge to edge").performClick()
-        compose.onNodeWithContentDescription("Desk sound").performClick()
+        compose.onNodeWithContentDescription("Computer sound").performClick()
         compose.onNodeWithContentDescription("Close remote control").performClick()
         compose.onNodeWithText("End").performClick()
         assertEquals(listOf("fill", "sound", "back", "end"), log)
@@ -93,7 +93,7 @@ class Wave5BehaviourTest {
     @Test fun fitAndSoundAreSwitchesWithFixedNames() {
         desk(granted = true)
         compose.onNodeWithContentDescription("Edge to edge").assertIsOff().assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
-        compose.onNodeWithContentDescription("Desk sound").assertIsOff().assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
+        compose.onNodeWithContentDescription("Computer sound").assertIsOff().assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
     }
 
     @Test fun superIsOnlyOnTheKeyRow() {

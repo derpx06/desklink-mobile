@@ -66,7 +66,7 @@ class A11yWalkerTest {
     @Test fun narrowScreenKeepsFitAndSoundInMore() {
         desk()
         compose.onNodeWithContentDescription("Edge to edge").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Desk sound").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Computer sound").assertDoesNotExist()
         compose.onNodeWithContentDescription("Extra options").assertExists()
     }
 
@@ -74,8 +74,8 @@ class A11yWalkerTest {
         desk()
         val radios = compose.onAllNodes(androidx.compose.ui.test.SemanticsMatcher("radio") { it.config.getOrNull(SemanticsProperties.Role) == Role.RadioButton }).fetchSemanticsNodes()
         val modes = radios.map { n -> n.config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } }
-        // Mirror/Extend come first (top of the screen), then Trackpad, Touch, View.
-        assertEquals(listOf("Mirror", "Extend", "Trackpad", "Touch", "View"), modes)
+        // Mirror/Extend come first (top of the screen), then Touchpad, Touch, View.
+        assertEquals(listOf("Mirror", "Extend", "Touchpad", "Touch", "View"), modes)
         assertEquals(listOf(true, false), radios.take(2).map { it.config.getOrNull(SemanticsProperties.Selected) })
         assertEquals(listOf(false, true, false), radios.drop(2).map { it.config.getOrNull(SemanticsProperties.Selected) })
     }

@@ -29,7 +29,7 @@ class PaletteModelTest {
     private val items = listOf(
         item("action:send-files", PaletteGroup.ACTIONS, "Send files"),
         item("action:send-clipboard", PaletteGroup.ACTIONS, "Send clipboard", keywords = "copy paste"),
-        item("action:ring", PaletteGroup.ACTIONS, "Ring desk", hint = "Makes it ring"),
+        item("action:ring", PaletteGroup.ACTIONS, "Ring computer", hint = "Makes it ring"),
         item("file:1", PaletteGroup.FILES, "invoice-october.pdf", hint = "Received"),
         item("file:2", PaletteGroup.FILES, "october-photos.zip", hint = "Sent"),
         item("file:3", PaletteGroup.FILES, "notes.txt"),

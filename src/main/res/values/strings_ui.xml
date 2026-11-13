@@ -82,22 +82,22 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_trying_paths">Trying Wi‑Fi, then the relay</string>
     <string name="home_looking_on_wifi">Looking for %1$s on this Wi‑Fi</string>
     <string name="home_meta_connecting_lan">Wi‑Fi</string>
-    <string name="home_live_screen">you\'re viewing the desk screen</string>
+    <string name="home_live_screen">you\'re viewing your computer\'s screen</string>
     <plurals name="home_live_terminals">
         <item quantity="one">%1$d terminal open</item>
         <item quantity="other">%1$d terminals open</item>
     </plurals>
-    <string name="home_live_phone_screen">the desk sees your screen</string>
+    <string name="home_live_phone_screen">your computer sees this phone\'s screen</string>
     <string name="home_desk_screen">Desk screen</string>
     <string name="settings_scroll_reverse_summary">Flip which way scrolling goes when this phone is the touchpad</string>
     <string name="home_action_unavailable">Not available right now</string>
     <string name="home_send_files">Send files</string>
     <string name="home_send_link">Send a link</string>
-    <string name="home_lock_desk">Lock desk</string>
+    <string name="home_lock_desk">Lock computer</string>
     <string name="home_share_screen">Share screen</string>
     <string name="home_stop_sharing">Stop sharing</string>
-    <string name="home_ping_desk">Ping desk</string>
-    <string name="home_ring_desk">Ring desk</string>
+    <string name="home_ping_desk">Ping computer</string>
+    <string name="home_ring_desk">Ring computer</string>
     <string name="home_rang">Ringing %1$s</string>
     <string name="home_send_clipboard">Send clipboard to %1$s</string>
     <string name="home_clipboard_sent">Clipboard sent to %1$s</string>
@@ -194,7 +194,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_transfer_received">Received</string>
     <string name="home_transfer_failed">Failed</string>
     <string name="home_share_screen_title">Share your screen with %1$s</string>
-    <string name="home_share_screen_body">Start it on %1$s: choose Show Phone Screen in DeskLink there. This phone then asks you to allow it, and Stop is always in the notification.</string>
+    <string name="home_share_screen_body">Start it on %1$s: choose Show phone screen in DeskLink there. This phone then asks you to allow it, and Stop is always in the notification.</string>
     <string name="home_feature_off">That feature is turned off for this computer</string>
     <string name="home_looking_for">Looking for %1$s…</string>
     <string name="home_link_sent">Link sent to %1$s</string>
@@ -266,7 +266,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="screen_share_stop">Stop</string>
     <string name="screen_share_stopped">Screen sharing stopped</string>
     <string name="session_live_title">Using %1$s</string>
-    <string name="session_live_screen">Viewing the desk screen</string>
+    <string name="session_live_screen">Viewing your computer\'s screen</string>
     <plurals name="session_live_terminals">
         <item quantity="one">%1$d terminal open</item>
         <item quantity="other">%1$d terminals open</item>
@@ -292,10 +292,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_compose_hide">Type straight into the terminal</string>
     <!-- UI v4: desk screen -->
     <string name="remote_mode_view">View</string>
-    <string name="remote_allow_control_first">Allow Control on %1$s first</string>
+    <string name="remote_allow_control_first">Allow control on %1$s first</string>
     <string name="remote_allow_control_action">Allow control</string>
     <string name="remote_notice_dismiss">Dismiss</string>
-    <string name="remote_view_only_hint">Watching only. Switch to Touch or Trackpad to control.</string>
+    <string name="remote_view_only_hint">Watching only. Switch to Touch or Touchpad to control.</string>
     <string name="remote_toolbar_label">Controls for %1$s: mouse buttons, keyboard and Super key</string>
     <string name="remote_toolbar_hint">These buttons control %1$s, not this phone</string>
     <string name="remote_left_click">Left</string>
@@ -322,7 +322,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="transfers_no_app">No app here opens this file</string>
 
     <!-- Stage D: desk features from the phone -->
-    <string name="pref_plugin_desk_settings">Desk settings</string>
+    <string name="pref_plugin_desk_settings">Computer settings</string>
     <string name="pref_plugin_desk_settings_desc">Change the computer\'s DeskLink switches from this phone</string>
     <string name="pref_plugin_desk_unlock">Unlock with this phone</string>
     <string name="pref_plugin_desk_unlock_desc">Confirm with your fingerprint to unlock the computer when it asks</string>
@@ -374,7 +374,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_phone_media">Show this phone\'s media on %1$s</string>
     <string name="settings_phone_media_summary">Needs notification access</string>
     <string name="settings_session_gate">Fingerprint before terminals</string>
-    <string name="settings_session_gate_summary">Also before the desk screen, once per connection</string>
+    <string name="settings_session_gate_summary">Also before Desk screen, once per connection</string>
     <string name="settings_session_gate_no_lock">Set up a screen lock to use this</string>
 
     <string name="gate_title">Open %1$s</string>
@@ -423,10 +423,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="qr_error_already_paired">This phone is already paired with %1$s.</string>
 
     <!-- Phase 2: tiles and the desk widget -->
-    <string name="tile_lock_desk">Lock desk</string>
+    <string name="tile_lock_desk">Lock computer</string>
     <string name="tile_keep_awake">Keep awake</string>
     <string name="tile_send_clipboard">Clipboard</string>
-    <string name="tile_ring_desk">Ring desk</string>
+    <string name="tile_ring_desk">Ring computer</string>
     <string name="surfaces_not_connected">Not connected</string>
     <string name="surfaces_not_paired">No computer paired</string>
     <string name="surfaces_add_tiles">Quick Settings tiles</string>
@@ -792,7 +792,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="sg_sound">Sound</string>
     <string name="sg_sound_summary">%1$s\'s sound here, this phone\'s media there</string>
     <string name="sg_control">Control</string>
-    <string name="sg_control_summary">Mouse and keyboard across devices, the desk screen</string>
+    <string name="sg_control_summary">Mouse and keyboard across devices, Desk screen</string>
     <string name="sg_files">Files</string>
     <string name="sg_files_summary">The Bucket and where received files go</string>
     <string name="sg_privacy">Privacy &amp; security</string>
@@ -823,7 +823,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="notes_clipboard_history_body">Android does not let an app read what was copied before, so DeskLink cannot list your clipboard history. What was shared is on the other device as it arrives. Pin a copy as a snippet to keep it.</string>
     <string name="notes_clipboard_pin">Pin the clipboard as a snippet</string>
     <string name="terminals_subtitle_none">No terminals on %1$s yet</string>
-    <string name="terminals_unavailable">Terminals are not available for this computer right now.</string>
+    <string name="terminals_unavailable">Terminals show here once %1$s is connected. The ones already open keep running there.</string>
     <string name="terminals_gate_message">Confirm it is you to see the terminals on this computer.</string>
     <string name="terminals_unlock">Unlock</string>
     <string name="terminal_start_timeout">Could not start a terminal on %1$s. Try again.</string>
@@ -980,7 +980,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_tile_update">Update needed</string>
     <string name="home_send_clipboard_short">Send clipboard</string>
     <string name="home_tile_clipboard">Clipboard</string>
-    <string name="home_tile_unlock">Unlock desk</string>
+    <string name="home_tile_unlock">Unlock computer</string>
     <string name="home_tile_clipboard_hint">Send what you copied</string>
     <string name="home_tile_clipboard_preview">Clipboard: “%1$s”</string>
     <string name="home_tile_clipboard_off">Clipboard sharing is off</string>
@@ -1035,7 +1035,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="palette_keywords_pair">add new computer</string>
     <!-- Offline -->
     <string name="home_things_to_check">Things to check</string>
-    <string name="home_still_works">Still works offline</string>
+    <string name="home_still_works">While it\'s offline</string>
     <string name="home_check_awake">Is %1$s awake?</string>
     <string name="home_check_awake_body">DeskLink needs to be running on it.</string>
     <string name="home_check_wifi">On the same Wi‑Fi?</string>
@@ -1143,7 +1143,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_waiting_input">Waiting for your input</string>
     <string name="terminals_keep_running">Terminals keep running on %1$s after you close this screen.</string>
     <string name="terminals_open_sessions">Open sessions</string>
-    <string name="terminals_new_launcher">New %1$s terminal</string>
     <string name="settings_search">Search settings</string>
     <string name="settings_search_none">Nothing matches “%1$s”.</string>
     <!-- Settings search: words people look for that a row's title does not say (never shown) -->
