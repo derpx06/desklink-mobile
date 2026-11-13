@@ -64,9 +64,10 @@
             android:paddingStart="7dp"
             android:paddingEnd="7dp"
             android:textColor="@color/widget_on_coral"
-            android:textSize="11sp"
+            android:textSize="11dp"
             android:textStyle="bold"
-            android:visibility="gone" />
+            android:visibility="gone"
+            tools:ignore="SpUsage" />
     </LinearLayout>
 
     <LinearLayout
