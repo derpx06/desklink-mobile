@@ -1024,9 +1024,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_offline_cant_reach">Can\'t reach it</string>
     <string name="home_offline_works">Works offline</string>
 
-    <!-- First run: splash, tour, permissions checklist -->
-    <string name="splash_tagline">Your computer, in your pocket.</string>
-    <string name="splash_looking_for">Looking for %1$s</string>
+    <!-- First run: tour, permissions checklist -->
     <string name="ob_skip">Skip</string>
     <string name="ob_next">Next</string>
     <string name="ob_back">Back</string>

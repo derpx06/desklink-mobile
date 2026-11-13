@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: any DeskLink screen that starts the app (a share, a widget, a notification) opens on the same splash
+     as the launcher icon does (Theme.DeskLink.Starting): the app's background and the mark on its tile. -->
+<resources>
+    <style name="DeskLinkTheme" parent="DeskLinkThemeBase.V27">
+        <item name="android:windowSplashScreenBackground">@color/brand_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+    </style>
+</resources>

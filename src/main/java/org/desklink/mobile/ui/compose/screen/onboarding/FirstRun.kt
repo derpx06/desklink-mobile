@@ -11,13 +11,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 
-/** What shows before Home: the splash while the paired computer is looked for, and the tour on a first run. Pure, so it is tested without a screen. */
+/** What shows before Home: the launch splash held while the paired computer is looked for, and the tour on a first run. Pure, so it is tested without a screen. */
 object FirstRun {
     /** A new default-preferences key; no existing key is read or rewritten. */
     const val KEY_ONBOARDING_SEEN = "onboarding_seen"
 
-    /** The splash never holds the app longer than this. */
-    const val SPLASH_MAX_MS = 1_000L
+    /** The launch splash never holds the app longer than this (counted from MainActivity's creation). */
+    const val SPLASH_MAX_MS = 500L
 
     /**
      * The splash shows on a cold start, for a paired computer that is not reachable yet, until it is or [SPLASH_MAX_MS] has passed.
@@ -25,9 +25,6 @@ object FirstRun {
      */
     fun showSplash(coldStart: Boolean, pairedName: String?, reachable: Boolean, expired: Boolean): Boolean =
         coldStart && pairedName != null && !reachable && !expired
-
-    /** What is left of the splash's second, counted from [startedAt] (the process's first frame), so a rotation does not restart it. */
-    fun splashRemainingMs(startedAt: Long, now: Long): Long = (SPLASH_MAX_MS - (now - startedAt)).coerceIn(0L, SPLASH_MAX_MS)
 
     /** The tour is for someone who has not paired and has not seen it; a paired person never sees it unasked. */
     fun showOnboarding(seen: Boolean, pairedCount: Int): Boolean = !seen && pairedCount == 0

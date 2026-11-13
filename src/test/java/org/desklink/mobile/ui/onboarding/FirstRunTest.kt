@@ -106,13 +106,4 @@ class FirstRunTest {
         assertFalse(PairingStack.canOfferChecklist(listOf("home", "settings"), "home"))
         assertFalse(PairingStack.canOfferChecklist(listOf("home", "permissions"), "home"))
         assertEquals(listOf("home"), PairingStack.settle(emptyList(), "home", ::isPairing))
-    }
-
-    @Test
-    fun theSplashSecondCountsFromTheFirstFrameNotFromEachComposition() {
-        assertEquals(FirstRun.SPLASH_MAX_MS, FirstRun.splashRemainingMs(1_000, 1_000))
-        assertEquals(400L, FirstRun.splashRemainingMs(1_000, 1_600))
-        assertEquals("a rotation after the second: nothing left", 0L, FirstRun.splashRemainingMs(1_000, 5_000))
-        assertEquals("a clock that went backwards never extends it", FirstRun.SPLASH_MAX_MS, FirstRun.splashRemainingMs(1_000, 500))
-    }
-}
+    }}
