@@ -19,8 +19,6 @@ object SettingsIndex {
         val page: SettingsPage, @StringRes val title: Int, @StringRes val summary: Int? = null, val needsDesk: Boolean = false,
         /** Words people may look for that the title does not say ("glide", "mouse", "edge"): searched, never shown. */
         @StringRes val keywords: Int? = null,
-        /** A relay row: not on the page, so not searchable, while the relay is compiled out (BuildConfig.RELAY_ENABLED). */
-        val relay: Boolean = false,
     )
 
     val rows: List<Row> = listOf(
@@ -66,10 +64,7 @@ object SettingsIndex {
         Row(SettingsPage.PRIVACY, R.string.settings_unpair_row, keywords = R.string.kw_settings_unpair_row),
         Row(SettingsPage.APPEARANCE, R.string.settings_theme, keywords = R.string.kw_settings_theme),
         Row(SettingsPage.APPEARANCE, R.string.setting_dynamic_colors, R.string.settings_dynamic_colors_summary, keywords = R.string.kw_setting_dynamic_colors),
-        Row(SettingsPage.ADVANCED, R.string.settings_phone_relay, keywords = R.string.kw_settings_phone_relay, relay = true),
-        Row(SettingsPage.ADVANCED, R.string.settings_desk_relay, R.string.settings_reach_anywhere_summary, needsDesk = true, keywords = R.string.kw_settings_desk_relay, relay = true),
-        Row(SettingsPage.ADVANCED, R.string.setting_advanced_network, R.string.setting_advanced_network_summary,
-            keywords = if (org.desklink.mobile.BuildConfig.RELAY_ENABLED) R.string.kw_setting_advanced_network else R.string.kw_setting_advanced_network_lan),
+        Row(SettingsPage.ADVANCED, R.string.setting_advanced_network, R.string.setting_advanced_network_summary, keywords = R.string.kw_setting_advanced_network),
         Row(SettingsPage.ADVANCED, R.string.trusted_networks, R.string.trusted_networks_desc, keywords = R.string.kw_trusted_networks),
         Row(SettingsPage.ADVANCED, R.string.custom_device_list, R.string.custom_devices_settings_summary, keywords = R.string.kw_custom_device_list),
         Row(SettingsPage.ADVANCED, R.string.settings_permissions, keywords = R.string.kw_settings_permissions),
@@ -79,8 +74,7 @@ object SettingsIndex {
     )
 
     /** Rows and pages with their words in [deskName]'s terms (a string with no "%s" simply ignores the name). */
-    fun rowsFor(page: SettingsPage, hasDesk: Boolean, relayEnabled: Boolean = org.desklink.mobile.BuildConfig.RELAY_ENABLED): List<Row> =
-        rows.filter { it.page == page && (hasDesk || !it.needsDesk) && (relayEnabled || !it.relay) }
+    fun rowsFor(page: SettingsPage, hasDesk: Boolean): List<Row> = rows.filter { it.page == page && (hasDesk || !it.needsDesk) }
 
     fun entries(context: Context, deskName: String, pages: List<SettingsPage>, hasDesk: Boolean = true): List<SettingsEntry> {
         // A line that wants a number ("%d devices added manually") has no words to search yet: it is left out.

@@ -98,7 +98,7 @@ class SettingsParityTest {
         assertEquals(listOf("Style", "Use wallpaper colours"), rows("AppearanceGroup"))
         assertEquals(
             listOf(
-                "Something stopped. Tap to restart", "Use the relay from this phone", "Reach <computer> from anywhere", "Advanced network",
+                "Something stopped. Tap to restart", "Advanced network",
                 "Trusted networks", "Add devices by IP", "Permissions", "Quick Settings tiles", "Export DeskLink logs", "About",
             ),
             rows("AdvancedGroup").filter { it != "Style" },

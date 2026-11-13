@@ -19,12 +19,13 @@ bootstrap link. File bytes only ever travel on the bounded WebRTC file-data
 channel.
 
 **Off in 1.3** (a LAN-only release): `RELAY_ENABLED` in `build.gradle.kts` is
-`false`, which turns the relay, TURN and every relay setting and label off;
-stored relay prefs are kept and ignored. When it is on: away from home, the
-phone and computer meet at the DeskLink relay and run an
+`false`. That constant is the only control: there is no setting to turn the
+relay or TURN on or off, and the relay address comes from the build
+(`DESKLINK_RELAY_URL`). When it is on: away from home, the phone and computer
+meet at the DeskLink relay and run an
 end-to-end encrypted bootstrap link through it (the relay sees IP addresses,
 certificate fingerprints and timing, never content); media goes direct or
-through TURN when the "Use TURN" setting allows. Spec: `docs/RELAY.md` in the
+through the relay's TURN. Spec: `docs/RELAY.md` in the
 workspace, relay server in the desktop repository's `relay/`.
 
 The inactive compatibility module documents the legacy KDE Connect-compatible

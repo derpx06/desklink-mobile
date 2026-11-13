@@ -36,31 +36,35 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
-/** The relay preferences (docs/RELAY.md §7). */
+/**
+ * The relay's switches (docs/RELAY.md §7). [BuildConfig.RELAY_ENABLED] is the only control: there is no setting or row that
+ * turns the relay or TURN on or off. On, the build's relay ([BuildConfig.DEFAULT_RELAY_URL]) and its TURN credentials are
+ * simply used; off (1.3: LAN only), neither runs.
+ */
 object RelaySettings {
+    /** Written by earlier builds' rows; kept in storage untouched (no migration) and never read. */
     const val KEY_ENABLED = "relay_enabled"
     const val KEY_URL = "relay_url"
     const val KEY_USE_TURN = "relay_use_turn"
+    /** Debug builds only, no row: set with `adb shell run-as` for relay testing (docs/RELAY.md §7). */
     const val KEY_FORCE_RELAY = "relay_debug_force_relay"
     const val KEY_FORCE_TURN = "relay_debug_force_turn"
 
     private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context)
 
-    /** [BuildConfig.RELAY_ENABLED] off (1.3: LAN only) turns every switch below off, whatever is stored. */
-    fun enabled(context: Context) = BuildConfig.RELAY_ENABLED && prefs(context).getBoolean(KEY_ENABLED, true)
+    fun enabled() = BuildConfig.RELAY_ENABLED
 
-    /** Empty means the built-in default, which is itself empty unless the build names a relay. */
-    fun url(context: Context): String =
-        prefs(context).getString(KEY_URL, "").orEmpty().trim().ifEmpty { BuildConfig.DEFAULT_RELAY_URL }
+    /** The build's relay (DESKLINK_RELAY_URL at build time); empty unless the build names one. */
+    fun url(): String = BuildConfig.DEFAULT_RELAY_URL.trim()
 
-    /** A relay address exists (entered, or built in). Without one nothing relay-related runs or shows. */
-    fun configured(context: Context) = BuildConfig.RELAY_ENABLED && url(context).isNotBlank()
+    /** Compiled in and a relay to reach. Without one nothing relay-related runs or shows. */
+    fun configured() = enabled() && url().isNotBlank()
 
     /** Whether the relay connection runs: switched on, an address to reach, and someone paired to reach. */
     fun shouldRun(enabled: Boolean, url: String, hasPairedDevices: Boolean) = enabled && url.isNotBlank() && hasPairedDevices
 
-    /** TURN comes from the relay: none at all without it, user-configured servers included. */
-    fun useTurn(context: Context) = BuildConfig.RELAY_ENABLED && prefs(context).getBoolean(KEY_USE_TURN, true)
+    /** TURN comes with the relay and only with it. */
+    fun useTurn() = BuildConfig.RELAY_ENABLED
 
     /** Debug builds only: no LAN links at all. Read when the service starts. */
     fun forceRelay(context: Context) = BuildConfig.RELAY_ENABLED && BuildConfig.DEBUG && prefs(context).getBoolean(KEY_FORCE_RELAY, false)
@@ -215,7 +219,7 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
 
     // No address means no relay at all: no lookup, no ladder, no "unavailable" (status stays OFF).
     private fun wanted(): Boolean =
-        RelaySettings.shouldRun(RelaySettings.enabled(context), RelaySettings.url(context), TrustedDevices.getAllTrustedDevices(context).isNotEmpty())
+        RelaySettings.shouldRun(RelaySettings.enabled(), RelaySettings.url(), TrustedDevices.getAllTrustedDevices(context).isNotEmpty())
 
     private fun connectLocked() {
         retry?.cancel(false)
@@ -228,7 +232,7 @@ class RelayLinkProvider(private val context: Context) : BaseLinkProvider() {
             setStatus(Status.OFF)
             return
         }
-        val url = RelaySettings.url(context)
+        val url = RelaySettings.url()
         val host = relayHost(url)
         val schemeOk = url.startsWith("wss://") || (BuildConfig.DEBUG && url.startsWith("ws://"))
         if (host.isNullOrEmpty() || !schemeOk) {

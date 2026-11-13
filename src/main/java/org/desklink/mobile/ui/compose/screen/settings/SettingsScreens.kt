@@ -96,8 +96,6 @@ import org.apache.commons.io.IOUtils
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.BuildConfig
 import org.desklink.mobile.R
-import org.desklink.mobile.backends.relay.RelayLinkProvider
-import org.desklink.mobile.backends.relay.RelaySettings
 import org.desklink.mobile.helpers.CreateFileParams
 import org.desklink.mobile.helpers.CreateFileResultContract
 import org.desklink.mobile.helpers.DeviceHelper
@@ -572,24 +570,7 @@ fun NetworkScreen(onBack: () -> Unit) {
     @Suppress("UNUSED_EXPRESSION") revision
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     SettingsColumn(stringResource(R.string.setting_advanced_network), onBack) {
-        // Compiled out (BuildConfig.RELAY_ENABLED, 1.3): no relay address, no TURN switch, no TURN servers.
-        if (BuildConfig.RELAY_ENABLED) {
-        SectionLabel(stringResource(R.string.settings_category_away))
-        RowGroup {
-            GroupRow(
-                stringResource(R.string.setting_relay_url),
-                subtitle = prefs.getString(RelaySettings.KEY_URL, null)?.trim()?.takeIf(String::isNotEmpty)
-                    ?: BuildConfig.DEFAULT_RELAY_URL.takeIf(String::isNotEmpty)?.let { stringResource(R.string.setting_relay_url_default, it) }
-                    ?: stringResource(R.string.settings_relay_not_set_up),
-                monoSubtitle = true,
-                onClick = { editing = RelaySettings.KEY_URL },
-            )
-            GroupRow(stringResource(R.string.settings_use_relay_fallback), subtitle = stringResource(R.string.settings_use_relay_fallback_summary), checked = prefs.getBoolean(RelaySettings.KEY_USE_TURN, true), onClick = {
-                prefs.edit { putBoolean(RelaySettings.KEY_USE_TURN, !prefs.getBoolean(RelaySettings.KEY_USE_TURN, true)) }
-                revision++
-            })
-        }
-        }
+        // No relay address, TURN switch or TURN servers here: the relay and its TURN follow BuildConfig.RELAY_ENABLED only.
         SectionLabel(stringResource(R.string.setting_webrtc_transport))
         RowGroup {
             GroupRow(
@@ -598,59 +579,23 @@ fun NetworkScreen(onBack: () -> Unit) {
                     ?: stringResource(R.string.setting_webrtc_stun_servers_description),
                 onClick = { editing = DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE },
             )
-            if (BuildConfig.RELAY_ENABLED) GroupRow(
-                stringResource(R.string.setting_webrtc_turn_servers),
-                subtitle = prefs.getString(DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE, null)?.takeIf(String::isNotBlank)
-                    ?: stringResource(R.string.setting_webrtc_turn_servers_description),
-                onClick = { editing = DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE },
-            )
         }
     }
     editing?.let { key ->
         TextDialog(
-            title = stringResource(
-                when (key) {
-                    RelaySettings.KEY_URL -> R.string.setting_relay_url
-                    DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE -> R.string.setting_webrtc_stun_servers
-                    else -> R.string.setting_webrtc_turn_servers
-                },
-            ),
+            title = stringResource(R.string.setting_webrtc_stun_servers),
             initial = prefs.getString(key, "").orEmpty(),
             confirm = stringResource(android.R.string.ok),
             onDismiss = { editing = null },
         ) { value ->
             editing = null
-            prefs.edit {
-                putString(key, value)
-                // A relay address entered is a relay wanted: "Reach from anywhere" turns on with it.
-                if (key == RelaySettings.KEY_URL && value.isNotBlank()) putBoolean(RelaySettings.KEY_ENABLED, true)
-            }
-            if (key == RelaySettings.KEY_URL) relaySettingChanged()
+            prefs.edit { putString(key, value) }
             revision++
         }
     }
 }
 
 // ---- shared --------------------------------------------------------------------------------------------------------------------
-
-/** Applies a relay setting once it has been saved. */
-internal fun relaySettingChanged() {
-    android.os.Handler(android.os.Looper.getMainLooper()).post {
-        BackgroundService.instance?.onRelaySettingsChanged()
-    }
-}
-
-@Composable
-internal fun relayStatusText(): String? {
-    val status = RelayLinkProvider.statusLive.value
-    return when (status) {
-        RelayLinkProvider.Status.CONNECTING -> stringResource(R.string.relay_status_connecting)
-        RelayLinkProvider.Status.ONLINE -> stringResource(R.string.setting_relay_connected)
-        RelayLinkProvider.Status.UNAVAILABLE -> stringResource(R.string.relay_status_unavailable)
-        RelayLinkProvider.Status.UPDATE_REQUIRED -> stringResource(R.string.relay_status_update_required)
-        else -> null
-    }
-}
 
 @Composable
 internal fun TextDialog(

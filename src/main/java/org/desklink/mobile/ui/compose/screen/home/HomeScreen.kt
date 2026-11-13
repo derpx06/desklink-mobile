@@ -276,7 +276,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
             val doing: @Composable () -> Unit = {
                 if (quiet) {
                     OfflineHero(state, actions) { sheet = true }
-                    ThingsToCheck(state, actions)
+                    ThingsToCheck(state)
                     StillWorksOffline(state, actions)
                 } else {
                     Hero(state, gate, actions) { sheet = true }
@@ -575,14 +575,13 @@ private class Check(val title: String, val body: String, val action: String? = n
 
 /** Numbered things that are really worth a look, for this state: no guesses about networks the phone cannot know. */
 @Composable
-private fun ThingsToCheck(state: HomeState, actions: HomeActions) {
+private fun ThingsToCheck(state: HomeState) {
     val checks = buildList {
         if (state.updateNeeded) add(Check(stringResource(R.string.home_check_update, state.name), stringResource(R.string.home_check_update_body, state.name)))
         add(Check(stringResource(R.string.home_check_awake, state.name), stringResource(R.string.home_check_awake_body)))
         add(Check(stringResource(R.string.home_check_wifi), stringResource(R.string.home_check_wifi_body, state.name)))
-        if (!org.desklink.mobile.BuildConfig.RELAY_ENABLED) { /* relay compiled out (1.3): no "Away from home?" check */ }
-        else if (state.relayAvailable) add(Check(stringResource(R.string.home_check_away), stringResource(R.string.home_check_away_relay_on)))
-        else add(Check(stringResource(R.string.home_check_away), stringResource(R.string.home_check_away_relay_off, state.name), stringResource(R.string.tab_settings)) { actions.onOpenSettings("connection") })
+        // Information only, never a way to turn the relay on: that is BuildConfig.RELAY_ENABLED alone.
+        if (org.desklink.mobile.BuildConfig.RELAY_ENABLED && state.relayAvailable) add(Check(stringResource(R.string.home_check_away), stringResource(R.string.home_check_away_relay_on)))
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SectionHeader(stringResource(R.string.home_things_to_check))

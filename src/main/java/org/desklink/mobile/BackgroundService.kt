@@ -109,12 +109,6 @@ class BackgroundService : Service() {
 
     private fun relayProvider(): RelayLinkProvider? = linkProviders.filterIsInstance<RelayLinkProvider>().firstOrNull()
 
-    /** The relay settings changed: reconnect with them, the ladder starting over. */
-    fun onRelaySettingsChanged() {
-        if (!initialized) return
-        runCatching { networkChangeExecutor.execute { relayProvider()?.reset(reconnect = true) } }
-    }
-
     /**
      * The default network (the one the relay socket and media use) became a
      * different network. Reconnect the relay at once, ladder reset, and let the

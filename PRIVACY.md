@@ -48,7 +48,7 @@ relay and TURN are switched off in the app, and nothing below happens. This
 section describes them for a later version that turns them on.
 
 When your phone and computer are not on the same network, they can meet through the
-DeskLink relay (you can turn this off, or point the app at your own relay).
+DeskLink relay.
 
 - The connection setup through the relay is **end-to-end encrypted** between your two
   devices. The relay cannot read it and cannot impersonate either device.
@@ -60,7 +60,7 @@ DeskLink relay (you can turn this off, or point the app at your own relay).
   encrypted WebRTC connection, directly between your devices where possible.
 - When no direct path works, that encrypted traffic may pass through a **TURN
   server provided by Cloudflare** (Cloudflare Realtime TURN). Cloudflare sees IP
-  addresses and traffic volume, not content. You can turn TURN off in Settings.
+  addresses and traffic volume, not content.
 
 ## Other network requests
 

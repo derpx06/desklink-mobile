@@ -87,7 +87,7 @@ object HomeModel {
             offers = offers(context, device),
             history = history.take(HISTORY_SEARCHED),
             terminalAttention = org.desklink.mobile.plugins.terminal.TerminalAttentionBadge.has(id),
-            relayAvailable = org.desklink.mobile.backends.relay.RelaySettings.enabled(context) &&
+            relayAvailable = org.desklink.mobile.backends.relay.RelaySettings.enabled() &&
                 org.desklink.mobile.backends.relay.RelayLinkProvider.statusLive.value == org.desklink.mobile.backends.relay.RelayLinkProvider.Status.ONLINE,
         )
     }

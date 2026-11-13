@@ -47,7 +47,7 @@ The two ML Kit rows apply only to a build made with `-Pdesklink.ocr=true`; the d
 
 | Data type | Collected | Shared | Ephemeral | Required | Purpose |
 |---|---|---|---|---|---|
-| Device or other IDs (device certificate fingerprint, IP address) | Yes | No (Cloudflare acts as a service provider for TURN) | Yes | No: only when the relay is used; it can be turned off in Settings | App functionality |
+| Device or other IDs (device certificate fingerprint, IP address) | Yes | No (Cloudflare acts as a service provider for TURN) | Yes | No: only when the relay is used (a build with RELAY_ENABLED on; there is no setting) | App functionality |
 | Device or other IDs (ML Kit installation identifier) | Yes (by Google's ML Kit library) | Yes, with Google | No | Yes while text recognition is in the app | Analytics / app functionality |
 | App info and performance (ML Kit usage and performance metrics) | Yes (by Google's ML Kit library) | Yes, with Google | No | Yes while text recognition is in the app | Analytics |
 

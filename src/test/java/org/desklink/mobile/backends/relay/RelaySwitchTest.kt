@@ -24,24 +24,35 @@ import java.io.File
 class RelaySwitchTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
 
+    /** Relay activity follows the constant alone: stored prefs from earlier builds, either way, change nothing. */
     @Test
-    fun storedRelayPrefsReachNothingWhileTheRelayIsCompiledOut() {
+    fun relayAndTurnFollowOnlyTheConstant() {
+        for (stored in listOf(true, false)) {
+            PreferenceManager.getDefaultSharedPreferences(app).edit {
+                putBoolean(RelaySettings.KEY_ENABLED, stored)
+                putString(RelaySettings.KEY_URL, if (stored) "wss://relay.example.org/v1" else "")
+                putBoolean(RelaySettings.KEY_USE_TURN, stored)
+            }
+            assertEquals(BuildConfig.RELAY_ENABLED, RelaySettings.enabled())
+            assertEquals(BuildConfig.RELAY_ENABLED, RelaySettings.useTurn())
+            assertEquals("the build's relay, never a stored one", BuildConfig.DEFAULT_RELAY_URL.trim(), RelaySettings.url())
+            assertEquals(BuildConfig.RELAY_ENABLED && BuildConfig.DEFAULT_RELAY_URL.isNotBlank(), RelaySettings.configured())
+        }
+        // Kept as stored: no migration.
+        assertEquals(false, PreferenceManager.getDefaultSharedPreferences(app).getBoolean(RelaySettings.KEY_ENABLED, true))
+    }
+
+    @Test
+    fun nothingRelayRunsWhileCompiledOut() {
         assumeFalse(BuildConfig.RELAY_ENABLED)
         PreferenceManager.getDefaultSharedPreferences(app).edit {
-            putBoolean(RelaySettings.KEY_ENABLED, true)
-            putString(RelaySettings.KEY_URL, "wss://relay.example.org/v1")
-            putBoolean(RelaySettings.KEY_USE_TURN, true)
             putBoolean(RelaySettings.KEY_FORCE_RELAY, true)
             putBoolean(RelaySettings.KEY_FORCE_TURN, true)
         }
-        assertFalse("no relay connection is attempted", RelaySettings.enabled(app))
-        assertFalse(RelaySettings.configured(app))
-        assertFalse("no TURN, user-configured included", RelaySettings.useTurn(app))
+        assertFalse("no relay connection is attempted", RelaySettings.shouldRun(RelaySettings.enabled(), RelaySettings.url(), hasPairedDevices = true))
+        assertFalse("no TURN", RelaySettings.useTurn())
         assertFalse("LAN links are never dropped", RelaySettings.forceRelay(app))
         assertFalse(RelaySettings.forceTurn(app))
-        assertFalse(RelaySettings.shouldRun(RelaySettings.enabled(app), RelaySettings.url(app), hasPairedDevices = true))
-        // Kept as stored: no migration.
-        assertEquals("wss://relay.example.org/v1", PreferenceManager.getDefaultSharedPreferences(app).getString(RelaySettings.KEY_URL, null))
     }
 
     @Test

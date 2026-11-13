@@ -2505,7 +2505,7 @@ class WebRtcSessionCoordinator(
      */
     private fun iceServersForPath(): List<PeerConnection.IceServer> {
         val preferences = PreferenceManager.getDefaultSharedPreferences(context)
-        val useTurn = RelaySettings.useTurn(context)
+        val useTurn = RelaySettings.useTurn()
         val lan = device.hasLanLink
         return selectIceServers(
             hasLanLink = lan,
@@ -2514,10 +2514,8 @@ class WebRtcSessionCoordinator(
                 preferences.getString(DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE, "").orEmpty(),
                 setOf("stun", "stuns"),
             ),
-            configuredTurn = if (!useTurn) emptyList() else configuredIceServers(
-                preferences.getString(DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE, "").orEmpty(),
-                setOf("turn", "turns"),
-            ),
+            // TURN is the relay's, never user-configured (no row sets one; a stored value is ignored).
+            configuredTurn = emptyList(),
             granted = if (lan || !useTurn) emptyList()
                 else RelayLinkProvider.instance?.iceServersFor(device.deviceId).orEmpty(),
         ).map(IceServerSpec::toIceServer)

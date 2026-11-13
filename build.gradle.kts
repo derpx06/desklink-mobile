@@ -42,17 +42,14 @@ android {
         versionName = "1.3.0"
         resConfigs("en")
         // The DeskLink relay (docs/RELAY.md): the deployed relay's wss://<host>/v1
-        // from the DESKLINK_RELAY_URL Gradle property or environment variable,
-        // else a placeholder that reaches nothing. Release builds must set it
-        // (docs/RELEASE.md). Users may override it in settings.
-        // No relay is deployed by default: without DESKLINK_RELAY_URL the app has none until the
-        // person enters one (Settings → More → Advanced network), and never looks one up.
+        // from the DESKLINK_RELAY_URL Gradle property or environment variable.
+        // There is no setting for it: without DESKLINK_RELAY_URL the app has no relay and never looks one up.
         val relayUrl = releaseSigningValue("DESKLINK_RELAY_URL") ?: ""
         buildConfigField("String", "DEFAULT_RELAY_URL", "\"$relayUrl\"")
-        // The one switch for everything off the LAN (docs/RELAY.md): the relay connection, TURN, relay-bootstrapped
-        // WebRTC and every row, label and line about them. 1.3 ships LAN-only: false in every build type (defaultConfig
-        // covers debug and release). Flip it to bring the relay back (desktop: RELAY_ENABLED in relay_link/mod.rs).
-        // Stored relay prefs are kept and ignored while it is off.
+        // The only control for everything off the LAN (docs/RELAY.md): the relay connection, its TURN and
+        // relay-bootstrapped WebRTC. No setting or row turns them on or off; on, they are simply used. 1.3 ships LAN-only:
+        // false in every build type (defaultConfig covers debug and release). Set true to bring the relay back (desktop:
+        // RELAY_ENABLED in relay_link/mod.rs). Relay prefs stored by earlier builds are kept and never read.
         buildConfigField("boolean", "RELAY_ENABLED", "false")
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
