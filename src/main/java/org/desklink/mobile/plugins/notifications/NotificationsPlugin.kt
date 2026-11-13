@@ -49,7 +49,9 @@ import org.desklink.mobile.webrtc.SyncDigest
 @LoadablePlugin
 class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener {
     private lateinit var appDatabase: AppDatabase
-    private val currentNotifications = mutableSetOf<String>()
+    /** The keys the desk has (sent and acknowledged); the only ones it may dismiss. */
+    @androidx.annotation.VisibleForTesting
+    internal val currentNotifications = mutableSetOf<String>()
     // Here we will map every notification to it's icon(hash)
     /**
      * Delivery callbacks run on DeskLink's outbound worker, while Android
@@ -701,8 +703,9 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     }
 
     private fun dismissNotification(dismissedId: String) {
+        // Only a notification this phone mirrored: a desk must not clear another app's (an excluded app's code) by its key.
         synchronized(notificationDeliveryLock) {
-            currentNotifications.remove(dismissedId)
+            if (!currentNotifications.remove(dismissedId)) return
         }
         NotificationReceiver.WithService(context) { service ->
             service.cancelNotification(dismissedId)
