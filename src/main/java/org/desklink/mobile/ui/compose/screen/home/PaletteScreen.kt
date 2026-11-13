@@ -119,6 +119,7 @@ fun PaletteScreen(
             id == Action.NEW_NOTE -> actions.onNewNote()
             id == Action.OPEN_BUCKET -> actions.onBucket()
             id == Action.PAIR_ANOTHER -> actions.onPairAnother()
+            id == Action.GUIDE -> actions.onGuide()
             id.startsWith("file:") -> built.files[id]?.let(actions.onOpenRecent)
             id.startsWith("note:") -> actions.onNote(id.removePrefix("note:"))
             id.startsWith("snippet:") -> built.snippets[id]?.let { clipboard.setText(AnnotatedString(it)); actions.onMessage(copied) }
@@ -240,6 +241,7 @@ private fun buildItems(context: android.content.Context, state: HomeState, notes
             Action.NEW_NOTE -> action(id, R.drawable.sym_edit_note, context.getString(R.string.tab_quick_new_note))
             Action.OPEN_BUCKET -> action(id, R.drawable.sym_folder, context.getString(R.string.palette_open_bucket))
             Action.PAIR_ANOTHER -> action(id, R.drawable.sym_add, context.getString(R.string.home_pair_another), keywords = kwPair)
+            Action.GUIDE -> action(id, R.drawable.sym_info, context.getString(R.string.guide_open), keywords = context.getString(R.string.guide_keywords))
         }
     }
     val sent = context.getString(R.string.home_transfer_sent)

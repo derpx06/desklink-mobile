@@ -99,6 +99,7 @@ object PaletteModel {
         const val NEW_NOTE = "action:new-note"
         const val OPEN_BUCKET = "action:bucket"
         const val PAIR_ANOTHER = "action:pair-another"
+        const val GUIDE = "action:guide"
     }
 
     /**
@@ -110,6 +111,6 @@ object PaletteModel {
         Action.SEND_FILES, Action.SEND_CLIPBOARD, Action.SEND_LINK, Action.DESK_SCREEN, Action.NEW_TERMINAL,
         Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET,
         Action.RING, Action.PING, Action.LOCK, Action.UNLOCK, Action.SHARE_SCREEN,
-        Action.PAIR_ANOTHER,
+        Action.PAIR_ANOTHER, Action.GUIDE,
     )
 }

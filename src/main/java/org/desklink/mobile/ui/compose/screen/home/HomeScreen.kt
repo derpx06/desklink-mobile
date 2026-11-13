@@ -238,6 +238,8 @@ class HomeActions(
     val onMessage: (String) -> Unit = {},
     /** The nudge's button: asks Android for notifications (the person tapped it). */
     val onTurnOnNotifications: () -> Unit = {},
+    /** The "Get started" guide. */
+    val onGuide: () -> Unit = {},
 )
 
 /** From this width the screen has two columns: what you can do on the left, what is going on on the right. */

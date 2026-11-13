@@ -9,6 +9,8 @@ import org.desklink.mobile.QrPairing
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.QrScanFlow
 import org.desklink.mobile.ui.compose.screen.onboarding.OnboardingScreen
+import org.desklink.mobile.ui.compose.screen.onboarding.GlanceScreen
+import org.desklink.mobile.ui.compose.screen.guide.GuideScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsChecklistScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.PermissionsSetupScreen
 import org.desklink.mobile.ui.compose.screen.onboarding.FinishSetupCard
@@ -43,12 +45,23 @@ abstract class FirstRunShots : ShotTest() {
     private fun tour(page: Int) = @Composable { OnboardingScreen(page, {}, paired = false, onFinish = {}, onSkip = {}) }
 
     @Test fun splash() = shoot("fr-splash") { SplashScreen("arch-desk") }
+    @Test fun glance() = shoot("fr-glance") { GlanceScreen(onStart = {}, onSkip = {}) }
     @Test fun tour1() = shoot("fr-tour-1", tour(0))
     @Test fun tour2() = shoot("fr-tour-2", tour(1))
     @Test fun tour3() = shoot("fr-tour-3", tour(2))
-    @Test fun tour4() = shoot("fr-tour-4", tour(3))
-    @Test fun tour5() = shoot("fr-tour-5", tour(4))
-    @Test fun tourReplayPaired() = shoot("fr-tour-5-replay") { OnboardingScreen(4, {}, paired = true, onFinish = {}, onSkip = {}) }
+    @Test fun tourReplayPaired() = shoot("fr-tour-3-replay") { OnboardingScreen(2, {}, paired = true, onFinish = {}, onSkip = {}) }
+
+    private val guideState = HomeState("d1", "arch-desk", DeviceConnection.LOCAL, listOf(ComputerRow("d1", "arch-desk", DeviceConnection.LOCAL)))
+    @Test fun guideUnpaired() = shoot("fr-guide-unpaired") { GuideScreen(null, onBack = {}, onAction = {}, trouble = setupRows.filter { it.id == "battery" || it.id == "oem" }) }
+    @Test fun guide() = shoot("fr-guide") { GuideScreen(guideState, onBack = {}, onAction = {}) }
+    @Test fun guideEnd() = shoot("fr-guide-end") {
+        val scroll = androidx.compose.foundation.rememberScrollState()
+        androidx.compose.runtime.LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+        GuideScreen(guideState, onBack = {}, onAction = {}, trouble = setupRows.filter { it.id == "battery" || it.id == "oem" }, scroll = scroll)
+    }
+    @Test fun guideBlocked() = shoot("fr-guide-blocked") {
+        GuideScreen(guideState.copy(connection = DeviceConnection.OFFLINE), onBack = {}, onAction = {})
+    }
 
     @Test fun homeNotificationsNudge() = shoot("fr-home-nudge") {
         val state = HomeState("d1", "arch-desk", DeviceConnection.LOCAL, listOf(ComputerRow("d1", "arch-desk", DeviceConnection.LOCAL)), rttMs = 12, notificationsOff = true)
@@ -100,6 +113,9 @@ abstract class FirstRunShots : ShotTest() {
     )
 
     @Test fun permissions() = shoot("fr-permissions") { PermissionsChecklistScreen("arch-desk", perms) {} }
+    @Test fun glanceRtl() = shoot("fr-glance-rtl") {
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Rtl) { GlanceScreen(onStart = {}, onSkip = {}) }
+    }
 
     private fun setupRow(id: String, icon: Int, title: String, summary: String, granted: Boolean, perms: List<String> = emptyList(), unknown: Boolean = false, blocked: Boolean = false) =
         PermissionRow(icon, title, summary, granted, unknown, id = id, permissions = perms, blocked = blocked) { }

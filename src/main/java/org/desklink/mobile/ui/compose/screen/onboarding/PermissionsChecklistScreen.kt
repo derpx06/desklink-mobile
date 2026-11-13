@@ -46,6 +46,8 @@ import org.desklink.mobile.ui.compose.screen.settings.actionLabel
 import org.desklink.mobile.ui.compose.screen.settings.permissionRows
 import org.desklink.mobile.ui.compose.screen.settings.rememberPermissionAsker
 import org.desklink.mobile.ui.compose.screen.settings.rememberResumeTick
+import org.desklink.mobile.ui.compose.DeskTextButton
+import androidx.compose.foundation.layout.offset
 import org.desklink.mobile.ui.compose.tokens
 
 /** The rows this screen lists: what the app really asks for, from the same list as Settings, minus what nothing the person turned on uses. */
@@ -72,7 +74,7 @@ internal fun needsPermissionsChecklist(context: Context, deskName: String): Bool
  * required, and the same list stays in Settings under Advanced. It follows the system's answers when the person comes back.
  */
 @Composable
-fun PermissionsChecklistRoute(deskName: String, onDone: () -> Unit) {
+fun PermissionsChecklistRoute(deskName: String, onSeeWhatYouCanDo: () -> Unit = {}, onDone: () -> Unit) {
     val context = LocalContext.current
     val tick = rememberResumeTick()
     val asker = rememberPermissionAsker()
@@ -80,11 +82,11 @@ fun PermissionsChecklistRoute(deskName: String, onDone: () -> Unit) {
     // The rows missing when it opened, kept as they turn "On", so a row does not vanish under the person's finger.
     val missing = rememberSaveable { ArrayList(stillMissing(rows)) }
     val shown = rows.filter { it.id in missing }
-    PermissionsChecklistScreen(deskName, shown, rememberAllowAll(shown, asker), onDone)
+    PermissionsChecklistScreen(deskName, shown, rememberAllowAll(shown, asker), onSeeWhatYouCanDo, onDone)
 }
 
 @Composable
-internal fun PermissionsChecklistScreen(deskName: String, rows: List<PermissionRow>, onAllowAll: () -> Unit = {}, onDone: () -> Unit) {
+internal fun PermissionsChecklistScreen(deskName: String, rows: List<PermissionRow>, onAllowAll: () -> Unit = {}, onSeeWhatYouCanDo: () -> Unit = {}, onDone: () -> Unit) {
     val t = tokens
     val shown = checklistRows(rows)
     val allDone = checklistCounted(rows).all { it.granted }
@@ -108,6 +110,7 @@ internal fun PermissionsChecklistScreen(deskName: String, rows: List<PermissionR
                     modifier = Modifier.padding(top = 16.dp).semantics { heading() },
                 )
                 Text(stringResource(R.string.perm_body), fontSize = 15.sp, lineHeight = 22.sp, color = t.textDim, modifier = Modifier.padding(top = 8.dp))
+                DeskTextButton(stringResource(R.string.guide_see_what), onSeeWhatYouCanDo, Modifier.padding(top = 4.dp).offset(x = (-12).dp), icon = R.drawable.sym_info)
             }
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 16.dp).clip(RoundedCornerShape(24.dp)), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 shown.forEach { row ->

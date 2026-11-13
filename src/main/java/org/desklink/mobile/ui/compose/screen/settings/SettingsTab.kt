@@ -134,15 +134,17 @@ fun SettingsTab(
     about: @Composable () -> Unit,
     /** Opens the computers sheet; null hides the "Switch" button. */
     onSwitchComputer: (() -> Unit)? = null,
+    /** The "Get started" guide. */
+    onGuide: () -> Unit = {},
 ) {
     val group = route?.let(SettingsPage::groupOf)
     when {
-        route == null -> SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer)
+        route == null -> SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer, onGuide)
         route == SettingsPage.NETWORK -> NetworkScreen(onBack)
         route == SettingsPage.PERMISSIONS -> SettingsColumn(stringResource(R.string.settings_permissions), onBack) { PermissionsSection(desk) }
         route == SettingsPage.ABOUT -> about()
         group != null -> SettingsGroupPage(group, desk, actions, onOpen, onBack)
-        else -> SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer)
+        else -> SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer, onGuide)
     }
 }
 
@@ -152,7 +154,7 @@ fun SettingsTab(
  * that page. Nothing here is a new setting: every row is still on its page.
  */
 @Composable
-private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: (String) -> Unit, waitingPermissions: Int, onSwitchComputer: (() -> Unit)?) {
+private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: (String) -> Unit, waitingPermissions: Int, onSwitchComputer: (() -> Unit)?, onGuide: () -> Unit) {
     val context = LocalContext.current
     val t = tokens
     val pages = if (desk == null) SettingsPage.WITHOUT_COMPUTER else SettingsPage.entries
@@ -218,6 +220,9 @@ private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: 
                     )
                 }
             }
+        }
+        RowGroup {
+            GroupRow(stringResource(R.string.guide_open), icon = R.drawable.sym_info, subtitle = stringResource(R.string.guide_open_summary), onClick = onGuide) { Chevron() }
         }
         Text(
             stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), fontSize = 12.sp, color = t.textDim,

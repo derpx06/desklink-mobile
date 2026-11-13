@@ -95,7 +95,7 @@ const val DESKTOP_APP_URL = "https://github.com/derpx06/DeskLink/releases"
 // ---- welcome ----------------------------------------------------------------------------------------
 
 @Composable
-fun WelcomeScreen(onPair: () -> Unit, onSettings: () -> Unit) {
+fun WelcomeScreen(onPair: () -> Unit, onSettings: () -> Unit, onGuide: () -> Unit = {}) {
     val t = tokens
     var installSheet by rememberSaveable { mutableStateOf(false) }
     // The button is pinned; what is above it scrolls (large text, short screens).
@@ -152,6 +152,7 @@ fun WelcomeScreen(onPair: () -> Unit, onSettings: () -> Unit) {
                 Text(stringResource(R.string.welcome_no_desklink), fontSize = 13.sp, lineHeight = 19.sp, color = t.textDim, modifier = Modifier.padding(start = 4.dp, end = 4.dp))
                 DeskTextButton(stringResource(R.string.welcome_send_install_link), { installSheet = true }, Modifier.offset(x = (-12).dp))
             }
+            DeskTextButton(stringResource(R.string.guide_open), onGuide, Modifier.offset(x = (-12).dp), icon = R.drawable.sym_info)
             Spacer(Modifier.height(16.dp))
         }
         PrimaryButton(
