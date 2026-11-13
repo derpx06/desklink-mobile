@@ -278,7 +278,7 @@ class CallsTest {
 
     @Test
     fun emergencyNumbersAreNeverDialledFromTheDesk() {
-        for (n in listOf("112", "911", "+112", "00 112", "9-9-9", "(911)")) assertTrue(n, CallRequests.isEmergency(n))
+        for (n in listOf("112", "911", "+112", "00 112", "9-9-9", "(911)", "000", "+000")) assertTrue(n, CallRequests.isEmergency(n))
         for (n in listOf("1120", "5551234", "+1 415 555 0100")) assertFalse(n, CallRequests.isEmergency(n))
         val t = CallTracker({ 0L }, null) { "id" }
         assertEquals(CallRequests.ERROR_EMERGENCY, CallRequests.handle("dial", "112", t, FakeControls(), CallFlags()))

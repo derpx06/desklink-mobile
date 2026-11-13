@@ -43,7 +43,8 @@ object CallRequests {
     /** An emergency number, bare or with a leading `+` or `00`, separators ignored. */
     fun isEmergency(number: String): Boolean {
         val digits = number.filter { it.isDigit() || it == '+' }.trimStart('+')
-        return digits.removePrefix("00") in EMERGENCY
+        // Bare first: "000" is one, and removing "00" from it left "0".
+        return digits in EMERGENCY || digits.removePrefix("00") in EMERGENCY
     }
 
     /** Runs [action]; null when done (the caller replies with a fresh snapshot), else the T2 error. */
