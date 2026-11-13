@@ -48,6 +48,7 @@ class SafCaseClashTest {
             if (uri.pathSegments.contains("children")) {
                 val parent = DocumentsContract.getDocumentId(uri)
                 if (failListingOf == parent) return null
+                if (loadingListingOf == parent) c.extras = android.os.Bundle().apply { putBoolean(DocumentsContract.EXTRA_LOADING, true) }
                 file(parent).listFiles().orEmpty().forEach { row(c, if (parent == "root") it.name else "$parent/${it.name}") }
             } else {
                 row(c, DocumentsContract.getDocumentId(uri))
@@ -92,7 +93,7 @@ class SafCaseClashTest {
         override fun insert(uri: Uri, values: android.content.ContentValues?): Uri? = null
         override fun delete(uri: Uri, selection: String?, args: Array<String>?) = 0
         override fun update(uri: Uri, values: android.content.ContentValues?, selection: String?, args: Array<String>?) = 0
-        companion object { lateinit var root: File; @Volatile var failListingOf: String? = null }
+        companion object { lateinit var root: File; @Volatile var failListingOf: String? = null; @Volatile var loadingListingOf: String? = null }
     }
 
     private lateinit var tree: SafTree

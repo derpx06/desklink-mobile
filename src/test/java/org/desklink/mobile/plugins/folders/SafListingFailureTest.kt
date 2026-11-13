@@ -38,7 +38,16 @@ class SafListingFailureTest {
     }
 
     @After
-    fun clear() { SafCaseClashTest.Fake.failListingOf = null }
+    fun clear() {
+        SafCaseClashTest.Fake.failListingOf = null
+        SafCaseClashTest.Fake.loadingListingOf = null
+    }
+
+    @Test
+    fun aListingTheProviderIsStillLoadingAbortsTheScan() {
+        SafCaseClashTest.Fake.loadingListingOf = "a"
+        assertThrows("a cloud folder still fetching is not a folder whose files were deleted", SafListingException::class.java) { tree.scan() }
+    }
 
     @Test
     fun aNullCursorMidWalkAbortsTheScanInsteadOfListingAnEmptyFolder() {

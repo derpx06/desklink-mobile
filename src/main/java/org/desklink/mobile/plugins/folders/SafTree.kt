@@ -55,6 +55,8 @@ class SafTree(private val resolver: ContentResolver, val tree: Uri, private val 
         val cursor = resolver.query(DocumentsContract.buildChildDocumentsUriUsingTree(tree, documentId), projection, null, null, null)
             ?: throw SafListingException()
         cursor.use { c ->
+            // A cloud provider still fetching answers with part of the folder: no better than no answer.
+            if (c.extras?.getBoolean(DocumentsContract.EXTRA_LOADING) == true) throw SafListingException()
             while (c.moveToNext()) {
                 val name = c.getString(1) ?: continue
                 out[name] = Item(c.getString(0), c.getString(2) == Document.MIME_TYPE_DIR, c.getLong(3), c.getLong(4))
