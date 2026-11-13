@@ -26,7 +26,7 @@ class ClipboardTileService : TileService() {
 
         // A tap is an explicit send: forced, with a toast saying what happened.
         TileServiceCompat.startActivityAndCollapse(this, PendingIntentActivityWrapper(
-            this, 0, ClipboardFloatingActivity.getIntent(this, true), PendingIntent.FLAG_ONE_SHOT, true
+            this, 0, ClipboardFloatingActivity.getIntent(this, true), PendingIntent.FLAG_ONE_SHOT, false
         ))
     }
 }
