@@ -178,6 +178,9 @@ class WebRtcTransport(
          */
         fun onLivenessEnvelope(envelope: WebRtcEnvelope) = onEnvelope(envelope)
         fun onControlChannelOpen()
+
+        /** A channel feature-ready waits for ([requiredChannelsOpen]) opened. */
+        fun onRequiredChannelOpen() {}
         fun onRemoteVideoTrack(track: VideoTrack)
         /** MediaProjection revocation is a screen-session event, not a peer
          * failure. The authenticated WebRTC connection stays alive so the
@@ -318,6 +321,7 @@ class WebRtcTransport(
                 if (channel.state() == DataChannel.State.OPEN) {
                     stateRef.compareAndSet(TransportState.CONNECTING, TransportState.CONNECTED)
                     if (channel.label() == WebRtcChannel.CONTROL.label) observer.onControlChannelOpen()
+                    if (channel.label() in REQUIRED_LABELS) observer.onRequiredChannelOpen()
                 }
             }
             override fun onMessage(buffer: DataChannel.Buffer) {
@@ -439,6 +443,13 @@ class WebRtcTransport(
 
     /** Bytes queued on the file channel: the sender's window is driven by this. */
     fun fileBufferedAmount(): Long = channels[WebRtcChannel.FILE_DATA.label]?.bufferedAmount() ?: 0L
+
+    /**
+     * Control, events and liveness are all open: what this side's feature-ready waits for, as the
+     * desk's does (`required_channels_open`). A feature or a probe sent before is lost.
+     */
+    fun requiredChannelsOpen(): Boolean =
+        REQUIRED_LABELS.all { channels[it]?.state() == DataChannel.State.OPEN }
 
     fun isReadyForPackets(): Boolean =
         state == TransportState.CONNECTED &&
@@ -1113,6 +1124,7 @@ class WebRtcTransport(
         /** How long after the last frame the capture re-delivers it, once, for refinement. */
         const val REFINE_AFTER_MS = 100L
         const val START_SCREEN_BITRATE = 2_500_000
+        val REQUIRED_LABELS = WebRtcChannel.REQUIRED.map { it.label }.toSet()
     }
 }
 

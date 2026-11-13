@@ -24,6 +24,34 @@ class WebRtcRecoveryPolicyTest {
     }
 
     @Test
+    fun `a restart request caps the ladder at its last rung instead of starting it over`() {
+        val policy = WebRtcRecoveryPolicy()
+        failures(policy, 7)
+        assertTrue(policy.unavailable())
+        policy.capAtLastRung()
+        assertEquals(16_000L, policy.claimDelayMillis())
+        policy.release()
+        // Early in the ladder a cap changes nothing.
+        val early = WebRtcRecoveryPolicy()
+        failures(early, 2)
+        early.capAtLastRung()
+        assertEquals(2_000L, early.claimDelayMillis())
+    }
+
+    @Test
+    fun `restart requests that keep coming still reach the unavailable state`() {
+        val policy = WebRtcRecoveryPolicy()
+        // Each failed negotiation is answered by a restart request from the desk.
+        repeat(10) {
+            policy.claimDelayMillis()
+            policy.release()
+            policy.capAtLastRung()
+        }
+        policy.claimDelayMillis()
+        assertTrue(policy.unavailable())
+    }
+
+    @Test
     fun `an explicit reset event starts the ladder over`() {
         val policy = WebRtcRecoveryPolicy()
         policy.claimDelayMillis()

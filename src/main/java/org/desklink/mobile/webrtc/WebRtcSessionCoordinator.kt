@@ -936,7 +936,7 @@ class WebRtcSessionCoordinator(
                         synchronized(lock) {
                             if (closed) return@synchronized
                             closeLocked()
-                            recovery.reset()
+                            recovery.capAtLastRung()
                             recoveryInProgress = false
                             device.setWebRtcRecoveryPending(false)
                             publish("RestartRequested", "Rebuilding WebRTC after the peer restarted")
@@ -1168,6 +1168,14 @@ class WebRtcSessionCoordinator(
             override fun onControlChannelOpen() {
                 if (sessions.isCurrent(binding)) {
                     beginHandover(binding, attemptId)
+                }
+            }
+
+            override fun onRequiredChannelOpen() {
+                // Capabilities may have been confirmed while a channel was still opening.
+                synchronized(lock) {
+                    if (closed || activeAttemptId != attemptId || activeBinding != binding) return
+                    if (handover.remoteCapabilitiesReceived) sendFeatureReady(binding, attemptId)
                 }
             }
 
@@ -1486,6 +1494,9 @@ class WebRtcSessionCoordinator(
 
     private fun sendFeatureReady(binding: SessionBinding, attemptId: String) {
         if (handover.localFeatureReadySent) return
+        // Not before control, events and liveness are open (as the desk): a feature or a probe
+        // sent into a channel that is not there yet is lost. `onRequiredChannelOpen` comes back.
+        if (transport?.requiredChannelsOpen() != true) return
         sendControl(
             binding,
             attemptId,
@@ -2777,7 +2788,7 @@ class WebRtcSessionCoordinator(
         private const val MAX_SDP_BYTES = 256 * 1024
         private const val MAX_CANDIDATE_BYTES = 16 * 1024
         private const val MAX_SEEN_REQUESTS = 4096
-        private const val TRANSIENT_DISCONNECT_GRACE_MILLIS = 12_000L
+        internal const val TRANSIENT_DISCONNECT_GRACE_MILLIS = 12_000L
         private const val OFFER_CREATION_TIMEOUT_MILLIS = 10_000L
         private const val REMOTE_HEARTBEAT_SECONDS = 10L
 

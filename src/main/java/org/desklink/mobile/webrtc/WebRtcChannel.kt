@@ -29,6 +29,9 @@ enum class WebRtcChannel(
         /** A liveness send while this much is buffered is skipped: the next heartbeat supersedes it. */
         const val LIVENESS_MAX_BUFFERED_BYTES = 8192L
 
+        /** Feature-ready waits for these, on both apps (desk: `WebRtcChannel::REQUIRED`). */
+        val REQUIRED = listOf(CONTROL, EVENTS, LIVENESS)
+
         fun fromLabel(label: String): WebRtcChannel? = entries.firstOrNull { it.label == label }
 
         fun validate(label: String, ordered: Boolean, maxRetransmits: Int?): WebRtcChannel {

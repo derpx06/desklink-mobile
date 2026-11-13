@@ -46,6 +46,20 @@ class WebRtcRecoveryPolicy(private val clock: () -> Long = { System.nanoTime() /
         readySince = null
     }
 
+    /**
+     * The desk asked for a restart: capped at the last rung, never reset, as the desk does
+     * (`restart_as_initiator`). Resetting on every request made a network where ICE never completes
+     * retry at the first rung for ever, each restart answered by another, and never reach
+     * [unavailable]. Capped past the last rung (its delay repeats): a failure after a request
+     * still reports [unavailable], as the desk's next failure does.
+     */
+    @Synchronized
+    fun capAtLastRung() {
+        nextAttempt = nextAttempt.coerceAtMost(DELAYS_MILLIS.size)
+        scheduled = false
+        readySince = null
+    }
+
     @Synchronized
     fun attempts(): Int = nextAttempt
 
