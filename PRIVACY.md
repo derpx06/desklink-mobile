@@ -43,6 +43,10 @@ your call log or messages, or see your location.
 
 ## The DeskLink relay
 
+**Not used in version 1.3.** This release works on your local network only: the
+relay and TURN are switched off in the app, and nothing below happens. This
+section describes them for a later version that turns them on.
+
 When your phone and computer are not on the same network, they can meet through the
 DeskLink relay (you can turn this off, or point the app at your own relay).
 

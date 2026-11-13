@@ -81,11 +81,24 @@ class SettingsSearchTest {
     }
 
     @Test fun rowsThatExistOnlyWithAComputerAreNotSearchableWithout() {
-        fun titles(hasDesk: Boolean) = groups.values.flatMap { SettingsPage.valueOf(it).let { page -> SettingsIndex.rowsFor(page, hasDesk) } }.map { it.title }
+        fun titles(hasDesk: Boolean) = groups.values.flatMap { SettingsPage.valueOf(it).let { page -> SettingsIndex.rowsFor(page, hasDesk, relayEnabled = true) } }.map { it.title }
         val keepAwake = org.desklink.mobile.R.string.settings_keep_awake
         val deskRelay = org.desklink.mobile.R.string.settings_desk_relay
         assertTrue(keepAwake in titles(true) && deskRelay in titles(true))
         assertTrue(keepAwake !in titles(false) && deskRelay !in titles(false))
         assertTrue("phone-only rows stay", org.desklink.mobile.R.string.settings_phone_name in titles(false))
+    }
+
+    /** 1.3 is LAN-only (BuildConfig.RELAY_ENABLED false): no relay row is on a page, so none is searchable. */
+    @Test fun relayRowsAreNotSearchableWhileTheRelayIsCompiledOut() {
+        fun titles(relayEnabled: Boolean) = SettingsPage.entries.flatMap { SettingsIndex.rowsFor(it, hasDesk = true, relayEnabled = relayEnabled) }.map { it.title }
+        val relayRows = listOf(org.desklink.mobile.R.string.settings_phone_relay, org.desklink.mobile.R.string.settings_desk_relay)
+        assertTrue(relayRows.all { it in titles(relayEnabled = true) })
+        assertTrue(relayRows.none { it in titles(relayEnabled = false) })
+        assertTrue("other rows stay", org.desklink.mobile.R.string.setting_advanced_network in titles(relayEnabled = false))
+        if (!org.desklink.mobile.BuildConfig.RELAY_ENABLED) {
+            val shipped = SettingsPage.entries.flatMap { SettingsIndex.rowsFor(it, hasDesk = true) }.map { it.title }
+            assertTrue(relayRows.none { it in shipped })
+        }
     }
 }

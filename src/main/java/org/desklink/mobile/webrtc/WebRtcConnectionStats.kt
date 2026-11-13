@@ -12,6 +12,14 @@ enum class WebRtcConnectionPath(val label: String) {
     TURN("turn"),
 }
 
+/**
+ * The path as a surface may name it. With the relay compiled out (BuildConfig.RELAY_ENABLED, 1.3) every link began on
+ * the LAN, so nothing is named the internet or a relay: anything but LAN reads as not known yet (null). The real path
+ * stays on the device for what decides on it (the fast lane).
+ */
+fun WebRtcConnectionPath?.shown(relayEnabled: Boolean = org.desklink.mobile.BuildConfig.RELAY_ENABLED): WebRtcConnectionPath? =
+    if (relayEnabled || this == WebRtcConnectionPath.LAN) this else null
+
 /** One poll of the live peer. Null fields are values libwebrtc has not measured yet. */
 data class WebRtcConnectionStats(
     val path: WebRtcConnectionPath,

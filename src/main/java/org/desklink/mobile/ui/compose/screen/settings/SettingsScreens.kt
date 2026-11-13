@@ -572,6 +572,8 @@ fun NetworkScreen(onBack: () -> Unit) {
     @Suppress("UNUSED_EXPRESSION") revision
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     SettingsColumn(stringResource(R.string.setting_advanced_network), onBack) {
+        // Compiled out (BuildConfig.RELAY_ENABLED, 1.3): no relay address, no TURN switch, no TURN servers.
+        if (BuildConfig.RELAY_ENABLED) {
         SectionLabel(stringResource(R.string.settings_category_away))
         RowGroup {
             GroupRow(
@@ -587,6 +589,7 @@ fun NetworkScreen(onBack: () -> Unit) {
                 revision++
             })
         }
+        }
         SectionLabel(stringResource(R.string.setting_webrtc_transport))
         RowGroup {
             GroupRow(
@@ -595,7 +598,7 @@ fun NetworkScreen(onBack: () -> Unit) {
                     ?: stringResource(R.string.setting_webrtc_stun_servers_description),
                 onClick = { editing = DeviceHelper.KEY_WEBRTC_STUN_SERVERS_PREFERENCE },
             )
-            GroupRow(
+            if (BuildConfig.RELAY_ENABLED) GroupRow(
                 stringResource(R.string.setting_webrtc_turn_servers),
                 subtitle = prefs.getString(DeviceHelper.KEY_WEBRTC_TURN_SERVERS_PREFERENCE, null)?.takeIf(String::isNotBlank)
                     ?: stringResource(R.string.setting_webrtc_turn_servers_description),

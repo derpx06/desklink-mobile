@@ -580,7 +580,8 @@ private fun ThingsToCheck(state: HomeState, actions: HomeActions) {
         if (state.updateNeeded) add(Check(stringResource(R.string.home_check_update, state.name), stringResource(R.string.home_check_update_body, state.name)))
         add(Check(stringResource(R.string.home_check_awake, state.name), stringResource(R.string.home_check_awake_body)))
         add(Check(stringResource(R.string.home_check_wifi), stringResource(R.string.home_check_wifi_body, state.name)))
-        if (state.relayAvailable) add(Check(stringResource(R.string.home_check_away), stringResource(R.string.home_check_away_relay_on)))
+        if (!org.desklink.mobile.BuildConfig.RELAY_ENABLED) { /* relay compiled out (1.3): no "Away from home?" check */ }
+        else if (state.relayAvailable) add(Check(stringResource(R.string.home_check_away), stringResource(R.string.home_check_away_relay_on)))
         else add(Check(stringResource(R.string.home_check_away), stringResource(R.string.home_check_away_relay_off, state.name), stringResource(R.string.tab_settings)) { actions.onOpenSettings("connection") })
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

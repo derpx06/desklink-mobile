@@ -103,7 +103,8 @@ class BackgroundService : Service() {
             linkProviders.add(LanLinkProvider(this))
             //linkProviders.add(LoopbackLinkProvider(this))
         }
-        linkProviders.add(RelayLinkProvider(this))
+        // Compiled out (BuildConfig.RELAY_ENABLED, 1.3): no relay socket, no TURN grants, no relay links.
+        if (BuildConfig.RELAY_ENABLED) linkProviders.add(RelayLinkProvider(this))
     }
 
     private fun relayProvider(): RelayLinkProvider? = linkProviders.filterIsInstance<RelayLinkProvider>().firstOrNull()

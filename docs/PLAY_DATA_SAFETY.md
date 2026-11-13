@@ -3,6 +3,11 @@
 Answers for the Play Console forms for DeskLink 1.3.0 (`org.desklink.mobile`).
 They follow `PRIVACY.md`; if the app or the relay changes, update both.
 
+**1.3.0 ships with the relay off** (`RELAY_ENABLED` false in `build.gradle.kts`): no relay
+connection and no TURN, so the relay and Cloudflare TURN parts below do not happen in this
+release. The owner should decide whether to answer the forms for the LAN-only build before
+submitting.
+
 **Before submitting, the owner must confirm one fact:** that the deployed relay keeps
 IP addresses and certificate fingerprints only in memory for the life of a
 connection (no logs, no database). The answers below assume it does. If the relay

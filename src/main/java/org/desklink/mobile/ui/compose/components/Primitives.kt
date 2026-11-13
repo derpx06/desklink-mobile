@@ -22,6 +22,7 @@ import kotlinx.coroutines.delay
 import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 import org.desklink.mobile.webrtc.WebRtcConnectionPath
+import org.desklink.mobile.webrtc.shown
 import org.desklink.mobile.webrtc.WebRtcConnectionStats
 
 /** A list that is dragged hides the keyboard, as the platform's own lists do; focus and the cursor stay where they were. */
@@ -78,10 +79,11 @@ fun rememberConnectionStats(deviceId: String?): WebRtcConnectionStats? {
 /** "Local network · 8 ms", in the wording the rest of DeskLink uses for the path. */
 @Composable
 fun connectionStatsLabel(stats: WebRtcConnectionStats): String {
-    val label = when (stats.path) {
+    val label = when (stats.path.shown()) {
         WebRtcConnectionPath.LAN -> stringResource(R.string.connection_local)
         WebRtcConnectionPath.DIRECT -> stringResource(R.string.remote_path_direct)
         WebRtcConnectionPath.TURN -> stringResource(R.string.remote_path_turn)
+        null -> stringResource(R.string.connection_connected)
     }
     return stats.roundTripTimeMs?.let { stringResource(R.string.remote_path_with_rtt, label, it) } ?: label
 }

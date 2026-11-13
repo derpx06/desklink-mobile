@@ -102,7 +102,7 @@ enum class SettingsPage(val route: String, @StringRes val title: Int, @StringRes
     FILES("files", R.string.sg_files, R.string.sg_files_summary, R.drawable.sym_folder_zip),
     PRIVACY("privacy", R.string.sg_privacy, R.string.sg_privacy_summary, R.drawable.sym_fingerprint),
     APPEARANCE("appearance", R.string.sg_appearance, R.string.sg_appearance_summary, R.drawable.sym_palette),
-    ADVANCED("advanced", R.string.sg_advanced, R.string.sg_advanced_summary, R.drawable.sym_tune),
+    ADVANCED("advanced", R.string.sg_advanced, if (BuildConfig.RELAY_ENABLED) R.string.sg_advanced_summary else R.string.sg_advanced_summary_lan, R.drawable.sym_tune),
     ;
 
     companion object {
@@ -1000,10 +1000,13 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
             ) { Chevron() }
         }
     }
-    SectionLabel(stringResource(R.string.settings_category_away))
+    // Compiled out (BuildConfig.RELAY_ENABLED, 1.3): no "Away from home" section or relay rows; "Advanced network" sits
+    // under Connection.
+    val relay = BuildConfig.RELAY_ENABLED
+    SectionLabel(stringResource(if (relay) R.string.settings_category_away else R.string.settings_category_connection))
     RowGroup {
         // Without a relay address the switch has nothing to turn on: say so, and wait for one.
-        GroupRow(
+        if (relay) GroupRow(
             stringResource(R.string.settings_phone_relay),
             icon = R.drawable.sym_public,
             subtitle = if (!configured) {
@@ -1019,12 +1022,12 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
                 changed()
             },
         )
-        if (desk != null && desk.remote?.relayConfigured == true) {
+        if (relay && desk != null && desk.remote?.relayConfigured == true) {
             DeskSwitch(desk, actions, DeskSettingsPlugin.RELAY, stringResource(R.string.settings_desk_relay, desk.name), R.drawable.sym_public, stringResource(R.string.settings_reach_anywhere_summary), desk.remote.relay)
         }
         GroupRow(stringResource(R.string.setting_advanced_network), icon = R.drawable.sym_tune, subtitle = stringResource(R.string.setting_advanced_network_summary), onClick = { onOpen(SettingsPage.NETWORK) }) { Chevron() }
     }
-    SectionLabel(stringResource(R.string.settings_category_connection))
+    if (relay) SectionLabel(stringResource(R.string.settings_category_connection))
     RowGroup {
         GroupRow(stringResource(R.string.trusted_networks), icon = R.drawable.sym_public, subtitle = stringResource(R.string.trusted_networks_desc), onClick = { trustedNetworks.launch(Intent(context, TrustedNetworksActivity::class.java)) })
         GroupRow(
@@ -1057,7 +1060,7 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
             for ((key, title, summary) in listOf(
                 Triple(RelaySettings.KEY_FORCE_RELAY, R.string.setting_relay_force_relay, R.string.setting_relay_force_relay_description),
                 Triple(RelaySettings.KEY_FORCE_TURN, R.string.setting_relay_force_turn, R.string.setting_relay_force_turn_description),
-            )) {
+            ).filter { BuildConfig.RELAY_ENABLED }) {
                 GroupRow(stringResource(title), subtitle = stringResource(summary), checked = prefs.getBoolean(key, false), onClick = {
                     prefs.edit { putBoolean(key, !prefs.getBoolean(key, false)) }
                     changed()

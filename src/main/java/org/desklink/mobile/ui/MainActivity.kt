@@ -178,6 +178,7 @@ import org.desklink.mobile.plugins.terminal.TerminalAttentionBadge
 import androidx.compose.runtime.collectAsState
 import org.desklink.mobile.ui.compose.screen.settings.showPluginPermission
 import org.desklink.mobile.ui.compose.tokens
+import org.desklink.mobile.webrtc.shown
 
 private const val STORAGE_LOCATION_CONFIGURED = 2020
 private const val STATE_STACK = "stack" // Saved only in onSaveInstanceState
@@ -700,7 +701,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         // The computer's notifications in the shade: a system query, so every five seconds, not every second.
         val mirrored = androidx.compose.runtime.remember(tick / 5, device.deviceId) { HomeModel.deskNotificationCount(this, device) }
         val state = HomeModel.build(this, device, paired, records).let { s ->
-            (if (s.ready && stats != null) s.copy(path = stats.path, rttMs = stats.roundTripTimeMs?.toInt()) else s).copy(deskNotifications = mirrored)
+            (if (s.ready && stats != null) s.copy(path = stats.path.shown(), rttMs = stats.roundTripTimeMs?.toInt()) else s).copy(deskNotifications = mirrored)
         }
         var sharingInfo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
         // One actions object per computer: a new one every second would make Home recompose even when nothing changed.

@@ -46,25 +46,27 @@ object RelaySettings {
 
     private fun prefs(context: Context) = PreferenceManager.getDefaultSharedPreferences(context)
 
-    fun enabled(context: Context) = prefs(context).getBoolean(KEY_ENABLED, true)
+    /** [BuildConfig.RELAY_ENABLED] off (1.3: LAN only) turns every switch below off, whatever is stored. */
+    fun enabled(context: Context) = BuildConfig.RELAY_ENABLED && prefs(context).getBoolean(KEY_ENABLED, true)
 
     /** Empty means the built-in default, which is itself empty unless the build names a relay. */
     fun url(context: Context): String =
         prefs(context).getString(KEY_URL, "").orEmpty().trim().ifEmpty { BuildConfig.DEFAULT_RELAY_URL }
 
     /** A relay address exists (entered, or built in). Without one nothing relay-related runs or shows. */
-    fun configured(context: Context) = url(context).isNotBlank()
+    fun configured(context: Context) = BuildConfig.RELAY_ENABLED && url(context).isNotBlank()
 
     /** Whether the relay connection runs: switched on, an address to reach, and someone paired to reach. */
     fun shouldRun(enabled: Boolean, url: String, hasPairedDevices: Boolean) = enabled && url.isNotBlank() && hasPairedDevices
 
-    fun useTurn(context: Context) = prefs(context).getBoolean(KEY_USE_TURN, true)
+    /** TURN comes from the relay: none at all without it, user-configured servers included. */
+    fun useTurn(context: Context) = BuildConfig.RELAY_ENABLED && prefs(context).getBoolean(KEY_USE_TURN, true)
 
     /** Debug builds only: no LAN links at all. Read when the service starts. */
-    fun forceRelay(context: Context) = BuildConfig.DEBUG && prefs(context).getBoolean(KEY_FORCE_RELAY, false)
+    fun forceRelay(context: Context) = BuildConfig.RELAY_ENABLED && BuildConfig.DEBUG && prefs(context).getBoolean(KEY_FORCE_RELAY, false)
 
     /** Debug builds only: relay-only ICE transport policy. */
-    fun forceTurn(context: Context) = BuildConfig.DEBUG && prefs(context).getBoolean(KEY_FORCE_TURN, false)
+    fun forceTurn(context: Context) = BuildConfig.RELAY_ENABLED && BuildConfig.DEBUG && prefs(context).getBoolean(KEY_FORCE_TURN, false)
 }
 
 /**

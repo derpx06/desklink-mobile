@@ -49,6 +49,11 @@ android {
         // person enters one (Settings → More → Advanced network), and never looks one up.
         val relayUrl = releaseSigningValue("DESKLINK_RELAY_URL") ?: ""
         buildConfigField("String", "DEFAULT_RELAY_URL", "\"$relayUrl\"")
+        // The one switch for everything off the LAN (docs/RELAY.md): the relay connection, TURN, relay-bootstrapped
+        // WebRTC and every row, label and line about them. 1.3 ships LAN-only: false in every build type (defaultConfig
+        // covers debug and release). Flip it to bring the relay back (desktop: RELAY_ENABLED in relay_link/mod.rs).
+        // Stored relay prefs are kept and ignored while it is off.
+        buildConfigField("boolean", "RELAY_ENABLED", "false")
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     buildFeatures {
