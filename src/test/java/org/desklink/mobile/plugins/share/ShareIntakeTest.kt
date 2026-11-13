@@ -49,6 +49,15 @@ class ShareIntakeTest {
     }
 
     @Test
+    fun theShareSheetKeepsOnlyTheUrisOfAMixedList() {
+        val uri = Uri.parse("content://other.app/1")
+        val mixed = Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, arrayListOf<android.os.Parcelable>(Intent("x"), uri))
+        assertEquals(listOf(uri), ShareActivity.streamUris(mixed))
+        val wrongSingle = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, Intent("x"))
+        assertEquals(emptyList<Uri>(), ShareActivity.streamUris(wrongSingle))
+    }
+
+    @Test
     fun aNotesShareNeedsSomethingInIt() {
         assertNull(ShareIntake.forNotes(Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, "  ")))
         assertNull(ShareIntake.forNotes(Intent("other").putExtra(Intent.EXTRA_TEXT, "hi")))

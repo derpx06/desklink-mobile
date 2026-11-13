@@ -23,6 +23,7 @@ import androidx.preference.PreferenceManager
 import org.desklink.mobile.BackgroundService
 import org.desklink.mobile.Device
 import org.desklink.mobile.DeskLinkApplication
+import org.desklink.mobile.extensions.getParcelableCompat
 import org.desklink.mobile.base.BaseActivity
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.extensions.device.toUiModel
@@ -235,11 +236,6 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
             .show()
     }
 
-    @Suppress("DEPRECATION")
-    private fun streamUris(intent: Intent): List<android.net.Uri> = runCatching {
-        if (Intent.ACTION_SEND_MULTIPLE == intent.action) intent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM).orEmpty()
-        else listOfNotNull(intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM))
-    }.getOrDefault(emptyList())
 
     override fun onStop() {
         DeskLinkApplication.getInstance().removeDeviceListChangedCallback(key = "ShareActivity")
@@ -252,6 +248,11 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
     }
 
     companion object {
+        /** The shared Uris, whatever else another app put in the list (an Intent in it crashed the confirm sheet). */
+        internal fun streamUris(intent: Intent): List<android.net.Uri> =
+            if (Intent.ACTION_SEND_MULTIPLE == intent.action) ShareIntake.streams(intent)
+            else listOfNotNull(runCatching { intent.getParcelableCompat<android.net.Uri>(Intent.EXTRA_STREAM) }.getOrNull())
+
         private const val KEY_SHARING = "sharing"
         /** A share is being read (main thread only). */
         private var sendingNow = false
