@@ -92,6 +92,17 @@ class ClipboardPluginTest {
     }
 
     @Test
+    fun aConnectPacketWithEmptyTextNeverBlanksTheClipboard() {
+        every { clipboardListener.updateTimestamp } returns 0L
+        val blank = NetworkPacket("desklink.clipboard.connect").apply {
+            set("content", "")
+            set("timestamp", System.currentTimeMillis())
+        }
+        clipboardPlugin.onPacketReceived(blank)
+        verify(exactly = 0) { clipboardListener.setText(any()) }
+    }
+
+    @Test
     fun testReceiveAndDiscardClipboardUpdateTimestampZero() {
         val content = "DLWq7RvblSa6zFPrwLjs9JAdA"
         val timestamp = System.currentTimeMillis()

@@ -8,7 +8,6 @@ package org.desklink.mobile.plugins.share;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -23,7 +22,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
-import androidx.core.content.ContextCompat;
 import androidx.core.content.IntentCompat;
 import androidx.core.content.LocusIdCompat;
 import androidx.core.content.pm.ShortcutInfoCompat;
@@ -287,8 +285,9 @@ public class SharePlugin extends Plugin {
 
     private void receiveText(NetworkPacket np) {
         String text = np.getString("text");
-        ClipboardManager cm = ContextCompat.getSystemService(context, ClipboardManager.class);
-        cm.setText(text);
+        if (text.isEmpty()) return;
+        // As the desk's copy: straight onto the clipboard it would be offered back to every desk as a new phone copy.
+        org.desklink.mobile.plugins.clipboard.ClipboardListener.Companion.instance(context).setText(text);
         handler.post(() -> Toast.makeText(context, R.string.shareplugin_text_saved, Toast.LENGTH_LONG).show());
     }
 

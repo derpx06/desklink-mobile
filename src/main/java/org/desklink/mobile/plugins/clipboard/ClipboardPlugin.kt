@@ -47,7 +47,7 @@ class ClipboardPlugin : Plugin() {
                 if (packetTime == 0L || packetTime < maxOf(ClipboardListener.instance(context).updateTimestamp, ClipboardListener.instance(context).copiedAt)) {
                     return false
                 }
-                if ("content" in np) { // change clipboard if content is in NetworkPacket
+                if ("content" in np && content.isNotEmpty()) { // a newer copy, never a blank
                     ClipboardListener.instance(context).setText(content)
                 }
                 return true
