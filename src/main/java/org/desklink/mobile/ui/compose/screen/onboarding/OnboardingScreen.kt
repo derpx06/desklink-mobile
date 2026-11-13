@@ -78,28 +78,34 @@ import org.desklink.mobile.ui.compose.components.rememberReducedMotion
 import org.desklink.mobile.ui.compose.tokens
 import kotlin.math.min
 
-/** What one page of the tour says. */
-class TourPage(@StringRes val kicker: Int, @StringRes val title: Int, @StringRes val body: Int)
+/** What one page of the tour says, and the scene beside it. */
+class TourPage(@StringRes val kicker: Int, @StringRes val title: Int, @StringRes val body: Int, val scene: Scene)
 
+/** One idea a page; the desk's tour says the same (both apps' tests pin it). */
 val TourPages = listOf(
-    TourPage(R.string.ob_p1_kicker, R.string.ob_p1_title, R.string.ob_p1_body),
-    TourPage(R.string.ob_p2_kicker, R.string.ob_p2_title, R.string.ob_p2_body),
-    TourPage(R.string.ob_p3_kicker, R.string.ob_p3_title, R.string.ob_p3_body),
-    TourPage(R.string.ob_p4_kicker, R.string.ob_p4_title, R.string.ob_p4_body),
-    TourPage(R.string.ob_p5_kicker, R.string.ob_p5_title, R.string.ob_p5_body),
+    TourPage(R.string.ob_tour_screens_kicker, R.string.ob_tour_screens_title, R.string.ob_tour_screens_body, Scene.CONTROL),
+    TourPage(R.string.ob_tour_share_kicker, R.string.ob_tour_share_title, R.string.ob_tour_share_body, Scene.SHARE),
+    TourPage(R.string.ob_tour_terminals_kicker, R.string.ob_tour_terminals_title, R.string.ob_tour_terminals_body, Scene.TERMINALS),
 )
 
-/** The tour with its own page memory (kept across a rotation). */
+/** The page before the tour's first: the glance. */
+const val GLANCE_PAGE = -1
+
+/**
+ * The first run: the glance, then the tour, with its own page memory (kept across a rotation). The glance's "Get started" opens
+ * the tour; Back from the tour's first page returns to it.
+ */
 @Composable
 fun OnboardingRoute(paired: Boolean, onFinish: () -> Unit, onSkip: () -> Unit) {
-    var page by rememberSaveable { mutableIntStateOf(0) }
-    OnboardingScreen(page, { page = it.coerceIn(0, TourPages.lastIndex) }, paired, onFinish, onSkip)
+    var page by rememberSaveable { mutableIntStateOf(GLANCE_PAGE) }
+    if (page == GLANCE_PAGE) GlanceScreen(onStart = { page = 0 }, onSkip = onSkip)
+    else OnboardingScreen(page, { page = it.coerceIn(GLANCE_PAGE, TourPages.lastIndex) }, paired, onFinish, onSkip)
 }
 
 /**
- * The five-page tour: segment bars on top (tap one to jump), Skip, an animated scene card, the page's words, and Back/Next. The last
- * page ends with [onFinish] ("Pair with a Computer", or Done when replayed on a paired phone). Pages change only when the person
- * asks: there is no timer. [onSkip] leaves the tour from any page.
+ * The tour: segment bars on top (tap one to jump), Skip, an animated scene card, the page's words, and Back/Next (Back on the
+ * first page returns to the glance). The last page ends with [onFinish] ("Pair with a computer", or Done when replayed on a
+ * paired phone). Pages change only when the person asks: there is no timer. [onSkip] leaves the tour from any page.
  */
 @Composable
 fun OnboardingScreen(page: Int, onPage: (Int) -> Unit, paired: Boolean, onFinish: () -> Unit, onSkip: () -> Unit) {
@@ -135,7 +141,7 @@ fun OnboardingScreen(page: Int, onPage: (Int) -> Unit, paired: Boolean, onFinish
                             onDragEnd = {
                                 val forward = if (rtl) dragged > 80f else dragged < -80f
                                 val back = if (rtl) dragged < -80f else dragged > 80f
-                                if (forward) onPage(page + 1) else if (back) onPage(page - 1)
+                                if (forward) onPage(page + 1) else if (back && page > 0) onPage(page - 1)
                             },
                         ) { _, delta -> dragged += delta }
                     }
@@ -152,7 +158,7 @@ fun OnboardingScreen(page: Int, onPage: (Int) -> Unit, paired: Boolean, onFinish
                     CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1f)) {
                         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             val s = min(maxWidth.value / SceneWidth, maxHeight.value / SceneHeight).coerceIn(0.5f, 1.15f)
-                            OnboardingScene(p, reduced, Modifier.graphicsLayer { scaleX = s; scaleY = s })
+                            OnboardingScene(TourPages[p].scene, reduced, Modifier.graphicsLayer { scaleX = s; scaleY = s })
                         }
                     }
                 }
@@ -170,13 +176,12 @@ fun OnboardingScreen(page: Int, onPage: (Int) -> Unit, paired: Boolean, onFinish
             }
         }
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 18.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (page > 0) {
-                val back = stringResource(R.string.ob_back)
-                Box(
-                    Modifier.size(56.dp).clip(CircleShape).border(1.dp, t.hairlineStrong, CircleShape).clickable(role = Role.Button, onClick = { onPage(page - 1) }).semantics { contentDescription = back },
-                    contentAlignment = Alignment.Center,
-                ) { Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = null, tint = t.text, modifier = Modifier.size(22.dp)) }
-            }
+            // On the first page too: it goes back to the glance.
+            val back = stringResource(R.string.ob_back)
+            Box(
+                Modifier.size(56.dp).clip(CircleShape).border(1.dp, t.hairlineStrong, CircleShape).clickable(role = Role.Button, onClick = { onPage(page - 1) }).semantics { contentDescription = back },
+                contentAlignment = Alignment.Center,
+            ) { Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = null, tint = t.text, modifier = Modifier.size(22.dp)) }
             if (last) {
                 PrimaryButton(
                     stringResource(if (paired) R.string.ob_done else R.string.welcome_pair),
@@ -191,7 +196,7 @@ fun OnboardingScreen(page: Int, onPage: (Int) -> Unit, paired: Boolean, onFinish
     }
 }
 
-/** One of the five bars: 4 dp to look at, 48 dp tall to touch, filled up to the current page. */
+/** One of the bars: 4 dp to look at, 48 dp tall to touch, filled up to the current page. */
 @Composable
 private fun SegmentBar(index: Int, filled: Boolean, selected: Boolean, reduced: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val t = tokens

@@ -51,10 +51,11 @@ class FirstRunTest {
     }
 
     @Test
-    fun theTourHasFivePagesAndEachSaysSomething() {
-        assertEquals(5, TourPages.size)
+    fun theTourHasThreePagesAndEachSaysSomething() {
+        assertEquals(3, TourPages.size)
         assertEquals(TourPages.size, TourPages.map { it.title }.toSet().size)
-        assertEquals(R.string.ob_p1_kicker, TourPages.first().kicker)
+        assertEquals(TourPages.size, TourPages.map { it.scene }.toSet().size)
+        assertEquals(R.string.ob_tour_screens_kicker, TourPages.first().kicker)
     }
 
     @Test

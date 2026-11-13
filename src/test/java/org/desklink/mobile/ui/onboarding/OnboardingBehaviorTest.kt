@@ -42,20 +42,23 @@ class OnboardingBehaviorTest {
                 }
             }
         }
-        repeat(4) { compose.onNodeWithText("Next").performClick() }
-        compose.onNodeWithText("Done").assertExists() // page five
+        compose.onNodeWithText("Get started").performClick()
+        repeat(2) { compose.onNodeWithText("Next").performClick() }
+        compose.onNodeWithText("Done").assertExists() // the last page
         route = "settings"
         compose.waitForIdle()
         route = "onboarding"
         compose.waitForIdle()
-        compose.onNodeWithText("Welcome to DeskLink").assertExists()
-        compose.onNodeWithText("Next").assertExists()
+        // A replay starts at the glance.
+        compose.onNodeWithText("Your phone and computer, together").assertExists()
+        compose.onNodeWithText("Get started").assertExists()
     }
 
     @Test
     fun everySegmentBarIsFortyEightDpToTouch() {
         compose.setContent { DeskLinkFixedTheme(compose.activity, false) { OnboardingRoute(paired = false, onFinish = {}, onSkip = {}) } }
+        compose.onNodeWithText("Get started").performClick()
         val bars = compose.onAllNodesWithContentDescription("Go to page", substring = true)
-        repeat(5) { bars[it].assertHeightIsAtLeast(48.dp) }
+        repeat(3) { bars[it].assertHeightIsAtLeast(48.dp) }
     }
 }

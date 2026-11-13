@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- First run "at a glance", the tour and the Get started guide. The glance and tour lines are the desk's words too
+     (DeskLink src/window/onboarding.rs): change both apps together. -->
+<resources>
+    <!-- At a glance: the very first screen -->
+    <string name="ob_glance_kicker">Welcome to DeskLink</string>
+    <string name="ob_glance_title">Your phone and computer, together</string>
+    <string name="ob_glance_line_screens">See and control one screen from the other</string>
+    <string name="ob_glance_line_share">Send files, and copy on one, paste on the other</string>
+    <string name="ob_glance_line_more">Phone notifications and terminals on both</string>
+    <string name="ob_glance_steps">Start in 3 steps</string>
+    <string name="ob_glance_step_install">Install DeskLink on both</string>
+    <string name="ob_glance_step_pair">Pair once with a code</string>
+    <string name="ob_glance_step_done">Done: they connect on their own</string>
+    <string name="ob_glance_private">No account. Only your paired devices can connect.</string>
+    <string name="ob_glance_start">Get started</string>
+    <string name="ob_glance_step_number">Step %1$d</string>
+
+    <!-- The tour: three pages, one idea each -->
+    <string name="ob_tour_screens_kicker">Screens</string>
+    <string name="ob_tour_screens_title">See it. Steer it.</string>
+    <string name="ob_tour_screens_body">Watch one screen on the other, and use your phone as a touchpad and keyboard.</string>
+    <string name="ob_tour_share_kicker">Share</string>
+    <string name="ob_tour_share_title">Files and copies, both ways</string>
+    <string name="ob_tour_share_body">Send a file in a tap, and copy on one device to paste on the other.</string>
+    <string name="ob_tour_terminals_kicker">Terminals</string>
+    <string name="ob_tour_terminals_title">Terminals that follow you</string>
+    <string name="ob_tour_terminals_body">Start a terminal on one device and pick it up on the other.</string>
+
+    <!-- Get started guide -->
+    <string name="guide_title">Get started</string>
+    <string name="guide_subtitle">What DeskLink can do, and how to start each one.</string>
+    <string name="guide_open">Get started guide</string>
+    <string name="guide_open_summary">What DeskLink can do, and how</string>
+    <string name="guide_see_what">See what you can do</string>
+    <string name="guide_keywords" translatable="false">help guide get started how tutorial tour learn what can</string>
+    <string name="guide_needs_pair">Pair a computer first.</string>
+    <string name="guide_on_computer">On your computer</string>
+    <string name="guide_your_computer">your computer</string>
+
+    <string name="guide_pair_title">Pair a computer</string>
+    <string name="guide_pair_how">On your computer, open DeskLink and choose Pair a phone. Then scan the code it shows.</string>
+    <string name="guide_pair_how_paired">Paired with %1$s. Add another computer the same way.</string>
+    <string name="guide_pair_button">Pair a computer</string>
+    <string name="guide_pair_another">Pair another computer</string>
+
+    <string name="guide_send_title">Send a file</string>
+    <string name="guide_send_how">Tap Send files, or share a photo or file to DeskLink from any app.</string>
+    <string name="guide_send_button">Send a file</string>
+
+    <string name="guide_clip_title">Copy on one, paste on the other</string>
+    <string name="guide_clip_how">What you copy on %1$s arrives here. Tap Send clipboard to send what you copied on this phone.</string>
+    <string name="guide_clip_button">Send clipboard</string>
+
+    <string name="guide_desk_title">See your computer\'s screen on the phone</string>
+    <string name="guide_desk_how">Open Desk screen to watch %1$s, and use this phone as its touchpad and keyboard.</string>
+    <string name="guide_desk_button">Open Desk screen</string>
+
+    <string name="guide_extend_title">Use the phone as a second screen</string>
+    <string name="guide_extend_how">In Desk screen, choose Extend. This phone becomes a second screen: drag windows onto it.</string>
+
+    <string name="guide_share_title">Share your phone\'s screen to the computer</string>
+    <string name="guide_share_how">%1$s shows this phone\'s screen in a window.</string>
+    <string name="guide_share_button">Share this screen</string>
+
+    <string name="guide_notif_title">Phone notifications on the computer</string>
+    <string name="guide_notif_how">This phone\'s notifications show on %1$s, and you can reply from there.</string>
+    <string name="guide_notif_button">Notification settings</string>
+
+    <string name="guide_term_title">Terminals on both</string>
+    <string name="guide_term_how">Open a terminal on %1$s from here, or pick up one you started there.</string>
+    <string name="guide_term_button">Open terminals</string>
+
+    <string name="guide_notes_title">Notes on both</string>
+    <string name="guide_notes_how">Write a note here and it shows on %1$s too.</string>
+    <string name="guide_notes_button">New note</string>
+
+    <string name="guide_find_title">Find my phone</string>
+    <string name="guide_find_how">Lost this phone? Ring it from %1$s, even when it is on silent. From here you can ring %1$s.</string>
+    <string name="guide_find_button">Ring your computer</string>
+
+    <string name="guide_lock_title">Lock and unlock</string>
+    <string name="guide_lock_how">Lock %1$s from here. To unlock it with this phone, turn that on in DeskLink on %1$s.</string>
+    <string name="guide_lock_button">Lock your computer</string>
+
+    <string name="guide_glide_title">Glide: the mouse moves onto the phone</string>
+    <string name="guide_glide_how">Move %1$s\'s mouse past the edge of its screen and it carries on here.</string>
+    <string name="guide_glide_button">Glide settings</string>
+
+    <string name="guide_tiles_title">Widgets and Quick Settings tiles</string>
+    <string name="guide_tiles_how">Add DeskLink tiles to Quick Settings. For widgets, touch and hold your home screen, then tap Widgets.</string>
+    <string name="guide_tiles_button">Add a tile</string>
+
+    <string name="guide_topbar_title">Top-bar menu</string>
+    <string name="guide_topbar_how">On a GNOME computer, DeskLink can sit in the top bar: send files, ring or lock in one click. Turn it on in DeskLink on the computer.</string>
+
+    <string name="guide_trouble_title">Can\'t connect?</string>
+    <string name="guide_trouble_how">Put both on the same Wi-Fi, and check that the computer\'s firewall lets DeskLink in. Then let DeskLink run in the background on this phone.</string>
+    <string name="guide_trouble_retry">Look again</string>
+    <string name="guide_trouble_wifi">Wi-Fi settings</string>
+</resources>
