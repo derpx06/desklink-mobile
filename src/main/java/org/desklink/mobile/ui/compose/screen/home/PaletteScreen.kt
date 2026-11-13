@@ -259,7 +259,17 @@ private fun buildItems(context: android.content.Context, state: HomeState, notes
     SettingsPage.entries.forEach { page ->
         items.add(PaletteItem("settings:" + page.route, PaletteGroup.SETTINGS, context.getString(page.title), page.icon, "", context.getString(page.summary)))
     }
-    items.add(PaletteItem("settings:" + SettingsPage.PERMISSIONS, PaletteGroup.SETTINGS, context.getString(R.string.settings_permissions), R.drawable.sym_tune))
+    // Each setting on its own, found by its name or a word for it; it opens its page. (Home always has a computer.)
+    fun text(id: Int) = runCatching { context.getString(id, name) }.getOrDefault("")
+    org.desklink.mobile.ui.compose.screen.settings.SettingsIndex.rows.forEach { row ->
+        val words = listOfNotNull(row.summary, row.keywords).joinToString(" ") { text(it) }
+        val route = when (row.title) {
+            R.string.settings_permissions -> SettingsPage.PERMISSIONS
+            R.string.about -> SettingsPage.ABOUT
+            else -> row.page.route
+        }
+        items.add(PaletteItem("settings:$route", PaletteGroup.SETTINGS, text(row.title), row.page.icon, context.getString(row.page.title), words))
+    }
     val here = context.getString(R.string.palette_computer_here)
     state.computers.forEach { c ->
         items.add(PaletteItem("computer:" + c.id, PaletteGroup.COMPUTERS, c.name, R.drawable.sym_desktop_windows, if (c.id == state.deviceId) here else context.getString(connectionShortRes(c.connection))))

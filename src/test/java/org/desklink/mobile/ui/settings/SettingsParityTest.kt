@@ -70,7 +70,7 @@ class SettingsParityTest {
         assertEquals(
             listOf(
                 "Send this phone's notifications to <computer>", "Choose apps", "<computer> shows them", "Show private contents on <computer>",
-                "Show <computer>'s notifications here", "Command alerts", "Show ongoing items on <computer>", "Share Do Not Disturb with <computer>", "Select a ringtone", "Persistent notification",
+                "Show <computer>'s notifications here", "Command alerts", "Show ongoing items on <computer>", "Share Do Not Disturb with <computer>", "Select a ringtone", "Always-on notification",
             ),
             rows("NotificationsGroup"),
         )
@@ -98,7 +98,7 @@ class SettingsParityTest {
         assertEquals(listOf("Style", "Use wallpaper colours"), rows("AppearanceGroup"))
         assertEquals(
             listOf(
-                "Something stopped. Tap to restart", "Advanced network",
+                "Something stopped. Tap to restart", "Helper servers",
                 "Trusted networks", "Add a computer by address", "Permissions", "Quick Settings tiles", "Export DeskLink logs", "About",
             ),
             rows("AdvancedGroup").filter { it != "Style" },
