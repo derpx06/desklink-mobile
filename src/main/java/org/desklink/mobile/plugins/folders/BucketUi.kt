@@ -584,7 +584,7 @@ class BucketUi(
             DeskDialog(
                 onDismissRequest = { renaming = null },
                 title = stringResource(R.string.bucket_rename),
-                text = { DeskTextField(name, { name = it.replace("/", "").take(200) }, Modifier.fillMaxWidth(), label = stringResource(R.string.bucket_rename), singleLine = true) },
+                text = { DeskTextField(name, { name = it.replace("/", "").take(200) }, Modifier.fillMaxWidth(), label = stringResource(R.string.terminal_rename_hint), singleLine = true) },
                 confirm = DialogAction(stringResource(R.string.bucket_rename)) {
                     renaming = null
                     BucketEngine.rename(deviceId, item.path, name) { ok -> if (!ok) runOnUiThread { toast(getString(R.string.bucket_rename_failed)) } }

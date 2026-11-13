@@ -165,11 +165,12 @@ fun DeskControls(
     Box(Modifier.fillMaxSize().windowInsetsPadding(safeInsets)) {
         // One compact strip, only while something is missing: control not yet granted (or watch-only).
         // Granted, dismissed or timed out, it is gone; it never repeats for the same state.
-        if (live && noticeVisible && (!controlEnabled || mode == ControlMode.View)) {
+        // With the controls showing it sits just above the toolbar (whose mode switch it is about), never
+        // under the name and End at the top; with them hidden, alone at the top centre.
+        val showNotice = live && noticeVisible && (!controlEnabled || mode == ControlMode.View)
+        val notice: @Composable (Modifier) -> Unit = { placed ->
             Row(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 8.dp)
+                placed
                     .background(AmberNotice, RoundedCornerShape(16.dp))
                     .padding(start = 12.dp, end = 4.dp)
                     .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
@@ -200,6 +201,7 @@ fun DeskControls(
                 }
             }
         }
+        if (showNotice && !visible) notice(Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
         val still = rememberReducedMotion()
         AnimatedVisibility(
             visible = visible,
@@ -247,7 +249,7 @@ fun DeskControls(
                     }
                 }
                     }
-                // F2: Mirror | Extend, under the name (the top centre is the amber notice's).
+                // F2: Mirror | Extend, under the name.
                 Pill {
                     Row(Modifier.padding(3.dp).selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
                         listOf(ScreenDisplay.MIRROR to R.string.remote_display_mirror, ScreenDisplay.EXTEND to R.string.remote_display_extend).forEach { (value, label) ->
@@ -273,6 +275,7 @@ fun DeskControls(
                 }
                 }
                 Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (showNotice) notice(Modifier)
                     keys()
                     hint?.let {
                         Text(it, fontSize = 11.sp, color = PillText, modifier = Modifier.background(PillBg, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp))
