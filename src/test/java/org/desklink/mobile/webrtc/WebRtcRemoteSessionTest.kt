@@ -476,6 +476,27 @@ class WebRtcRemoteSessionTest {
         assertEquals(WebRtcRemoteSessionState.PAUSED_LOCKED, controller.snapshot().state)
     }
 
+    @Test
+    fun `values a newer desk may send pass validation, and known fields stay checked`() {
+        val now = System.currentTimeMillis()
+        val newer = grant("11111111-2222-3333-4444-555555555555", owner = "desktop", leaseId = "l").copy(display = "hologram")
+        val back = WebRtcRemoteSessionControlMessage.fromJson(newer.toJson())
+        assertEquals("hologram", back.display)
+        back.validate(wire, attemptId, now)
+        val sound = newer.copy(
+            kind = WebRtcRemoteSessionControlKind.AUDIO_REQUEST, direction = null, display = null,
+            leaseId = null, ownerDeviceId = null, leaseExpiresAt = null,
+            action = "balance", audioDirection = "sideways", source = "radio",
+        )
+        val soundBack = WebRtcRemoteSessionControlMessage.fromJson(sound.toJson())
+        assertEquals("radio", soundBack.source)
+        assertEquals("sideways", soundBack.audioDirection)
+        soundBack.validate(wire, attemptId, now)
+        assertThrows(IllegalArgumentException::class.java) {
+            newer.copy(screenWidth = 100).validate(wire, attemptId, now) // a size needs both dimensions
+        }
+    }
+
     private fun grant(
         remoteSessionId: String,
         owner: String,

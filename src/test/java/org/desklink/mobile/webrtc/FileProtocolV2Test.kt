@@ -183,6 +183,24 @@ class FileProtocolV2Test {
     }
 
     @Test
+    fun anOfferOrAcceptWithALaneThisBuildCannotUseGoesOverWebRtc() {
+        for ((message, lane) in listOf(
+            offer() to FileLaneSpec(v = 2),
+            offer() to FileLaneSpec(v = 1, kind = "quic"),
+            control(WebRtcFileAction.ACCEPT) { copy(resumeBlock = 0, prefixSha256 = hex64, maxFrameBytes = 61_440) } to FileLaneSpec(v = 1, port = 1716, token = "NOT-HEX"),
+        )) {
+            val back = WebRtcFileControl.fromJson(JSONObject(message.copy(lane = lane).toJson().toString()))
+            assertEquals(null, back.lane)
+            back.validate(deskWire)
+        }
+        // A switch to a lane it cannot use is still refused: it cannot follow it.
+        val switch = WebRtcFileControl.fromJson(
+            JSONObject(control(WebRtcFileAction.LANE) { copy(lane = FileLaneSpec(kind = "quic", startBlock = 1, pass = 0)) }.toJson().toString()),
+        )
+        assertThrows(IllegalArgumentException::class.java) { switch.validate(deskWire) }
+    }
+
+    @Test
     fun theOfferCarriesTheBucketAndShareExtras() {
         val bucket = offer { copy(folder = "bucket", relpath = "Photos/a.jpg", contentSha256 = hex64, filename = "a.jpg") }
         bucket.validate(deskWire)

@@ -220,9 +220,17 @@ data class WebRtcFileControl(
             val folder = str("folder")
             val relpath = str("relpath")
             val filename = str("filename")?.let { if (folder == null && relpath == null) sanitizeFilename(it) else it }
+            val action = WebRtcFileAction.fromWireName(value.getString("action"))
+            // Forward compatibility: a lane this build cannot use (a newer version, kind or token) in an offer or an
+            // accept is dropped and the file goes over WebRTC; refusing the whole message left a newer desk's transfer
+            // unanswered. A `lane` switch to an unknown kind is still refused: it cannot be followed.
+            val lane = value.optJSONObject("lane")?.let(FileLaneSpec::fromJson)?.takeUnless { spec ->
+                (action == WebRtcFileAction.OFFER || action == WebRtcFileAction.ACCEPT) &&
+                    (spec.v != 1 || runCatching { spec.validate() }.isFailure)
+            }
             return WebRtcFileControl(
                 protocolVersion = value.getInt("protocolVersion"),
-                action = WebRtcFileAction.fromWireName(value.getString("action")),
+                action = action,
                 transferId = value.getString("transferId"),
                 deviceId = value.getString("deviceId"),
                 sessionId = value.getLong("sessionId"),
@@ -250,7 +258,7 @@ data class WebRtcFileControl(
                 folder = folder,
                 relpath = relpath,
                 contentSha256 = str("contentSha256"),
-                lane = value.optJSONObject("lane")?.let(FileLaneSpec::fromJson),
+                lane = lane,
             )
         }
     }
