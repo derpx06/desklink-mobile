@@ -6,6 +6,8 @@ package org.desklink.mobile.webrtc
 import org.json.JSONObject
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WebRtcSignalingTest {
@@ -105,5 +107,17 @@ class WebRtcSignalingTest {
             false,
             WebRtcSessionCoordinator.shouldRestartAfterBootstrapReconnect("a", "b", true),
         )
+    }
+
+    @Test
+    fun `a stalled attempt started by recovery is replaced by the LAN heartbeat like any other`() {
+        val stall = WebRtcSessionCoordinator.ATTEMPT_STALL_MS
+        // A recovery whose attempt has not started yet: left alone.
+        assertTrue(WebRtcSessionCoordinator.negotiationInFlight(true, false, 0))
+        assertFalse(WebRtcSessionCoordinator.negotiationInFlight(false, false, 0))
+        // A young attempt is left alone, a stalled one replaced, recovery or not.
+        assertTrue(WebRtcSessionCoordinator.negotiationInFlight(true, true, stall - 1))
+        assertFalse(WebRtcSessionCoordinator.negotiationInFlight(true, true, stall))
+        assertFalse(WebRtcSessionCoordinator.negotiationInFlight(false, true, stall))
     }
 }

@@ -240,8 +240,7 @@ class WebRtcSessionCoordinator(
         // attempt that has visibly stalled, or a pending recovery that will
         // start its own attempt, is left alone here.
         val inFlight = synchronized(lock) {
-            recoveryInProgress || (activeAttemptId != null &&
-                SystemClock.elapsedRealtime() - attemptStartedAt < ATTEMPT_STALL_MS)
+            negotiationInFlight(recoveryInProgress, activeAttemptId != null, SystemClock.elapsedRealtime() - attemptStartedAt)
         }
         if (inFlight) return
         if (!shouldRestartAfterBootstrapReconnect(
@@ -894,12 +893,15 @@ class WebRtcSessionCoordinator(
             }
             SignalingMessageType.ANSWER -> {
                 val sdp = requiredString(message.payload, "sdp", MAX_SDP_BYTES)
-                synchronized(lock) {
-                    handover.answerSdp = sdp
-                    cancelAnswerWatchdogLocked()
+                // The attempt first: a late answer to a replaced attempt must not cancel the
+                // current attempt's answer watchdog nor mark it answered.
+                val answered = synchronized(lock) {
+                    currentTransport(binding, message.sessionAttemptId).also {
+                        handover.answerSdp = sdp
+                        cancelAnswerWatchdogLocked()
+                    }
                 }
-                currentTransport(binding, message.sessionAttemptId)
-                    .setRemoteDescription(SessionDescription.Type.ANSWER, sdp)
+                answered.setRemoteDescription(SessionDescription.Type.ANSWER, sdp)
             }
             SignalingMessageType.ICE_CANDIDATE -> {
                 val candidate = requiredString(message.payload, "candidate", MAX_CANDIDATE_BYTES)
@@ -1306,6 +1308,9 @@ class WebRtcSessionCoordinator(
 
     private fun beginHandover(binding: SessionBinding, attemptId: String) = synchronized(lock) {
         require(sessions.isCurrent(binding)) { "Stale DeskLink session" }
+        // A replaced peer's control-channel open, delivered late, must not touch the new
+        // attempt's handover: setting its nonce made the new attempt skip its own hello.
+        if (closed || activeAttemptId != attemptId || activeBinding != binding) return@synchronized
         val localDeviceId = DeviceHelper.getDeviceId(context)
         publish("Authenticating", null)
         if (localDeviceId >= device.deviceId) return@synchronized
@@ -2429,8 +2434,12 @@ class WebRtcSessionCoordinator(
                     if (closed || activeAttemptId != null) return@synchronized
                     runCatching { startInitiatorLocked(current, iceServers.getOrThrow()) }
                         .onFailure { error ->
+                            // Not scheduleRecovery(attemptId): that attempt is gone, so it returned at
+                            // once and left a half-started attempt holding the slot. Cleared instead,
+                            // with nothing pending, the next LAN heartbeat starts over.
                             publish("Failed", error.message)
-                            scheduleRecovery(current, attemptId, error.message ?: "WebRTC recovery failed", false)
+                            closeLocked()
+                            recoveryInProgress = false
                         }
                 }
             }, delay)
@@ -2807,6 +2816,17 @@ class WebRtcSessionCoordinator(
         @JvmStatic
         fun shouldInitiateForRestartRequest(localDeviceId: String, remoteDeviceId: String): Boolean =
             localDeviceId < remoteDeviceId
+
+        /**
+         * Whether a LAN heartbeat must leave the WebRTC negotiation alone: an attempt younger than
+         * [ATTEMPT_STALL_MS], or a recovery whose attempt has not started yet. Once the recovery's
+         * attempt exists it is judged by its age like any other: "recovery in progress" stays set
+         * until feature-ready, so an attempt it started that stalled (ICE checking for ever, no
+         * FAILED) blocked the heartbeat's replacement for good.
+         */
+        @JvmStatic
+        fun negotiationInFlight(recoveryInProgress: Boolean, hasAttempt: Boolean, attemptAgeMs: Long): Boolean =
+            if (hasAttempt) attemptAgeMs < ATTEMPT_STALL_MS else recoveryInProgress
 
         @JvmStatic
         fun shouldRestartAfterBootstrapReconnect(
