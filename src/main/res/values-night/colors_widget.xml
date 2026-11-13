@@ -13,4 +13,5 @@
     <color name="widget_on_tonal">#FFDFE5FF</color>
     <color name="widget_accent">#FFA9B8FF</color>
     <color name="widget_on_accent">#FF14204F</color>
+    <color name="widget_ripple">#29FFFFFF</color>
 </resources>

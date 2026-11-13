@@ -32,19 +32,21 @@ class NotesWidget : FamilyWidget() {
     fun draw(context: Context, view: NotesView): RemoteViews {
         val v = views(context, R.layout.widget_notes)
         val rows = listOf(R.id.n_row1, R.id.n_row2, R.id.n_row3, R.id.n_row4, R.id.n_row5)
+        val texts = listOf(R.id.n_row1_text, R.id.n_row2_text, R.id.n_row3_text, R.id.n_row4_text, R.id.n_row5_text)
         rows.forEach { v.show(it, false) }
         v.show(R.id.n_message, false)
         v.show(R.id.n_more, false)
+        v.show(R.id.n_mark, WidgetRules.roomForExtras(DeskWidgets.fontScale(context)))
         v.setOnClickPendingIntent(R.id.n_title, DeskWidgets.openNote(context, ""))
         v.setOnClickPendingIntent(R.id.n_new, DeskWidgets.newNote(context))
         when (view) {
-            NotesView.Hidden -> message(v, context.getString(R.string.widget_notes_locked) + "\n" + context.getString(R.string.widget_notes_locked_hint), DeskWidgets.openNote(context, ""))
-            NotesView.Empty -> message(v, context.getString(R.string.widget_notes_none), DeskWidgets.newNote(context))
-            NotesView.Unavailable -> message(v, context.getString(R.string.widget_notes_unavailable), DeskWidgets.openNote(context, ""))
+            NotesView.Hidden -> message(v, context.getString(R.string.widget_notes_locked) + "\n" + context.getString(R.string.widget_notes_locked_hint), DeskWidgets.openNote(context, ""), R.drawable.widget_ic_lock)
+            NotesView.Empty -> message(v, context.getString(R.string.widget_notes_none), DeskWidgets.newNote(context), R.drawable.widget_ic_note)
+            NotesView.Unavailable -> message(v, context.getString(R.string.widget_notes_unavailable), DeskWidgets.openNote(context, ""), R.drawable.widget_ic_warning)
             is NotesView.Titles -> {
                 view.lines.forEachIndexed { i, line ->
                     v.show(rows[i], true)
-                    v.setTextViewText(rows[i], line.title)
+                    v.setTextViewText(texts[i], line.title)
                     v.setContentDescription(rows[i], context.getString(R.string.widget_notes_open, line.title))
                     v.setOnClickPendingIntent(rows[i], DeskWidgets.openNote(context, line.id))
                 }
@@ -57,9 +59,12 @@ class NotesWidget : FamilyWidget() {
         return v
     }
 
-    private fun message(v: RemoteViews, text: String, tap: PendingIntent) {
+    /** The one line in place of the titles, with an icon that says the same thing (a lock, a note, a warning). */
+    private fun message(v: RemoteViews, text: String, tap: PendingIntent, icon: Int) {
         v.show(R.id.n_message, true)
-        v.setTextViewText(R.id.n_message, text)
+        v.setImageViewResource(R.id.n_message_icon, icon)
+        v.setTextViewText(R.id.n_message_text, text)
+        v.setContentDescription(R.id.n_message, text)
         v.setOnClickPendingIntent(R.id.n_message, tap)
     }
 

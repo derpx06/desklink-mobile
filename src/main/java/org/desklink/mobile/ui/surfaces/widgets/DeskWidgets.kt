@@ -23,6 +23,7 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.IdRes
 import androidx.annotation.LayoutRes
+import androidx.annotation.StringRes
 import androidx.core.net.toUri
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.MainActivity
@@ -146,9 +147,47 @@ object DeskWidgets {
         context.getString(if (f.charging) R.string.widget_pc_battery_charging else R.string.widget_pc_battery, it)
     }
 
-    /** Shows [view] as asked or off: the look of "not now", with the reason in the spoken description. */
-    internal fun setEnabledLook(views: RemoteViews, @IdRes view: Int, enabled: Boolean) {
-        views.setFloat(view, "setAlpha", if (enabled) 1f else 0.38f)
+    /**
+     * The look of "not now": the icon at 38 % and its label at 70 % (still 6:1 or better, so it can be read), with the reason in the
+     * spoken name. The button stays and still answers a tap, with the reason. `View.setAlpha` can be called through RemoteViews
+     * only from Android 12; before it that call broke the whole widget ("Can't load widget"), so there the icon's own image
+     * is dimmed instead (`ImageView.setImageAlpha`) and the label keeps its colour.
+     */
+    internal fun setEnabledLook(views: RemoteViews, @IdRes icon: Int, @IdRes label: Int?, enabled: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setFloat(icon, "setAlpha", if (enabled) 1f else 0.38f)
+            if (label != null) views.setFloat(label, "setAlpha", if (enabled) 1f else 0.7f)
+        } else {
+            views.setInt(icon, "setImageAlpha", if (enabled) 255 else 97)
+        }
+    }
+
+    internal fun fontScale(context: Context): Float = context.resources.configuration.fontScale
+
+    /** "Lock arch-desk", or plain "Lock desk" when there is no computer to name. */
+    internal fun named(context: Context, @StringRes withName: Int, @StringRes plain: Int, name: String?): String =
+        if (name.isNullOrBlank()) context.getString(plain) else context.getString(withName, name)
+
+    /** An action's spoken name: what it does, and when it is off, that it is off and why. */
+    internal fun spokenAction(context: Context, label: String, enabled: Boolean, reason: String?): String =
+        if (enabled) label else context.getString(R.string.widget_action_off, label, reason.orEmpty()).trim()
+
+    /**
+     * The header every computer widget shares (layout `widget_part_header`): the computer's name, its state as a dot and
+     * words, and a tap ([tap]; none when the whole widget is the target) that opens the app on it. Not paired: "DeskLink",
+     * "No computer paired", and the tap opens the app to pair one.
+     */
+    internal fun header(context: Context, v: RemoteViews, name: String?, tone: Tone, words: String, tap: PendingIntent?) {
+        v.setTextViewText(R.id.w_name, name ?: context.getString(R.string.app_name))
+        // At huge text the decorative mark gives its room to the name.
+        v.setViewVisibility(R.id.w_mark, if (WidgetRules.roomForExtras(fontScale(context))) View.VISIBLE else View.GONE)
+        v.setTextViewText(R.id.w_status, words)
+        v.setImageViewResource(R.id.w_dot, dot(tone))
+        if (tap != null) {
+            v.setOnClickPendingIntent(R.id.w_header, tap)
+            val hint = if (name == null) context.getString(R.string.widget_not_paired_hint) else null
+            v.setContentDescription(R.id.w_header, listOfNotNull(named(context, R.string.widget_cd_open, R.string.widget_cd_open_app, name), words, hint).joinToString(". "))
+        }
     }
 }
 

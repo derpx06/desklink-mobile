@@ -22,11 +22,12 @@ import android.widget.RemoteViews
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.clipboard.ClipboardFloatingActivity
 import org.desklink.mobile.ui.MainActivity
+import org.desklink.mobile.ui.surfaces.widgets.DeskWidgets
 
 /**
- * The home-screen widget: the current desk, its link, this phone's battery, terminals with a
- * "finished" badge, now playing, and Lock / Send clipboard / Ring / Open terminals. 2×2 shows the
- * essentials; from about 4×3 the terminals and media rows join them.
+ * The home-screen widget: the current desk with the DeskLink mark, its link as a dot plus words, this phone's battery, terminals with a
+ * "finished" badge, now playing, and Lock / Send clipboard / Ring / Open terminals. A short 2×2 shows the computer with
+ * Lock and Clipboard, a taller one all four actions; from about 4×3 the terminals and media rows join them.
  */
 class DeskWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = update(context, manager, ids)
@@ -41,89 +42,103 @@ class DeskWidgetProvider : AppWidgetProvider() {
             if (ids.isNotEmpty()) update(context, manager, ids)
         }
 
+        /** The layouts by the smallest size (dp) each needs: 2x2 short, 2x2 with two rows of actions, 4x3 and up. */
+        internal val layouts = listOf(
+            SizeF(110f, 110f) to R.layout.widget_desk_small,
+            SizeF(110f, 180f) to R.layout.widget_desk_medium,
+            SizeF(250f, 230f) to R.layout.widget_desk_large,
+        )
+
         private fun update(context: Context, manager: AppWidgetManager, ids: IntArray) {
             val desk = DeskSurfaces.currentDesk(context)?.let { DeskSurfaces.snapshot(context, it) }
             ids.forEach { id ->
                 val views = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    RemoteViews(
-                        mapOf(
-                            SizeF(110f, 110f) to build(context, R.layout.widget_desk_small, desk),
-                            SizeF(280f, 230f) to build(context, R.layout.widget_desk_large, desk),
-                        ),
-                    )
+                    RemoteViews(layouts.associate { (size, layout) -> size to build(context, layout, desk) })
                 } else {
                     val options = manager.getAppWidgetOptions(id)
-                    val large = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH) >= 280 &&
-                        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT) >= 230
-                    build(context, if (large) R.layout.widget_desk_large else R.layout.widget_desk_small, desk)
+                    val w = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+                    val h = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
+                    build(context, (layouts.lastOrNull { it.first.width <= w && it.first.height <= h } ?: layouts.first()).second, desk)
                 }
                 runCatching { manager.updateAppWidget(id, views) }
             }
         }
 
-        private fun build(context: Context, layout: Int, desk: DeskSnapshot?): RemoteViews {
+        internal fun build(context: Context, layout: Int, desk: DeskSnapshot?): RemoteViews {
             val views = RemoteViews(context.packageName, layout)
             val large = layout == R.layout.widget_desk_large
             val (level, charging) = DeskSurfaces.phoneBattery(context)
-            val battery = if (level >= 0) context.getString(if (charging) R.string.widget_battery_charging else R.string.widget_battery, level) else ""
+            val battery = if (level >= 0) context.getString(if (charging) R.string.widget_battery_charging else R.string.widget_battery, level) else null
+            val name = desk?.name
+            val open = activity(context, 1, Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_DEVICE_ID, desk?.id))
 
-            views.setOnClickPendingIntent(R.id.widget_header, activity(context, 1, Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_DEVICE_ID, desk?.id)))
-            if (desk == null) {
-                views.setTextViewText(R.id.widget_name, context.getString(R.string.app_name))
-                views.setTextViewText(R.id.widget_status, context.getString(R.string.surfaces_not_paired))
-                views.setImageViewResource(R.id.widget_dot, R.drawable.widget_dot_faint)
-            } else {
-                views.setTextViewText(R.id.widget_name, desk.name)
-                val (dot, status) = when (desk.link) {
-                    DeskLink.CONNECTED -> R.drawable.widget_dot_mint to context.getString(R.string.connection_connected)
-                    DeskLink.CONNECTING -> R.drawable.widget_dot_amber to context.getString(R.string.connection_connecting)
-                    DeskLink.OFFLINE -> R.drawable.widget_dot_faint to (
-                        DeskSurfaceRules.lastSeenLabel(desk.lastSeen) { context.getString(R.string.widget_last_seen, DateUtils.formatSameDayTime(it, System.currentTimeMillis(), java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)) }
-                            ?: context.getString(R.string.connection_offline)
-                        )
-                }
-                views.setImageViewResource(R.id.widget_dot, dot)
-                // The small layout has no battery slot: the phone's battery joins the status line.
-                views.setTextViewText(R.id.widget_status, if (large || battery.isEmpty()) status else "$status · $battery")
+            val (tone, status) = when (desk?.link) {
+                null -> org.desklink.mobile.ui.surfaces.widgets.Tone.OFF to context.getString(R.string.surfaces_not_paired)
+                DeskLink.CONNECTED -> org.desklink.mobile.ui.surfaces.widgets.Tone.OK to context.getString(R.string.connection_connected)
+                DeskLink.CONNECTING -> org.desklink.mobile.ui.surfaces.widgets.Tone.WAIT to context.getString(R.string.connection_connecting)
+                DeskLink.OFFLINE -> org.desklink.mobile.ui.surfaces.widgets.Tone.OFF to (
+                    DeskSurfaceRules.lastSeenLabel(desk?.lastSeen) { context.getString(R.string.widget_last_seen, DateUtils.formatSameDayTime(it, System.currentTimeMillis(), java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)) }
+                        ?: context.getString(R.string.connection_offline)
+                    )
             }
-            if (large) views.setTextViewText(R.id.widget_battery, battery)
+            // This phone's battery joins the status words: it is the phone's, so it never sits beside the computer's name.
+            val words = listOfNotNull(status, battery?.takeIf { desk != null }).joinToString(" · ")
+            DeskWidgets.header(context, views, name, tone, words, open)
+
+            // Lock, Clipboard and Ring need the feature link; off, they stay (dimmed) and a tap says why. Terminals always opens.
+            val ready = desk?.ready == true
+            val reason = if (desk == null) context.getString(R.string.surfaces_not_paired) else status
+            // At huge text the icons stay (each with its spoken name); the labels would be cut off.
+            val labels = org.desklink.mobile.ui.surfaces.widgets.WidgetRules.roomForExtras(DeskWidgets.fontScale(context))
+            fun button(root: Int, icon: Int, label: Int, named: Int, plain: Int, enabled: Boolean, tap: PendingIntent) {
+                DeskWidgets.setEnabledLook(views, icon, label, enabled)
+                views.setViewVisibility(label, if (labels) View.VISIBLE else View.GONE)
+                views.setContentDescription(root, DeskWidgets.spokenAction(context, DeskWidgets.named(context, named, plain, name), enabled, reason))
+                // With no computer at all, every button opens the app, where one is paired.
+                views.setOnClickPendingIntent(root, if (desk == null) open else tap)
+            }
 
             val badge = DeskSurfaceRules.terminalBadge(desk?.unseenFinished ?: 0)
+            val finished = badge?.let { context.resources.getQuantityString(R.plurals.widget_finished, desk?.unseenFinished ?: 0, desk?.unseenFinished ?: 0) }
             views.setViewVisibility(R.id.widget_badge, if (badge != null) View.VISIBLE else View.GONE)
             views.setTextViewText(R.id.widget_badge, badge ?: "")
+
+            // The Terminals tab of the app, on this computer: the one list of terminals.
+            val terminals = activity(context, 2, MainActivity.terminalsIntent(context, desk?.id))
+            button(R.id.widget_lock, R.id.widget_lock_icon, R.id.widget_lock_label, R.string.widget_cd_lock, R.string.home_lock_desk, ready, action(context, DeskSurfaces.Action.LOCK, desk?.id))
+            // Android 10+ reads the clipboard only for the app in front: the floating activity is it.
+            button(R.id.widget_clipboard, R.id.widget_clipboard_icon, R.id.widget_clipboard_label, R.string.widget_cd_clipboard, R.string.send_clipboard, ready, activity(context, 3, ClipboardFloatingActivity.getIntent(context, true)))
+            button(R.id.widget_ring, R.id.widget_ring_icon, R.id.widget_ring_label, R.string.widget_cd_ring, R.string.home_ring_desk, ready, action(context, DeskSurfaces.Action.RING, desk?.id))
+            button(R.id.widget_terminals, R.id.widget_terminals_icon, R.id.widget_terminals_label, R.string.widget_cd_terminals, R.string.widget_open_terminals, desk != null, terminals)
+            // The badge is a number on the button: its meaning goes into the spoken name.
+            if (finished != null && desk != null) views.setContentDescription(R.id.widget_terminals, context.getString(R.string.widget_cd_terminals, name) + ". " + finished)
+
             if (large) {
                 val count = desk?.terminals ?: 0
-                views.setTextViewText(
-                    R.id.widget_terminal_text,
-                    if (count == 0) context.getString(R.string.widget_no_terminals) else context.resources.getQuantityString(R.plurals.widget_terminals, count, count),
-                )
-                views.setViewVisibility(R.id.widget_attached_dot, if (desk?.terminalAttached == true) View.VISIBLE else View.GONE)
+                val attached = desk?.terminalAttached == true
+                val countText = if (count == 0) context.getString(R.string.widget_no_terminals) else context.resources.getQuantityString(R.plurals.widget_terminals, count, count)
+                // "open here" in words beside the coral dot: the dot alone was colour-only information.
+                views.setTextViewText(R.id.widget_terminal_text, listOfNotNull(countText, context.getString(R.string.widget_terminal_open_here).takeIf { attached }).joinToString(" · "))
+                views.setViewVisibility(R.id.widget_attached_dot, if (attached) View.VISIBLE else View.GONE)
                 views.setContentDescription(
                     R.id.widget_terminal_row,
                     listOfNotNull(
-                        if (count == 0) context.getString(R.string.widget_no_terminals) else context.resources.getQuantityString(R.plurals.widget_terminals, count, count),
-                        context.getString(R.string.widget_terminal_attached).takeIf { desk?.terminalAttached == true },
-                        badge?.let { context.resources.getQuantityString(R.plurals.widget_finished, desk?.unseenFinished ?: 0, desk?.unseenFinished ?: 0) },
-                    ).joinToString(", "),
+                        DeskWidgets.named(context, R.string.widget_cd_terminals, R.string.widget_open_terminals, name),
+                        countText,
+                        context.getString(R.string.widget_terminal_attached).takeIf { attached },
+                        finished,
+                    ).joinToString(". "),
                 )
+                views.setOnClickPendingIntent(R.id.widget_terminal_row, if (desk == null) open else terminals)
                 val title = desk?.mediaTitle
                 views.setViewVisibility(R.id.widget_media_row, if (title != null) View.VISIBLE else View.GONE)
                 if (title != null) {
                     views.setTextViewText(R.id.widget_media_title, title)
                     views.setImageViewResource(R.id.widget_play_pause, if (desk.mediaPlaying) R.drawable.sym_pause else R.drawable.sym_play_arrow)
-                    views.setContentDescription(R.id.widget_play_pause, context.getString(if (desk.mediaPlaying) R.string.mpris_pause else R.string.mpris_play))
+                    views.setContentDescription(R.id.widget_play_pause, context.getString(if (desk.mediaPlaying) R.string.widget_cd_pause else R.string.widget_cd_play, desk.name) + ". " + title)
                     views.setOnClickPendingIntent(R.id.widget_play_pause, action(context, DeskSurfaces.Action.PLAY_PAUSE, desk.id))
                 }
             }
-
-            // The Terminals tab of the app, on this computer: the one list of terminals.
-            val terminals = MainActivity.terminalsIntent(context, desk?.id)
-            if (large) views.setOnClickPendingIntent(R.id.widget_terminal_row, activity(context, 2, terminals))
-            views.setOnClickPendingIntent(R.id.widget_terminals, activity(context, 2, terminals))
-            views.setOnClickPendingIntent(R.id.widget_lock, action(context, DeskSurfaces.Action.LOCK, desk?.id))
-            views.setOnClickPendingIntent(R.id.widget_ring, action(context, DeskSurfaces.Action.RING, desk?.id))
-            // Android 10+ reads the clipboard only for the app in front: the floating activity is it.
-            views.setOnClickPendingIntent(R.id.widget_clipboard, activity(context, 3, ClipboardFloatingActivity.getIntent(context, true)))
             return views
         }
 

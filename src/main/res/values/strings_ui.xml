@@ -467,7 +467,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="widget_status_label">Computer status</string>
     <string name="widget_status_description">Which computer you are linked to and how: over Wi‑Fi, through the relay or not reachable, with its battery.</string>
     <string name="widget_actions_label">Quick actions</string>
-    <string name="widget_actions_description">Computer screen, send files, send clipboard and ring, with Lock when your computer allows it.</string>
+    <string name="widget_actions_description">Screen, Files, Clipboard, Ring and Lock for your computer, one tap each. An action that cannot run now stays, dimmed, and a tap says why.</string>
     <string name="widget_notes_label">Notes</string>
     <string name="widget_notes_description">Your newest notes and a button for a new one. Titles stay hidden while the phone is locked.</string>
     <string name="widget_transfers_label">Transfers</string>
@@ -506,7 +506,33 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="widget_terminals_new">New terminal</string>
     <string name="widget_terminals_access_off">Terminal access is off</string>
     <string name="widget_terminals_access_hint">Tap to retry</string>
+    <string name="widget_terminals_access_off_short">Access is off</string>
     <string name="widget_unpaired">This widget\'s computer is no longer paired</string>
+    <!-- Widget redesign: short action labels, spoken names that say what a tap does and on which computer. -->
+    <string name="widget_screen">Screen</string>
+    <string name="widget_files">Files</string>
+    <string name="widget_not_paired_hint">Tap to pair a computer</string>
+    <string name="widget_not_paired_short">Not paired</string>
+    <string name="widget_terminal_open_here">open here</string>
+    <string name="widget_notes_open_list">Open notes</string>
+    <string name="widget_pc_battery_spoken">Battery %1$d%%</string>
+    <string name="widget_pc_battery_charging_spoken">Battery %1$d%%, charging</string>
+    <string name="widget_cd_open">Open %1$s in DeskLink</string>
+    <string name="widget_cd_open_app">Open DeskLink</string>
+    <string name="widget_cd_screen">Show the screen of %1$s</string>
+    <string name="widget_cd_files">Send files to %1$s</string>
+    <string name="widget_cd_clipboard">Send clipboard to %1$s</string>
+    <string name="widget_cd_ring">Ring %1$s</string>
+    <string name="widget_cd_lock">Lock %1$s</string>
+    <string name="widget_cd_terminals">Open terminals on %1$s</string>
+    <string name="widget_cd_new_terminal">Start a new terminal on %1$s</string>
+    <string name="widget_cd_play">Play music on %1$s</string>
+    <string name="widget_cd_pause">Pause music on %1$s</string>
+    <string name="widget_cd_transfers">Transfers with %1$s. Tap to open Files</string>
+    <string name="widget_transfer_sending_to">Sending to %1$s</string>
+    <string name="widget_transfer_receiving_from">Receiving from %1$s</string>
+    <string name="widget_transfer_sent_to">Sent to %1$s</string>
+    <string name="widget_transfer_received_from">Received from %1$s</string>
 
     <!-- Phase 3: calls -->
     <string name="pref_plugin_calls">Calls on the computer</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Quick actions: 4x1 or 4x2. Redrawn on every change; the period is only the system's safety net against a picture left by a killed process. -->
+<!-- Quick actions: 4x1 or 4x2 (at least 270 dp wide, so each of the five actions keeps a 48 dp target). Redrawn on every change; the period is only the system's safety net against a picture left by a killed process. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_actions_description"
     android:initialLayout="@layout/widget_actions_small"
@@ -7,8 +7,8 @@
     android:maxResizeWidth="320dp"
     android:minHeight="40dp"
     android:minResizeHeight="40dp"
-    android:minResizeWidth="250dp"
-    android:minWidth="250dp"
+    android:minResizeWidth="270dp"
+    android:minWidth="270dp"
     android:previewImage="@drawable/widget_actions_preview"
     android:previewLayout="@layout/widget_actions_large"
     android:resizeMode="horizontal|vertical"
