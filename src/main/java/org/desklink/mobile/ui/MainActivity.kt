@@ -1012,10 +1012,16 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             org.desklink.mobile.helpers.PermissionRecovery.onResult(this, ok)
             if (!ok) showMessage(getString(R.string.scan_camera_denied))
         }
+        // Asked once per visit: a rotation or a restore re-runs the effect, and a second request while the first dialog is up came
+        // back empty ("camera denied" under the open dialog).
+        var askedCamera by rememberSaveable { mutableStateOf(false) }
         LaunchedEffect(Unit) {
             // Look again now, so computers on this network fill in while the camera starts.
             BackgroundService.ForceRefreshConnections(this@MainActivity)
-            if (!granted) request.launch(Manifest.permission.CAMERA)
+            if (!granted && !askedCamera) {
+                askedCamera = true
+                request.launch(Manifest.permission.CAMERA)
+            }
         }
         val nearby = DeskLinkApplication.getInstance().devices.values
             .filter { it.isReachable && !it.isPaired }
