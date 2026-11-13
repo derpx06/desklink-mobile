@@ -99,4 +99,81 @@ class SettingsSearchTest {
         }
         for (page in groups.keys) assertTrue("$page has no relay row", rowsOf(page).none { "relay" in it || "use_turn" in it || "turn_servers" in it })
     }
+
+    // English text of every string, as the app shows it ('\'' unescaped; "%1$s" is the computer's name).
+    private val strings: Map<String, String> by lazy {
+        listOf("res/values/strings.xml", "res/values/strings_ui.xml").flatMap { path ->
+            Regex("""<string name="(\w+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL).findAll(root.resolve(path).readText()).map {
+                it.groupValues[1] to it.groupValues[2].replace("\\'", "'").replace("\\\"", "\"").replace("%1\$s", "arch-desk")
+            }.toList()
+        }.toMap()
+    }
+
+    private class Indexed(val page: String, val title: String, val summary: String?, val keywords: String?)
+
+    private val indexRows: List<Indexed> by lazy {
+        Regex("""Row\(SettingsPage\.(\w+), R\.string\.(\w+)(?:, R\.string\.(\w+))?.*?keywords = R\.string\.(\w+)""").findAll(index).map {
+            Indexed(it.groupValues[1], it.groupValues[2], it.groupValues[3].ifEmpty { null }, it.groupValues[4])
+        }.toList()
+    }
+
+    private fun entries() = indexRows.map { row ->
+        SettingsEntry(SettingsPage.valueOf(row.page), strings.getValue(row.title), row.summary?.let(strings::getValue), row.keywords?.let(strings::getValue).orEmpty())
+    }
+
+    @Test fun everyRowSaysWhatItDoesAndHasWordsToBeFoundBy() {
+        assertTrue(indexRows.size >= 49)
+        // Every Row( of the index was read (a row with no keywords would be skipped by the pattern above).
+        assertEquals(Regex("""Row\(SettingsPage\.""").findAll(index).count(), indexRows.size)
+        for (row in indexRows) {
+            assertTrue("${row.title} has a line", !row.summary?.let(strings::get).isNullOrBlank())
+            assertTrue("${row.title} has search words", (row.keywords?.let(strings::get) ?: "").split(" ").count { it.isNotBlank() } >= 2)
+        }
+    }
+
+    @Test fun searchFindsEverySettingByItsTitleAndByTheWordsPeopleUse() {
+        val entries = entries()
+        for (e in entries) assertTrue("${e.title} by its title", e in SettingsSearch.search(entries, e.title))
+        val synonyms = mapOf(
+            "battery" to "settings_keep_awake", "notifications" to "settings_phone_notifications", "lock" to "settings_unlock_nearby",
+            "unlock" to "settings_unlock_nearby", "files" to "settings_downloads_folder", "folder" to "settings_downloads_folder",
+            "download location" to "settings_downloads_folder", "keyboard" to "settings_glide", "mouse" to "settings_glide",
+            "trackpad" to "mousepad_sensitivity_settings_title", "screen" to "settings_session_gate", "share screen" to "settings_session_gate",
+            "dark mode" to "settings_theme", "sound" to "settings_desk_sound", "microphone" to "settings_mic_consent",
+            "password" to "settings_session_password", "pair" to "home_pair_another", "unpair" to "settings_unpair_row",
+            "forget" to "settings_unpair_row", "rename" to "settings_phone_name", "startup" to "settings_connect_on_startup",
+            "start at login" to "settings_connect_on_startup", "privacy" to "privacy_policy", "permissions" to "settings_permissions",
+        )
+        for ((query, title) in synonyms) {
+            val found = SettingsSearch.search(entries, query).map { it.title }
+            assertTrue("\"$query\" finds ${strings[title]} (found $found)", strings.getValue(title) in found)
+        }
+    }
+
+    /**
+     * No English string a person reads uses a word only a developer knows. Searched-only keywords (kw_), strings not
+     * for translation, the widgets' (their own owner) and the upstream credits are not read here.
+     */
+    @Test fun noUserStringIsJargon() {
+        val jargon = listOf(
+            "webrtc", "sdp", "pty", "tls", "ssl", "certificate", "certificates", "payload", "handshake", "daemon", "portal", "gstreamer",
+            "pipewire", "codec", "bitrate", "ssrc", "mime", "uri", "ip address", "socket", "packet", "packets", "protocol", "mdns", "udp",
+            "tcp", "d bus", "dbus", "xdg", "stun", "peer", "backend", "json", "hostname", "subnet", "ipv4", "ipv6", "plugin", "plugins",
+            "signaling", "handover", "logind", "mpris", "encoder", "decoder", "vp8", "h 264", "rtp", "uuid", "websocket", "mib", "kib", "sha256",
+        )
+        val caps = listOf("ICE", "TURN", "LAN", "IP", "URL", "API")
+        fun words(text: String) = " " + text.map { if (it.isLetterOrDigit()) it else ' ' }.joinToString("").split(Regex("\\s+")).filter(String::isNotEmpty).joinToString(" ") + " "
+        val found = mutableListOf<String>()
+        for (path in listOf("res/values/strings.xml", "res/values/strings_ui.xml")) {
+            Regex("""<(string|item)(?=[\s>])( name="(\w+)")?([^>]*)>(.*?)</\1>""", RegexOption.DOT_MATCHES_ALL).findAll(root.resolve(path).readText()).forEach { m ->
+                val name = m.groupValues[3]
+                if ("translatable=\"false\"" in m.groupValues[4] || name.startsWith("kw_") || name.startsWith("widget_") || name.endsWith("_task")) return@forEach
+                val text = m.groupValues[5]
+                val lower = words(text.lowercase())
+                val hit = jargon.firstOrNull { " $it " in lower } ?: caps.firstOrNull { " $it " in words(text) }
+                if (hit != null) found += "$name [$hit]: $text"
+            }
+        }
+        assertTrue("jargon in user strings:\n" + found.joinToString("\n"), found.isEmpty())
+    }
 }

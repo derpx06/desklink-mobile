@@ -384,7 +384,7 @@ private fun ConnectionGroup(desk: DeskSettings?, actions: SettingsActions, prefs
                 }
             }
         }
-        GroupRow(stringResource(R.string.home_pair_another), icon = R.drawable.sym_add, onClick = actions.onPairAnother) { Chevron() }
+        GroupRow(stringResource(R.string.home_pair_another), icon = R.drawable.sym_add, subtitle = stringResource(R.string.sum_home_pair_another), onClick = actions.onPairAnother) { Chevron() }
     }
     val invalidName = stringResource(R.string.invalid_device_name)
     if (editingName) {
@@ -565,7 +565,7 @@ private fun ClipboardGroup(desk: DeskSettings?, actions: SettingsActions, prefs:
         }
         DeskSwitch(desk, actions, DeskSettingsPlugin.CLIPBOARD, stringResource(R.string.settings_desk_clipboard, desk.name), R.drawable.sym_content_paste, stringResource(R.string.settings_desk_clipboard_summary, desk.name), desk.remote?.clipboard == true)
         if (desk.clipboardOn) {
-            GroupRow(stringResource(R.string.home_send_clipboard, desk.name), icon = R.drawable.sym_upload, onClick = actions.onSendClipboard) { Chevron() }
+            GroupRow(stringResource(R.string.home_send_clipboard, desk.name), icon = R.drawable.sym_upload, subtitle = stringResource(R.string.sum_home_send_clipboard), onClick = actions.onSendClipboard) { Chevron() }
         }
     }
 }
@@ -807,7 +807,7 @@ private fun FilesGroup(desk: DeskSettings?, actions: SettingsActions, prefs: and
             onClick = { runCatching { folder.launch(null) } },
         ) { Chevron() }
         if (custom) {
-            GroupRow(stringResource(R.string.sg_files_default_folder), icon = R.drawable.sym_restart_alt, onClick = {
+            GroupRow(stringResource(R.string.sg_files_default_folder), icon = R.drawable.sym_restart_alt, subtitle = stringResource(R.string.sum_sg_files_default_folder), onClick = {
                 prefs.edit { putBoolean("share_destination_custom", false) }
                 changed()
             })
@@ -906,6 +906,7 @@ private fun UnpairRow(desk: DeskSettings?, actions: SettingsActions) {
     GroupRow(
         stringResource(R.string.settings_unpair_row, desk.name),
         icon = R.drawable.sym_link_off,
+        subtitle = stringResource(R.string.sum_settings_unpair_row, desk.name),
         titleColor = t.red,
         iconTint = t.red,
         onClick = { confirmUnpair = true },
@@ -1024,7 +1025,7 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
     SectionLabel(stringResource(R.string.settings_category_help))
     RowGroup {
         GroupRow(stringResource(R.string.settings_export_logs), icon = R.drawable.sym_upload_file, subtitle = stringResource(R.string.settings_export_logs_text), onClick = { exportLogs.launch(CreateFileParams("text/plain", "desklink-log.txt")) })
-        GroupRow(stringResource(R.string.about), icon = R.drawable.sym_info, onClick = { onOpen(SettingsPage.ABOUT) }) { Chevron() }
+        GroupRow(stringResource(R.string.about), icon = R.drawable.sym_info, subtitle = stringResource(R.string.sum_about), onClick = { onOpen(SettingsPage.ABOUT) }) { Chevron() }
     }
     if (BuildConfig.DEBUG) {
         SectionLabel(stringResource(R.string.settings_category_debug))

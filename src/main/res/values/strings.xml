@@ -113,8 +113,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="qr_replace_pairing_title">Replace the pairing with %1$s?</string>
     <string name="qr_replace_pairing_message">This code shows a different identity for a computer you already paired with. Only continue if you reinstalled DeskLink on that computer.</string>
     <string name="qr_replace_pairing_confirm">Replace</string>
-    <string name="my_device_fingerprint">SHA256 fingerprint of your device certificate is:</string>
-    <string name="remote_device_fingerprint">SHA256 fingerprint of remote device certificate is:</string>
+    <string name="my_device_fingerprint">This phone’s security code:</string>
+    <string name="remote_device_fingerprint">The computer’s security code:</string>
     <string name="pair_requested">Pair requested</string>
     <string name="pairing_verification_code" translatable="false">🔑 %1s</string>
     <string name="pairing_request_from">Pairing request from \'%1s\'</string>
@@ -139,16 +139,16 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="other">Received %2$d files from %1$s</item>
     </plurals>
     <plurals name="received_files_fail_title">
-        <item quantity="one">Failed receiving file from %1$s</item>
-        <item quantity="other">Failed receiving %2$d of %3$d files from %1$s</item>
+        <item quantity="one">Couldn\'t receive the file from %1$s</item>
+        <item quantity="other">Couldn\'t receive %2$d of %3$d files from %1$s</item>
     </plurals>
     <plurals name="sent_files_title">
         <item quantity="one">Sent file to %1$s</item>
         <item quantity="other">Sent %2$d files to %1$s"</item>
     </plurals>
     <plurals name="send_files_fail_title">
-        <item quantity="one">Failed sending file to %1$s</item>
-        <item quantity="other">Failed sending %2$d of %3$d files to %1$s</item>
+        <item quantity="one">Couldn\'t send the file to %1$s</item>
+        <item quantity="other">Couldn\'t send %2$d of %3$d files to %1$s</item>
     </plurals>
     <string name="tap_to_open">Tap to open</string>
     <string name="received_file_text">Tap to open \'%1s\'</string>
@@ -166,16 +166,16 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="share_to">Share to…</string>
     <string name="unreachable_device_dynamic_shortcut">%s (✕)</string>
     <string name="unreachable_device_url_share_text">URLs shared to an unreachable device will be delivered to it once it becomes reachable.\n\n</string>
-    <string name="unreachable_share_toast">The URL will be shared the next time the device is connected.</string>
-    <string name="protocol_version">Protocol version:</string>
-    <string name="protocol_version_newer">This device uses a newer protocol version</string>
-    <string name="invalid_device_name">Invalid device name</string>
+    <string name="unreachable_share_toast">The link will be shared the next time the computer is connected.</string>
+    <string name="protocol_version">Connection version:</string>
+    <string name="protocol_version_newer">This computer has a newer DeskLink. Update DeskLink on this phone.</string>
+    <string name="invalid_device_name">Enter a name for this phone</string>
     <string name="shareplugin_text_saved">Received text, saved to clipboard</string>
     <string name="custom_devices_settings">Custom device list</string>
     <string name="custom_devices_settings_summary">%d added by address</string>
     <string name="custom_device_list">Add a computer by address</string>
     <string name="custom_device_deleted">Custom device deleted</string>
-    <string name="custom_device_list_help">If your device is not automatically detected, you can add its IP address or hostname by clicking on the button below</string>
+    <string name="custom_device_list_help">If your computer is not found on its own, add its address (for example 192.168.1.20 or my-pc.local) with the button below.</string>
     <string name="custom_device_fab_hint">Add a device</string>
     <string name="undo">Undo</string>
     <string name="share_destination_folder_preference">Destination directory</string>
@@ -185,13 +185,13 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="filter_apps_info">Notifications will be synchronized for the selected apps.</string>
     <string name="show_notification_if_screen_off">Send notifications only if the screen is off</string>
     <string name="add_device_dialog_title">Add device</string>
-    <string name="add_device_hint">Hostname or IP address</string>
+    <string name="add_device_hint">Computer’s address</string>
     <string name="send_files">Send files</string>
 
     <string name="block_notification_contents">Block notification contents</string>
     <string name="block_notification_images">Block notification images</string>
 
-    <string name="device_rename_title">Rename device</string>
+    <string name="device_rename_title">Rename this phone</string>
     <string name="device_rename_confirm">Rename</string>
     <string name="refresh">Refresh</string>
     <string name="no_file_browser">There are no file browsers installed.</string>
@@ -202,8 +202,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="findmyphone_found">Found it</string>
 
 
-    <string name="permission_explanation">This plugin needs permissions to work</string>
-    <string name="optional_permission_explanation">You need to grant extra permissions to enable all functions</string>
+    <string name="permission_explanation">This feature needs permission to work</string>
+    <string name="optional_permission_explanation">Allow a few more things to use every feature</string>
     <string name="share_optional_permission_explanation">To receive files you need to allow storage access</string>
     <string name="share_notifications_explanation">To see the progress when sending and receiving files you need to allow notifications</string>
     <string name="contacts_permission_explanation">To share your contacts with the computer, DeskLink needs to read them</string>
@@ -229,8 +229,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_export_logs">Export DeskLink logs</string>
     <string name="settings_export_logs_text">Saves a file you can attach to a bug report.</string>
 
-    <string name="setting_persistent_notification_oreo">Persistent notification</string>
-    <string name="setting_persistent_notification_description">Tap to enable/disable in Notification settings</string>
+    <string name="setting_persistent_notification_oreo">Always-on notification</string>
+    <string name="setting_persistent_notification_description">DeskLink shows it to keep working in the background. Tap to hide or show it</string>
 
     <string name="extra_options">Extra options</string>
     <string name="privacy_options">Privacy options</string>
@@ -342,9 +342,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="send_clipboard">Send clipboard</string>
 
 
-    <string name="setting_webrtc_transport">WebRTC transport</string>
-    <string name="setting_webrtc_stun_servers">STUN servers</string>
-    <string name="setting_webrtc_stun_servers_description">Optional comma-separated stun:// server URIs. No server is configured by default.</string>
+    <string name="setting_webrtc_transport">Connection</string>
+    <string name="setting_webrtc_stun_servers">Helper servers</string>
+    <string name="setting_webrtc_stun_servers_description">For experts. Addresses of servers that help your devices find each other across networks, separated by commas. Leave empty to use your own network only.</string>
 
     <string name="receive_notifications_permission_explanation">Notifications need to be allowed to receive them from other devices</string>
     <string name="findmyphone_notifications_explanation">The notifications permission is needed so the phone can ring when the app is in the background</string>
@@ -357,7 +357,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="ping_failed">Could not ping device</string>
     <string name="ping_in_progress">Pinging…</string>
 
-    <string name="device_host_invalid">Host is invalid. Use a valid hostname, IPv4, or IPv6</string>
+    <string name="device_host_invalid">That address doesn’t look right. Use something like 192.168.1.20 or my-pc.local.</string>
     <string name="device_host_duplicate">Host already exists in the list</string>
 
 

@@ -30,7 +30,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <!-- Device -->
     <string name="device_encryption">Encryption</string>
-    <string name="device_tap_permission">Tap to grant</string>
+    <string name="device_tap_permission">Tap to allow</string>
     <string name="device_unpair_title">Unpair %1$s?</string>
     <string name="device_unpair_message">Both devices will stop trusting each other until you pair them again.</string>
     <string name="device_try_again">Try again</string>
@@ -61,8 +61,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="setting_debug_allow_screenshots">Allow screenshots</string>
     <string name="setting_debug_allow_screenshots_description">Debug builds only. Files, Notes and Terminals can then be captured. Takes effect the next time a screen opens.</string>
     <string name="setting_dynamic_colors">Use wallpaper colours</string>
-    <string name="setting_advanced_network">Advanced network</string>
-    <string name="setting_advanced_network_summary">Connection servers, for experts</string>
+    <string name="setting_advanced_network">Helper servers</string>
+    <string name="setting_advanced_network_summary">For experts. Leave as it is for home use</string>
     <!-- UI v4: Home -->
     <string name="home_unavailable_connecting">Still connecting to %1$s</string>
     <string name="home_unavailable_unreachable">Can\'t set up the connection to %1$s yet. DeskLink keeps trying.</string>
@@ -106,7 +106,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_clipboard_on_q">%1$s\'s copies arrive at once. This phone\'s go when you open DeskLink, tap Send clipboard or use the tile</string>
     <string name="desk_notifications_channel">From %1$s</string>
     <string name="settings_desk_notifications_here">Show %1$s\'s notifications here</string>
-    <string name="settings_desk_notifications_here_summary">In their own channel. Swiping one away here closes it on %1$s</string>
+    <string name="settings_desk_notifications_here_summary">They show up on this phone. Swiping one away here closes it on %1$s</string>
     <string name="link_from_desk">Open link from %1$s</string>
     <string name="link_open">Open</string>
     <string name="link_copy">Copy</string>
@@ -229,7 +229,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_theme">Style</string>
     <string name="settings_dynamic_colors_summary">Off keeps DeskLink\'s own colours</string>
     <string name="settings_connect_on_startup">Connect on startup</string>
-    <string name="settings_connect_on_startup_summary">After the phone restarts</string>
+    <string name="settings_connect_on_startup_summary">DeskLink starts and connects after the phone restarts</string>
     <string name="settings_permissions">Permissions</string>
     <plurals name="settings_permissions_waiting">
         <item quantity="one">%1$d needs your OK</item>
@@ -257,7 +257,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="accessibility_setup_done">DeskLink\'s accessibility service is on</string>
     <string name="accessibility_setup_ask">%1$s wants to control this phone</string>
     <string name="accessibility_setup_ask_text">Tap to turn on DeskLink in Accessibility</string>
-    <string name="settings_desk_notifications_summary">Reply from the computer</string>
+    <string name="settings_desk_notifications_summary">See and reply to them on the computer</string>
     <string name="settings_paired_key">Paired · key %1$s</string>
 
     <!-- UI v4: live sessions -->
@@ -364,9 +364,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_job_finished">%1$s finished</string>
 
     <string name="settings_keep_awake">Keep %1$s awake while connected</string>
-    <string name="settings_keep_awake_summary">While this phone is connected</string>
+    <string name="settings_keep_awake_summary">Stops the computer going to sleep while this phone is connected</string>
     <string name="settings_command_alerts">Command alerts</string>
-    <string name="settings_command_alerts_summary">Long-running commands in shared terminals</string>
+    <string name="settings_command_alerts_summary">Tells this phone when a long command in a shared terminal finishes</string>
     <string name="settings_unlock_nearby">Unlock with this phone</string>
     <string name="settings_unlock_nearby_on">On. Turn it off on %1$s.</string>
     <string name="settings_unlock_nearby_off">Off. Turn it on in DeskLink on %1$s.</string>
@@ -712,7 +712,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_no_camera">No camera app is available</string>
     <string name="bucket_skipped" tools:ignore="PluralsCandidate">%1$d could not be added (too large, or the Bucket is full)</string>
     <string name="bucket_text_added">Saved to the Bucket</string>
-    <string name="bucket_text_failed">That text is too long for the Bucket (1 MiB at most)</string>
+    <string name="bucket_text_failed">That text is too long for the Bucket (1 MB at most)</string>
     <string name="bucket_waiting_for">Waiting for %1$s</string>
     <string name="bucket_syncing">Syncing…</string>
     <string name="bucket_with">With %1$s</string>
@@ -899,7 +899,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="welcome_install_copied">Link copied</string>
     <string name="welcome_install_message">Install DeskLink on your computer: %1$s</string>
     <string name="settings_desk_shows_notifications">%1$s shows them</string>
-    <string name="settings_desk_shows_notifications_summary">Off hides this phone\'s notifications on %1$s (they are still sent while the switch above is on)</string>
+    <string name="settings_desk_shows_notifications_summary">Turn off to stop %1$s showing this phone\'s notifications, while still sending them</string>
     <string name="share_queue_full">Only %1$d files are kept waiting for the computer. Send the rest again afterwards.</string>
     <string name="unlock_first">Unlock your phone first.</string>
     <string name="export_logs_failed">The log could not be saved.</string>
@@ -909,7 +909,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="bucket_restored_note">Restored: %1$s changed it after you deleted it</string>
     <string name="home_update_deskLink">Update DeskLink on %1$s</string>
     <string name="feature_stopped_title">Something stopped. Tap to restart</string>
-    <string name="feature_stopped_summary">%1$s hit an error and was stopped; the rest of DeskLink goes on. A report was kept.</string>
+    <string name="feature_stopped_summary">%1$s stopped working and was turned off. The rest of DeskLink keeps going. Tap to start it again.</string>
     <plurals name="bucket_confirm_add_title">
         <item quantity="one">Add %1$d item to the Bucket?</item>
         <item quantity="other">Add %1$d items to the Bucket?</item>
@@ -1162,10 +1162,10 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_search">Search settings</string>
     <string name="settings_search_none">Nothing matches “%1$s”.</string>
     <!-- Settings search: words people look for that a row's title does not say (never shown) -->
-    <string name="kw_settings_phone_name" translatable="false">rename device name phone name</string>
-    <string name="kw_settings_connect_on_startup" translatable="false">autostart boot start launch reconnect</string>
-    <string name="kw_settings_keep_awake" translatable="false">sleep suspend caffeine wake idle</string>
-    <string name="kw_home_pair_another" translatable="false">add pair new device second computer</string>
+    <string name="kw_settings_phone_name" translatable="false">rename device name phone name call it</string>
+    <string name="kw_settings_connect_on_startup" translatable="false">autostart boot start launch reconnect startup login start at login restart</string>
+    <string name="kw_settings_keep_awake" translatable="false">sleep suspend caffeine wake idle battery power lid</string>
+    <string name="kw_home_pair_another" translatable="false">add pair new device second computer qr code</string>
     <string name="kw_settings_phone_notifications" translatable="false">mirror sync alerts push messages</string>
     <string name="kw_sg_choose_apps" translatable="false">apps filter which allow block</string>
     <string name="kw_settings_desk_shows_notifications" translatable="false">popups toasts alerts</string>
@@ -1173,8 +1173,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="kw_settings_desk_notifications_here" translatable="false">reverse show computer alerts on phone</string>
     <string name="kw_settings_command_alerts" translatable="false">terminal finished done command</string>
     <string name="kw_settings_activity_on" translatable="false">ongoing progress media sticky</string>
-    <string name="kw_settings_dnd_share" translatable="false">silent quiet mute do not disturb</string>
-    <string name="kw_select_ringtone" translatable="false">sound tone ring find my phone</string>
+    <string name="kw_settings_dnd_share" translatable="false">silent quiet mute do not disturb dnd focus</string>
+    <string name="kw_select_ringtone" translatable="false">sound tone ring find my phone ringtone</string>
     <string name="kw_setting_persistent_notification_oreo" translatable="false">foreground service status bar icon always on</string>
     <string name="kw_settings_phone_clipboard" translatable="false">copy paste sync</string>
     <string name="kw_settings_clipboard_offer" translatable="false">copy paste send ask prompt</string>
@@ -1182,35 +1182,57 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="kw_home_send_clipboard" translatable="false">copy paste push now</string>
     <string name="kw_settings_calls_on" translatable="false">phone call ring answer dial telephony</string>
     <string name="kw_settings_show_caller" translatable="false">caller id incoming number</string>
-    <string name="kw_settings_desk_sound" translatable="false">audio speaker volume stream music</string>
+    <string name="kw_settings_desk_sound" translatable="false">audio speaker volume stream music sound</string>
     <string name="kw_settings_desk_may_play" translatable="false">audio sound allow</string>
-    <string name="kw_settings_mic_consent" translatable="false">microphone mic voice record</string>
+    <string name="kw_settings_mic_consent" translatable="false">microphone mic voice record sound</string>
     <string name="kw_settings_phone_media" translatable="false">music player now playing controls</string>
-    <string name="kw_settings_glide" translatable="false">glide mouse keyboard pointer cursor edge screen edge share mouse share keyboard barrier synergy control</string>
-    <string name="kw_mousepad_sensitivity_settings_title" translatable="false">pointer speed mouse sensitivity touchpad cursor</string>
-    <string name="kw_mousepad_scroll_direction_title" translatable="false">reverse scroll natural direction mouse wheel touchpad</string>
+    <string name="kw_settings_glide" translatable="false">glide mouse keyboard pointer cursor trackpad touchpad edge screen edge share mouse share keyboard barrier synergy control</string>
+    <string name="kw_mousepad_sensitivity_settings_title" translatable="false">pointer speed mouse sensitivity touchpad trackpad cursor</string>
+    <string name="kw_mousepad_scroll_direction_title" translatable="false">reverse scroll natural direction mouse wheel touchpad trackpad</string>
     <string name="kw_settings_bucket_with" translatable="false">folder sync shared folder files drop</string>
-    <string name="kw_settings_downloads_folder" translatable="false">save location storage received files directory</string>
+    <string name="kw_settings_downloads_folder" translatable="false">save location download location storage received files directory where</string>
     <string name="kw_sg_files_default_folder" translatable="false">reset downloads default</string>
     <string name="kw_settings_gallery_send" translatable="false">photos screenshots auto upload camera roll</string>
     <string name="kw_settings_gallery_screenshots" translatable="false">screenshot folder photos auto</string>
     <string name="kw_settings_gallery_camera" translatable="false">camera folder photos dcim auto</string>
     <string name="kw_settings_contacts_share" translatable="false">contacts address book people phone book</string>
-    <string name="kw_settings_session_password" translatable="false">password pin lock passcode secret</string>
-    <string name="kw_settings_session_gate" translatable="false">ask permission confirm approve terminal screen access prompt</string>
-    <string name="kw_settings_unlock_nearby" translatable="false">unlock lock screen login proximity</string>
+    <string name="kw_settings_session_password" translatable="false">password pin lock passcode secret security</string>
+    <string name="kw_settings_session_gate" translatable="false">ask permission confirm approve terminal screen access prompt share screen screen sharing biometric</string>
+    <string name="kw_settings_unlock_nearby" translatable="false">unlock lock screen login proximity password</string>
     <string name="kw_device_encryption" translatable="false">key fingerprint certificate security tls</string>
     <string name="kw_privacy_policy" translatable="false">data legal terms</string>
-    <string name="kw_settings_unpair_row" translatable="false">forget remove disconnect delete device</string>
-    <string name="kw_settings_theme" translatable="false">dark light mode style night system</string>
+    <string name="kw_settings_unpair_row" translatable="false">forget remove disconnect delete device unpair</string>
+    <string name="kw_settings_theme" translatable="false">dark light mode style night system theme appearance</string>
     <string name="kw_setting_dynamic_colors" translatable="false">wallpaper material you colour color</string>
-    <string name="kw_setting_advanced_network" translatable="false">stun server port</string>
+    <string name="kw_setting_advanced_network" translatable="false">stun server port network internet</string>
     <string name="kw_trusted_networks" translatable="false">wifi wi-fi ssid autodiscovery</string>
     <string name="kw_custom_device_list" translatable="false">ip address manual add device</string>
-    <string name="kw_settings_permissions" translatable="false">allow access accessibility battery overlay notification camera storage</string>
+    <string name="kw_settings_permissions" translatable="false">allow access accessibility battery overlay notification camera storage permissions privacy</string>
     <string name="kw_surfaces_add_tiles" translatable="false">quick settings tile widget shade</string>
     <string name="kw_settings_export_logs" translatable="false">debug report bug diagnostics</string>
     <string name="kw_about" translatable="false">version licence license credits authors</string>
+    <!-- Settings: what a row does, in one sentence (search results, and rows whose own line is only a value) -->
+    <string name="sum_settings_phone_name">The name your computers see for this phone</string>
+    <string name="sum_home_pair_another">Connect this phone to another computer by scanning its QR code</string>
+    <string name="sum_settings_dnd_share">When one goes quiet, so does the other. Turned on at %1$s</string>
+    <string name="sum_select_ringtone">The sound this phone plays when %1$s rings it</string>
+    <string name="sum_settings_phone_clipboard">Text you copy on this phone can be pasted on %1$s</string>
+    <string name="sum_home_send_clipboard">Send what this phone has copied right now</string>
+    <string name="sum_settings_glide">Use %1$s\'s mouse and keyboard on this phone</string>
+    <string name="sum_mousepad_sensitivity">How fast the pointer moves when this phone is the touchpad</string>
+    <string name="sum_settings_downloads_folder">Where files from your computer are saved on this phone</string>
+    <string name="sum_sg_files_default_folder">Save received files in Downloads again</string>
+    <string name="sum_settings_gallery_send">New screenshots and photos go to %1$s on their own</string>
+    <string name="sum_settings_gallery_screenshots">The folder watched for new screenshots</string>
+    <string name="sum_settings_gallery_camera">The folder watched for new photos</string>
+    <string name="sum_settings_contacts_share">Lets %1$s name callers and search your contacts</string>
+    <string name="sum_settings_session_password">A password %1$s asks for before terminals and screen access. Set on %1$s</string>
+    <string name="sum_settings_session_gate">Check your fingerprint or screen lock before terminals and the computer\'s screen open</string>
+    <string name="sum_settings_unlock_nearby">Unlock %1$s from this phone when you are nearby. Turned on at %1$s</string>
+    <string name="sum_settings_unpair_row">Disconnect and forget %1$s. You can pair again later</string>
+    <string name="sum_settings_theme">Light, dark, or the same as your phone</string>
+    <string name="sum_settings_permissions">What DeskLink may use on this phone, and what still needs allowing</string>
+    <string name="sum_about">Version, licenses and credits</string>
     <string name="settings_quick_switches">Quick switches</string>
     <string name="settings_quick_clipboard">Share clipboard</string>
     <string name="settings_quick_clipboard_on">Synced with %1$s</string>
