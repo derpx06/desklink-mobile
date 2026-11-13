@@ -6,53 +6,55 @@
 
 package org.desklink.mobile.ui.surfaces.widgets
 
-import android.app.PendingIntent
 import android.content.Context
 import android.util.SizeF
 import android.widget.RemoteViews
-import androidx.annotation.IdRes
 import org.desklink.mobile.R
 import org.desklink.mobile.ui.surfaces.DeskSurfaces
 
 class QuickActionsWidget : FamilyWidget() {
     override val sizes = listOf(SizeF(250f, 40f), SizeF(250f, 110f))
 
+    /** One action's place in the layout, its spoken name with and without a computer, and its tap. */
+    private class Slot(val root: Int, val icon: Int, val label: Int, val named: Int, val plain: Int)
+
+    private val slots = mapOf(
+        WidgetAction.SCREEN to Slot(R.id.act_screen, R.id.act_screen_icon, R.id.act_screen_label, R.string.widget_cd_screen, R.string.home_desk_screen),
+        WidgetAction.FILES to Slot(R.id.act_files, R.id.act_files_icon, R.id.act_files_label, R.string.widget_cd_files, R.string.home_send_files),
+        WidgetAction.CLIPBOARD to Slot(R.id.act_clipboard, R.id.act_clipboard_icon, R.id.act_clipboard_label, R.string.widget_cd_clipboard, R.string.home_send_clipboard_short),
+        WidgetAction.RING to Slot(R.id.act_ring, R.id.act_ring_icon, R.id.act_ring_label, R.string.widget_cd_ring, R.string.home_ring_desk),
+        WidgetAction.LOCK to Slot(R.id.act_lock, R.id.act_lock_icon, R.id.act_lock_label, R.string.widget_cd_lock, R.string.home_lock_desk),
+    )
+
     override fun render(context: Context, facts: ComputerFacts?, size: SizeF): RemoteViews {
         val large = size.height >= 110f
         val v = views(context, if (large) R.layout.widget_actions_large else R.layout.widget_actions_small)
         val id = facts?.id
-        val name = facts?.name.orEmpty()
-        val buttons = WidgetRules.actions(facts).associateBy { it.action }
-        fun button(a: WidgetAction, @IdRes root: Int, nameRes: Int, tap: PendingIntent) {
-            val ui = buttons.getValue(a)
-            DeskWidgets.setEnabledLook(v, root, ui.enabled)
-            val label = context.getString(nameRes)
-            v.setContentDescription(root, if (ui.enabled) label else context.getString(R.string.widget_action_off, label, ui.reason?.let { context.getString(it, name) }.orEmpty()))
-            // A disabled button still answers a tap: with the reason, in Home's words.
-            v.setOnClickPendingIntent(root, tap)
-        }
-        button(WidgetAction.SCREEN, R.id.act_screen, R.string.home_desk_screen, DeskWidgets.act(context, WidgetAction.SCREEN, id))
-        button(WidgetAction.FILES, R.id.act_files, R.string.home_send_files, DeskWidgets.act(context, WidgetAction.FILES, id))
-        button(WidgetAction.CLIPBOARD, R.id.act_clipboard, R.string.home_send_clipboard_short, DeskWidgets.act(context, WidgetAction.CLIPBOARD, id))
-        button(WidgetAction.RING, R.id.act_ring, R.string.home_ring_desk, DeskWidgets.send(context, DeskSurfaces.Action.RING, id))
-        // Lock is on the widget only while the computer lets this phone lock it.
-        val lock = WidgetRules.lock(facts)
-        v.show(R.id.act_lock, lock != null)
-        if (lock != null) {
-            val label = context.getString(R.string.home_lock_desk)
-            DeskWidgets.setEnabledLook(v, R.id.act_lock, lock.enabled)
-            v.setContentDescription(R.id.act_lock, if (lock.enabled) label else context.getString(R.string.widget_action_off, label, lock.reason?.let { context.getString(it, name) }.orEmpty()))
-            v.setOnClickPendingIntent(R.id.act_lock, DeskWidgets.send(context, DeskSurfaces.Action.LOCK, id))
+        val name = facts?.name
+        // At huge text the icons stay (each with its spoken name); the labels would be cut off.
+        val labels = WidgetRules.roomForExtras(DeskWidgets.fontScale(context))
+        WidgetRules.actions(facts).forEach { ui ->
+            val slot = slots.getValue(ui.action)
+            DeskWidgets.setEnabledLook(v, slot.icon, slot.label, ui.enabled)
+            v.show(slot.label, labels)
+            val reason = ui.reason?.let { context.getString(it, name.orEmpty()) }
+            v.setContentDescription(slot.root, DeskWidgets.spokenAction(context, DeskWidgets.named(context, slot.named, slot.plain, name), ui.enabled, reason))
+            // A button that is off still answers a tap: with the reason, in Home's words. With no computer at all, the tap
+            // opens the app, where one is paired.
+            v.setOnClickPendingIntent(
+                slot.root,
+                when {
+                    facts == null -> DeskWidgets.openApp(context, null)
+                    ui.action == WidgetAction.RING -> DeskWidgets.send(context, DeskSurfaces.Action.RING, id)
+                    ui.action == WidgetAction.LOCK -> DeskWidgets.send(context, DeskSurfaces.Action.LOCK, id)
+                    else -> DeskWidgets.act(context, ui.action, id)
+                },
+            )
         }
         if (large) {
             val status = WidgetRules.status(facts)
-            v.setTextViewText(R.id.w_name, facts?.name ?: context.getString(R.string.app_name))
-            v.setTextViewText(R.id.w_status, context.getString(status.label))
-            v.setImageViewResource(R.id.w_dot, DeskWidgets.dot(status.tone))
-            v.setOnClickPendingIntent(R.id.w_header, DeskWidgets.openApp(context, id))
-            v.setContentDescription(R.id.w_header, context.getString(R.string.widget_join, facts?.name ?: context.getString(R.string.app_name), context.getString(status.label)))
+            DeskWidgets.header(context, v, name, status.tone, context.getString(status.label), DeskWidgets.openApp(context, id))
         }
         return v
     }
 }
-

@@ -162,11 +162,11 @@ object WidgetRules {
     }
 
     /**
-     * The quick-action buttons in order. Lock is there only while the computer lets this phone lock it; the rest
-     * stay and look off, with Home's reason, when the computer is not ready or the feature is switched off.
+     * The quick-action buttons in order. Every one is always there (as on Home): one the computer cannot take now looks off,
+     * with Home's reason, and a tap says why. Lock included: it is off while the computer does not let this phone lock it.
      */
     fun actions(f: ComputerFacts?): List<ActionUi> {
-        val order = listOf(WidgetAction.SCREEN, WidgetAction.FILES, WidgetAction.CLIPBOARD, WidgetAction.RING)
+        val order = listOf(WidgetAction.SCREEN, WidgetAction.FILES, WidgetAction.CLIPBOARD, WidgetAction.RING, WidgetAction.LOCK)
         return order.map { a ->
             val why = f?.let(::notReady)
             when {
@@ -176,13 +176,6 @@ object WidgetRules {
                 else -> ActionUi(a, true)
             }
         }
-    }
-
-    /** Lock is offered only when the computer allows it; whether it can be pressed now follows the link. */
-    fun lock(f: ComputerFacts?): ActionUi? {
-        if (f == null || !f.lock) return null
-        val why = notReady(f)
-        return if (why != null) ActionUi(WidgetAction.LOCK, false, notReadyHint(why)) else ActionUi(WidgetAction.LOCK, true)
     }
 
     /** What a tap does *now*, from the live state (the picture may be older than the link). */
@@ -223,6 +216,12 @@ object WidgetRules {
 
     /** A running transfer first, else the newest finished one, else nothing. */
     fun transfers(running: TransfersView.Running?, last: TransfersView.Last?): TransfersView = running ?: last ?: TransfersView.Idle
+
+    /**
+     * Room for the extras of a one-row widget (the action labels, the status widget's delay line) at this font scale. From
+     * 150 % text they would be cut off, so they go and the essentials (name, state, icons with their spoken names) stay.
+     */
+    fun roomForExtras(fontScale: Float): Boolean = fontScale < 1.5f
 
     /** How many 48 dp note rows fit a widget this tall (dp): the header takes 56 (8 + 48). */
     fun noteRows(heightDp: Float): Int = ((heightDp - 56f) / 48f).toInt().coerceIn(1, 5)

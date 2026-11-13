@@ -8,7 +8,6 @@ import org.desklink.mobile.ui.compose.model.device.DeviceConnection
 import org.desklink.mobile.webrtc.WebRtcConnectionPath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -63,9 +62,9 @@ class WidgetRulesTest {
     // ---- quick actions --------------------------------------------------------------------------------------
 
     @Test
-    fun allFourButtonsWorkWhileConnected() {
+    fun allFiveButtonsWorkWhileConnected() {
         val ui = WidgetRules.actions(facts())
-        assertEquals(listOf(WidgetAction.SCREEN, WidgetAction.FILES, WidgetAction.CLIPBOARD, WidgetAction.RING), ui.map { it.action })
+        assertEquals(listOf(WidgetAction.SCREEN, WidgetAction.FILES, WidgetAction.CLIPBOARD, WidgetAction.RING, WidgetAction.LOCK), ui.map { it.action })
         assertTrue(ui.all { it.enabled && it.reason == null })
     }
 
@@ -89,11 +88,21 @@ class WidgetRulesTest {
     }
 
     @Test
-    fun lockExistsOnlyWhereTheComputerAllowsIt() {
-        assertNull(WidgetRules.lock(facts(lock = false)))
-        assertNull(WidgetRules.lock(null))
-        assertTrue(WidgetRules.lock(facts())!!.enabled)
-        assertFalse(WidgetRules.lock(offline().copy(lock = true))!!.enabled)
+    fun lockIsOffNotHiddenWhereTheComputerDoesNotAllowIt() {
+        fun lock(f: ComputerFacts?) = WidgetRules.actions(f).single { it.action == WidgetAction.LOCK }
+        assertFalse(lock(facts(lock = false)).enabled)
+        assertEquals("Not available right now", context.getString(lock(facts(lock = false)).reason!!))
+        assertFalse(lock(null).enabled)
+        assertTrue(lock(facts()).enabled)
+        assertEquals("Offline", context.getString(lock(offline()).reason!!))
+    }
+
+    @Test
+    fun oneRowExtrasGoAtHugeTextOnly() {
+        assertTrue(WidgetRules.roomForExtras(1.0f))
+        assertTrue(WidgetRules.roomForExtras(1.3f))
+        assertFalse(WidgetRules.roomForExtras(1.5f))
+        assertFalse(WidgetRules.roomForExtras(2.0f))
     }
 
     @Test

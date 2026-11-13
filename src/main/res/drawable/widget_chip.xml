@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The tonal pill behind an action's icon (52 x 32 dp), Material 3's "active indicator" shape. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_tonal" />
+    <corners android:radius="16dp" />
+</shape>

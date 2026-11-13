@@ -12,31 +12,40 @@ import android.widget.RemoteViews
 import org.desklink.mobile.R
 
 class ComputerStatusWidget : FamilyWidget() {
-    override val sizes = listOf(SizeF(110f, 40f), SizeF(180f, 40f))
+    override val sizes = listOf(SizeF(110f, 40f), SizeF(180f, 40f), SizeF(250f, 40f))
 
     override fun render(context: Context, facts: ComputerFacts?, size: SizeF): RemoteViews {
         val v = views(context, R.layout.widget_status)
         val status = WidgetRules.status(facts)
-        // Narrow (2 cells): the short words; wider: the full ones, as Home's header says them.
-        val words = context.getString(if (size.width < 180f) shortLabel(status) else status.label)
+        // Up to 3 cells: the short words ("Connected · Relay"); 4 cells: the full ones, as Home's header says them. Spoken: always the full ones.
+        val words = context.getString(if (size.width < 250f) shortLabel(status) else status.label)
         val now = System.currentTimeMillis()
-        val rtt = facts?.rttMs
-        val detail = when {
-            facts == null -> null
-            facts.ready -> listOfNotNull(rtt?.let { context.getString(R.string.home_meta_rtt, it) }, context.getString(R.string.widget_status_updated, DeskWidgets.clock(context, now)))
-            else -> facts.lastSeen?.let { listOf(context.getString(R.string.widget_status_last_seen, DeskWidgets.clock(context, it))) }
-        }?.joinToString(" · ")
+        val narrow = size.width < 180f
         val battery = facts?.takeIf { it.ready }?.let { DeskWidgets.batteryText(context, it) }
+        val rtt = facts?.takeIf { it.ready }?.rttMs?.let { context.getString(R.string.home_meta_rtt, it) }
+        val time = when {
+            facts == null -> null
+            facts.ready -> context.getString(R.string.widget_status_updated, DeskWidgets.clock(context, now))
+            else -> facts.lastSeen?.let { context.getString(R.string.widget_status_last_seen, DeskWidgets.clock(context, it)) }
+        }
+        // Narrow: the battery moves under the name (beside it, it cut the name and the state short) and "Updated" goes.
+        val detail = listOfNotNull(battery?.takeIf { narrow }, rtt, time?.takeIf { !narrow || facts?.ready != true }).takeIf { it.isNotEmpty() }?.joinToString(" · ")
+        val batterySpoken = facts?.takeIf { it.ready }?.batteryPercent?.let {
+            context.getString(if (facts.charging) R.string.widget_pc_battery_charging_spoken else R.string.widget_pc_battery_spoken, it)
+        }
+        val showDetail = detail != null && WidgetRules.roomForExtras(DeskWidgets.fontScale(context))
 
-        v.setTextViewText(R.id.w_name, facts?.name ?: context.getString(R.string.app_name))
-        v.setTextViewText(R.id.w_status, words)
-        v.setImageViewResource(R.id.w_dot, DeskWidgets.dot(status.tone))
-        v.setTextViewText(R.id.w_battery, battery.orEmpty())
-        v.show(R.id.w_battery, battery != null)
+        DeskWidgets.header(context, v, facts?.name, status.tone, words, tap = null)
+        v.setTextViewText(R.id.w_battery_text, battery.orEmpty())
+        v.show(R.id.w_battery, battery != null && !narrow)
         v.setTextViewText(R.id.w_detail, detail.orEmpty())
-        v.show(R.id.w_detail, detail != null)
-        val spoken = listOfNotNull(facts?.name, context.getString(status.label), detail, battery).joinToString(", ")
-        v.setContentDescription(android.R.id.background, spoken)
+        v.show(R.id.w_detail, showDetail)
+        // One row: the state takes a second line only when nothing is under it.
+        v.setInt(R.id.w_status, "setMaxLines", if (showDetail) 1 else 2)
+        // One target, read as one sentence: what a tap does, then the state in full words (never only the short ones).
+        val hint = if (facts == null) context.getString(R.string.widget_not_paired_hint) else null
+        val spoken = listOfNotNull(DeskWidgets.named(context, R.string.widget_cd_open, R.string.widget_cd_open_app, facts?.name), context.getString(status.label), batterySpoken, rtt, time, hint)
+        v.setContentDescription(android.R.id.background, spoken.joinToString(". "))
         v.setOnClickPendingIntent(android.R.id.background, DeskWidgets.openApp(context, facts?.id))
         return v
     }

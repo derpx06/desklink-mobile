@@ -8,11 +8,13 @@
     <color name="widget_mint">#FF0F9B72</color>
     <color name="widget_amber">#FF9A6412</color>
     <color name="widget_faint">#FF8F8F97</color>
-    <color name="widget_coral">#FFE5533D</color>
+    <!-- coralText: white badge text on it is 5.6:1 (the brighter coral was 3.7:1). -->
+    <color name="widget_coral">#FFB9402B</color>
     <color name="widget_on_coral">#FFFFFFFF</color>
     <!-- The widget family: tonal buttons and the filled "New" button, from the app's accentContainer / accent tokens. -->
     <color name="widget_tonal">#FFE2E8FB</color>
     <color name="widget_on_tonal">#FF1B2F7A</color>
     <color name="widget_accent">#FF3256D6</color>
     <color name="widget_on_accent">#FFFFFFFF</color>
+    <color name="widget_ripple">#1F000000</color>
 </resources>

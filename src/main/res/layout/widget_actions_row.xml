@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The round tonal buttons (Lock only when the computer allows it), shared by the 4x1 and 4x2 quick actions. -->
+<!-- The five labelled actions, shared by the 4x1 and 4x2 quick actions. An action the computer cannot take now stays here,
+     dimmed, and a tap says why (never hidden). Labels go away only when the text is too big for one row; the spoken names stay. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     tools:ignore="UseAppTint"
@@ -13,17 +14,23 @@
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
+        android:background="@drawable/widget_row_ripple"
         android:gravity="center"
         android:minHeight="48dp"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
 
         <ImageView
             android:id="@+id/act_screen_icon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/widget_tonal_circle"
+            android:layout_width="48dp"
+            android:layout_height="32dp"
+            android:background="@drawable/widget_chip"
             android:importantForAccessibility="no"
-            android:padding="9dp"
+            android:paddingStart="13dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="13dp"
+            android:paddingBottom="5dp"
             android:src="@drawable/sym_desktop_windows"
             android:tint="@color/widget_on_tonal" />
 
@@ -31,31 +38,39 @@
             android:id="@+id/act_screen_label"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:gravity="center"
             android:importantForAccessibility="no"
             android:maxLines="1"
-            android:text="@string/home_desk_screen"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:text="@string/widget_screen"
             android:textColor="@color/widget_text"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/act_files"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
+        android:background="@drawable/widget_row_ripple"
         android:gravity="center"
         android:minHeight="48dp"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
 
         <ImageView
             android:id="@+id/act_files_icon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/widget_tonal_circle"
+            android:layout_width="48dp"
+            android:layout_height="32dp"
+            android:background="@drawable/widget_chip"
             android:importantForAccessibility="no"
-            android:padding="9dp"
+            android:paddingStart="13dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="13dp"
+            android:paddingBottom="5dp"
             android:src="@drawable/sym_upload_file"
             android:tint="@color/widget_on_tonal" />
 
@@ -63,31 +78,39 @@
             android:id="@+id/act_files_label"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:gravity="center"
             android:importantForAccessibility="no"
             android:maxLines="1"
-            android:text="@string/home_send_files"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:text="@string/widget_files"
             android:textColor="@color/widget_text"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/act_clipboard"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
+        android:background="@drawable/widget_row_ripple"
         android:gravity="center"
         android:minHeight="48dp"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
 
         <ImageView
             android:id="@+id/act_clipboard_icon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/widget_tonal_circle"
+            android:layout_width="48dp"
+            android:layout_height="32dp"
+            android:background="@drawable/widget_chip"
             android:importantForAccessibility="no"
-            android:padding="9dp"
+            android:paddingStart="13dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="13dp"
+            android:paddingBottom="5dp"
             android:src="@drawable/sym_content_paste"
             android:tint="@color/widget_on_tonal" />
 
@@ -95,31 +118,39 @@
             android:id="@+id/act_clipboard_label"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:gravity="center"
             android:importantForAccessibility="no"
             android:maxLines="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
             android:text="@string/widget_clipboard"
             android:textColor="@color/widget_text"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/act_ring"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
+        android:background="@drawable/widget_row_ripple"
         android:gravity="center"
         android:minHeight="48dp"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
 
         <ImageView
             android:id="@+id/act_ring_icon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/widget_tonal_circle"
+            android:layout_width="48dp"
+            android:layout_height="32dp"
+            android:background="@drawable/widget_chip"
             android:importantForAccessibility="no"
-            android:padding="9dp"
+            android:paddingStart="13dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="13dp"
+            android:paddingBottom="5dp"
             android:src="@drawable/sym_vibration"
             android:tint="@color/widget_on_tonal" />
 
@@ -127,32 +158,39 @@
             android:id="@+id/act_ring_label"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:gravity="center"
             android:importantForAccessibility="no"
             android:maxLines="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
             android:text="@string/widget_ring"
             android:textColor="@color/widget_text"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
     </LinearLayout>
     <LinearLayout
         android:id="@+id/act_lock"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
+        android:background="@drawable/widget_row_ripple"
         android:gravity="center"
         android:minHeight="48dp"
         android:orientation="vertical"
-        android:visibility="gone">
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp">
 
         <ImageView
             android:id="@+id/act_lock_icon"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/widget_tonal_circle"
+            android:layout_width="48dp"
+            android:layout_height="32dp"
+            android:background="@drawable/widget_chip"
             android:importantForAccessibility="no"
-            android:padding="9dp"
+            android:paddingStart="13dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="13dp"
+            android:paddingBottom="5dp"
             android:src="@drawable/sym_lock"
             android:tint="@color/widget_on_tonal" />
 
@@ -160,13 +198,15 @@
             android:id="@+id/act_lock_label"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:gravity="center"
             android:importantForAccessibility="no"
             android:maxLines="1"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
             android:text="@string/widget_lock"
             android:textColor="@color/widget_text"
-            android:textSize="11sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>

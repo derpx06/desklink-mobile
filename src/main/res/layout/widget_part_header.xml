@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The header every computer widget shares: the DeskLink mark, the computer's name, and its state as a dot plus words
+     (the dot's shape changes too: filled when connected, a ring otherwise). The whole row opens the app on that computer;
+     its spoken name is set in code ("Open arch-desk in DeskLink. Connected over Wi‑Fi"). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_header"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/widget_row_ripple"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
+
+    <ImageView
+        android:id="@+id/w_mark"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:importantForAccessibility="no"
+        android:layout_marginEnd="10dp"
+        android:src="@drawable/desklink_mark" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:importantForAccessibility="no"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/w_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="middle"
+            android:fontFamily="monospace"
+            android:importantForAccessibility="no"
+            android:maxLines="1"
+            android:text="@string/widget_desk_preview_name"
+            android:textColor="@color/widget_text"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:gravity="top"
+            android:importantForAccessibility="no"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/w_dot"
+                android:layout_gravity="top"
+                android:layout_marginTop="4dp"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginEnd="6dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/widget_dot_mint" />
+
+            <TextView
+                android:id="@+id/w_status"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:importantForAccessibility="no"
+                android:maxLines="2"
+                android:text="@string/home_short_wifi"
+                android:textColor="@color/widget_text_dim"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_battery"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:gravity="center_vertical"
+        android:importantForAccessibility="no"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/widget_battery_small" />
+
+        <TextView
+            android:id="@+id/w_battery_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="2dp"
+            android:importantForAccessibility="no"
+            android:maxLines="1"
+            android:text="@string/widget_pc_preview_battery"
+            android:textColor="@color/widget_text_dim"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>
