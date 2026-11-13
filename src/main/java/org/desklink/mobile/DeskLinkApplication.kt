@@ -334,6 +334,7 @@ class DeskLinkApplication : Application() {
         // A pointer on a dark screen helps no one, and the desk would wait for it: it goes back.
         runCatching { org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(release = true) }
         webRtcCoordinators.values.forEach { runCatching { it.onScreenOff() } }
+        BackgroundService.instance?.recheckPowerLease()
     }
 
     /** The live WebRTC connection's identity for [deviceId], or null (see [org.desklink.mobile.ui.SessionGate]). */

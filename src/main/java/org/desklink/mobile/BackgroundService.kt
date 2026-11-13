@@ -362,11 +362,17 @@ class BackgroundService : Service() {
                 bytesMoving(it.finished, it.resuming, it.updatedAt, android.os.SystemClock.elapsedRealtime())
             } == true || org.desklink.mobile.plugins.folders.BucketEngine.moving(id),
             gliding = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.activeDesk == id,
+            screenOn = getSystemService<PowerManager>()?.isInteractive != false,
         )
     }
 
     private val leaseRecheck = android.os.Handler(android.os.Looper.getMainLooper())
     private val leaseRecheckTask = Runnable { updateConnectionPowerLease() }
+
+    /** The screen went off: the locks held only for someone looking go now, not at the next check. */
+    fun recheckPowerLease() {
+        leaseRecheck.post(leaseRecheckTask)
+    }
 
     private fun acquireWorkWakeLock() {
         val powerManager = getSystemService<PowerManager>() ?: return
@@ -625,8 +631,14 @@ class BackgroundService : Service() {
             !finished && !resuming && now - updatedAt < PROGRESS_LEASE_MS
 
         /** Work that needs the CPU with the screen off; being connected is not work. */
-        fun isActiveWork(terminalAttached: Boolean, deskScreen: Boolean, phoneScreenShared: Boolean, transferring: Boolean, gliding: Boolean = false): Boolean =
-            terminalAttached || deskScreen || phoneScreenShared || transferring || gliding
+        /**
+         * Work that is only for someone looking at this phone (a terminal, the desk's screen, this screen shown, glide)
+         * counts only while the screen is on: a terminal left attached at screen off used to renew the wake lock (and the
+         * Wi-Fi lock) for hours. Its output waits in the desk's ring and catches up when the phone wakes. A moving file is
+         * work whatever the screen does.
+         */
+        fun isActiveWork(terminalAttached: Boolean, deskScreen: Boolean, phoneScreenShared: Boolean, transferring: Boolean, gliding: Boolean = false, screenOn: Boolean = true): Boolean =
+            transferring || (screenOn && (terminalAttached || deskScreen || phoneScreenShared || gliding))
 
         @JvmStatic
         var instance: BackgroundService? = null
