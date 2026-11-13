@@ -12,6 +12,7 @@ commonsLang3 = "3.20.0"
 constraintlayoutCompose = "1.1.1"
 coreKtx = "1.19.0"
 coreSplashscreen = "1.2.0"
+profileinstaller = "1.4.1"
 dependencyLicenseReport = "3.1.4"
 disklrucache = "2.0.2"
 documentfile = "1.1.0"
@@ -63,6 +64,7 @@ androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-mani
 androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "uiToolingPreview" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
+androidx-profileinstaller = { module = "androidx.profileinstaller:profileinstaller", version.ref = "profileinstaller" }
 androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 androidx-gridlayout = { module = "androidx.gridlayout:gridlayout", version.ref = "gridlayout" }
 androidx-junit = { module = "androidx.test.ext:junit", version.ref = "junitExt" }
