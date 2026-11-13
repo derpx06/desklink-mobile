@@ -108,4 +108,10 @@ class GalleryRulesTest {
         assertTrue("a burst of provider notifications is one pass", watcher.contains("kickSoon(context)"))
         assertTrue("the manager forgets stored gallery sends when the switch is off", java.io.File("src/main/java/org/desklink/mobile/webrtc/WebRtcFileTransferManager.kt").readText().contains("GalleryWatcher.mayResume("))
     }
+
+    @Test
+    fun theFallbackListingWaitsLongWithTheScreenOff() {
+        assertEquals(60_000L, GalleryWatcher.pollAfter(screenOn = true))
+        assertTrue("not every minute in a pocket", GalleryWatcher.pollAfter(screenOn = false) >= 15 * 60_000L)
+    }
 }

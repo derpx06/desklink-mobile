@@ -108,6 +108,11 @@ object GalleryWatcher {
     /** A callback that never came (the queue was cleared) must not stall the gallery for good. */
     private const val SENDING_STALE_MS = 10 * 60_000L
     private const val POLL_MS = 60_000L
+    /** With the screen off nobody takes a picture or a screenshot: the fallback listing waits much longer. */
+    private const val POLL_SCREEN_OFF_MS = 15 * 60_000L
+
+    /** How long until the fallback listing looks again. */
+    internal fun pollAfter(screenOn: Boolean) = if (screenOn) POLL_MS else POLL_SCREEN_OFF_MS
     private const val COALESCE_MS = 2_000L
     private var pollScheduled = false
     private var kickPending = false
@@ -158,10 +163,11 @@ object GalleryWatcher {
             if (ready && !s.sending) sendNext(context, device, s)
         }
         // The provider may not report a new picture in a picked folder: while a computer is taking them and connected, look again
-        // every minute (one bounded listing). Nothing is scheduled otherwise.
+        // every minute (one bounded listing; every 15 with the screen off). Nothing is scheduled otherwise.
         if (watching) {
             val first = synchronized(this) { (!pollScheduled).also { pollScheduled = true } }
-            if (first) runCatching { worker.schedule({ synchronized(this) { pollScheduled = false }; kick(context) }, POLL_MS, TimeUnit.MILLISECONDS) }
+            val screenOn = context.getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
+            if (first) runCatching { worker.schedule({ synchronized(this) { pollScheduled = false }; kick(context) }, pollAfter(screenOn), TimeUnit.MILLISECONDS) }
         }
     }
 

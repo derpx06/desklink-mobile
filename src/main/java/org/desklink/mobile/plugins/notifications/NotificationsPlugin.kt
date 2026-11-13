@@ -222,6 +222,13 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             postedNotifications.add(key)
         }
 
+        // Ongoing, foreground-service, summary and DeskLink's own notifications are never mirrored: a media or download
+        // notification reposted every second costs no label lookup thread and no timer (an older pending send of it goes).
+        if (neverMirrored(statusBarNotification)) {
+            synchronized(postedNotificationsLock) { cancelDelayedNotification(key) }
+            return
+        }
+
         // The label is looked up (a disk read) now, off the main thread; the send half a second later finds it in the cache.
         val pkg = statusBarNotification.packageName
         org.desklink.mobile.helpers.ThreadHelper.execute { appNameLookup(context, pkg) }
@@ -257,16 +264,21 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         mainHandler.removeCallbacksAndMessages(key)
     }
 
+    /** Never mirrored, whatever the settings say: decided from the notification alone. */
+    private fun neverMirrored(statusBarNotification: StatusBarNotification): Boolean {
+        val flags = statusBarNotification.notification.flags
+        val packageName = statusBarNotification.packageName
+        return (flags and Notification.FLAG_FOREGROUND_SERVICE) != 0
+            || (flags and Notification.FLAG_ONGOING_EVENT) != 0
+            || (flags and Notification.FLAG_LOCAL_ONLY) != 0
+            || (flags and NotificationCompat.FLAG_GROUP_SUMMARY) != 0
+            || "org.desklink.mobile" == packageName || "org.desklink.mobile.debug" == packageName
+    }
+
     /** Whether [sendNotification] would mirror it: also what the snapshot's `ids` list. */
     private fun isMirrored(statusBarNotification: StatusBarNotification): Boolean {
         val notification = statusBarNotification.notification
-        if ((notification.flags and Notification.FLAG_FOREGROUND_SERVICE) != 0
-            || (notification.flags and Notification.FLAG_ONGOING_EVENT) != 0
-            || (notification.flags and Notification.FLAG_LOCAL_ONLY) != 0
-            || (notification.flags and NotificationCompat.FLAG_GROUP_SUMMARY) != 0
-        ) {
-            return false
-        }
+        if (neverMirrored(statusBarNotification)) return false
         val packageName = statusBarNotification.packageName
         if (!appDatabase.isEnabled(packageName)) return false
         // Android's own "secret" mark: never copied (one-time codes, banking).
@@ -275,7 +287,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             if ("low_battery" == statusBarNotification.tag) return false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && "MediaOngoingActivity" == notification.channelId) return false
         }
-        if ("org.desklink.mobile" == packageName || "org.desklink.mobile.debug" == packageName) return false
         // T3: who is calling reaches the desk only with "Show caller on <desk>"; the dialer's
         // call and missed-call notifications would otherwise tell it anyway.
         if (isCallNotification(statusBarNotification) &&

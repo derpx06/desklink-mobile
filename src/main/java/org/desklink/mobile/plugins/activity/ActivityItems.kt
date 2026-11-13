@@ -69,11 +69,11 @@ object ActivityItems {
         private var last = Long.MIN_VALUE / 2
         private var pending = false
 
-        /** null: a trailing send already waits; 0: send now; more: send after that many ms. */
+        /** null: a trailing send already waits; 0: send now; more: send after that many ms ([interval] between sends). */
         @Synchronized
-        fun onChange(now: Long): Long? {
+        fun onChange(now: Long, interval: Long = intervalMs): Long? {
             if (pending) return null
-            val wait = (last + intervalMs - now).coerceAtLeast(0)
+            val wait = (last + interval - now).coerceAtLeast(0)
             if (wait == 0L) { last = now; return 0L }
             pending = true
             return wait
@@ -82,6 +82,12 @@ object ActivityItems {
         @Synchronized
         fun onFired(now: Long) { pending = false; last = now }
     }
+
+    /**
+     * Between snapshots with the screen off: the first change (a call ringing) still goes at once, but a progress bar ticking
+     * in another app no longer costs a full notification fetch and a packet every second while the phone is in a pocket.
+     */
+    const val SCREEN_OFF_INTERVAL_MS = 5_000L
 
     private val IMPORTANCE = listOf("call", "navigation", "timer", "progress", "other")
 

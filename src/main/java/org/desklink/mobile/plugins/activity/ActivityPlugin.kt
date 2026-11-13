@@ -97,11 +97,13 @@ class ActivityPlugin : Plugin(), NotificationReceiver.NotificationListener {
         device.sendPacket(ActivityItems.packet(JSONArray(), System.currentTimeMillis()).also { it["rev"] = empty })
     }
 
-    /** At most one snapshot a second: the first change goes at once, then one trailing send; a busy phone does not starve it. */
+    /** At most one snapshot a second (one in five with the screen off): the first change goes at once, then one trailing send. */
     private fun schedule() {
         if (!::mainHandler.isInitialized) return
         mainHandler.post {
-            val wait = throttle.onChange(SystemClock.elapsedRealtime()) ?: return@post
+            val screenOn = context.getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
+            val interval = if (screenOn) 1_000L else ActivityItems.SCREEN_OFF_INTERVAL_MS
+            val wait = throttle.onChange(SystemClock.elapsedRealtime(), interval) ?: return@post
             if (wait == 0L) sendChange() else mainHandler.postDelayed({ throttle.onFired(SystemClock.elapsedRealtime()); sendChange() }, wait)
         }
     }

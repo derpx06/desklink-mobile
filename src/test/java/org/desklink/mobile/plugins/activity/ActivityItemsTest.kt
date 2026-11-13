@@ -6,6 +6,7 @@ import org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -95,6 +96,25 @@ class ActivityItemsTest {
         assertEquals("a change right after it waits a full second", 1_000L, t.onChange(1_000))
         t.onFired(2_000)
         assertEquals("a quiet spell: at once again", 0L, t.onChange(5_000))
+    }
+
+    @Test
+    fun withTheScreenOffABusyProgressBarIsSentOnceInFiveSeconds() {
+        val t = ActivityItems.Throttle(1_000L)
+        val off = ActivityItems.SCREEN_OFF_INTERVAL_MS
+        assertEquals("a call still goes at once", 0L, t.onChange(0, off))
+        assertEquals(off - 300, t.onChange(300, off))
+        t.onFired(off)
+        // An hour of a progress bar changing every 100 ms: at most one send in each interval.
+        var sends = 1
+        var pendingAt = Long.MAX_VALUE
+        var now = off
+        while (now < 3_600_000L) {
+            now += 100
+            if (now >= pendingAt) { t.onFired(now); sends++; pendingAt = Long.MAX_VALUE }
+            when (val wait = t.onChange(now, off)) { null -> {}; 0L -> sends++; else -> pendingAt = now + wait }
+        }
+        assertTrue("$sends sends", sends <= 3_600_000L / off + 2)
     }
 
     @Test

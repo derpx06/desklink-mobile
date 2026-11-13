@@ -19,6 +19,15 @@ class ReleaseHygieneTest {
     }
 
     @Test
+    fun withTheScreenOffOnlyAMovingFileHoldsTheWakeLock() {
+        assertFalse("a terminal left attached", BackgroundService.isActiveWork(true, false, false, false, screenOn = false))
+        assertFalse("the desk's screen", BackgroundService.isActiveWork(false, true, false, false, screenOn = false))
+        assertFalse("this screen shown", BackgroundService.isActiveWork(false, false, true, false, screenOn = false))
+        assertFalse("glide", BackgroundService.isActiveWork(false, false, false, false, gliding = true, screenOn = false))
+        assertTrue("a file moving", BackgroundService.isActiveWork(false, false, false, true, screenOn = false))
+    }
+
+    @Test
     fun theVersionIs130AndHasItsStoreChangelog() {
         val gradle = project("build.gradle.kts").readText()
         assertTrue("versionName = \"1.3.0\"" in gradle)
