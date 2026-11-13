@@ -15,21 +15,11 @@ import org.desklink.mobile.plugins.clipboard.ClipboardListener
 /**
  * Links (contract C3). The desk's `share.request {url}` becomes a heads-up "Open link from <desk>"
  * with Open and Copy: Android 10+ forbids starting the browser from the background. The other way,
- * the share sheet's "Open on computer" sends the link as `url`.
+ * "Send to computer" sends a shared text that is a whole URL as `url`.
  */
 object LinkFromDesk {
     private const val EXTRA_URL = "url"
     private const val EXTRA_ID = "id"
-    /** The share-sheet entry "Open on computer" (an alias of the share activity). */
-    const val OPEN_ON_DESK_ALIAS = "org.desklink.mobile.plugins.share.OpenOnDesk"
-    private val LINK = Regex("""https?://[^\s<>"]+""")
-
-    /** Shared through "Open on computer": the first web link in [text], or null otherwise. */
-    @JvmStatic
-    fun openOnDeskLink(intent: Intent?, text: String): String? =
-        if (intent?.component?.className == OPEN_ON_DESK_ALIAS) firstLink(text) else null
-
-    fun firstLink(text: String): String? = LINK.find(text)?.value?.trimEnd('.', ',', ')', ']', '!', '?', ';', ':')
 
     @JvmStatic
     fun show(context: Context, deskName: String, url: String) {

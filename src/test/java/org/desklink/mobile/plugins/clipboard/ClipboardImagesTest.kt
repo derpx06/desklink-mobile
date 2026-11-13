@@ -2,10 +2,8 @@ package org.desklink.mobile.plugins.clipboard
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.desklink.mobile.NetworkPacket
-import org.desklink.mobile.plugins.share.LinkFromDesk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,12 +34,5 @@ class ClipboardImagesTest {
         val fresh = File(dir, "fresh.png").apply { writeText("x"); setLastModified(1_000 + ClipboardImages.KEEP_MS - 1) }
         assertEquals(listOf(old), ClipboardImages.expired(listOf(old, fresh), now = 1_000 + ClipboardImages.KEEP_MS))
         dir.deleteRecursively()
-    }
-
-    @Test
-    fun openOnDeskFindsTheLinkInSharedText() {
-        assertEquals("https://example.com/a?b=1", LinkFromDesk.firstLink("Read this: https://example.com/a?b=1."))
-        assertEquals("http://x.org/p", LinkFromDesk.firstLink("Title\nhttp://x.org/p"))
-        assertNull(LinkFromDesk.firstLink("no link here"))
     }
 }

@@ -376,12 +376,6 @@ public class SharePlugin extends Plugin {
                 } catch (MalformedURLException e) {
                     isUrl = false;
                 }
-                // "Open on <desk>" (C3): the link inside "Title https://…" is what the desk opens.
-                String link = LinkFromDesk.INSTANCE.openOnDeskLink(intent, text);
-                if (link != null) {
-                    text = link;
-                    isUrl = true;
-                }
                 NetworkPacket np = new NetworkPacket(SharePlugin.PACKET_TYPE_SHARE_REQUEST);
                 np.set(isUrl ? "url" : "text", text);
                 device.sendPacket(np);
