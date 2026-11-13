@@ -100,7 +100,7 @@ class PaletteModelTest {
 
     private val everything = listOf(
         Action.SEND_FILES, Action.SEND_CLIPBOARD, Action.SEND_LINK, Action.DESK_SCREEN, Action.NEW_TERMINAL,
-        Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.RING, Action.PING, Action.LOCK, Action.UNLOCK, Action.SHARE_SCREEN, Action.PAIR_ANOTHER,
+        Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.RING, Action.PING, Action.LOCK, Action.UNLOCK, Action.SHARE_SCREEN, Action.PAIR_ANOTHER, Action.GUIDE,
     )
 
     @Test
@@ -114,7 +114,7 @@ class PaletteModelTest {
     fun anUnreachableComputerBlocksWhatNeedsItAndNothingElse() {
         val s = state(DeviceConnection.OFFLINE)
         listOf(Action.SEND_FILES, Action.RING, Action.LOCK, Action.UNLOCK, Action.NEW_TERMINAL).forEach { assertEquals(it, Blocker.OFFLINE, HomeDerive.blocker(s, it)) }
-        listOf(Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.PAIR_ANOTHER).forEach { assertEquals(it, null, HomeDerive.blocker(s, it)) }
+        listOf(Action.OPEN_TERMINALS, Action.NEW_NOTE, Action.OPEN_BUCKET, Action.PAIR_ANOTHER, Action.GUIDE).forEach { assertEquals(it, null, HomeDerive.blocker(s, it)) }
     }
 
     @Test
