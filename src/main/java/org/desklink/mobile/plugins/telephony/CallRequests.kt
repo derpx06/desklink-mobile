@@ -35,15 +35,28 @@ object CallRequests {
     /** The desk asked to dial an emergency number: refused, the phone's own dialer is the way (mirrors the desk's list). */
     const val ERROR_EMERGENCY = "emergency"
 
-    private val EMERGENCY = setOf(
+    /** The shared list (wire_values.json `telephony.emergency`, the desk's `calls::EMERGENCY`), in its order. */
+    internal val EMERGENCY = listOf(
         "112", "911", "999", "000", "110", "119", "118", "122", "100", "101",
         "102", "108", "115", "117", "113", "144", "155", "190", "199", "933",
     )
 
-    /** An emergency number, bare or with a leading `+` or `00`, separators ignored. */
+    /**
+     * An emergency number, bare, with a leading `+` or `00`, or behind a country code (`+44 999`, `0044 112`, `+1 911`);
+     * separators ignored. Mirrors the desk's `dial_refusal`. Bare first: Australia's 000 starts like the prefix 00.
+     */
     fun isEmergency(number: String): Boolean {
-        val digits = number.filter { it.isDigit() || it == '+' }.trimStart('+')
-        return digits.removePrefix("00") in EMERGENCY
+        val n = number.filter { it.isDigit() || it == '+' }
+        if (n.removePrefix("+") in EMERGENCY) return true
+        val international = when {
+            n.startsWith("+") -> n.drop(1)
+            n.startsWith("00") -> n.drop(2)
+            else -> return false
+        }
+        // "+00…" carries a second prefix; but "00000" is 00 + Australia's 000, so both readings are tried.
+        return listOf(international, international.removePrefix("00")).any { digits ->
+            EMERGENCY.any { code -> digits.endsWith(code) && digits.length - code.length <= 3 }
+        }
     }
 
     /** Runs [action]; null when done (the caller replies with a fresh snapshot), else the T2 error. */
