@@ -68,10 +68,18 @@ abstract class ShotTest {
     /** Part of every file name: the form factor, e.g. "phone" or "tablet". */
     abstract val form: String
 
+    /** Lays the screen out right to left (a qualifier alone does not reach Compose under Robolectric). */
+    open val rtl: Boolean = false
+
     fun shoot(name: String, content: @Composable () -> Unit) {
         // One composition, switched from light to dark in place (a rule can set its content only once).
         val dark = androidx.compose.runtime.mutableStateOf(false)
-        compose.setContent { DeskLinkFixedTheme(compose.activity, dark.value) { content() } }
+        compose.setContent {
+            DeskLinkFixedTheme(compose.activity, dark.value) {
+                val direction = if (rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides direction) { content() }
+            }
+        }
         compose.waitForIdle()
         val texts = compose.onAllNodes(androidx.compose.ui.test.isRoot(), useUnmergedTree = true).fetchSemanticsNodes().flatMap { root ->
             fun walk(n: androidx.compose.ui.semantics.SemanticsNode): List<String> =
