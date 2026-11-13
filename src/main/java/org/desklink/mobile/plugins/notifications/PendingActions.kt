@@ -25,4 +25,19 @@ class PendingActions<T> {
 
     @Synchronized
     fun clear() = byKey.clear()
+
+    companion object {
+        /** The label the desk shows and sends back on a press: no control characters and trimmed, as the desk keeps it. */
+        fun label(title: CharSequence?): String = title?.toString().orEmpty().filter { !it.isISOControl() }.trim()
+
+        /**
+         * The buttons worth mirroring, each with its label: a press is found by that label, so a blank one (Android 15's redaction
+         * blanks every title; icon-only buttons) or a second one with the same label could never be pressed. [usable]: it has an
+         * intent and is not a reply (that goes as `requestReplyId`). A [redacted] notification has none: they would act blind.
+         */
+        fun <T> sendable(actions: List<T>, redacted: Boolean, title: (T) -> CharSequence?, usable: (T) -> Boolean): List<Pair<String, T>> {
+            if (redacted) return emptyList()
+            return actions.filter(usable).map { label(title(it)) to it }.filter { it.first.isNotEmpty() }.distinctBy { it.first }
+        }
+    }
 }
