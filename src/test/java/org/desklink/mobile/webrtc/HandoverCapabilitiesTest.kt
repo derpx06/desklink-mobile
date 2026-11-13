@@ -24,6 +24,7 @@ class HandoverCapabilitiesTest {
         "desklink.clipboard.connect",
         "desklink.contacts.request_all_uids_timestamps",
         "desklink.contacts.request_vcards_by_uid",
+        "desklink.filelane.v1",
         "desklink.findmyphone.request",
         "desklink.folders",
         "desklink.handoff",
@@ -49,11 +50,13 @@ class HandoverCapabilitiesTest {
         "desklink.unlock.request",
     )
     private val deskAccepts = setOf(
+        "desklink.activity",
         "desklink.battery",
         "desklink.clipboard",
         "desklink.clipboard.connect",
         "desklink.contacts.response_uids_timestamps",
         "desklink.contacts.response_vcards",
+        "desklink.filelane.v1",
         "desklink.findmyphone.request",
         "desklink.folders",
         "desklink.lock.request",
@@ -98,7 +101,7 @@ class HandoverCapabilitiesTest {
         val (incoming, outgoing) = handover()
         val profile = WebRtcFeatureProfile.all
         assertEquals("advertised by no plugin and no handover rule", emptySet<String>(), profile - incoming - outgoing)
-        assertTrue(profile.size >= 32)
+        assertTrue(profile.size >= 33)
         assertTrue("plugins loaded: " + org.desklink.mobile.plugins.PluginFactory.availablePlugins.size, org.desklink.mobile.plugins.PluginFactory.availablePlugins.size > 20)
     }
 }
