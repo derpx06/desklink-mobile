@@ -26,6 +26,18 @@ object MediaControl {
         else -> playerList.firstOrNull()
     }
 
+    /** A seek just made holds the bar this long: the desk's report of the old position is not shown. */
+    const val SEEK_HOLD_MS = 1_500L
+
+    /** While dragging, at most five seeks a second go out. */
+    const val DRAG_EVERY_MS = 200L
+
+    /** Whether a position report arriving at [now] is the old one of a seek made at [heldAt] (0 = none). */
+    fun isHeld(heldAt: Long, now: Long): Boolean = heldAt > 0 && now - heldAt in 0 until SEEK_HOLD_MS
+
+    /** A drag's value goes out when [DRAG_EVERY_MS] has passed since the last one sent. */
+    fun dragDue(lastSentAt: Long, now: Long): Boolean = now - lastSentAt >= DRAG_EVERY_MS
+
     /** Where the track is now: the last reported position, advanced while playing, within the track. */
     fun position(lastPositionMs: Long, lastPositionAt: Long, playing: Boolean, lengthMs: Long, now: Long): Long {
         val advanced = if (playing) lastPositionMs + (now - lastPositionAt).coerceAtLeast(0) else lastPositionMs

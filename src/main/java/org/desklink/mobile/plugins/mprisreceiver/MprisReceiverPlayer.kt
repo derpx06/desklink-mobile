@@ -113,13 +113,17 @@ internal class MprisReceiverPlayer(
             controller.setVolumeTo(unroundedVolume.toInt(), 0)
         }
 
+    /** Where the track is now, not where it was when the app last updated its state. */
     var position: Long
         get() {
             val state = controller.playbackState ?: return 0
-            return state.position
+            return positionNow(
+                state.position, state.lastPositionUpdateTime, state.playbackSpeed,
+                state.state == PlaybackState.STATE_PLAYING, android.os.SystemClock.elapsedRealtime(), length,
+            )
         }
         set(position) {
-            controller.transportControls.seekTo(position)
+            controller.transportControls.seekTo(clampSeek(position, length))
         }
 
     val length: Long
@@ -130,4 +134,19 @@ internal class MprisReceiverPlayer(
 
     val metadata: MediaMetadata?
         get() = controller.metadata
+
+    companion object {
+        /** A reported position moved on to [now] while playing (at its speed), within the track. */
+        @JvmStatic
+        fun positionNow(position: Long, updatedAt: Long, speed: Float, playing: Boolean, now: Long, length: Long): Long {
+            if (position < 0) return 0 // PLAYBACK_POSITION_UNKNOWN
+            val moved = if (playing && updatedAt > 0) ((now - updatedAt).coerceAtLeast(0) * speed).toLong() else 0L
+            return clampSeek(position + moved, length)
+        }
+
+        /** A seek target kept inside the track (unbounded above when the length is unknown). */
+        @JvmStatic
+        fun clampSeek(target: Long, length: Long): Long =
+            if (length > 0) target.coerceIn(0, length) else target.coerceAtLeast(0)
+    }
 }

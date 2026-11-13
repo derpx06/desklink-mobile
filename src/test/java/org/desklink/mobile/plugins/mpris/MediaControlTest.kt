@@ -126,4 +126,20 @@ class MediaControlTest {
         assertEquals("Hurry Up", MediaControl.notificationText("", "Hurry Up", "Spotify"))
         assertEquals("Spotify", MediaControl.notificationText("", "", "Spotify"))
     }
+
+    /** The desk's report of the old position, sent before the player applied a seek, must not pull the bar back. */
+    @Test
+    fun aSeekHoldsTheBarAgainstTheOldPositionForAMoment() {
+        assertTrue(MediaControl.isHeld(heldAt = 10_000, now = 10_900))
+        assertFalse(MediaControl.isHeld(heldAt = 10_000, now = 11_600))
+        assertFalse(MediaControl.isHeld(heldAt = 0, now = 100)) // nothing was sought
+    }
+
+    /** A drag sends at most five seeks a second. */
+    @Test
+    fun aDragSeeksAtMostFiveTimesASecond() {
+        assertTrue(MediaControl.dragDue(lastSentAt = 0, now = 1_000))
+        assertFalse(MediaControl.dragDue(lastSentAt = 1_000, now = 1_150))
+        assertTrue(MediaControl.dragDue(lastSentAt = 1_000, now = 1_200))
+    }
 }
