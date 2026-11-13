@@ -134,6 +134,8 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             else -> LineState.IDLE
         }
         val missed = tracker.onLine(line)
+        // A dozing phone must not fall asleep between this callback and the send.
+        holdAwake(CallTracker.wakeLeaseMs(line, missed != null))
         if (line != LineState.RINGING) {
             restoreRinger()
             flags.silenced = false
@@ -145,6 +147,18 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
         settings.edit { if (live != null) putString(KEY_LIVE_CALL, CallTracker.encode(live)) else remove(KEY_LIVE_CALL) }
         sendSnapshot()
         missed?.let { device.sendPacket(CallTracker.missedPacket(it, System.currentTimeMillis(), showCaller(context, device.deviceId))) }
+    }
+
+    private var callWakeLock: android.os.PowerManager.WakeLock? = null
+
+    private fun holdAwake(ms: Long) {
+        runCatching {
+            val lock = callWakeLock ?: context.getSystemService(android.os.PowerManager::class.java)
+                ?.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "DeskLink:call-event")
+                ?.apply { setReferenceCounted(false) }
+                ?.also { callWakeLock = it }
+            lock?.acquire(ms)
+        }
     }
 
     private fun sendSnapshot() {

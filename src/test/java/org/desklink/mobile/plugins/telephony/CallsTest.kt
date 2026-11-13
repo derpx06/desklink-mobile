@@ -283,4 +283,12 @@ class CallsTest {
         val t = CallTracker({ 0L }, null) { "id" }
         assertEquals(CallRequests.ERROR_EMERGENCY, CallRequests.handle("dial", "112", t, FakeControls(), CallFlags()))
     }
+
+    @Test
+    fun aRingOrMissedCallHoldsTheCpuAwakeLongerThanOtherLineChanges() {
+        assertEquals(15_000L, CallTracker.wakeLeaseMs(LineState.RINGING, false))
+        assertEquals(15_000L, CallTracker.wakeLeaseMs(LineState.IDLE, true))
+        assertEquals(5_000L, CallTracker.wakeLeaseMs(LineState.OFFHOOK, false))
+        assertEquals(5_000L, CallTracker.wakeLeaseMs(LineState.IDLE, false))
+    }
 }

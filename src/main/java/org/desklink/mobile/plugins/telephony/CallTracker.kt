@@ -106,6 +106,17 @@ class CallTracker(
     }
 
     companion object {
+        /**
+         * How long the phone stays awake to get a line change to the desk: a ring is the one that
+         * matters (the desk shows it while the phone is dozing), a missed call as long, everything
+         * else a moment. The event is already on the interactive lane; this only stops the CPU
+         * sleeping between the telephony callback and the data channel's send.
+         */
+        fun wakeLeaseMs(line: LineState, missed: Boolean): Long = when {
+            line == LineState.RINGING || missed -> 15_000L
+            else -> 5_000L
+        }
+
         const val STATE_RINGING = "ringing"
         const val STATE_DIALING = "dialing"
         const val STATE_TALKING = "talking"
