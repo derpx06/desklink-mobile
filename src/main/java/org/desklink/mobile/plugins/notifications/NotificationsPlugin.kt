@@ -65,6 +65,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private val keyguardManager: KeyguardManager by lazy { context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager }
     private lateinit var mainHandler: Handler
     private val postedNotificationsLock = Any()
+    private val dedupe = NotificationDedupe()
 
     override val displayName: String
         get() = context.getString(R.string.pref_plugin_notifications)
@@ -125,6 +126,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         synchronized(notificationDeliveryLock) {
             currentNotifications.clear()
         }
+        dedupe.clear()
         pendingIntents.clear()
         pendingActions.clear()
 
@@ -201,6 +203,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
         pendingActions.remove(id)
         pendingIntents.removeKey(id)
+        dedupe.forget(id)
 
         if (appDatabase.isReady() && !appDatabase.isEnabled(statusBarNotification.packageName)) {
             synchronized(notificationDeliveryLock) {
@@ -265,7 +268,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     }
 
     /** Never mirrored, whatever the settings say: decided from the notification alone. */
-    private fun neverMirrored(statusBarNotification: StatusBarNotification): Boolean {
+    @androidx.annotation.VisibleForTesting
+    internal fun neverMirrored(statusBarNotification: StatusBarNotification): Boolean {
         val flags = statusBarNotification.notification.flags
         val packageName = statusBarNotification.packageName
         return (flags and Notification.FLAG_FOREGROUND_SERVICE) != 0
@@ -419,6 +423,13 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
         }
         fitToWire(np)
+        // The same content again (an app re-posting on a timer) or the same words under a second key is not sent twice.
+        val signature = contentSignature(np)
+        val words = "$packageName|${np.getStringOrNull("title")}|${np.getStringOrNull("text") ?: np.getStringOrNull("ticker")}"
+        if (!dedupe.shouldSend(key, packageName, signature, isPreexisting, words)) {
+            Log.d(TAG, "not sent again: $key (unchanged or a twin)")
+            return
+        }
         // `sendPacket` only queues work. Its return cannot prove that the
         // authenticated WebRTC event channel accepted the notification. Mark
         // it synchronized only from the completion callback so a failed
@@ -431,6 +442,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
 
             override fun onFailure(e: Throwable) {
+                dedupe.forget(key)
                 synchronized(notificationDeliveryLock) {
                     currentNotifications.remove(key)
                 }
@@ -736,6 +748,11 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
             if (!fits()) np["conversation"] = null as org.json.JSONArray?
         }
+
+        /** What the desk shows for a notification: its words, buttons and reply; never its post time or silent flag. */
+        fun contentSignature(np: NetworkPacket): String = listOf(
+            "title", "text", "ticker", "groupName", "actions", "conversation", "requestReplyId", "isClearable",
+        ).joinToString("\u0000") { np.getString(it) }
 
         /** The snapshot's rev: the ids with their post times (an update re-posts, so it changes the rev). */
         fun snapshotRev(entries: List<Pair<String, Long>>): String =
