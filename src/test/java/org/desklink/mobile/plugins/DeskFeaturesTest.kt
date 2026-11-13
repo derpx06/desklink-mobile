@@ -114,6 +114,7 @@ class DeskFeaturesTest {
         assertEquals(R.string.unlock_refused_not_locked, DeskUnlockPlugin.refusalText("not-locked"))
         assertEquals(R.string.unlock_refused_not_ready, DeskUnlockPlugin.refusalText("not-ready"))
         assertEquals(R.string.unlock_refused_wrong_device, DeskUnlockPlugin.refusalText("wrong-device"))
+        assertEquals(R.string.unlock_refused_unsupported, DeskUnlockPlugin.refusalText("unsupported"))
         for (code in listOf("expired", "no-nonce", "replayed")) assertEquals(R.string.unlock_refused_expired, DeskUnlockPlugin.refusalText(code))
         assertEquals(R.string.unlock_refused_other, DeskUnlockPlugin.refusalText("from-the-future"))
     }

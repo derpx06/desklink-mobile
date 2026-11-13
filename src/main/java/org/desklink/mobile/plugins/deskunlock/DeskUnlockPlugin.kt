@@ -153,6 +153,7 @@ class DeskUnlockPlugin : Plugin() {
             "not-ready" -> R.string.unlock_refused_not_ready
             "expired", "no-nonce", "replayed" -> R.string.unlock_refused_expired
             "wrong-device" -> R.string.unlock_refused_wrong_device
+            "unsupported" -> R.string.unlock_refused_unsupported
             else -> R.string.unlock_refused_other
         }
 
