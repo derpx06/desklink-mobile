@@ -555,6 +555,12 @@ class WebRtcFileTransferManager(
             return
         }
         if (stored == null && ref != null && receives.size < FileV2.ACTIVE_PER_DIRECTION) stored = adoptBucketCheckpoint(wire, message)
+        // A new file bigger than the free space (less the reserve) cannot fit: refused now, not filled to the last byte and paused.
+        if (stored == null && freeSpace() < totalSize + FileReceiver.MIN_FREE_BYTES) {
+            link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.STORAGE_FULL, message = "Not enough space on the phone."))
+            if (ref != null) BucketEngine.receiveEnded(wire.peerDeviceId, ref.relpath)
+            return
+        }
         if (receives.size >= FileV2.ACTIVE_PER_DIRECTION) {
             link.sendControl(reply(wire, id, message.transferToken, WebRtcFileAction.ERROR).copy(code = FileCodes.BUSY, message = "The phone is receiving other files."))
             // A Bucket file that was refused is asked for again later, not waited on for ever.

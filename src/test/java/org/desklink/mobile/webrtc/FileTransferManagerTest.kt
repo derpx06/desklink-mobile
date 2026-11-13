@@ -99,8 +99,10 @@ class FileTransferManagerTest {
             override fun bufferedAmount() = bufferedAmount
         }
         var now = 0L
+        /** Free space where the partial file is written (the transfer root). */
+        var spare = Long.MAX_VALUE
         fun tick() { runner.tickStep?.invoke() }
-        val manager = WebRtcFileTransferManager(context, device, link, runner, { now }, { Long.MAX_VALUE }, destination, java.util.concurrent.Executor { it.run() }, lanes)
+        val manager = WebRtcFileTransferManager(context, device, link, runner, { now }, { spare }, destination, java.util.concurrent.Executor { it.run() }, lanes)
         val root: File get() = File(context.filesDir, "webrtc-transfers")
         fun control(action: WebRtcFileAction, id: String, token: String = "t".repeat(32), block: WebRtcFileControl.() -> WebRtcFileControl = { this }) = WebRtcFileControl(
             action = action, transferId = id, deviceId = peerWire.senderDeviceId, sessionId = peerWire.sessionId,
@@ -1229,6 +1231,24 @@ class FileTransferManagerTest {
         pump(maxMessages = 0)
         assertTrue("nothing was created", desk.root.listFiles().orEmpty().isEmpty())
         assertTrue(desk.delivered.isEmpty())
+    }
+
+    @Test
+    fun aFileBiggerThanTheFreeSpaceIsRefusedAtTheOfferWithNothingStored() {
+        val id = UUID.randomUUID().toString()
+        desk.spare = FileV2.BLOCK_BYTES * 3L + FileReceiver.MIN_FREE_BYTES
+        desk.manager.handleControl(deskWire, offer(id = id, size = FileV2.BLOCK_BYTES * 4L))
+        pump(maxMessages = 0)
+        val answer = desk.sent.single()
+        assertEquals(WebRtcFileAction.ERROR, answer.action)
+        assertEquals(FileCodes.STORAGE_FULL, answer.code)
+        assertEquals("Not enough space on the phone.", answer.message)
+        assertNull(FileTransferStore(desk.root).load(id))
+        // With room for it and the reserve, the same size is taken.
+        desk.spare = FileV2.BLOCK_BYTES * 4L + FileReceiver.MIN_FREE_BYTES
+        desk.manager.handleControl(deskWire, offer(size = FileV2.BLOCK_BYTES * 4L))
+        pump(maxMessages = 0)
+        assertEquals(1, desk.sent.count { it.action == WebRtcFileAction.ACCEPT })
     }
 
     @Test
