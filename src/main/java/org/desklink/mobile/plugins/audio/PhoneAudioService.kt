@@ -40,8 +40,13 @@ class PhoneAudioService : Service() {
             return START_NOT_STICKY
         }
         val id = intent?.getStringExtra(EXTRA_DEVICE) ?: return stop()
-        // Already carrying a session for another computer: that one is left exactly as it is (this start was a refusal).
-        if (shouldKeepCurrent(deviceId, sessionId, id)) return START_NOT_STICKY
+        // Already carrying a session for another computer: that one is left exactly as it is (this start was a refusal). The
+        // start still came through startForegroundService, so it is answered with the current notification.
+        if (shouldKeepCurrent(deviceId, sessionId, id)) {
+            val sound = projection != null
+            runCatching { startForegroundCompat(notification(DeskNames.of(deviceId), sound), sound) }
+            return START_NOT_STICKY
+        }
         deviceId = id
         val sound = intent.hasExtra(EXTRA_RESULT_DATA)
         // Microphone service without RECORD_AUDIO (revoked meanwhile), or a start Android no longer allows.
@@ -145,8 +150,13 @@ class PhoneAudioService : Service() {
         private const val EXTRA_RESULT_CODE = "resultCode"
         private const val EXTRA_RESULT_DATA = "resultData"
 
-        /** The microphone, from a visible activity. */
-        fun startMic(context: Context, deviceId: String): Boolean = startService(context, Intent(context, PhoneAudioService::class.java).putExtra(EXTRA_DEVICE, deviceId))
+        /**
+         * The microphone, from a visible activity. Without RECORD_AUDIO the service could not go foreground as a microphone, and a
+         * foreground start that never calls startForeground crashes the app: so it is not started at all.
+         */
+        fun startMic(context: Context, deviceId: String): Boolean =
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                startService(context, Intent(context, PhoneAudioService::class.java).putExtra(EXTRA_DEVICE, deviceId))
 
         /** A refused start (Android 12+ background limits, a revoked permission) is a "no", never a crash. */
         private fun startService(context: Context, intent: Intent): Boolean =

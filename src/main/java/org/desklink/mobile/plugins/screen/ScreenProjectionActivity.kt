@@ -32,7 +32,8 @@ class ScreenProjectionActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID)
-        if (requestCode == REQUEST_CAPTURE && resultCode == RESULT_OK && data != null) {
+        // Only a complete request starts the foreground service: one it would have to stop before startForeground crashes the app.
+        if (requestCode == REQUEST_CAPTURE && resultCode == RESULT_OK && data != null && !deviceId.isNullOrBlank()) {
             val serviceIntent = Intent(this, PhoneScreenCaptureService::class.java)
                 .putExtra(PhoneScreenCaptureService.EXTRA_DEVICE_ID, deviceId)
                 .putExtra(PhoneScreenCaptureService.EXTRA_RESULT_CODE, resultCode)
