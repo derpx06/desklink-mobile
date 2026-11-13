@@ -273,7 +273,8 @@ fun ActionTile(
         CappedFontScale(1.3f) {
             Column {
                 Text(label, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, color = fg)
-                if (hint != null) Text(hint, fontSize = 12.sp, lineHeight = 16.sp, color = if (filled) t.onAccent else t.textDim)
+                // Two lines at most: a long reason must not stretch the tile (a tap says it whole).
+                if (hint != null) Text(hint, fontSize = 12.sp, lineHeight = 16.sp, color = if (filled) t.onAccent else t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
