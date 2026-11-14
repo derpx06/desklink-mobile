@@ -99,7 +99,6 @@ public class LanLinkProvider extends BaseLinkProvider {
     private final MdnsDiscovery mdnsDiscovery;
 
     private volatile long lastBroadcast = 0;
-    private final static long delayBetweenBroadcasts = 200;
 
     private volatile boolean listening = false;
 
@@ -342,7 +341,7 @@ public class LanLinkProvider extends BaseLinkProvider {
      * not answer is backed off ({@link DialBackoff}), so a desk that moved is not hammered.
      */
     @WorkerThread
-    private void dialKnownAddresses() {
+    private void dialKnownAddresses(@Nullable Network network) {
         // Same rule as broadcasting: nothing is announced to, or dialed on, a network that is not trusted.
         if (!TrustedNetworkHelper.isTrustedNetwork(context)) return;
         long now = android.os.SystemClock.elapsedRealtime();
@@ -353,8 +352,20 @@ public class LanLinkProvider extends BaseLinkProvider {
                 Socket socket = null;
                 try {
                     if (visibleDevices.containsKey(dial.getDeviceId())) return;
-                    socket = SocketFactory.getDefault().createSocket();
-                    socket.connect(new java.net.InetSocketAddress(dial.getAddress(), dial.getPort()), 3000);
+                    // On the network that came back (F20): until it is the default one, an unbound
+                    // socket has no route to the desk. A failed connect closes its socket, so each
+                    // try gets a new one.
+                    SocketFactory factory = network != null ? network.getSocketFactory() : SocketFactory.getDefault();
+                    socket = NetworkReturn.connect(android.os.SystemClock::sleep, () -> {
+                        Socket attempt = factory.createSocket();
+                        try {
+                            attempt.connect(new java.net.InetSocketAddress(dial.getAddress(), dial.getPort()), 3000);
+                            return attempt;
+                        } catch (IOException e) {
+                            closeQuietly(attempt);
+                            throw e;
+                        }
+                    });
                     configureSocket(socket);
                     NetworkPacket myIdentity = DeviceHelper.getDeviceInfo(context).toIdentityPacket();
                     myIdentity.set("targetDeviceId", dial.getDeviceId());
@@ -838,7 +849,7 @@ public class LanLinkProvider extends BaseLinkProvider {
 
             sendUdpIdentityPacket(ipList, network);
         });
-        ThreadHelper.execute(this::dialKnownAddresses);
+        ThreadHelper.execute(() -> dialKnownAddresses(network));
     }
 
     @WorkerThread
@@ -934,8 +945,26 @@ public class LanLinkProvider extends BaseLinkProvider {
         visibleDevices.clear();
         dialBackoff.reset();
 
-        announceBurst(network, true);
+        announceBurst(network, true, false);
     }
+
+    /**
+     * A LAN network came up or back (F20): what backed off during the outage gets a fresh try, and
+     * the burst (which dials the paired desks' last addresses, bound to this network) is not
+     * swallowed by the throttle that a recovery request moments earlier would have set.
+     */
+    @Override
+    public void onNetworkAvailable(@Nullable Network network) {
+        if (udpServer == null) {
+            setupUdpListener();
+        }
+        dialBackoff.reset();
+        networkBurstUntil = System.currentTimeMillis() + BURST_OFFSETS_MILLIS[BURST_OFFSETS_MILLIS.length - 1];
+        announceBurst(network, false, true);
+    }
+
+    /** Until then a plain re-announce would only replace the network-available burst's bound beacons and dials with unbound ones. */
+    private volatile long networkBurstUntil = 0;
 
     @Override
     public void refreshDiscovery() {
@@ -944,7 +973,8 @@ public class LanLinkProvider extends BaseLinkProvider {
         }
         // A screen-on or connectivity refresh re-announces only: restarting NSD resets its back-off
         // and its radio work, and is for a network change (started if it is not running).
-        announceBurst(null, false);
+        if (System.currentTimeMillis() < networkBurstUntil) return;
+        announceBurst(null, false, false);
     }
 
     // A single beacon is easily lost — UDP, a desktop listener not up yet, an
@@ -955,9 +985,9 @@ public class LanLinkProvider extends BaseLinkProvider {
     private final java.util.concurrent.atomic.AtomicLong burstGeneration =
             new java.util.concurrent.atomic.AtomicLong();
 
-    private void announceBurst(@Nullable Network network, boolean restartDiscovery) {
-        // Only the outbound churn is throttled.
-        if (System.currentTimeMillis() < lastBroadcast + delayBetweenBroadcasts) {
+    private void announceBurst(@Nullable Network network, boolean restartDiscovery, boolean force) {
+        // Only the outbound churn is throttled, and never a network coming back.
+        if (!NetworkReturn.burstAllowed(System.currentTimeMillis(), lastBroadcast, force)) {
             Log.i("LanLinkProvider", "announceBurst: relax cowboy");
             return;
         }

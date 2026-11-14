@@ -94,6 +94,9 @@ public abstract class BaseLinkProvider {
      * recovery request, a new network appearing next to the current one).
      */
     public void refreshDiscovery() { }
+
+    /** A network came up (or back): by default, a re-announce. */
+    public void onNetworkAvailable(@Nullable Network network) { refreshDiscovery(); }
     public abstract String getName();
 
     public abstract int getPriority();
