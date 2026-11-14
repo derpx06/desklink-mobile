@@ -275,12 +275,12 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
     }
 
     var playerOpen by rememberSaveable { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
     // A row of "Everything DeskLink does": open it, run its step (then open its page), look again, or say why not.
     val onFeatureRow: (Feature, FeatureStatus) -> Unit = { f, status ->
         fun open() {
             if (f.open == Everything.OPEN_PLAYER) {
-                if (state.media != null) playerOpen = true else actions.onMessage(context.getString(R.string.everything_media_nothing, state.name))
+                if (state.media != null) playerOpen = true else actions.onMessage(resources.getString(R.string.everything_media_nothing, state.name))
             } else openAction(f.open, actions) { linkDialog = true }
         }
         when (Everything.action(status)) {
@@ -292,7 +292,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
             }
             RowAction.RETRY -> actions.onRetry()
             RowAction.EXPLAIN -> (status as FeatureStatus.Off).let { off ->
-                off.why?.let { actions.onMessage(context.getString(it, state.name)) } ?: actions.onBlocked(f.action ?: f.id, context.getString(f.name), off.blocker)
+                off.why?.let { actions.onMessage(resources.getString(it, state.name)) } ?: actions.onBlocked(f.action ?: f.id, resources.getString(f.name), off.blocker)
             }
         }
     }
