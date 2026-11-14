@@ -26,6 +26,8 @@ object BlockedActions {
         "settings_glide_accessibility" to "the Allow row under it opens the accessibility setup",
         "widget_cd_open_app" to "is the action: opens DeskLink",
         "bucket_turn_on" to "is the action",
+        "everything_step_turn_on" to "the Everything row's Turn on button (turns the switch on, then asks for its permission)",
+        "everything_glide_off" to "the Everything Glide row's Turn on button",
         "bucket_home_off" to "the card opens the Bucket, whose Turn on button turns it on",
         "perm_title" to "each row's Allow button",
         "setup_step_notification_access" to "the step's button opens Android's notification access page",
