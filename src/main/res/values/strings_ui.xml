@@ -110,8 +110,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="link_from_desk">Open link from %1$s</string>
     <string name="link_open">Open</string>
     <string name="link_copy">Copy</string>
-    <string name="audio_mic_denied">Microphone access is off for DeskLink. Turn it on in Android settings to share sound.</string>
-    <string name="audio_unavailable">Android did not let DeskLink start sharing sound. Open DeskLink and try again.</string>
+    <string name="audio_mic_denied">Microphone access is off for DeskLink, so sound can\'t be shared.</string>
+    <string name="audio_unavailable">Android did not let DeskLink start sharing sound. Try again in a moment.</string>
     <string name="audio_unsupported">This phone cannot share its sound (it needs Android 10).</string>
     <string name="audio_busy">This phone\'s sound is already going to another computer.</string>
     <string name="audio_tap_answer">Tap to answer</string>
@@ -174,7 +174,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_desk_may_play">Let %1$s play sound here</string>
     <string name="settings_desk_may_play_summary">%1$s can send its sound to this phone without asking first. End it from Home</string>
     <string name="clipboard_nothing_sent">The clipboard has no text to send</string>
-    <string name="clipboard_desk_off">%1$s has clipboard sharing turned off, so it would ignore this. Turn it on there, or in Settings.</string>
+    <string name="clipboard_desk_off">%1$s has clipboard sharing turned off, so it would ignore this.</string>
     <string name="clipboard_too_large">That copy is too large to send to your computer</string>
     <string name="settings_clipboard_auto">Automatic sync (advanced)</string>
     <string name="settings_clipboard_auto_grant">Sends each copy without a tap. Needs a one-time setup from a computer (it uses adb). Tap to copy the command: %1$s</string>
@@ -337,7 +337,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="unlock_decline">Not me · keep locked</string>
     <string name="unlock_expired">That request expired. Ask again from the computer.</string>
     <string name="unlock_no_screen_lock">Set up a screen lock on this phone to unlock the computer with it.</string>
-    <string name="unlock_refused_pref_off">%1$s doesn\'t allow unlocking with this phone. Turn it on in DeskLink there.</string>
+    <string name="unlock_refused_pref_off">%1$s doesn\'t allow unlocking with this phone yet.</string>
     <string name="unlock_refused_not_lan">%1$s unlocks only when this phone is on the same network.</string>
     <string name="unlock_refused_not_locked">%1$s isn\'t locked.</string>
     <string name="unlock_refused_not_ready">%1$s isn\'t ready yet. Try again in a moment.</string>
@@ -370,7 +370,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_command_alerts_summary">Tells this phone when a long command in a shared terminal finishes</string>
     <string name="settings_unlock_nearby">Unlock with this phone</string>
     <string name="settings_unlock_nearby_on">On. Turn it off on %1$s.</string>
-    <string name="settings_unlock_nearby_off">Off. Turn it on in DeskLink on %1$s.</string>
+    <string name="settings_unlock_nearby_off">Off on %1$s</string>
     <string name="settings_phone_media">Show this phone\'s media on %1$s</string>
     <string name="settings_phone_media_summary">Needs notification access</string>
     <string name="settings_session_gate">Fingerprint before terminals</string>
@@ -597,11 +597,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_glide">Let %1$s control this phone</string>
     <string name="settings_glide_title">Glide</string>
     <string name="settings_glide_explain">Move %1$s\'s mouse past its screen edge and it carries on here: its pointer and keyboard control this phone, as if the two screens were side by side.</string>
-    <string name="settings_glide_on">On here. Turn on Glide on %1$s too, then move its pointer past the screen edge</string>
-    <string name="glide_ask_title">%1$s wants to use Glide. Turn on?</string>
-    <string name="glide_ask_text">Allow turns on “Let %1$s control this phone”, so its mouse and keyboard can continue here. You decide.</string>
-    <string name="glide_ask_allow">Allow</string>
-    <string name="glide_ask_not_now">Not now</string>
+    <string name="settings_glide_on">On here. Move %1$s\'s pointer past its screen edge onto this phone</string>
     <string name="settings_glide_off">Off. Move %1$s\'s pointer past its screen edge onto this phone</string>
     <string name="settings_glide_accessibility">Turn on DeskLink\'s accessibility service so %1$s can point and type here</string>
     <!-- F8b: Bucket progress -->
@@ -772,7 +768,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="files_show_all">Show all %1$d</string>
     <string name="capture_pages_full" tools:ignore="PluralsCandidate">A scan holds up to %1$d pages. Send this one, then scan the rest.</string>
     <string name="capture_no_camera">This phone has no camera DeskLink can use right now.</string>
-    <string name="capture_camera_denied">Camera access is off for DeskLink. Turn it on in Android settings to use this.</string>
+    <string name="capture_camera_denied">Camera access is off for DeskLink, so this can\'t be used.</string>
     <string name="files_received_notification">Received %1$s from %2$s</string>
     <string name="files_save_failed_notification">%1$s arrived but could not be saved. It is kept: open Files to try again.</string>
     <string name="files_saved_in">Received files go to %1$s</string>
@@ -881,7 +877,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="notes_saved_shared_cut">Saved, but only the first part fits: a note is limited to 20 KB</string>
     <string name="snippets_full">500 snippets are pinned: unpin one first</string>
     <string name="first_share_title">What should DeskLink share with %1$s?</string>
-    <string name="first_share_body">Nothing is shared until you say so. You can change both in Settings at any time.</string>
+    <string name="first_share_body">Nothing is shared until you say so. You can change both at any time.</string>
     <string name="first_share_clipboard">Clipboard: what you copy on either device can be pasted on the other</string>
     <string name="first_share_notifications">Notifications: this phone\'s notifications (not secret ones) appear on %1$s, and you can reply from there</string>
     <string name="first_share_later">Files and links are always sent only when you choose to send them.</string>
@@ -931,7 +927,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item quantity="one">%1$d file could not be read any more. Share it again.</item>
         <item quantity="other">%1$d files could not be read any more. Share them again.</item>
     </plurals>
-    <string name="settings_turn_on_at">Turn on at %1$s</string>
+    <string name="settings_turn_on_at">Off on %1$s</string>
     <string name="bucket_skip_fetch">Couldn\'t fetch</string>
     <string name="settings_activity_on">Show ongoing items on %1$s</string>
     <string name="settings_activity_on_summary">Timers, progress, navigation and calls running here. Follows the notification filter and privacy choices</string>
@@ -1069,7 +1065,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="welcome_install_sheet_title">Install DeskLink on your computer</string>
     <string name="scan_type_address">Type the computer\'s address instead</string>
     <string name="perm_title">Turn on what you\'ll use</string>
-    <string name="perm_body">Each one asks only when you tap it. You can change them later in Settings, under Advanced.</string>
+    <string name="perm_body">Each one asks only when you tap it. You can change any of them later.</string>
     <string name="perm_on">On</string>
     <string name="perm_continue">Continue</string>
     <string name="perm_skip">Skip for now</string>
@@ -1080,7 +1076,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="perm_microphone_summary">Use this phone as a microphone for %1$s</string>
     <string name="setup_kicker">Before you pair</string>
     <string name="setup_title">Set up this phone</string>
-    <string name="setup_body">Allow what DeskLink\'s features use, all at once or one by one. Nothing here is required: you can pair now and change any of it later in Settings, under Advanced.</string>
+    <string name="setup_body">Allow what DeskLink\'s features use, all at once or one by one. Nothing here is required: you can pair now and change any of it later.</string>
     <string name="setup_group_connect">To pair and stay connected</string>
     <string name="setup_group_features">For the features you use</string>
     <string name="setup_group_later">Asked when you use it</string>
@@ -1090,7 +1086,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="setup_later_location">Location</string>
     <string name="setup_later_location_summary">Only to read the Wi-Fi name, if you limit DeskLink to trusted networks</string>
     <string name="setup_later_dnd">Do Not Disturb access</string>
-    <string name="setup_later_dnd_summary">When you turn on Share Do Not Disturb</string>
+    <string name="setup_later_dnd_summary">Asked when Share Do Not Disturb is on</string>
     <string name="setup_allow_all">Allow all</string>
     <string name="setup_not_now">Not now</string>
     <string name="setup_step_notification_access">On the next screen, turn on DeskLink. Your computer then shows this phone\'s notifications, and you can reply from it.</string>
@@ -1102,12 +1098,12 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_blocked_update">%1$s needs the same DeskLink version on this phone and %2$s. Update the older one.</string>
     <string name="home_blocked_connecting">%1$s works once %2$s is connected. Still connecting…</string>
     <string name="home_blocked_unreachable">%1$s needs %2$s, and it cannot be reached. Check that both are on the same network.</string>
-    <string name="home_blocked_offline">%1$s needs %2$s, and it is offline. Open DeskLink on it.</string>
+    <string name="home_blocked_offline">%1$s needs %2$s, and it is offline. Try again once it is on.</string>
     <string name="home_blocked_phone_off">%1$s is turned off on this phone.</string>
     <string name="home_blocked_permission">%1$s needs a permission on this phone.</string>
-    <string name="home_blocked_desk_off">%1$s is off on %2$s. Turn it on in DeskLink\'s settings there.</string>
+    <string name="home_blocked_desk_off">%1$s isn\'t available on %2$s.</string>
     <string name="home_blocked_same_wifi">%1$s works only on the same Wi-Fi as %2$s.</string>
-    <string name="home_blocked_unlock_off">%1$s is off. Turn on Unlock with this phone in DeskLink\'s settings for this phone on %2$s.</string>
+    <string name="home_blocked_unlock_off">%1$s is off on %2$s.</string>
     <string name="home_needs_update">Needs an update</string>
     <string name="home_needs_link">Needs %1$s connected</string>
     <string name="home_needs_turning_on">Needs turning on here</string>
@@ -1232,4 +1228,32 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="settings_version">DeskLink %1$s</string>
     <string name="home_notifications_off">Notifications are off</string>
     <string name="home_notifications_turn_on">Turn on</string>
+
+    <!-- Ask on phone / Ask on computer: the words are asks.json's (pinned by AsksTest) -->
+    <string name="ask_prompt">%1$s asks to %2$s</string>
+    <string name="ask_allow">Allow</string>
+    <string name="ask_not_now">Not now</string>
+    <string name="ask_on_phone">Ask on phone</string>
+    <string name="ask_on_computer">Ask on computer</string>
+    <string name="ask_again">Ask again</string>
+    <string name="ask_waiting">Waiting for %1$s: tap Allow there</string>
+    <string name="ask_declined">%1$s said not now</string>
+    <string name="ask_timed_out">%1$s didn\'t answer</string>
+    <string name="ask_undelivered">Couldn\'t reach %1$s</string>
+    <string name="ask_blocked">Notifications are off on %1$s: open DeskLink there to allow</string>
+    <string name="ask_feature_glide">use Glide on this phone</string>
+    <string name="ask_feature_contacts">see your contacts</string>
+    <string name="ask_feature_notifications">show your notifications</string>
+    <string name="ask_feature_calls">show and answer your calls</string>
+    <string name="ask_feature_media">show and control your music</string>
+    <string name="ask_feature_photos">get your new photos and screenshots</string>
+    <string name="ask_feature_dnd">share Do Not Disturb</string>
+    <string name="ask_feature_clipboard">share the clipboard</string>
+    <string name="ask_prompt_text">Nothing changes unless you tap Allow.</string>
+    <string name="ask_public_title">A request from your computer</string>
+    <string name="ask_public_text">Unlock to answer it</string>
+    <string name="ask_consent_permission">Android asks next: tap Allow there.</string>
+    <string name="ask_consent_special">Android\'s page for it opens next: switch DeskLink on there, then come back.</string>
+    <string name="ask_consent_done">Done</string>
+    <string name="ask_off_on">Off on %1$s</string>
 </resources>

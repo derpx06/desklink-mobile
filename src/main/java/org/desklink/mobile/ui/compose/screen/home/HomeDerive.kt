@@ -21,6 +21,8 @@ enum class Fix {
     TURN_ON_HERE,
     /** Android has not granted it: the request (or the system page) opens at once. */
     ALLOW,
+    /** Off at the computer: "Ask on computer" sends it a request its person answers there (asks.json). */
+    ASK_COMPUTER,
     /** Only the computer (or an update) can change it: the line says where. */
     NONE,
 }
@@ -91,7 +93,8 @@ object HomeDerive {
         Blocker.CONNECTING, Blocker.CANT_REACH, Blocker.OFFLINE -> Fix.RETRY
         Blocker.PHONE_OFF -> Fix.TURN_ON_HERE
         Blocker.PERMISSION -> Fix.ALLOW
-        Blocker.UPDATE, Blocker.DESK_OFF, Blocker.NOT_SAME_WIFI, Blocker.UNLOCK_OFF -> Fix.NONE
+        Blocker.UNLOCK_OFF -> Fix.ASK_COMPUTER
+        Blocker.UPDATE, Blocker.DESK_OFF, Blocker.NOT_SAME_WIFI -> Fix.NONE
     }
 
     /** The one line a tap says, formatted with the action's name and then the computer's. */
@@ -124,6 +127,7 @@ object HomeDerive {
     fun fixLabel(f: Fix): Int? = when (f) {
         Fix.RETRY -> org.desklink.mobile.R.string.terminal_retry
         Fix.TURN_ON_HERE -> org.desklink.mobile.R.string.home_turn_on
+        Fix.ASK_COMPUTER -> org.desklink.mobile.R.string.ask_on_computer
         Fix.ALLOW, Fix.NONE -> null
     }
 

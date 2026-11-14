@@ -74,7 +74,10 @@ class DeskUnlockPlugin : Plugin() {
             np.getStringOrNull("unlockRefused")?.let { code ->
                 refusal = code
                 clear()
-                val message = context.getString(refusalText(code), device.name)
+                // Off at the computer: ask it (its person answers there; at most every few minutes unasked).
+                val asked = code == "pref-off" &&
+                    device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.let { it.askable("unlockNearby") && it.askDesk("unlockNearby", manual = false) } == true
+                val message = context.getString(refusalText(code), device.name) + if (asked) " " + context.getString(R.string.ask_waiting, device.name) else ""
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
                 }

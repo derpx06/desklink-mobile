@@ -16,7 +16,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="product_name">DeskLink</string>
     <string name="connection_service_name">DeskLink connection service</string>
     <string name="channel_pairing">Pairing requests</string>
-    <string name="channel_requests">From your computer</string>
+    <string name="channel_requests">Requests from your computers</string>
     <string name="channel_calls">Calls</string>
     <string name="channel_find_phone">Find my phone</string>
     <string name="channel_files_receiving">Files being received</string>
@@ -375,7 +375,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_launcher_claude">Claude Code</string>
     <string name="terminal_launcher_codex">Codex</string>
     <string name="terminal_not_allowed_title">Terminal access is turned off</string>
-    <string name="terminal_not_allowed_message">Allow terminal access from this phone in DeskLink on your computer, then tap Try again.</string>
+    <string name="terminal_not_allowed_message">Terminal access from this phone is off on your computer.</string>
     <string name="terminal_locked_title">Locked</string>
     <string name="terminal_enter_password">Enter password</string>
     <string name="terminal_ended_by_computer">The computer ended this session</string>

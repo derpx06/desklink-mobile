@@ -76,41 +76,24 @@ object Glide {
 
     fun setAllowed(context: Context, deviceId: String, on: Boolean) {
         PreferenceManager.getDefaultSharedPreferences(context).edit { putBoolean(key(deviceId), on) }
-        if (on) askedAt.remove(deviceId)
+        // Turned on (from the prompt or the switch): any pending ask for it is answered.
+        if (on) org.desklink.mobile.plugins.desksettings.Asks.forget(context, deviceId, SETTING_KEY)
     }
 
     /** The key of `desklink.settings.request {set: {glide: true}}`: the desk asks this phone to turn Glide on (mirrored desk side). */
     const val SETTING_KEY = "glide"
 
-    /** What the phone shows when a desk asks for Glide: the person decides here, nothing is flipped for them. */
-    enum class Prompt { TURN_ON, ACCESSIBILITY, NONE }
-
-    /**
-     * The prompt for a desk's request: the switch for that desk off → ask to turn it on; on but without the accessibility service
-     * that moves the pointer → ask for that; both on → nothing to ask (the desk only had an old report). A body that is not a
-     * request to turn Glide on asks nothing.
-     */
-    fun promptFor(asksToTurnOn: Boolean, switchOn: Boolean, serviceOn: Boolean): Prompt = when {
-        !asksToTurnOn -> Prompt.NONE
-        !switchOn -> Prompt.TURN_ON
-        !serviceOn -> Prompt.ACCESSIBILITY
-        else -> Prompt.NONE
-    }
-
-    /** Whether the `set` of a `desklink.settings.request` asks to turn Glide on (`{glide: true}`; any other key asks nothing). */
-    fun asksToTurnOn(set: org.json.JSONObject?): Boolean = set?.opt(SETTING_KEY) == true
-
-    /** How long Home keeps saying "<computer> is asking" or "refused while locked" after it happened. */
+    /** How long Home keeps saying "refused while locked" after it happened. */
     const val NOTICE_MS = 600_000L
 
-    private val askedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private val refusedLockedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
-    /** The desk asked this phone to turn Glide on and the person has not answered yet (Home's Glide row offers Allow). */
-    fun markAsked(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()) { askedAt[deviceId] = now }
-
-    fun asking(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()): Boolean =
-        askedAt[deviceId]?.let { now - it < NOTICE_MS } == true
+    /**
+     * The desk asked this phone to turn Glide on and the person has not answered yet (Home's Glide row offers Allow).
+     * Read from the one list of pending asks ([org.desklink.mobile.plugins.desksettings.Asks]), never a second flag.
+     */
+    fun asking(deviceId: String, now: Long = System.currentTimeMillis()): Boolean =
+        org.desklink.mobile.plugins.desksettings.Asks.waiting(now).any { it.deskId == deviceId && it.feature.key == SETTING_KEY }
 
     /** A glide was handed back because this phone was locked; cleared by the next glide or a new answer. */
     fun markRefusedLocked(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()) { refusedLockedAt[deviceId] = now }
@@ -118,9 +101,8 @@ object Glide {
     fun refusedLocked(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()): Boolean =
         refusedLockedAt[deviceId]?.let { now - it < NOTICE_MS } == true
 
-    /** The person answered (turned it on, or tried again): the notices go. */
+    /** The person answered (turned it on, or tried again): the locked notice goes. */
     fun clearNotices(deviceId: String) {
-        askedAt.remove(deviceId)
         refusedLockedAt.remove(deviceId)
     }
 

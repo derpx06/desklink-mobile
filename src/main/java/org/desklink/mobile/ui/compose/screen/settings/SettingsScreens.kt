@@ -160,6 +160,8 @@ data class DeskSettings(
     val contactsReadable: Boolean = true,
     /** W13: "Show ongoing items on <desk>" (phone-owned, off by default). */
     val activityOn: Boolean = false,
+    /** The desk's settings plugin: "Ask on computer" for what is off there (asks.json); null without a link. */
+    val asker: org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin? = null,
 )
 
 @androidx.compose.runtime.Stable
