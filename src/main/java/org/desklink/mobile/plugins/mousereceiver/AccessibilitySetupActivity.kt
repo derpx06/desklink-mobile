@@ -28,6 +28,15 @@ import org.desklink.mobile.helpers.NotificationHelper
 class AccessibilitySetupActivity : AppCompatActivity() {
     private var dialog: AlertDialog? = null
 
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Allow on a desk's Glide ask, with the service not running: the switch for that desk goes on (the person tapped
+        // Allow), then the steps for the service below.
+        if (savedInstanceState == null) intent.getStringExtra(EXTRA_ALLOW_GLIDE)?.let {
+            org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.answered(this, it, allow = true)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         dialog?.dismiss()
@@ -77,6 +86,9 @@ class AccessibilitySetupActivity : AppCompatActivity() {
 
     companion object {
         private const val NOTIFICATION_ASK = 1739
+
+        /** The desk whose Glide ask the person allowed (the switch for it goes on). */
+        const val EXTRA_ALLOW_GLIDE = "allowGlideFor"
 
         private const val PREFS = "accessibility_disclosure"
         private const val KEY_ACCEPTED_AT = "accepted_at"

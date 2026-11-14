@@ -968,7 +968,8 @@ class Device : PacketReceiver {
 
     private fun dispatchPacket(np: NetworkPacket, fromWebRtc: Boolean) {
         countReceived(deviceId, np.type)
-        Log.d(
+        // Not for the pointer stream: two log lines per motion packet were 250 logd writes a second during a glide.
+        if (!org.desklink.mobile.helpers.InboundLimits.isInput(np.type)) Log.d(
             "DeskLink/Inbound",
             "${np.type} from $deviceId (webrtc=$fromWebRtc, links=${links.size})",
         )
@@ -1138,8 +1139,8 @@ class Device : PacketReceiver {
             np.payload?.close()
             return false
         }
-        // Type only, never the body. tools/device_e2e.sh asserts on this line.
-        Log.i("DeskLink/Feature", "Received ${np.type} from $deviceId")
+        // Type only, never the body. tools/device_e2e.sh asserts on this line (never for the pointer stream).
+        if (!org.desklink.mobile.helpers.InboundLimits.isInput(np.type)) Log.i("DeskLink/Feature", "Received ${np.type} from $deviceId")
         val targetPlugins = pluginsByIncomingInterface[np.type] // Returns an empty collection if the key doesn't exist
         if (targetPlugins.isEmpty()) {
             Log.w("Device", "Ignoring packet with type ${np.type} because no plugin can handle it")

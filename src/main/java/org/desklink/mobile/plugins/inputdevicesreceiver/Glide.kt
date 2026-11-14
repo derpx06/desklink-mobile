@@ -27,7 +27,7 @@ object Glide {
     /** A glide with no packet for this long is over: the desk went away without G4 (a pointer left idle is rarely this long). */
     const val IDLE_END_MS = 600_000L
 
-    /** G7: the desk sends ≤ 250 motion packets a second; twice that is a flood, dropped. */
+    /** G7: the desk sends ≤ 125 motion packets a second (older desks 250); twice the old rate is a flood, dropped. */
     const val MAX_PACKETS_PER_SECOND = 500
 
     /** G7: key text per packet. */

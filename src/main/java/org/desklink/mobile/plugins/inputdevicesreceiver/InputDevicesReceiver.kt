@@ -59,6 +59,7 @@ class InputDevicesReceiverPlugin : Plugin() {
     override fun onDestroy() {
         displayManager.unregisterDisplayListener(displayListener)
         if (Glide.activeDesk == device.deviceId) stop(release = false)
+        cancelAsk(context, device.deviceId)
     }
 
     /** Whether a glide could start now: the person's switch for this desk and the accessibility service that moves the pointer. */
@@ -72,7 +73,15 @@ class InputDevicesReceiverPlugin : Plugin() {
         val ready = glideAllowed()
         // Locked: not now, and why (the desk says "Unlock <phone> to use Glide"); allowed again once unlocked (USER_PRESENT).
         val locked = ready && locked()
+        // Allowed now, however it came about: the desk's ask is answered, its prompt goes.
+        if (ready && !locked) cancelAsk(context, device.deviceId)
         device.sendPacket(statePacket(ready && !locked, entered = false, reason = if (locked) REASON_LOCKED else null))
+    }
+
+    /** "Not now" on the desk's ask: the desk hears it was declined (and stops waiting). Still a state report. */
+    fun reportDeclined() {
+        if (glideAllowed() && !locked()) return reportAllowed()
+        device.sendPacket(statePacket(false, entered = false, reason = REASON_DECLINED))
     }
 
     /** No glide over the lock screen: the desk's pointer would reach its shade, tiles and notifications. */
@@ -123,35 +132,21 @@ class InputDevicesReceiverPlugin : Plugin() {
     }
 
     /**
-     * The desk asks this phone to turn Glide on (its person pressed "Ask on phone"): a prompt here, never a flipped switch. The
-     * person turns it on (and the accessibility service) on the Control page the notification opens.
+     * The desk asks this phone to turn Glide on (its person pressed "Ask on phone", or just set Glide to this phone): a prompt
+     * here, never a flipped switch. A heads-up notification with Allow and Not now, so it reaches the person whatever app is in
+     * front (an activity started from the background is blocked on Android 10+ and ColorOS); one per desk, re-alerting when the
+     * desk asks again, gone when answered, when Glide becomes allowed, or after [ASK_TIMEOUT_MS] (the desk's own wait).
      */
     private fun onAsked(np: NetworkPacket) {
         if (!asks.allow(np.type)) return
         val prompt = Glide.promptFor(Glide.asksToTurnOn(runCatching { np.getJSONObject("set") }.getOrNull()),
             Glide.allowed(context, device.deviceId), MouseReceiverService.instance != null)
         if (prompt == Glide.Prompt.NONE) return reportAllowed()
-        val open = android.app.PendingIntent.getActivity(
-            context, "glide-ask-${device.deviceId}".hashCode(),
-            android.content.Intent(context, org.desklink.mobile.ui.MainActivity::class.java)
-                .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_SETTINGS_PAGE, org.desklink.mobile.ui.compose.screen.settings.SettingsPage.CONTROL.route)
-                .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_DEVICE_ID, device.deviceId)
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
-        )
-        val (title, text) = askWords(context, prompt, device.name)
-        val notification = androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(text))
-            .setContentIntent(open)
-            .addAction(0, context.getString(R.string.glide_ask_action), open)
-            .setAutoCancel(true)
-            .build()
+        Log.i(TAG, "The desk asks for Glide ($prompt)")
         @android.annotation.SuppressLint("MissingPermission")
-        fun post() = androidx.core.app.NotificationManagerCompat.from(context).notify("glide-ask-${device.deviceId}", ASK_NOTICE_ID, notification)
-        runCatching { post() }
+        fun post() = androidx.core.app.NotificationManagerCompat.from(context)
+            .notify(askTag(device.deviceId), ASK_NOTICE_ID, askNotice(context, device.deviceId, device.name, prompt, MouseReceiverService.instance != null))
+        runCatching { post() }.onFailure { Log.w(TAG, "The Glide prompt could not be shown (${it.javaClass.simpleName})") }
     }
 
     /** At most one prompt every few seconds per desk, whatever the desk sends. */
@@ -186,7 +181,7 @@ class InputDevicesReceiverPlugin : Plugin() {
         val (x, y) = Glide.entry(edge, deltax, deltay, length, metrics.widthPixels, metrics.heightPixels)
         MouseReceiverService.setPos(x, y)
         SessionLiveNotification.refresh(context, device.deviceId)
-        // The accept (W6): the desk streams nothing until it hears this, and takes silence for a refusal after 300 ms. Sent
+        // The accept (W6): the desk streams nothing until it hears this, and takes silence for a refusal after 1 s. Sent
         // only for an enter acted on, and before any hand-back this glide can produce.
         sendAccept()
     }
@@ -231,6 +226,17 @@ class InputDevicesReceiverPlugin : Plugin() {
     )
     override val outgoingPacketTypes: Array<String> = arrayOf(DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES)
 
+    /** Allow and Not now on the desk's ask. Not exported: no other app may turn Glide on. */
+    class AskReceiver : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+            val deviceId = intent.getStringExtra(EXTRA_DEVICE) ?: return
+            when (intent.action) {
+                ACTION_ALLOW -> answered(context, deviceId, allow = true)
+                ACTION_NOT_NOW -> answered(context, deviceId, allow = false)
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "DeskLink/Glide"
         private const val ASK_NOTICE_ID = 4417
@@ -238,6 +244,95 @@ class InputDevicesReceiverPlugin : Plugin() {
 
         /** `reason` of an `allowed: false` report: the phone is locked (glide_bodies.json). */
         const val REASON_LOCKED = "locked"
+
+        /** `reason` of an `allowed: false` report: the person tapped "Not now" on the desk's ask (glide_bodies.json). */
+        const val REASON_DECLINED = "declined"
+
+        /** The prompt goes after this long: the desk stops waiting then too (`glide::ASK_WAIT`). */
+        const val ASK_TIMEOUT_MS = 60_000L
+
+        const val ACTION_ALLOW = "org.desklink.mobile.glide.ALLOW"
+        const val ACTION_NOT_NOW = "org.desklink.mobile.glide.NOT_NOW"
+        const val EXTRA_DEVICE = "deviceId"
+
+        @JvmStatic
+        fun askTag(deviceId: String) = "glide-ask-$deviceId"
+
+        @JvmStatic
+        fun cancelAsk(context: android.content.Context, deviceId: String) =
+            androidx.core.app.NotificationManagerCompat.from(context).cancel(askTag(deviceId), ASK_NOTICE_ID)
+
+        /**
+         * The prompt for a desk's ask. Allow turns the switch on for that desk; when the accessibility service that moves the
+         * pointer is not running, Allow opens its setup (an activity: a broadcast may not start one from a notification).
+         */
+        @JvmStatic
+        fun askNotice(
+            context: android.content.Context,
+            deviceId: String,
+            deskName: String,
+            prompt: Glide.Prompt,
+            serviceOn: Boolean,
+        ): android.app.Notification {
+            val code = askTag(deviceId).hashCode()
+            val flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            val open = android.app.PendingIntent.getActivity(
+                context, code,
+                android.content.Intent(context, org.desklink.mobile.ui.MainActivity::class.java)
+                    .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_SETTINGS_PAGE, org.desklink.mobile.ui.compose.screen.settings.SettingsPage.CONTROL.route)
+                    .putExtra(org.desklink.mobile.ui.MainActivity.EXTRA_DEVICE_ID, deviceId)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+                flags,
+            )
+            fun answer(action: String) = android.app.PendingIntent.getBroadcast(
+                context, code + action.hashCode(),
+                android.content.Intent(context, AskReceiver::class.java).setAction(action).putExtra(EXTRA_DEVICE, deviceId),
+                flags,
+            )
+            val allow = if (prompt == Glide.Prompt.TURN_ON && serviceOn) {
+                answer(ACTION_ALLOW)
+            } else {
+                android.app.PendingIntent.getActivity(
+                    context, code + 1,
+                    android.content.Intent(context, org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity::class.java)
+                        .putExtra(org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.EXTRA_ALLOW_GLIDE, deviceId)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    flags,
+                )
+            }
+            val (title, text) = askWords(context, prompt, deskName)
+            return androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(text))
+                // Heads-up: the channel is high importance; this is the same for Android 7.
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(open)
+                .addAction(
+                    androidx.core.app.NotificationCompat.Action.Builder(0, context.getString(R.string.glide_ask_allow), allow)
+                        // Never from the lock screen without unlocking: it lets the desk control this phone.
+                        .setAuthenticationRequired(true)
+                        .build(),
+                )
+                .addAction(0, context.getString(R.string.glide_ask_not_now), answer(ACTION_NOT_NOW))
+                .setAutoCancel(true)
+                .setTimeoutAfter(ASK_TIMEOUT_MS)
+                .build()
+        }
+
+        /** The person answered the prompt for [deviceId]; [allow]: Glide is on for that desk now. */
+        @JvmStatic
+        fun answered(context: android.content.Context, deviceId: String, allow: Boolean) {
+            cancelAsk(context, deviceId)
+            if (allow) Glide.setAllowed(context, deviceId, true)
+            val plugin = runCatching {
+                org.desklink.mobile.DeskLinkApplication.getInstance().getDevice(deviceId)?.getPlugin(InputDevicesReceiverPlugin::class.java)
+            }.getOrNull() ?: return
+            org.desklink.mobile.helpers.ThreadHelper.execute {
+                runCatching { if (allow) plugin.reportAllowed() else plugin.reportDeclined() }
+            }
+        }
 
         /** The prompt's title and text: "<computer> wants to use Glide. Turn on?" and what to do. */
         @JvmStatic

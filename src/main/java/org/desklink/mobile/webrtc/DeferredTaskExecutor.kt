@@ -51,14 +51,22 @@ internal class OffThreadObserver(
     private val events: DeferredTaskExecutor,
     private val maxQueuedEnvelopes: Int = MAX_QUEUED_ENVELOPES,
     private val maxQueuedBytes: Long = MAX_QUEUED_BYTES,
+    /**
+     * The pointer and keys (the input channels) are handled here, in their own order, never behind [events]: a notification
+     * burst or a snapshot being applied there held every Glide motion packet back, so the pointer lagged and then jumped.
+     * Null: on [events] like everything else.
+     */
+    private val input: DeferredTaskExecutor? = null,
 ) : WebRtcTransport.Observer {
     private val queuedEnvelopes = java.util.concurrent.atomic.AtomicInteger()
     private val queuedBytes = java.util.concurrent.atomic.AtomicLong()
     private val overflowed = java.util.concurrent.atomic.AtomicBoolean()
 
-    private fun post(action: () -> Unit) {
+    private fun post(action: () -> Unit) = post(events, action)
+
+    private fun post(on: DeferredTaskExecutor, action: () -> Unit) {
         try {
-            events.execute(action)
+            on.execute(action)
         } catch (_: RejectedExecutionException) {
             // The coordinator is closed; a dying peer's last callbacks are
             // dropped. Throwing here would unwind into libwebrtc's native thread.
@@ -84,7 +92,7 @@ internal class OffThreadObserver(
         }
         queuedEnvelopes.incrementAndGet()
         queuedBytes.addAndGet(size)
-        post {
+        post(input?.takeIf { isInput(envelope.channel) } ?: events) {
             try {
                 target.onEnvelope(envelope)
             } finally {
@@ -118,6 +126,9 @@ internal class OffThreadObserver(
     override fun onFileBufferedLow() = target.onFileBufferedLow()
 
     companion object {
+        /** The channels the pointer and keys travel on. */
+        fun isInput(channel: String) = channel == WebRtcChannel.INPUT_REALTIME.label || channel == WebRtcChannel.INPUT_RELIABLE.label
+
         /** Messages waiting for the handlers; a burst of a few hundred is ordinary, this many is a stuck or hostile peer. */
         const val MAX_QUEUED_ENVELOPES = 5000
         const val MAX_QUEUED_BYTES = 24L * 1024 * 1024

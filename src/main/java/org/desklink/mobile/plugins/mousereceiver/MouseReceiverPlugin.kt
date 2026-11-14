@@ -65,8 +65,11 @@ class MouseReceiverPlugin : Plugin() {
             return false // Keys are typed only into a focused field (above), never moved as a pointer
         }
 
-        val dx = np.getDouble("dx", 0.toDouble()).let { if (it < 0) floor(it) else ceil(it) }.toInt()
-        val dy = np.getDouble("dy", 0.toDouble()).let { if (it < 0) floor(it) else ceil(it) }.toInt()
+        // Motion keeps its fractions (the pointer adds them up); only a scroll is counted in whole units.
+        val moveX = np.getDouble("dx", 0.0)
+        val moveY = np.getDouble("dy", 0.0)
+        val dx = moveX.let { if (it < 0) floor(it) else ceil(it) }.toInt()
+        val dy = moveY.let { if (it < 0) floor(it) else ceil(it) }.toInt()
         val hasAbsolutePosition = np.has("x") && np.has("y")
         val x = np.getInt("x", 0)
         val y = np.getInt("y", 0)
@@ -133,9 +136,8 @@ class MouseReceiverPlugin : Plugin() {
             }
         } else {
             // Mouse Move
-            if (dx != 0 || dy != 0) {
-                // Log.i("MouseReceiverPlugin", "move Mouse dx: $dx dy: $dy")
-                return MouseReceiverService.move(dx, dy)
+            if (moveX != 0.0 || moveY != 0.0) {
+                return MouseReceiverService.move(moveX, moveY)
             } else if (hasAbsolutePosition) {
                 return MouseReceiverService.setPos(x, y)
             } else {

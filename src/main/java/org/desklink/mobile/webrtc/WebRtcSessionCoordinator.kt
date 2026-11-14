@@ -125,6 +125,10 @@ class WebRtcSessionCoordinator(
     private val peerEvents = DeferredTaskExecutor(
         "DeskLink-WebRTC-Events-${device.deviceId}",
     ) { error -> Log.w(TAG, "WebRTC peer callback failed", error) }
+    /** The input channels' envelopes (Glide's pointer, the desk's clicks and keys): never queued behind [peerEvents]. */
+    private val peerInput = DeferredTaskExecutor(
+        "DeskLink-WebRTC-Input-${device.deviceId}",
+    ) { error -> Log.w(TAG, "WebRTC input callback failed", error) }
     private val remoteActionExecutor = DeferredTaskExecutor(
         "DeskLink-WebRTC-RemoteAction-${device.deviceId}",
     ) { error ->
@@ -981,6 +985,7 @@ class WebRtcSessionCoordinator(
         transportCleanup.close()
         remoteActionExecutor.close()
         peerEvents.close()
+        peerInput.close()
         terminalLink.close()
     }
 
@@ -1004,6 +1009,7 @@ class WebRtcSessionCoordinator(
         transportCleanup.close()
         remoteActionExecutor.close()
         peerEvents.close()
+        peerInput.close()
         terminalLink.close()
     }
 
@@ -1055,7 +1061,7 @@ class WebRtcSessionCoordinator(
         createLocalChannels = createLocalChannels,
         relayOnly = RelaySettings.forceTurn(context),
         lowCostOnly = device.hasLanLink,
-        observer = OffThreadObserver(events = peerEvents, target = object : WebRtcTransport.Observer {
+        observer = OffThreadObserver(events = peerEvents, input = peerInput, target = object : WebRtcTransport.Observer {
             override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) {
                 when (type) {
                     SignalingMessageType.OFFER -> synchronized(lock) {
@@ -1142,7 +1148,14 @@ class WebRtcSessionCoordinator(
                         handleHandoverMessage(binding, attemptId, envelope)
                         return@runCatching
                     }
-                    require(currentTransport(binding, attemptId).handoverState().featuresAllowed) {
+                    val featuresAllowed = currentTransport(binding, attemptId).handoverState().featuresAllowed
+                    // Input is handled on its own thread: one that overtakes the handover's last step (on the event thread) is
+                    // dropped, never a protocol failure.
+                    if (!featuresAllowed && OffThreadObserver.isInput(envelope.channel)) {
+                        inboundDrops.dropped("input before the handover finished")
+                        return@runCatching
+                    }
+                    require(featuresAllowed) {
                         "DeskLink WebRTC feature handover is incomplete"
                     }
                     if (

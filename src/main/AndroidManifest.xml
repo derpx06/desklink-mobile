@@ -212,6 +212,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.handoff.HandoffPlugin$DismissReceiver"
             android:exported="false" />
 
+        <!-- Allow / Not now on a desk's Glide ask. Not exported: no other app may turn Glide on. -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin$AskReceiver"
+            android:exported="false" />
+
         <!-- "Copy" on "Open link from <desk>". -->
         <receiver
             android:name="org.desklink.mobile.plugins.share.LinkFromDesk$CopyReceiver"

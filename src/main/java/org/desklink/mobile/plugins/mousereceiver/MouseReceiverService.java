@@ -13,6 +13,7 @@ import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.util.DisplayMetrics;
+import android.view.Choreographer;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -42,6 +43,15 @@ public class MouseReceiverService extends AccessibilityService {
     private Handler runHandler;
     private Runnable hideRunnable;
     private GestureDescription.StrokeDescription swipeStoke;
+    /** The main thread's, taken when the overlay is made: frames are asked for from any thread (it is thread-safe). */
+    private volatile Choreographer choreographer;
+    /** The pointer should be on screen (a move since the last hide). A frame never shows a pointer that was hidden. */
+    private volatile boolean shown;
+    /** The position (the truth) and one overlay update per frame from it. */
+    private final PointerFrames pointer = new PointerFrames(this::requestFrame);
+    private final Choreographer.FrameCallback drawFrame = frameTimeNanos -> drawPointer();
+    /** The pointer hides after this long without a move. */
+    private static final int IDLE_HIDE_MS = 5000;
 
     @Override
     public void onCreate() {
@@ -76,6 +86,10 @@ public class MouseReceiverService extends AccessibilityService {
         cursorLayout.gravity = Gravity.START | Gravity.TOP;
         cursorLayout.x = displayMetrics.widthPixels / 2;
         cursorLayout.y = displayMetrics.heightPixels / 2;
+        DisplayMetrics real = new DisplayMetrics();
+        windowManager.getDefaultDisplay().getRealMetrics(real);
+        pointer.setBounds(real.widthPixels, real.heightPixels);
+        pointer.moveTo(real.widthPixels / 2.0, real.heightPixels / 2.0);
 
         // https://developer.android.com/training/system-ui/navigation.html#behind
         cursorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
@@ -85,20 +99,24 @@ public class MouseReceiverService extends AccessibilityService {
         windowManager.addView(cursorView, cursorLayout);
 
         hideRunnable = () -> {
+            shown = false;
             if (cursorView == null) return;
             cursorView.setVisibility(View.GONE);
             Log.i("MouseReceiverService", "Hiding pointer due to inactivity");
         };
         runHandler = new Handler();
+        choreographer = Choreographer.getInstance();
 
         cursorView.setVisibility(View.GONE);
     }
 
-    private void hideAfter5Seconds() {
-        hide(5000);
+    /** Hides the pointer after [delayMillis]; 0 hides it for good, so a frame already asked for does not show it again. */
+    public void hide(int delayMillis) {
+        if (delayMillis == 0) shown = false;
+        scheduleHide(delayMillis);
     }
 
-    public void hide(int delayMillis) {
+    private void scheduleHide(int delayMillis) {
         final Handler handler = runHandler;
         final Runnable hider = hideRunnable;
         if (handler == null || hider == null) return; // not connected yet, or already torn down
@@ -106,75 +124,84 @@ public class MouseReceiverService extends AccessibilityService {
         handler.postDelayed(hider, delayMillis);
     }
 
-    // The view and its layout are gone once the service is: 0 is the answer then, not a crash.
+    /** Where the pointer's hot spot is (real pixels): the position, not the overlay, which may be a frame behind. */
     public int getX() {
-        final View view = cursorView;
-        final LayoutParams layout = cursorLayout;
-        return view == null || layout == null ? 0 : layout.x + view.getWidth() / 2;
+        return pointer.x();
     }
 
     public int getY() {
-        final View view = cursorView;
-        final LayoutParams layout = cursorLayout;
-        return view == null || layout == null ? 0 : layout.y + view.getHeight() / 2;
+        return pointer.y();
     }
 
-    public void moveView(int dx, int dy) {
-        // Everything the posted update needs is taken now: the service can be switched off between here and the main thread.
+    private boolean requestFrame() {
+        final Choreographer c = choreographer;
+        if (c == null) return false;
+        c.postFrameCallback(drawFrame);
+        return true;
+    }
+
+    /** One frame: the overlay goes where the pointer is now, whatever number of moves came since the last frame. */
+    private void drawPointer() {
+        final int[] at = pointer.frame();
         final WindowManager manager = windowManager;
         final View view = cursorView;
         final LayoutParams layout = cursorLayout;
-        if (manager == null || view == null || layout == null) return;
-        DisplayMetrics displayMetrics = new DisplayMetrics();
-        manager.getDefaultDisplay().getRealMetrics(displayMetrics);
-
-        layout.x += dx;
-        layout.y += dy;
-
-        if (getX() > displayMetrics.widthPixels)
-            layout.x = displayMetrics.widthPixels - view.getWidth() / 2;
-        if (getY() > displayMetrics.heightPixels)
-            layout.y = displayMetrics.heightPixels - view.getHeight() / 2;
-        if (getX() < 0) layout.x = -view.getWidth() / 2;
-        if (getY() < 0) layout.y = -view.getHeight() / 2;
-
-        Cursor.INSTANCE.setX(getX());
-        Cursor.INSTANCE.setY(getY());
-
-        new Handler(getMainLooper()).post(() -> {
-            try {
-                manager.updateViewLayout(view, layout);
+        if (manager == null || view == null || layout == null) return; // switched off since the frame was asked for
+        layout.x = at[0] - view.getWidth() / 2;
+        layout.y = at[1] - view.getHeight() / 2;
+        try {
+            manager.updateViewLayout(view, layout);
+            if (shown) {
                 view.setVisibility(View.VISIBLE);
-            } catch (RuntimeException e) {
-                // The window went with the service (IllegalArgumentException), or the token did (BadTokenException).
-                Log.w("MouseReceiverService", "pointer update dropped: " + e.getClass().getSimpleName());
+                scheduleHide(IDLE_HIDE_MS);
             }
-        });
+        } catch (RuntimeException e) {
+            // The window went with the service (IllegalArgumentException), or the token did (BadTokenException).
+            Log.w("MouseReceiverService", "pointer update dropped: " + e.getClass().getSimpleName());
+        }
     }
 
-    public static boolean move(int dx, int dy) {
+    private void moveBy(double dx, double dy) {
+        final WindowManager manager = windowManager;
+        if (manager != null) {
+            // The real size, read each move: a rotation changes it.
+            DisplayMetrics displayMetrics = new DisplayMetrics();
+            manager.getDefaultDisplay().getRealMetrics(displayMetrics);
+            pointer.setBounds(displayMetrics.widthPixels, displayMetrics.heightPixels);
+        }
+        shown = true;
+        pointer.moveBy(dx, dy);
+        Cursor.INSTANCE.setX(pointer.x());
+        Cursor.INSTANCE.setY(pointer.y());
+    }
+
+    /** Moves the pointer by a delta in desk pixels; fractions are kept, not rounded up per packet. */
+    public static boolean move(double dx, double dy) {
         final MouseReceiverService s = instance;
         if (s == null) return false;
 
         int fromX = s.getX();
         int fromY = s.getY();
 
-        s.moveView(dx, dy);
+        s.moveBy(dx, dy);
 
-        s.hideAfter5Seconds();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && s.isSwiping()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && s.isSwiping()
+                && (fromX != s.getX() || fromY != s.getY())) {
             return s.continueSwipe(fromX, fromY);
         }
 
         return true;
     }
 
+    public static boolean move(int dx, int dy) {
+        return move((double) dx, (double) dy);
+    }
+
     public static boolean setPos(int x, int y) {
         final MouseReceiverService s = instance;
         if (s == null) return false;
 
-        return move(x - s.getX(), y - s.getY());
+        return move((double) (x - s.getX()), (double) (y - s.getY()));
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -276,7 +303,7 @@ public class MouseReceiverService extends AccessibilityService {
         swipeStoke = new GestureDescription.StrokeDescription(path, 0, 1, true);
         GestureDescription.Builder builder = new GestureDescription.Builder();
         builder.addStroke(swipeStoke);
-        ((ImageView) cursorView.findViewById(R.id.mouse_cursor)).setImageResource(R.drawable.mouse_pointer_clicked);
+        showPointer(R.drawable.mouse_pointer_clicked);
         return dispatchGesture(builder.build(), null, null);
     }
 
@@ -302,9 +329,16 @@ public class MouseReceiverService extends AccessibilityService {
         GestureDescription.Builder builder = new GestureDescription.Builder();
         builder.addStroke(swipeStoke);
         swipeStoke = null;
-        final View view = cursorView;
-        if (view != null) ((ImageView) view.findViewById(R.id.mouse_cursor)).setImageResource(R.drawable.mouse_pointer);
+        showPointer(R.drawable.mouse_pointer);
         return dispatchGesture(builder.build(), null, null);
+    }
+
+    /** The pointer's picture (pressed or not), changed on the main thread: drags start from the input thread. */
+    private void showPointer(int drawable) {
+        final View view = cursorView;
+        final Handler handler = runHandler;
+        if (view == null || handler == null) return;
+        handler.post(() -> ((ImageView) view.findViewById(R.id.mouse_cursor)).setImageResource(drawable));
     }
 
 

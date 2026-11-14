@@ -81,8 +81,66 @@ class GlideAskTest {
         assertFalse("the person decides, not the desk", Glide.allowed(app, "desk-ask"))
         val notice = notices().single()
         assertEquals("Workbench wants to use Glide. Turn on?", notice.extras.getString("android.title"))
-        assertTrue("a one-tap way there", notice.contentIntent != null && notice.actions.size == 1)
+        assertTrue("a tap opens the switch", notice.contentIntent != null)
+        assertEquals(listOf("Allow", "Not now"), notice.actions.map { it.title.toString() })
         assertTrue("nothing sent back but state", sent.none { it.type == DeskLinkProtocol.PACKET_TYPE_SETTINGS_REQUEST })
+    }
+
+    /**
+     * The prompt must reach the person over whatever app is in front: a high-importance channel and priority (heads-up), never
+     * an activity started from the background, and it goes away by itself when the desk stops waiting.
+     */
+    @Test
+    fun thePromptIsAHeadsUpThatTimesOutWithTheDesk() {
+        plugin().onPacketReceived(ask())
+        val notice = notices().single()
+        assertEquals(org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS, notice.channelId)
+        @Suppress("DEPRECATION")
+        assertEquals(android.app.Notification.PRIORITY_HIGH, notice.priority)
+        assertEquals(InputDevicesReceiverPlugin.ASK_TIMEOUT_MS, notice.timeoutAfter)
+        assertEquals("the desk waits as long (glide::ASK_WAIT)", 60_000L, InputDevicesReceiverPlugin.ASK_TIMEOUT_MS)
+    }
+
+    private fun answer(action: String) = InputDevicesReceiverPlugin.AskReceiver().onReceive(
+        app, android.content.Intent(action).putExtra(InputDevicesReceiverPlugin.EXTRA_DEVICE, "desk-ask"),
+    )
+
+    @Test
+    fun allowTurnsGlideOnForThatDeskAndThePromptGoes() {
+        plugin().onPacketReceived(ask())
+        answer(InputDevicesReceiverPlugin.ACTION_ALLOW)
+        assertTrue("the person allowed it", Glide.allowed(app, "desk-ask"))
+        assertTrue("answered: gone", notices().isEmpty())
+    }
+
+    @Test
+    fun notNowTellsTheDeskItWasDeclinedAndThePromptGoes() {
+        val p = plugin()
+        p.onPacketReceived(ask())
+        p.reportDeclined()
+        val report = sent.last()
+        assertEquals(false, report.getBoolean("allowed", true))
+        assertEquals(InputDevicesReceiverPlugin.REASON_DECLINED, report.getString("reason"))
+        answer(InputDevicesReceiverPlugin.ACTION_NOT_NOW)
+        assertFalse(Glide.allowed(app, "desk-ask"))
+        assertTrue(notices().isEmpty())
+    }
+
+    @Test
+    fun allowedBySomeOtherWayThePromptGoes() {
+        val p = plugin()
+        p.onPacketReceived(ask())
+        assertEquals(1, notices().size)
+        // The person turned the switch on in the app instead, with the service running: the report says allowed, the prompt goes.
+        org.robolectric.Robolectric.buildService(org.desklink.mobile.plugins.mousereceiver.MouseReceiverService::class.java).create()
+        try {
+            Glide.setAllowed(app, "desk-ask", true)
+            p.reportAllowed()
+            assertEquals(true, sent.last().getBoolean("allowed", false))
+            assertTrue(notices().isEmpty())
+        } finally {
+            org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance = null
+        }
     }
 
     @Test

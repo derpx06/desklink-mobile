@@ -128,8 +128,45 @@ class OffThreadObserverTest {
         }
     }
 
-    private fun envelope(payload: String = "eA==") = WebRtcEnvelope(
-        protocolVersion = 1, messageId = "m", deviceId = "d", sessionId = 1, connectionGeneration = 1, channel = "events",
+    /**
+     * Glide's pointer rides the input channels: a notification burst stuck on the event thread used to hold every motion packet
+     * behind it (the pointer lagged, then jumped). Input runs on its own thread, in its own order.
+     */
+    @Test
+    fun `input is never queued behind a busy event thread`() {
+        val release = CountDownLatch(1)
+        val inputSeen = CopyOnWriteArrayList<String>()
+        val inputDone = CountDownLatch(3)
+        val target = object : WebRtcTransport.Observer {
+            override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) = Unit
+            override fun onEnvelope(envelope: WebRtcEnvelope) {
+                if (OffThreadObserver.isInput(envelope.channel)) { inputSeen += envelope.messageId; inputDone.countDown() } else release.await()
+            }
+            override fun onControlChannelOpen() = Unit
+            override fun onRemoteVideoTrack(track: VideoTrack) = Unit
+            override fun onScreenCaptureStopped(reason: String) = Unit
+            override fun onConnectionStateChanged(state: WebRtcPeerHealth) = Unit
+            override fun onFailure(error: Throwable) = Unit
+        }
+        val events = DeferredTaskExecutor("test-observer-events-busy")
+        val input = DeferredTaskExecutor("test-observer-input")
+        try {
+            val observer = OffThreadObserver(target, events, input = input)
+            observer.onEnvelope(envelope(channel = WebRtcChannel.EVENTS.label, id = "notification")) // stuck
+            observer.onEnvelope(envelope(channel = WebRtcChannel.INPUT_REALTIME.label, id = "move-1"))
+            observer.onEnvelope(envelope(channel = WebRtcChannel.INPUT_RELIABLE.label, id = "click"))
+            observer.onEnvelope(envelope(channel = WebRtcChannel.INPUT_REALTIME.label, id = "move-2"))
+            assertTrue("input waited behind the event thread", inputDone.await(1, TimeUnit.SECONDS))
+            assertEquals("in the order they came", listOf("move-1", "click", "move-2"), inputSeen.toList())
+        } finally {
+            release.countDown()
+            events.close()
+            input.close()
+        }
+    }
+
+    private fun envelope(payload: String = "eA==", channel: String = "events", id: String = "m") = WebRtcEnvelope(
+        protocolVersion = 1, messageId = id, deviceId = "d", sessionId = 1, connectionGeneration = 1, channel = channel,
         messageType = "t", timestamp = 0, flags = 0, payloadLength = 1, payloadBase64 = payload,
     )
 
