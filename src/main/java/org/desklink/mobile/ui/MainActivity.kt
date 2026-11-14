@@ -380,6 +380,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         // A question from the computer whose heads-up was missed opens now that the person is here.
         org.desklink.mobile.plugins.capture.PhoneCapture.openIfWaiting(this)
         org.desklink.mobile.plugins.audio.PhoneAudio.openIfWaiting(this)
+        // A permission or access changed in Android's settings meanwhile: the computers' "Ask on phone" rows follow.
+        org.desklink.mobile.plugins.desksettings.Asks.reportAll()
     }
 
     override fun onDestroy() {
@@ -504,6 +506,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             ) { route ->
                 holder.SaveableStateProvider(route) { Screen(route, paired) }
             }
+            // A computer's ask waiting for the person: on top of every screen, with the notification's own Allow / Not now.
+            org.desklink.mobile.ui.compose.components.IncomingAsksBanner(
+                org.desklink.mobile.plugins.desksettings.Asks.waiting(),
+                onAllow = { startActivity(org.desklink.mobile.plugins.desksettings.Asks.allowIntent(this@MainActivity, it.deskId, it.feature.key)) },
+                onNotNow = { org.desklink.mobile.plugins.desksettings.Asks.notNow(this@MainActivity, it.deskId, it.feature.key) },
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+            )
             // Above the tab bar when it is showing.
             // The design's inverse snackbar: its action is the opposite theme's accent (the app's accent is 1.7:1 on it).
             org.desklink.mobile.ui.compose.components.DeskSnackbarHost(
@@ -863,7 +872,9 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val clipboard = device.getPlugin(org.desklink.mobile.plugins.clipboard.ClipboardPlugin::class.java)
         when {
             clipboard == null -> showMessage(getString(R.string.home_feature_off))
-            clipboard.deskIgnoresClipboard() -> showMessage(getString(R.string.clipboard_desk_off, device.name))
+            clipboard.deskIgnoresClipboard() -> showFix(getString(R.string.clipboard_desk_off, device.name), getString(R.string.home_turn_on)) {
+                device.getPlugin(DeskSettingsPlugin::class.java)?.set(DeskSettingsPlugin.CLIPBOARD, true)
+            }
             clipboard.sendNow() -> showMessage(getString(R.string.home_clipboard_sent, device.name))
             org.desklink.mobile.plugins.clipboard.ClipboardListener.instance(this).lastRefusedTooLarge -> showMessage(getString(R.string.clipboard_too_large))
             else -> showMessage(getString(R.string.clipboard_nothing_sent))
@@ -974,6 +985,14 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 showMessage(message)
                 device.pluginsWithoutPermissions[plugin]?.let { showPluginPermission(it, optional = false) }
             }
+            org.desklink.mobile.ui.compose.screen.home.Fix.ASK_COMPUTER -> {
+                val asker = device.getPlugin(DeskSettingsPlugin::class.java)
+                if (asker?.askable(ASK_UNLOCK) == true) {
+                    showFix(message, getString(R.string.ask_on_computer)) { asker.askDesk(ASK_UNLOCK); tick++ }
+                } else {
+                    showMessage(message)
+                }
+            }
             org.desklink.mobile.ui.compose.screen.home.Fix.NONE -> showMessage(message)
         }
     }
@@ -995,7 +1014,11 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     /** Written at once, applied off the main thread: reloading plugins is blocking. */
     private fun setPluginEnabled(device: Device, key: String, on: Boolean) {
-        CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch { device.setPluginEnabled(key, on) }
+        CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
+            device.setPluginEnabled(key, on)
+            // The desk's "Ask on phone" rows follow this phone's state.
+            runCatching { device.getPlugin(DeskSettingsPlugin::class.java)?.sendReport() }
+        }
         tick++
     }
 
@@ -1335,6 +1358,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 deskNotificationsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java)),
                 activityOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.activity.ActivityPlugin::class.java)),
                 ready = it.hasActiveWebRtcFeatureTransport,
+                asker = it.getPlugin(DeskSettingsPlugin::class.java),
             )
         }
         fun deskSet(key: String, on: Boolean) = device?.getPlugin(DeskSettingsPlugin::class.java)?.set(key, on)
@@ -1576,6 +1600,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         /** Launcher shortcuts (res/xml/shortcuts.xml). */
         const val ACTION_NEW_NOTE = "org.desklink.mobile.action.NEW_NOTE"
         const val ACTION_ADD_TO_BUCKET = "org.desklink.mobile.action.ADD_TO_BUCKET"
+        /** asks.json toDesk: unlocking with this phone. */
+        private const val ASK_UNLOCK = "unlockNearby"
         const val EXTRA_DEVICE_ID = "deviceId"
         const val EXTRA_OPEN_FILES = "openFiles"
         const val EXTRA_OPEN_TERMINALS = "openTerminals"

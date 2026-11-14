@@ -657,6 +657,11 @@ class TerminalActivity : AppCompatActivity() {
                     Surface(color = MaterialTheme.colorScheme.errorContainer, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.terminal_not_allowed_message), modifier = Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium)
                     }
+                    // The one action: ask the computer to turn it on (asks.json terminalAccess).
+                    val desk = remember(deviceId) { DeskLinkApplication.getInstance().getDevice(deviceId) }
+                    org.desklink.mobile.ui.compose.components.AskOnComputer(
+                        desk?.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java), desk?.name.orEmpty(), "terminalAccess",
+                    )
                 } else if (!connected) {
                     ReconnectingBanner(dark = true)
                 }

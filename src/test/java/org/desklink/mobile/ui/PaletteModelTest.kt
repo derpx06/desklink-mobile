@@ -150,7 +150,7 @@ class PaletteModelTest {
         assertEquals(Fix.TURN_ON_HERE, fixes[Blocker.PHONE_OFF])
         assertEquals(Fix.ALLOW, fixes[Blocker.PERMISSION])
         assertEquals(Fix.NONE, fixes[Blocker.DESK_OFF])
-        assertEquals(Fix.NONE, fixes[Blocker.UNLOCK_OFF])
+        assertEquals("off at the computer: asked from here", Fix.ASK_COMPUTER, fixes[Blocker.UNLOCK_OFF])
         val app = ApplicationProvider.getApplicationContext<Application>()
         Blocker.entries.forEach { b ->
             val line = app.getString(HomeDerive.message(b), "Ring", "arch-desk")

@@ -81,7 +81,7 @@
     <string name="guide_find_button">Ring your computer</string>
 
     <string name="guide_lock_title">Lock and unlock</string>
-    <string name="guide_lock_how">Lock %1$s from here. To unlock it with this phone, turn that on in DeskLink on %1$s.</string>
+    <string name="guide_lock_how">Lock %1$s from here, and unlock it too once %1$s allows it.</string>
     <string name="guide_lock_button">Lock your computer</string>
 
     <string name="guide_glide_title">Glide: the mouse moves onto the phone</string>
@@ -93,7 +93,7 @@
     <string name="guide_tiles_button">Add a tile</string>
 
     <string name="guide_topbar_title">Top-bar menu</string>
-    <string name="guide_topbar_how">On a GNOME computer, DeskLink can sit in the top bar: send files, ring or lock in one click. Turn it on in DeskLink on the computer.</string>
+    <string name="guide_topbar_how">On a GNOME computer, DeskLink can also sit in the top bar: send files, ring or lock in one click.</string>
 
     <string name="guide_trouble_title">Can\'t connect?</string>
     <string name="guide_trouble_how">Put both on the same Wi-Fi, and check that the computer\'s firewall lets DeskLink in. Then let DeskLink run in the background on this phone.</string>

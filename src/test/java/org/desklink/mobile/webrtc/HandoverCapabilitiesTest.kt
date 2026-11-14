@@ -40,7 +40,7 @@ class HandoverCapabilitiesTest {
         "desklink.notification.request",
         "desklink.ping",
         "desklink.settings",
-        // The desk asking for Glide on the phone (a prompt there).
+        // The desk asking the phone to turn a feature on (a prompt there, asks.json).
         "desklink.settings.request",
         "desklink.share.request",
         "desklink.shareinputdevices.request",
@@ -67,6 +67,8 @@ class HandoverCapabilitiesTest {
         "desklink.notification",
         "desklink.notification.request",
         "desklink.ping",
+        // The phone's own report (asks.json features), and its changes and asks.
+        "desklink.settings",
         "desklink.settings.request",
         "desklink.share.request",
         "desklink.shareinputdevices",

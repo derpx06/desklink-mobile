@@ -121,6 +121,12 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:theme="@style/Theme.Transparent" />
+        <!-- Allow on a desk's ask: Android's permission dialog or special-access page, then the setting goes on. -->
+        <activity
+            android:name="org.desklink.mobile.plugins.desksettings.AskConsentActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
         <activity
             android:name="org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity"
             android:exported="false"
@@ -212,9 +218,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.handoff.HandoffPlugin$DismissReceiver"
             android:exported="false" />
 
-        <!-- Allow / Not now on a desk's Glide ask. Not exported: no other app may turn Glide on. -->
+        <!-- Not now on a desk's ask (asks.json). Not exported: no other app may answer for the person. -->
         <receiver
-            android:name="org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin$AskReceiver"
+            android:name="org.desklink.mobile.plugins.desksettings.Asks$AskReceiver"
             android:exported="false" />
 
         <!-- "Copy" on "Open link from <desk>". -->

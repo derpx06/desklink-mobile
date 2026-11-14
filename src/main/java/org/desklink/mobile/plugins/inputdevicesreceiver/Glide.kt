@@ -79,24 +79,6 @@ object Glide {
     /** The key of `desklink.settings.request {set: {glide: true}}`: the desk asks this phone to turn Glide on (mirrored desk side). */
     const val SETTING_KEY = "glide"
 
-    /** What the phone shows when a desk asks for Glide: the person decides here, nothing is flipped for them. */
-    enum class Prompt { TURN_ON, ACCESSIBILITY, NONE }
-
-    /**
-     * The prompt for a desk's request: the switch for that desk off → ask to turn it on; on but without the accessibility service
-     * that moves the pointer → ask for that; both on → nothing to ask (the desk only had an old report). A body that is not a
-     * request to turn Glide on asks nothing.
-     */
-    fun promptFor(asksToTurnOn: Boolean, switchOn: Boolean, serviceOn: Boolean): Prompt = when {
-        !asksToTurnOn -> Prompt.NONE
-        !switchOn -> Prompt.TURN_ON
-        !serviceOn -> Prompt.ACCESSIBILITY
-        else -> Prompt.NONE
-    }
-
-    /** Whether the `set` of a `desklink.settings.request` asks to turn Glide on (`{glide: true}`; any other key asks nothing). */
-    fun asksToTurnOn(set: org.json.JSONObject?): Boolean = set?.opt(SETTING_KEY) == true
-
     /** A known Qt exit edge, read as the phone's entry edge; anything else is not one. */
     fun validEdge(edge: Int) = edge == TOP_EDGE || edge == LEFT_EDGE || edge == RIGHT_EDGE || edge == BOTTOM_EDGE
 

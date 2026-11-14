@@ -373,6 +373,7 @@ private fun ConnectionGroup(desk: DeskSettings?, actions: SettingsActions, prefs
         // Where the computer has it too (Connection): ask it to stay awake while this phone is connected, if it allows that.
         if (desk != null) {
             DeskSwitch(desk, actions, DeskSettingsPlugin.KEEP_AWAKE, stringResource(R.string.settings_keep_awake, desk.name), R.drawable.sym_coffee, stringResource(R.string.settings_keep_awake_summary), desk.remote?.keepAwake == true, notAllowedHere = !DeskSettingsPlugin.keepAwakeUsable(desk.remote))
+            org.desklink.mobile.ui.compose.components.AskOnComputer(desk.asker, desk.name, "keepAwakeAllowed")
         }
     }
     RowGroup {
@@ -504,6 +505,7 @@ private fun NotificationsGroup(desk: DeskSettings?, actions: SettingsActions, pr
             enabled = false,
             onDisabledClick = { actions.onMessage(dndWhy) },
         )
+        org.desklink.mobile.ui.compose.components.AskOnComputer(desk.asker, desk.name, "dndSync")
         if (dndSync && !org.desklink.mobile.plugins.battery.DndSync.canSet(context)) {
             AllowRow(stringResource(R.string.settings_dnd_access), stringResource(R.string.settings_dnd_access_summary, desk.name)) {
                 runCatching { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
@@ -693,12 +695,15 @@ private fun ControlGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
                 if (!desk.glideOn && !desk.accessibilityOn) AccessibilitySetupActivity.open(context)
             },
         )
+        if (desk.glideOn) org.desklink.mobile.ui.compose.components.AskOnComputer(desk.asker, desk.name, "glide")
         if (desk.glideOn && !desk.accessibilityOn) {
             AllowRow(stringResource(R.string.settings_perm_accessibility), stringResource(R.string.settings_perm_accessibility_summary, desk.name)) { AccessibilitySetupActivity.open(context) }
         }
     }
     SectionLabel(stringResource(R.string.sg_control_desk_screen, desk.name))
     RowGroup {
+        // Control of the computer's screen from this phone needs the computer's approval (its portal): asked from here.
+        org.desklink.mobile.ui.compose.components.AskOnComputer(desk.asker, desk.name, "control")
         GroupRow(
             stringResource(R.string.mousepad_sensitivity_settings_title),
             icon = R.drawable.sym_mouse,
@@ -769,6 +774,7 @@ private fun GalleryRows(desk: DeskSettings, changed: () -> Unit) {
         enabled = accepted || on, // turning it off is always possible
         onClick = { org.desklink.mobile.plugins.gallery.GalleryWatcher.setOn(context, desk.id, !on); changed() },
     )
+    org.desklink.mobile.ui.compose.components.AskOnComputer(desk.asker, desk.name, "galleryAccepted")
     if (on) {
         val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
         val none = stringResource(R.string.settings_gallery_folder_none)
@@ -887,6 +893,7 @@ private fun PrivacyGroup(desk: DeskSettings?, actions: SettingsActions, prefs: a
                 },
                 enabled = live,
             )
+            org.desklink.mobile.ui.compose.components.AskOnComputer(desk.asker, desk.name, "unlockNearby")
             GroupRow(
                 stringResource(R.string.device_encryption),
                 icon = R.drawable.sym_lock,

@@ -5,7 +5,6 @@ import org.desklink.mobile.NetworkPacket
 import org.desklink.mobile.R
 import org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin
 import org.desklink.mobile.plugins.deskunlock.DeskUnlockPlugin
-import org.desklink.mobile.plugins.inputdevicesreceiver.Glide
 import org.desklink.mobile.plugins.telephony.CallFlags
 import org.desklink.mobile.plugins.telephony.CallRequests
 import org.desklink.mobile.plugins.telephony.CallTracker
@@ -41,7 +40,8 @@ class WireValuesTest {
 
     @Test
     fun `the desk's glide ask is read as one`() {
-        assertTrue(Glide.asksToTurnOn(f.getJSONObject("glideAsk").getJSONObject("set")))
+        assertEquals(listOf(org.desklink.mobile.plugins.desksettings.Asks.Feature.GLIDE),
+            org.desklink.mobile.plugins.desksettings.Asks.askedKeys(f.getJSONObject("glideAsk").getJSONObject("set")))
     }
 
     @Test

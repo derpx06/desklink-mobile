@@ -154,6 +154,10 @@ class TerminalsActions(
     val onRestart: (TerminalSessionState) -> Unit = {},
     /** A dimmed "new terminal" was tapped with the computer not connected: say so and look for it again (never starts anything). */
     val onUnavailable: () -> Unit = {},
+    /** Terminal access is off at the computer and it can be asked (asks.json terminalAccess), and where that ask stands. */
+    val askable: Boolean = false,
+    val askState: org.desklink.mobile.plugins.desksettings.AskBook.State? = null,
+    val onAskComputer: () -> Unit = {},
 )
 
 /**
@@ -237,6 +241,7 @@ fun TerminalsTab(
         )
     }
 
+    val asker = remember(deviceId) { DeskLinkApplication.getInstance().getDevice(deviceId)?.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java) }
     val ended = stringResource(R.string.terminal_snack_ended)
     val needsLink = stringResource(R.string.terminal_needs_link, deskName)
     TerminalsContent(
@@ -250,6 +255,9 @@ fun TerminalsTab(
             onOpen = onOpenSession,
             onNew = start,
             onRetry = { client?.refresh() },
+            askable = asker?.let { @Suppress("UNUSED_VARIABLE") val c = it.asksChanged; it.askable("terminalAccess") } == true,
+            askState = asker?.askState("terminalAccess"),
+            onAskComputer = { asker?.askDesk("terminalAccess") },
             onEnterPassword = { passwordDismissed = false },
             onUnlock = { gateRuns++ },
             onRename = { id, name -> SessionPreviews.setLabel(context, deviceId, id, name); labelsRevision++ },
@@ -344,10 +352,22 @@ fun TerminalsContent(
                 R.drawable.sym_lock, stringResource(R.string.terminal_locked_title), stringResource(R.string.terminals_gate_message),
                 action = stringResource(R.string.terminals_unlock), onAction = actions.onUnlock,
             )
-            TerminalsPanel.NOT_ALLOWED -> Notice(
-                R.drawable.sym_lock, stringResource(R.string.terminal_not_allowed_title), stringResource(R.string.terminal_not_allowed_message),
-                action = stringResource(R.string.terminal_retry), onAction = actions.onRetry,
-            )
+            TerminalsPanel.NOT_ALLOWED -> {
+                // The one action: ask the computer (or, from an older one that cannot be asked, try again).
+                val ask = actions.askState
+                val waiting = ask == org.desklink.mobile.plugins.desksettings.AskBook.State.WAITING || ask == org.desklink.mobile.plugins.desksettings.AskBook.State.BLOCKED
+                Notice(
+                    R.drawable.sym_lock, stringResource(R.string.terminal_not_allowed_title),
+                    if (actions.askable && ask != null) org.desklink.mobile.ui.compose.components.askWords(ask, deskName) else stringResource(R.string.terminal_not_allowed_message),
+                    action = when {
+                        !actions.askable -> stringResource(R.string.terminal_retry)
+                        waiting -> null
+                        ask == null -> stringResource(R.string.ask_on_computer)
+                        else -> stringResource(R.string.ask_again)
+                    },
+                    onAction = if (actions.askable) actions.onAskComputer else actions.onRetry,
+                )
+            }
             TerminalsPanel.LOCKED -> {
                 val denial = state.passwordNeeded
                 val lockedOut = denial is SessionPasswordDenial.Locked
