@@ -66,6 +66,33 @@ import org.desklink.mobile.ui.compose.screen.settings.SettingsPage
 import org.desklink.mobile.ui.compose.tokens
 
 /**
+ * What an action or Settings id ("action:ring", "settings:calls") opens: the palette's actions and Home's "Everything DeskLink does"
+ * both go through here, so a feature opens the same place from either. Any other id does nothing.
+ */
+internal fun openAction(id: String, actions: HomeActions, onSendLink: () -> Unit) {
+    when {
+        id == Action.SEND_FILES -> actions.onSendFiles()
+        id == Action.SEND_CLIPBOARD -> actions.onSendClipboard()
+        id == Action.SEND_LINK -> onSendLink()
+        id == Action.DESK_SCREEN -> actions.onDeskScreen()
+        id == Action.RING -> actions.onRing()
+        id == Action.PING -> actions.onPing()
+        id == Action.LOCK -> actions.onLock()
+        id == Action.UNLOCK -> actions.onUnlockDesk()
+        id == Action.SHARE_SCREEN -> actions.onShareScreen()
+        id == Action.NEW_TERMINAL -> actions.onNewTerminal()
+        id == Action.OPEN_TERMINALS -> actions.onTerminals()
+        id == Action.NEW_NOTE -> actions.onNewNote()
+        id == Action.OPEN_NOTES -> actions.onNotes()
+        id == Action.OPEN_BUCKET -> actions.onBucket()
+        id == Action.PAIR_ANOTHER -> actions.onPairAnother()
+        id == Action.GUIDE -> actions.onGuide()
+        id == Everything.ADD_TILES -> actions.onAddTiles()
+        id.startsWith("settings:") -> actions.onOpenSettings(id.removePrefix("settings:"))
+    }
+}
+
+/**
  * "Find anything": one search over what the app really has. Actions the connected computer offers, recent files, notes,
  * snippets, settings pages and computers, grouped. Ranking is [PaletteModel]; this file only turns the app's data into
  * items and an item's id back into a call. It covers the Home page (the tab bar stays).
@@ -105,26 +132,11 @@ fun PaletteScreen(
         // A dimmed action says why and how to fix it; it never sends anything.
         built.items.firstOrNull { it.id == id }?.blocked?.let { b -> return actions.onBlocked(id, built.items.first { it.id == id }.title, b) }
         when {
-            id == Action.SEND_FILES -> actions.onSendFiles()
-            id == Action.SEND_CLIPBOARD -> actions.onSendClipboard()
-            id == Action.SEND_LINK -> onSendLink()
-            id == Action.DESK_SCREEN -> actions.onDeskScreen()
-            id == Action.RING -> actions.onRing()
-            id == Action.PING -> actions.onPing()
-            id == Action.LOCK -> actions.onLock()
-            id == Action.UNLOCK -> actions.onUnlockDesk()
-            id == Action.SHARE_SCREEN -> actions.onShareScreen()
-            id == Action.NEW_TERMINAL -> actions.onNewTerminal()
-            id == Action.OPEN_TERMINALS -> actions.onTerminals()
-            id == Action.NEW_NOTE -> actions.onNewNote()
-            id == Action.OPEN_BUCKET -> actions.onBucket()
-            id == Action.PAIR_ANOTHER -> actions.onPairAnother()
-            id == Action.GUIDE -> actions.onGuide()
             id.startsWith("file:") -> built.files[id]?.let(actions.onOpenRecent)
             id.startsWith("note:") -> actions.onNote(id.removePrefix("note:"))
             id.startsWith("snippet:") -> built.snippets[id]?.let { clipboard.setText(AnnotatedString(it)); actions.onMessage(copied) }
-            id.startsWith("settings:") -> actions.onOpenSettings(id.removePrefix("settings:"))
             id.startsWith("computer:") -> id.removePrefix("computer:").let { if (it != state.deviceId) actions.onSelectComputer(it) }
+            else -> openAction(id, actions, onSendLink)
         }
     }
 

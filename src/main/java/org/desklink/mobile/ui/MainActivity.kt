@@ -738,9 +738,6 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val records = androidx.compose.runtime.remember(history, device.deviceId) { TransferHistory.store(this).forDevice(device.deviceId) }
         // The computer's notifications in the shade: a system query, so every five seconds, not every second.
         val mirrored = androidx.compose.runtime.remember(tick / 5, device.deviceId) { HomeModel.deskNotificationCount(this, device) }
-        val state = HomeModel.build(this, device, paired, records).let { s ->
-            (if (s.ready && stats != null) s.copy(path = stats.path.shown(), rttMs = stats.roundTripTimeMs?.toInt()) else s).copy(deskNotifications = mirrored)
-        }
         var sharingInfo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
         // One actions object per computer: a new one every second would make Home recompose even when nothing changed.
         val actions = androidx.compose.runtime.remember(device, computersRequest) { homeActions(device) { sharingInfo = true } }
@@ -748,6 +745,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val resumed = rememberResumeTick()
         val asker = rememberPermissionAsker()
         val setupRows = androidx.compose.runtime.remember(resumed, asker.asked, device.name) { permissionRows(this, device.name, asker.ask, PermissionNeeds.remaining(this)) }
+        // "Everything DeskLink does" runs these same rows' Allow for its one step, and says which are missing.
+        featureRows = setupRows
+        val missing = androidx.compose.runtime.remember(setupRows) { setupRows.filter { !it.granted && !it.unknown }.map { it.id }.toSet() }
+        val state = HomeModel.build(this, device, paired, records).let { s ->
+            (if (s.ready && stats != null) s.copy(path = stats.path.shown(), rttMs = stats.roundTripTimeMs?.toInt()) else s).copy(deskNotifications = mirrored)
+        }.let { s -> s.copy(phone = s.phone.copy(missing = missing)) }
         val allowAll = rememberAllowAll(finishSetupRows(setupRows), asker)
         var setupExpanded by androidx.compose.runtime.remember { mutableStateOf(!defaultPrefs.getBoolean(FirstRun.KEY_HOME_SETUP_COLLAPSED, false)) }
         val finishSetup: (@Composable () -> Unit)? = if (!hasChecklistWork(setupRows)) null else {
@@ -956,7 +959,49 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             openComputersRequest = computersRequest,
             onComputersShown = { computersRequest = 0 },
             onGuide = { push(GUIDE) },
+            onFeatureStep = { featureId, step -> featureStep(device, featureId, step) },
+            onAddTiles = { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) offerTiles() else showMessage(getString(R.string.guide_tiles_how)) },
         )
+    }
+
+    /** The permission rows Home's "Finish setting up" shows now, with their Allow: the steps of "Everything DeskLink does" run them. */
+    private var featureRows: List<org.desklink.mobile.ui.compose.screen.settings.PermissionRow> = emptyList()
+
+    /**
+     * The one step of a row of "Everything DeskLink does": this phone's switch (and the permission it then needs), a permission row's
+     * own Allow, the feature's own permission explanation, or Glide. Each does something on screen; Home opens the page after.
+     */
+    private fun featureStep(device: Device, featureId: String, step: org.desklink.mobile.ui.compose.screen.home.FeatureStep) {
+        val feature = org.desklink.mobile.ui.compose.screen.home.Everything.features.firstOrNull { it.id == featureId } ?: return
+        val key = (HomeModel.PLUGIN_FOR[feature.action ?: feature.id] ?: HomeModel.PLUGIN_FOR[feature.id])?.let { Plugin.getPluginKey(it) }
+        fun allow(row: String) = featureRows.firstOrNull { it.id == row }?.allow?.invoke()
+            ?: if (row == "accessibility") org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.open(this) else showMessage(getString(R.string.everything_step_permission))
+        val glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide
+        val receiver = { device.getPlugin(org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin::class.java) }
+        when (step) {
+            org.desklink.mobile.ui.compose.screen.home.FeatureStep.TurnOn -> {
+                if (key == null) return showMessage(getString(R.string.home_feature_off))
+                setPluginEnabled(device, key, true)
+                showMessage(getString(R.string.everything_turned_on, getString(feature.name), device.name))
+                // What it needs next is asked at once, so one tap gets it working.
+                feature.needs?.takeIf { row -> featureRows.any { it.id == row && !it.granted && !it.unknown } }?.let(::allow)
+            }
+            is org.desklink.mobile.ui.compose.screen.home.FeatureStep.Permission -> allow(step.row)
+            org.desklink.mobile.ui.compose.screen.home.FeatureStep.PluginPermission ->
+                key?.let { device.pluginsWithoutPermissions[it] }?.let { showPluginPermission(it, optional = false) } ?: showMessage(getString(R.string.everything_step_permission))
+            is org.desklink.mobile.ui.compose.screen.home.FeatureStep.Glide -> {
+                glide.setAllowed(this, device.deviceId, true)
+                receiver()?.reportAllowed()
+                if (org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance == null) org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.open(this)
+                else showMessage(getString(R.string.everything_turned_on, getString(R.string.settings_glide_title), device.name))
+            }
+            org.desklink.mobile.ui.compose.screen.home.FeatureStep.GlideAgain -> {
+                glide.clearNotices(device.deviceId)
+                receiver()?.reportAllowed()
+                showMessage(getString(R.string.everything_glide_again, device.name))
+            }
+        }
+        tick++
     }
 
     /**

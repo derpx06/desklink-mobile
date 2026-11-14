@@ -60,6 +60,7 @@ object Glide {
         enterEdge = edge
         edgeLength = length
         lastPacketAt = now
+        clearNotices(deviceId)
     }
 
     fun end() {
@@ -73,8 +74,10 @@ object Glide {
     fun allowed(context: Context, deviceId: String): Boolean =
         PreferenceManager.getDefaultSharedPreferences(context).getBoolean(key(deviceId), false)
 
-    fun setAllowed(context: Context, deviceId: String, on: Boolean) =
+    fun setAllowed(context: Context, deviceId: String, on: Boolean) {
         PreferenceManager.getDefaultSharedPreferences(context).edit { putBoolean(key(deviceId), on) }
+        if (on) askedAt.remove(deviceId)
+    }
 
     /** The key of `desklink.settings.request {set: {glide: true}}`: the desk asks this phone to turn Glide on (mirrored desk side). */
     const val SETTING_KEY = "glide"
@@ -96,6 +99,30 @@ object Glide {
 
     /** Whether the `set` of a `desklink.settings.request` asks to turn Glide on (`{glide: true}`; any other key asks nothing). */
     fun asksToTurnOn(set: org.json.JSONObject?): Boolean = set?.opt(SETTING_KEY) == true
+
+    /** How long Home keeps saying "<computer> is asking" or "refused while locked" after it happened. */
+    const val NOTICE_MS = 600_000L
+
+    private val askedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val refusedLockedAt = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    /** The desk asked this phone to turn Glide on and the person has not answered yet (Home's Glide row offers Allow). */
+    fun markAsked(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()) { askedAt[deviceId] = now }
+
+    fun asking(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()): Boolean =
+        askedAt[deviceId]?.let { now - it < NOTICE_MS } == true
+
+    /** A glide was handed back because this phone was locked; cleared by the next glide or a new answer. */
+    fun markRefusedLocked(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()) { refusedLockedAt[deviceId] = now }
+
+    fun refusedLocked(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()): Boolean =
+        refusedLockedAt[deviceId]?.let { now - it < NOTICE_MS } == true
+
+    /** The person answered (turned it on, or tried again): the notices go. */
+    fun clearNotices(deviceId: String) {
+        askedAt.remove(deviceId)
+        refusedLockedAt.remove(deviceId)
+    }
 
     /** A known Qt exit edge, read as the phone's entry edge; anything else is not one. */
     fun validEdge(edge: Int) = edge == TOP_EDGE || edge == LEFT_EDGE || edge == RIGHT_EDGE || edge == BOTTOM_EDGE

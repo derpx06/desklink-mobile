@@ -87,6 +87,7 @@ object HomeModel {
             offers = offers(context, device),
             history = history.take(HISTORY_SEARCHED),
             terminalAttention = org.desklink.mobile.plugins.terminal.TerminalAttentionBadge.has(id),
+            phone = PhoneFacts(glide = glide(context, device)),
             relayAvailable = org.desklink.mobile.backends.relay.RelaySettings.enabled() &&
                 org.desklink.mobile.backends.relay.RelayLinkProvider.statusLive.value == org.desklink.mobile.backends.relay.RelayLinkProvider.Status.ONLINE,
         )
@@ -121,7 +122,27 @@ object HomeModel {
         PaletteModel.Action.RING to org.desklink.mobile.plugins.findremotedevice.FindRemoteDevicePlugin::class.java,
         PaletteModel.Action.PING to org.desklink.mobile.plugins.ping.PingPlugin::class.java,
         PaletteModel.Action.LOCK to org.desklink.mobile.plugins.lockdevice.LockDevicePlugin::class.java,
+        // This phone's per-computer features listed by "Everything DeskLink does".
+        Everything.NOTIFICATIONS to org.desklink.mobile.plugins.notifications.NotificationsPlugin::class.java,
+        Everything.DESK_NOTIFICATIONS to org.desklink.mobile.plugins.receivenotifications.ReceiveNotificationsPlugin::class.java,
+        Everything.CALLS to org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java,
+        Everything.CONTACTS to org.desklink.mobile.plugins.contacts.ContactsPlugin::class.java,
+        Everything.MEDIA to MprisPlugin::class.java,
     )
+
+    /** Glide with [device]: whether its DeskLink takes it, this phone's switch and service, and what it last asked or was refused. */
+    private fun glide(context: Context, device: Device): GlideFacts {
+        val id = device.deviceId
+        val glide = org.desklink.mobile.plugins.inputdevicesreceiver.Glide
+        return GlideFacts(
+            deskCan = device.getPlugin(org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin::class.java) != null &&
+                device.featureActive(org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.PACKET_TYPE_SHARE_INPUT_DEVICES),
+            on = glide.allowed(context, id),
+            service = org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.instance != null,
+            asking = glide.asking(id),
+            refusedLocked = glide.refusedLocked(id),
+        )
+    }
 
     /** Why a plugin is not working: off on this phone, waiting for a permission, or (anything else) not offered by the computer. */
     fun blocker(device: Device, key: String): Blocker? = blocker(
