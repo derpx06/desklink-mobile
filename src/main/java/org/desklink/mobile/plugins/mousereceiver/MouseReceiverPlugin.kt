@@ -56,13 +56,13 @@ class MouseReceiverPlugin : Plugin() {
             return false
         }
 
-        // F4 glide: while the desk's pointer is here, its keys go to the focused field. (Typing without gliding was removed.)
-        if (org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(device.deviceId) && (np.has("key") || np.has("specialKey"))) {
-            return AccessibilityTyping.handle(np)
-        }
-
+        // Keys go to the focused field while the desk's pointer glides here (F4), or while the desk controls this phone's
+        // shared screen (its Phone Screen window): there every key was dropped since typing without gliding was removed.
+        // Never moved as a pointer.
         if (np.has("key") || np.has("specialKey")) {
-            return false // Keys are typed only into a focused field (above), never moved as a pointer
+            val gliding = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(device.deviceId)
+            val snapshot = org.desklink.mobile.DeskLinkApplication.getInstance().webRtcCoordinator(device.deviceId)?.remoteSessionSnapshot()
+            return if (gliding || takesKeys(snapshot)) AccessibilityTyping.handle(np) else false
         }
 
         // Motion keeps its fractions (the pointer adds them up); only a scroll is counted in whole units.
@@ -163,6 +163,11 @@ class MouseReceiverPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = emptyArray()
 
     companion object {
+        /** The desk holds control of this phone's screen, shared to it: its keys type here. */
+        @JvmStatic
+        fun takesKeys(snapshot: org.desklink.mobile.webrtc.WebRtcRemoteSessionController.Snapshot?): Boolean =
+            snapshot != null && snapshot.hasControlLease && snapshot.direction == org.desklink.mobile.webrtc.WebRtcScreenDirection.PHONE_TO_DESKTOP
+
         private const val PACKET_TYPE_MOUSEPAD_REQUEST = DeskLinkProtocol.PACKET_TYPE_MOUSEPAD_REQUEST
     }
 }

@@ -400,6 +400,12 @@ class WebRtcSessionCoordinator(
             audioEndsWithShareLocked()
             transport?.stopScreenCapture()
         }
+        // The plugin and the foreground service end with it: a stop that reached only the transport (End, the phone's own
+        // Desk screen) left both believing the share ran, so the desk's next ask was answered with no prompt.
+        device.getPlugin(ScreenControlPlugin::class.java)?.onPhoneCaptureEnded()
+        if (PhoneScreenCaptureService.sharingDeviceId == device.deviceId) {
+            context.stopService(Intent(context, PhoneScreenCaptureService::class.java))
+        }
     }
 
     /** The real size and rotation of the display (what the capture covers), in the order width, height, degrees. */
@@ -1913,13 +1919,10 @@ class WebRtcSessionCoordinator(
                     ),
                 )
                 if (message.direction == WebRtcScreenDirection.PHONE_TO_DESKTOP) {
-                    // The plugin starts Android's explicit MediaProjection flow. An answer to this
-                    // phone's own offer was asked for here: no "the desk wants your screen" prompt.
-                    val request = NetworkPacket(DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST).apply {
-                        this["role"] = ScreenControlPlugin.ROLE_PHONE_SCREEN
-                        if (offeredHere) this[ScreenControlPlugin.OFFERED_FIELD] = true
-                    }
-                    device.getPlugin(ScreenControlPlugin::class.java)?.onPacketReceived(request)
+                    // The plugin starts Android's explicit MediaProjection flow, unless the capture really runs. An answer
+                    // to this phone's own offer was asked for here: no "the desk wants your screen" prompt.
+                    device.getPlugin(ScreenControlPlugin::class.java)
+                        ?.askForCapture(offeredHere, capturing = transport?.isCapturingScreen() == true)
                 }
             }
             WebRtcRemoteSessionControlKind.REQUEST_CONTROL,

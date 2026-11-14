@@ -10,8 +10,7 @@ import org.desklink.mobile.DeskLinkApplication
 class ScreenProjectionActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        getSystemService(android.app.NotificationManager::class.java)
-            ?.cancel(ScreenControlPlugin.PROMPT_NOTIFICATION_ID)
+        intent.getStringExtra(EXTRA_DEVICE_ID)?.let { ScreenControlPlugin.cancelAsk(this, it) }
         // Recreated (a rotation under the system prompt): the first prompt is still up and its answer comes here.
         if (savedInstanceState != null) return
         val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager

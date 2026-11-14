@@ -25,12 +25,30 @@ class TypeRemovedTest {
     @Test
     fun glideStillTypesIntoTheFocusedFieldWhileThePointerIsOnThePhone() {
         val plugin = source("plugins/mousereceiver/MouseReceiverPlugin.kt")
-        val glideKeys = plugin.substringAfter("F4 glide: while the desk's pointer is here")
-        assertTrue(glideKeys.contains("Glide.isGliding(device.deviceId) && (np.has(\"key\") || np.has(\"specialKey\"))"))
-        assertTrue(glideKeys.substringBefore("return false").contains("AccessibilityTyping.handle(np)"))
+        val keys = plugin.substringAfter("Keys go to the focused field while the desk's pointer glides here")
+        assertTrue(keys.contains("Glide.isGliding(device.deviceId)"))
+        assertTrue(keys.substringBefore("val dx").contains("if (gliding || takesKeys(snapshot)) AccessibilityTyping.handle(np) else false"))
         // Its consent is the glide switch alone (the packet gate in the coordinator).
         val gate = source("webrtc/WebRtcSessionCoordinator.kt").substringAfter("internal fun deliverFeaturePacket").substringBefore("verifyInboundInput")
         assertTrue(gate.contains("glide.isGliding(device.deviceId) && glide.allowed(context, device.deviceId)"))
+    }
+
+    /**
+     * The desk's Phone Screen window types into the phone while it holds control of the phone's shared screen (a lease
+     * checked by `verifyInboundInput` before any plugin sees the packet); keys were dropped there (owner, 11-14).
+     */
+    @Test
+    fun theDeskControllingThisSharedScreenTypesIntoTheFocusedField() {
+        fun snapshot(lease: Boolean, direction: org.desklink.mobile.webrtc.WebRtcScreenDirection?) =
+            org.desklink.mobile.webrtc.WebRtcRemoteSessionController.Snapshot(
+                org.desklink.mobile.webrtc.WebRtcRemoteSessionState.CONTROLLING, "s", direction, lease,
+            )
+        val phoneScreen = org.desklink.mobile.webrtc.WebRtcScreenDirection.PHONE_TO_DESKTOP
+        assertTrue(MouseReceiverPlugin.takesKeys(snapshot(true, phoneScreen)))
+        assertFalse("no control, no typing", MouseReceiverPlugin.takesKeys(snapshot(false, phoneScreen)))
+        assertFalse("the phone viewing the desk is not the desk typing here",
+            MouseReceiverPlugin.takesKeys(snapshot(true, org.desklink.mobile.webrtc.WebRtcScreenDirection.DESKTOP_TO_PHONE)))
+        assertFalse(MouseReceiverPlugin.takesKeys(null))
     }
 
     @Test
