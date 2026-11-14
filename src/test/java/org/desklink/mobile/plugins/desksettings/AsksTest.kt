@@ -242,6 +242,16 @@ class AsksTest {
     }
 
     @Test
+    fun allowForControlOnlyOpensTheAccessibilitySetupAndTurnsNothingOn() {
+        assertFalse("off while the service is not running", Asks.isOn(app, device, Asks.Feature.CONTROL))
+        val activity = allow("control").get()
+        settle()
+        assertEquals(org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity::class.java.name, shadowOf(activity).nextStartedActivity?.component?.className)
+        assertTrue("nothing enabled from the ask", enabled.isEmpty() && !Glide.allowed(app, DESK))
+        assertTrue("done at once", activity.isFinishing)
+    }
+
+    @Test
     fun theConsentScreenRefusesAnUnknownDeskOrKey() {
         assertTrue(Robolectric.buildActivity(AskConsentActivity::class.java, Asks.allowIntent(app, "nobody", "contacts")).setup().get().isFinishing)
         assertTrue(Robolectric.buildActivity(AskConsentActivity::class.java, Asks.allowIntent(app, DESK, "terminalAccess")).setup().get().isFinishing)

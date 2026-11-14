@@ -1249,6 +1249,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="ask_feature_photos">get your new photos and screenshots</string>
     <string name="ask_feature_dnd">share Do Not Disturb</string>
     <string name="ask_feature_clipboard">share the clipboard</string>
+    <string name="ask_feature_control">control this phone</string>
     <string name="ask_prompt_text">Nothing changes unless you tap Allow.</string>
     <string name="ask_public_title">A request from your computer</string>
     <string name="ask_public_text">Unlock to answer it</string>

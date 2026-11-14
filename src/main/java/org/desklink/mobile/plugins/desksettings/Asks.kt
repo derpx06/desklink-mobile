@@ -65,6 +65,9 @@ object Asks {
         PHOTOS("photos", R.string.ask_feature_photos, Kind.SETTING),
         DND("dnd", R.string.ask_feature_dnd, Kind.SPECIAL),
         CLIPBOARD("clipboard", R.string.ask_feature_clipboard, Kind.SETTING),
+
+        /** Control of this phone's screen from the desk: DeskLink's accessibility service, which only the person turns on. */
+        CONTROL("control", R.string.ask_feature_control, Kind.SPECIAL),
         ;
 
         /** The runtime permissions Allow asks Android for (empty: none, or a special access instead). */
@@ -120,6 +123,8 @@ object Asks {
                 org.desklink.mobile.plugins.gallery.GalleryWatcher.folders(context, device.deviceId).isNotEmpty()
             Feature.DND -> org.desklink.mobile.plugins.battery.DndSync.canSet(context)
             Feature.CLIPBOARD -> pluginOn(device, org.desklink.mobile.plugins.clipboard.ClipboardPlugin::class.java)
+            // Running, not only switched on: control is refused while the service is not bound.
+            Feature.CONTROL -> org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.running()
         }
     }.getOrDefault(false)
 
@@ -135,6 +140,7 @@ object Asks {
             Feature.PHOTOS -> org.desklink.mobile.plugins.gallery.GalleryWatcher.setOn(context, device.deviceId, true)
             Feature.DND -> Unit // The switch is the desk's (dndSync); the phone only grants the access.
             Feature.CLIPBOARD -> plugin(org.desklink.mobile.plugins.clipboard.ClipboardPlugin::class.java)
+            Feature.CONTROL -> Unit // Nothing to switch here: the person turns the service on in Android's settings.
         }
     }
 

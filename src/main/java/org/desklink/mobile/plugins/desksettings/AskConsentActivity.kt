@@ -73,6 +73,13 @@ class AskConsentActivity : ComponentActivity() {
                 }
                 done()
             }
+            feature == Asks.Feature.CONTROL -> {
+                // Only the accessibility setup (disclosure, then Android's page): nothing is turned on from here.
+                if (!org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.running()) {
+                    org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.open(this)
+                }
+                done()
+            }
             feature.kind == Asks.Kind.PERMISSION && feature.permissions().any { checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED } ->
                 org.desklink.mobile.helpers.PermissionRecovery.requestOrExplain(this, feature.permissions().toTypedArray(), request::launch)
             feature.specialAction() != null && !specialGranted(feature) -> {

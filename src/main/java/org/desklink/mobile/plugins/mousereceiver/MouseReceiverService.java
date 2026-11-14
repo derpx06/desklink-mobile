@@ -58,6 +58,8 @@ public class MouseReceiverService extends AccessibilityService {
         MouseReceiverService.instance = this;
         Log.i("MouseReceiverService", "created");
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.reportAllowedToAll();
+        // Ask on phone for control (asks.json toPhone "control"): the desks hear it is on or off now.
+        org.desklink.mobile.plugins.desksettings.Asks.INSTANCE.reportAll();
     }
 
     @Override
@@ -449,6 +451,8 @@ public class MouseReceiverService extends AccessibilityService {
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(true);
         if (instance == this) instance = null;
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.reportAllowedToAll();
+        // Ask on phone for control (asks.json toPhone "control"): the desks hear it is on or off now.
+        org.desklink.mobile.plugins.desksettings.Asks.INSTANCE.reportAll();
         if (windowManager != null && cursorView != null) {
             try {
                 windowManager.removeView(cursorView);
@@ -464,6 +468,8 @@ public class MouseReceiverService extends AccessibilityService {
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(true);
         if (instance == this) instance = null;
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.reportAllowedToAll();
+        // Ask on phone for control (asks.json toPhone "control"): the desks hear it is on or off now.
+        org.desklink.mobile.plugins.desksettings.Asks.INSTANCE.reportAll();
         return super.onUnbind(intent);
     }
 

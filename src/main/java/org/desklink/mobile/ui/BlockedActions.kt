@@ -36,11 +36,6 @@ object BlockedActions {
         "ask_blocked" to "Ask again (and the desk's window shows the request)",
     )
 
-    /** Blocked states another branch adds; listed so the rule covers them once merged (not checked for existence). */
-    val PENDING: Map<String, String> = mapOf(
-        "Control is off on the phone (phone-screen view, screen-fix branch)" to "Ask on phone from the desk; Allow on the phone",
-    )
-
     /** Every place a computer-side switch blocks a feature on the phone -> the asks.json toDesk key its Ask on computer sends. */
     val ASK_ON_COMPUTER: Map<String, String> = mapOf(
         "Terminals tab and terminal screen: terminal access off" to "terminalAccess",
