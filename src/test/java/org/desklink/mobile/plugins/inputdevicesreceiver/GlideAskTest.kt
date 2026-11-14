@@ -44,7 +44,10 @@ class GlideAskTest {
     private fun notices() = shadowOf(app.getSystemService(NotificationManager::class.java)).allNotifications
 
     @After
-    fun clear() = Glide.setAllowed(app, "desk-ask", false)
+    fun clear() {
+        Glide.setAllowed(app, "desk-ask", false)
+        Glide.clearNotices("desk-ask")
+    }
 
     @Test
     fun everyStateHasItsPrompt() {
@@ -157,5 +160,22 @@ class GlideAskTest {
         val p = plugin()
         repeat(50) { p.onPacketReceived(ask()) }
         assertEquals(1, notices().size)
+    }
+
+    @Test
+    fun anAskIsRememberedForHomeUntilAnswered() {
+        assertFalse(Glide.asking("desk-ask"))
+        plugin().onPacketReceived(ask())
+        assertTrue("Home's Glide row offers Allow", Glide.asking("desk-ask"))
+        Glide.setAllowed(app, "desk-ask", true)
+        assertFalse("turning it on answers it", Glide.asking("desk-ask"))
+        // Both notices fade after NOTICE_MS; the next glide clears a refusal at once.
+        Glide.markRefusedLocked("x", now = 1_000L)
+        assertTrue(Glide.refusedLocked("x", now = 1_000L + Glide.NOTICE_MS - 1))
+        assertFalse(Glide.refusedLocked("x", now = 1_000L + Glide.NOTICE_MS))
+        Glide.markRefusedLocked("x", now = 1_000L)
+        Glide.begin("x", Glide.TOP_EDGE, null, now = 2_000L)
+        Glide.end()
+        assertFalse(Glide.refusedLocked("x", now = 2_000L))
     }
 }

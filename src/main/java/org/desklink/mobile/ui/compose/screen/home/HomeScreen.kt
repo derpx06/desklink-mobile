@@ -187,6 +187,8 @@ data class HomeState(
     val terminalAttention: Boolean = false,
     /** Notifications are not allowed on this phone (Android 13+): a one-line nudge with a button. */
     val notificationsOff: Boolean = false,
+    /** This phone's side of each feature: missing permissions and Glide ("Everything DeskLink does"). */
+    val phone: PhoneFacts = PhoneFacts(),
 ) {
     val ready get() = connection == DeviceConnection.LOCAL || connection == DeviceConnection.AWAY || connection == DeviceConnection.CONNECTED
 }
@@ -240,6 +242,10 @@ class HomeActions(
     val onTurnOnNotifications: () -> Unit = {},
     /** The "Get started" guide. */
     val onGuide: () -> Unit = {},
+    /** A row of "Everything DeskLink does" needs a step: run it (a permission, a switch, Glide). Its page opens after, from Home. */
+    val onFeatureStep: (featureId: String, step: FeatureStep) -> Unit = { _, _ -> },
+    /** Quick Settings tiles and widgets: offers a tile (Android 13+), or says how. */
+    val onAddTiles: () -> Unit = {},
 )
 
 /** From this width the screen has two columns: what you can do on the left, what is going on on the right. */
@@ -269,6 +275,27 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
     }
 
     var playerOpen by rememberSaveable { mutableStateOf(false) }
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    // A row of "Everything DeskLink does": open it, run its step (then open its page), look again, or say why not.
+    val onFeatureRow: (Feature, FeatureStatus) -> Unit = { f, status ->
+        fun open() {
+            if (f.open == Everything.OPEN_PLAYER) {
+                if (state.media != null) playerOpen = true else actions.onMessage(resources.getString(R.string.everything_media_nothing, state.name))
+            } else openAction(f.open, actions) { linkDialog = true }
+        }
+        when (Everything.action(status)) {
+            RowAction.OPEN -> open()
+            RowAction.STEP -> {
+                val step = (status as FeatureStatus.Step).step
+                actions.onFeatureStep(f.id, step)
+                if (Everything.opensAfter(f, step)) open()
+            }
+            RowAction.RETRY -> actions.onRetry()
+            RowAction.EXPLAIN -> (status as FeatureStatus.Off).let { off ->
+                off.why?.let { actions.onMessage(resources.getString(it, state.name)) } ?: actions.onBlocked(f.action ?: f.id, resources.getString(f.name), off.blocker)
+            }
+        }
+    }
     // Where the card's artwork is, for the player to grow from.
     val cardArt = remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     val quiet = linkGlyphState(state.connection, state.path) == LinkGlyphState.OFFLINE
@@ -338,6 +365,8 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
                         org.desklink.mobile.plugins.folders.BucketHomeCard(state.deviceId, state.name, onOpen = actions.onBucket)
                     }
                 }
+                // Last: where everything is, each with its one step. Full width in both layouts.
+                EverythingSection(state, onFeatureRow)
             }
             }
         }

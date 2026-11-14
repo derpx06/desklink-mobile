@@ -97,6 +97,8 @@ object PaletteModel {
         const val NEW_TERMINAL = "action:new-terminal"
         const val OPEN_TERMINALS = "action:terminals"
         const val NEW_NOTE = "action:new-note"
+        /** The Notes tab (Home's "Everything DeskLink does"; the palette offers a new note instead). */
+        const val OPEN_NOTES = "action:notes"
         const val OPEN_BUCKET = "action:bucket"
         const val PAIR_ANOTHER = "action:pair-another"
         const val GUIDE = "action:guide"

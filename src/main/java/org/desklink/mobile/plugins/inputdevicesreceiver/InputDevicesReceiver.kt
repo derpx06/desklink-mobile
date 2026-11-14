@@ -143,6 +143,7 @@ class InputDevicesReceiverPlugin : Plugin() {
             Glide.allowed(context, device.deviceId), MouseReceiverService.instance != null)
         if (prompt == Glide.Prompt.NONE) return reportAllowed()
         Log.i(TAG, "The desk asks for Glide ($prompt)")
+        Glide.markAsked(device.deviceId)
         @android.annotation.SuppressLint("MissingPermission")
         fun post() = androidx.core.app.NotificationManagerCompat.from(context)
             .notify(askTag(device.deviceId), ASK_NOTICE_ID, askNotice(context, device.deviceId, device.name, prompt, MouseReceiverService.instance != null))
@@ -167,6 +168,7 @@ class InputDevicesReceiverPlugin : Plugin() {
         // Not allowed, no accessibility service, a dark screen (nobody to see the pointer), or a nonsense edge: hand it straight back (G5).
         if (!Glide.validEdge(edge) || !Glide.allowed(context, device.deviceId) || MouseReceiverService.instance == null || !screenIsOn() || locked()) {
             Log.i(TAG, "Glide refused (allowed=${Glide.allowed(context, device.deviceId)}, service=${MouseReceiverService.instance != null}, locked=${locked()})")
+            if (locked()) Glide.markRefusedLocked(device.deviceId)
             sendRelease(0, deltay.coerceIn(-Glide.MAX_DESK_PX, Glide.MAX_DESK_PX).toInt())
             // And the reason as state, so the desk stops arming the edge for nothing.
             reportAllowed()

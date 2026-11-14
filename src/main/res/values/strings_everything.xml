@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- Home: "Everything DeskLink does", the list at the end of Home. %1$s is the computer's name. -->
+    <string name="everything_title">Everything DeskLink does</string>
+    <string name="everything_subtitle">Where each thing is, and one tap to start it with %1$s.</string>
+
+    <string name="everything_group_share">Share &amp; files</string>
+    <string name="everything_group_screen">Screen &amp; control</string>
+    <string name="everything_group_calls">Calls &amp; messages</string>
+    <string name="everything_group_notes">Notes, clipboard &amp; sound</string>
+    <string name="everything_group_more">More</string>
+
+    <string name="everything_status_ready">Ready</string>
+    <string name="everything_status_step">One step needed</string>
+    <string name="everything_status_off">Not possible right now</string>
+
+    <string name="everything_send">Send</string>
+    <string name="everything_share">Share</string>
+    <string name="everything_lock">Lock</string>
+    <string name="everything_unlock">Unlock</string>
+    <string name="everything_ring">Ring</string>
+    <string name="everything_ping">Ping</string>
+    <string name="everything_add">Add</string>
+    <string name="everything_pair">Pair</string>
+    <string name="everything_what_to_do">What to do</string>
+
+    <string name="everything_send_files_line">Photos and files to %1$s</string>
+    <string name="everything_send_link_line">Open a web page on %1$s</string>
+    <string name="everything_bucket_line">A folder that stays the same on both, even offline</string>
+    <string name="everything_desk_screen_line">See %1$s and use this phone as its touchpad</string>
+    <string name="everything_extend">Second screen</string>
+    <string name="everything_extend_line">In Desk screen, choose Extend to add this phone as a screen</string>
+    <string name="everything_share_screen_line">Show this phone on %1$s and use it from there</string>
+    <string name="everything_glide_line">Move %1$s\'s mouse past its screen edge onto this phone</string>
+    <string name="everything_terminals_line">Command lines you can use on both</string>
+    <string name="everything_lock_line">Lock %1$s from here</string>
+    <string name="everything_unlock_line">Unlock %1$s with this phone when you are close by</string>
+    <string name="everything_notifications">Notifications on the computer</string>
+    <string name="everything_notifications_line">See and answer this phone\'s notifications on %1$s</string>
+    <string name="everything_desk_notifications">Computer notifications here</string>
+    <string name="everything_desk_notifications_line">%1$s\'s notifications show on this phone</string>
+    <string name="everything_calls_line">See who is calling, answer and dial from %1$s</string>
+    <string name="everything_contacts_line">Caller names and contacts on %1$s</string>
+    <string name="everything_clipboard_line">Copy on one, paste on the other</string>
+    <string name="everything_notes_line">Notes that show on both</string>
+    <string name="everything_media">Music and videos</string>
+    <string name="everything_media_line">Play, pause and skip what is playing on %1$s</string>
+    <string name="everything_media_nothing">Nothing is playing on %1$s right now. Start something there and it shows here.</string>
+    <string name="everything_ring_line">Find %1$s by making it ring. It can ring this phone too.</string>
+    <string name="everything_ping_line">Check that %1$s hears this phone</string>
+    <string name="everything_tiles">Tiles and widgets</string>
+    <string name="everything_tiles_line">Start things from Quick Settings or your home screen</string>
+    <string name="everything_pair_line">Add another computer the same way</string>
+
+    <string name="everything_step_turn_on">Turned off on this phone. Turn it on for %1$s.</string>
+    <string name="everything_step_permission">Needs a permission on this phone</string>
+    <string name="everything_step_notification_access">Needs notification access on this phone</string>
+    <string name="everything_step_notifications">Needs permission to show notifications</string>
+    <string name="everything_step_calls">Needs permission for calls</string>
+    <string name="everything_step_contacts">Needs permission for contacts</string>
+    <string name="everything_glide_asking">%1$s is asking to use Glide</string>
+    <string name="everything_glide_off">Off. Turn it on, then move %1$s\'s mouse past its screen edge.</string>
+    <string name="everything_glide_locked">Stopped while this phone was locked. It is unlocked now, so try again.</string>
+    <string name="everything_turned_on">%1$s is on for %2$s</string>
+    <string name="everything_glide_again">%1$s can Glide onto this phone again</string>
+    <string name="everything_glide_cant">%1$s can\'t Glide yet. Update DeskLink there.</string>
+</resources>
