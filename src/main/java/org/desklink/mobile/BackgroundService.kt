@@ -181,6 +181,20 @@ class BackgroundService : Service() {
         }.onFailure { Log.d(LOG_TAG, "Ignoring discovery refresh during service shutdown", it) }
     }
 
+    /** A LAN network came up or back: each provider re-announces, and the LAN one dials its desks on it. */
+    private fun networkAvailable(network: Network) {
+        if (!initialized) return
+        runCatching {
+            networkChangeExecutor.execute {
+                if (!initialized) return@execute
+                for (linkProvider in linkProviders) {
+                    runCatching { linkProvider.onNetworkAvailable(network) }
+                        .onFailure { Log.w(LOG_TAG, "Link-provider network-available failed", it) }
+                }
+            }
+        }.onFailure { Log.d(LOG_TAG, "Ignoring network-available during service shutdown", it) }
+    }
+
     /**
      * The interface the links and WebRTC candidates were bound to is gone or
      * re-addressed: drop the LAN links, re-announce, and rebuild WebRTC now
@@ -260,7 +274,9 @@ class BackgroundService : Service() {
                 // Wi-Fi, ethernet) moves nothing that exists: announce on it,
                 // drop nothing. Previously only the *first* network did
                 // anything, so a switch never triggered discovery at all.
-                if (!isVpn(network)) refreshDiscovery()
+                // Wi-Fi back after a drop: dial the desks on it at once
+                // rather than wait for a desk to notice its stale socket (F20).
+                if (!isVpn(network)) networkAvailable(network)
             }
 
             override fun onLost(network: Network) {
