@@ -212,6 +212,11 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
             android:name="org.desklink.mobile.plugins.handoff.HandoffPlugin$DismissReceiver"
             android:exported="false" />
 
+        <!-- Not now on a desk's ask to see this screen. Not exported: no other app may answer it. -->
+        <receiver
+            android:name="org.desklink.mobile.plugins.screen.ScreenControlPlugin$AskReceiver"
+            android:exported="false" />
+
         <!-- "Copy" on "Open link from <desk>". -->
         <receiver
             android:name="org.desklink.mobile.plugins.share.LinkFromDesk$CopyReceiver"

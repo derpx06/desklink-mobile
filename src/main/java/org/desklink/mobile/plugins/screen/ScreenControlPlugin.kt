@@ -314,10 +314,8 @@ class ScreenControlPlugin : Plugin() {
     override fun onPacketReceived(np: NetworkPacket): Boolean {
         when (np.type) {
             PACKET_TYPE_SCREEN_REQUEST -> {
-                if (np.getString("role", "") == ROLE_PHONE_SCREEN && shouldPromptForCapture()) {
-                    promptedAt = android.os.SystemClock.elapsedRealtime()
-                    screenSessionActive = true
-                    promptForCapture(offered = np.getBoolean(OFFERED_FIELD, false))
+                if (np.getString("role", "") == ROLE_PHONE_SCREEN) {
+                    askForCapture(np.getBoolean(OFFERED_FIELD, false), capturing = phoneCaptureRequested)
                 }
             }
             PACKET_TYPE_SCREEN_READY -> {
@@ -378,50 +376,48 @@ class ScreenControlPlugin : Plugin() {
         screenSessionActive = false
     }
 
-    /** Not while capture runs, nor while a prompt from the last 30 s may
-     * still be on screen. It used to be a latch: a prompt Android silently
-     * blocked (background activity launch) left it set, and every later
-     * request from the desktop was ignored with nothing shown. */
-    private fun shouldPromptForCapture(): Boolean {
-        if (phoneCaptureRequested) return false
-        val since = promptedAt ?: return true
-        return android.os.SystemClock.elapsedRealtime() - since > PROMPT_PENDING_MS
+    /**
+     * A desk asks to see this phone's screen. [capturing] is whether the capture really runs (the transport's word, from the
+     * coordinator): a flag of this plugin's own used to say "already sharing" after the share had been stopped by the phone's
+     * own Desk screen or a reconnect, and every later ask from the desk was ignored with nothing shown (owner, 11-14).
+     */
+    fun askForCapture(offered: Boolean, capturing: Boolean) {
+        if (capturing) return
+        phoneCaptureRequested = false
+        screenSessionActive = true
+        promptForCapture(offered)
     }
 
-    /** Android blocks activity starts from the background without telling
-     * us, so the consent prompt is also offered as a notification: tapping it
-     * is a user action, which Android always lets open the prompt. */
+    /** The share ended, however (the phone's own stop, End, a reconnect): the next ask from a desk prompts again. */
+    fun onPhoneCaptureEnded() {
+        phoneCaptureRequested = false
+        promptedAt = null
+    }
+
+    /**
+     * Android's consent prompt, opened directly when Android lets this app start it (it is in front), and always a heads-up
+     * notification with Allow and Not now: an activity started from the background is blocked on Android 10+ and ColorOS
+     * without a word. One per desk, posted again (alerting again) on each ask, gone when answered or after
+     * [PROMPT_TIMEOUT_MS] (the desk's own wait).
+     */
     private fun promptForCapture(offered: Boolean) {
-        val intent = Intent(context, ScreenProjectionActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .putExtra(ScreenProjectionActivity.EXTRA_DEVICE_ID, device.deviceId)
-        try {
-            context.startActivity(intent)
-        } catch (exception: RuntimeException) {
-            Log.w(TAG, "Could not open the screen-sharing prompt directly", exception)
+        val now = android.os.SystemClock.elapsedRealtime()
+        // Not twice within the window: a second system prompt would stack on the first.
+        if (promptedAt?.let { now - it < PROMPT_PENDING_MS } != true) {
+            promptedAt = now
+            try {
+                context.startActivity(projectionIntent(context, device.deviceId))
+            } catch (exception: RuntimeException) {
+                Log.w(TAG, "Could not open the screen-sharing prompt directly", exception)
+            }
         }
         // Offered from this phone's own Share screen: the person is in the app, no notification.
         if (offered) return
-        val pending = android.app.PendingIntent.getActivity(
-            context,
-            device.deviceId.hashCode(),
-            intent,
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = androidx.core.app.NotificationCompat.Builder(
-            context,
-            org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS,
-        )
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(context.getString(R.string.screen_share_prompt_title, device.name))
-            .setContentText(context.getString(R.string.screen_share_prompt_text))
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
-            .setTimeoutAfter(PROMPT_PENDING_MS)
-            .build()
-        context.getSystemService(android.app.NotificationManager::class.java)
-            ?.notify(PROMPT_NOTIFICATION_ID, notification)
+        Log.i(TAG, "The desk asks to see this screen: prompt posted")
+        @android.annotation.SuppressLint("MissingPermission")
+        fun post() = androidx.core.app.NotificationManagerCompat.from(context)
+            .notify(askTag(device.deviceId), PROMPT_NOTIFICATION_ID, askNotice(context, device.deviceId, device.name))
+        runCatching { post() }.onFailure { Log.w(TAG, "The screen-sharing prompt could not be shown (${it.javaClass.simpleName})") }
     }
 
     fun onPhoneCapturePermissionFinished(granted: Boolean) {
@@ -445,6 +441,14 @@ class ScreenControlPlugin : Plugin() {
         latestStatus = reason.ifBlank { context.getString(R.string.remote_screen_error) }
     }
 
+    /** Not now on a desk's ask. Not exported: no other app may answer for the person. */
+    class AskReceiver : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: Intent) {
+            val deviceId = intent.getStringExtra(EXTRA_DEVICE) ?: return
+            if (intent.action == ACTION_NOT_NOW) declined(context, deviceId)
+        }
+    }
+
     override val supportedPacketTypes: Array<String> = SCREEN_PACKET_TYPES
     override val outgoingPacketTypes: Array<String> = SCREEN_PACKET_TYPES
 
@@ -462,6 +466,71 @@ class ScreenControlPlugin : Plugin() {
         const val REASON_BUSY = "busy"
         const val PROMPT_NOTIFICATION_ID = 1702
         private const val PROMPT_PENDING_MS = 30_000L
+
+        /** The prompt goes after this long; the desk stops waiting then too (`remote_control::ASK_WAIT`). */
+        const val PROMPT_TIMEOUT_MS = 60_000L
+
+        /** `reason` of the `screen-error` sent for "Not now" (the desk says "Not allowed on <phone>"). */
+        const val REASON_DECLINED = "declined"
+
+        const val ACTION_NOT_NOW = "org.desklink.mobile.screen.NOT_NOW"
+        const val EXTRA_DEVICE = "deviceId"
+
+        @JvmStatic
+        fun askTag(deviceId: String) = "screen-ask-$deviceId"
+
+        @JvmStatic
+        fun cancelAsk(context: android.content.Context, deviceId: String) =
+            androidx.core.app.NotificationManagerCompat.from(context).cancel(askTag(deviceId), PROMPT_NOTIFICATION_ID)
+
+        @JvmStatic
+        fun projectionIntent(context: android.content.Context, deviceId: String): Intent =
+            Intent(context, ScreenProjectionActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(ScreenProjectionActivity.EXTRA_DEVICE_ID, deviceId)
+
+        /** "<desk> wants to see your screen" with Allow (Android's own consent prompt next) and Not now. */
+        @JvmStatic
+        fun askNotice(context: android.content.Context, deviceId: String, deskName: String): android.app.Notification {
+            val code = askTag(deviceId).hashCode()
+            val flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            val allow = android.app.PendingIntent.getActivity(context, code, projectionIntent(context, deviceId), flags)
+            val notNow = android.app.PendingIntent.getBroadcast(
+                context, code + 1,
+                Intent(context, AskReceiver::class.java).setAction(ACTION_NOT_NOW).putExtra(EXTRA_DEVICE, deviceId),
+                flags,
+            )
+            val text = context.getString(R.string.screen_share_prompt_text)
+            return androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.screen_share_prompt_title, deskName))
+                .setContentText(text)
+                .setStyle(androidx.core.app.NotificationCompat.BigTextStyle().bigText(text))
+                // Heads-up: the channel is high importance; this is the same for Android 7.
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(allow)
+                .addAction(
+                    androidx.core.app.NotificationCompat.Action.Builder(0, context.getString(R.string.screen_share_prompt_allow), allow)
+                        // Never from the lock screen without unlocking: the desk would see this phone.
+                        .setAuthenticationRequired(true)
+                        .build(),
+                )
+                .addAction(0, context.getString(R.string.screen_share_prompt_not_now), notNow)
+                .setAutoCancel(true)
+                .setTimeoutAfter(PROMPT_TIMEOUT_MS)
+                .build()
+        }
+
+        /** "Not now": the prompt goes and the desk hears it was declined (it stops waiting and says so). */
+        @JvmStatic
+        fun declined(context: android.content.Context, deviceId: String) {
+            cancelAsk(context, deviceId)
+            val app = org.desklink.mobile.DeskLinkApplication.getInstance()
+            app.getDevicePlugin(deviceId, ScreenControlPlugin::class.java)?.onPhoneCaptureEnded()
+            org.desklink.mobile.helpers.ThreadHelper.execute {
+                runCatching { app.reportWebRtcScreenCaptureFailure(deviceId, REASON_DECLINED) }
+            }
+        }
         const val ROLE_DESKTOP_SCREEN = "desktop-screen"
         const val DEFAULT_MAX_DIMENSION = 1280
         const val DEFAULT_FPS = 6
