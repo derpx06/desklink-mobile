@@ -81,6 +81,8 @@ class WebRtcSessionCoordinator(
     /** The desktop's last offered attempt, named in a restart request so it is not taken for stale. */
     private var lastPeerAttemptId: String? = null
     private var activeBinding: SessionBinding? = null
+    /** Written under [lock]; volatile so [wireForCallback] can read it without the lock. */
+    @Volatile
     private var activeWireBinding: WebRtcWireBinding? = null
     private var transport: WebRtcTransport? = null
     private var handover = HandoverRuntime()
@@ -636,6 +638,30 @@ class WebRtcSessionCoordinator(
     /** Identifies the live WebRTC connection (its session id), or null without one. */
     fun connectionKey(): Long? = synchronized(lock) { activeWireBinding?.sessionId }
 
+    /**
+     * A liveness-channel message, answered where it arrives: on libwebrtc's signalling thread. Never takes [lock] (F42): a
+     * [lock] holder blocked in a libwebrtc call that needs this thread would wait for it forever.
+     */
+    internal fun onLivenessEnvelope(binding: SessionBinding, envelope: WebRtcEnvelope) {
+        runCatching {
+            require(sessions.isCurrent(binding)) { "Stale DeskLink session" }
+            peerLiveness.onInbound(SystemClock.elapsedRealtime())
+            val wire = requireNotNull(wireForCallback()) { "No active DeskLink WebRTC wire binding" }
+            envelope.requireBoundTo(wire.peerDeviceId, wire.sessionId, wire.generation)
+            // Heartbeats are idempotent, so no replay-cache entry; only a heartbeat may use this channel.
+            val packet = WebRtcPacketBridge.decode(wire, envelope)
+            require(packet.type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT) { "Only heartbeats use the liveness channel" }
+            device.onWebRtcPacketReceived(packet)
+        }.onFailure { Log.w(TAG, "Rejected a liveness message: ${it.message}") }
+    }
+
+    /**
+     * The current wire, read without [lock]. The liveness channel is answered on libwebrtc's signalling thread, and a [lock]
+     * holder can be blocked in a libwebrtc call that waits for that thread (`setAudioRecording` when the phone's sound starts):
+     * taking the lock there deadlocked the app's main thread (F42).
+     */
+    private fun wireForCallback(): WebRtcWireBinding? = activeWireBinding
+
     /** Called only from a user gesture in the remote-control UI. */
     fun requestRemoteView(direction: WebRtcScreenDirection) {
         remoteActionExecutor.execute {
@@ -1127,18 +1153,7 @@ class WebRtcSessionCoordinator(
                 sendSignal(binding, attemptId, type, payload)
             }
 
-            override fun onLivenessEnvelope(envelope: WebRtcEnvelope) {
-                runCatching {
-                    require(sessions.isCurrent(binding)) { "Stale DeskLink session" }
-                    peerLiveness.onInbound(SystemClock.elapsedRealtime())
-                    val wire = requireNotNull(synchronized(lock) { activeWireBinding }) { "No active DeskLink WebRTC wire binding" }
-                    envelope.requireBoundTo(wire.peerDeviceId, wire.sessionId, wire.generation)
-                    // Heartbeats are idempotent, so no replay-cache entry; only a heartbeat may use this channel.
-                    val packet = WebRtcPacketBridge.decode(wire, envelope)
-                    require(packet.type == DeskLinkProtocol.PACKET_TYPE_HEARTBEAT) { "Only heartbeats use the liveness channel" }
-                    device.onWebRtcPacketReceived(packet)
-                }.onFailure { Log.w(TAG, "Rejected a liveness message: ${it.message}") }
-            }
+            override fun onLivenessEnvelope(envelope: WebRtcEnvelope) = onLivenessEnvelope(binding, envelope)
 
             override fun onFileFrame(frame: ByteArray) {
                 // Any inbound data is proof of life; the manager only queues the frame.
