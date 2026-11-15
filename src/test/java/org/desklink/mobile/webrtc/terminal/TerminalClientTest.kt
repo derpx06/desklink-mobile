@@ -310,6 +310,25 @@ class TerminalClientTest {
         assertEquals(true, h.controls(TerminalAction.RESIZE).last().claimSize)
     }
 
+    /** F38: leaving the terminal gives the size back on the desk; opening it again must not take it from the desk window. */
+    @Test
+    fun reopeningASessionThePhoneCreatedDoesNotClaimTheSizeAgain() {
+        val h = Harness()
+        h.ready(); h.listed()
+        h.client.create(30, 50)
+        h.fromHost(h.hostControl(TerminalAction.CREATED).copy(terminalId = "t9", rows = 30, cols = 50))
+        h.listed(TerminalSessionInfo("t9", "bash", 30, 50, deskWindow = true, phoneSize = true))
+        h.client.sink("t9", 30, 50)
+        h.client.attachOrResize("t9", 30, 50)
+        h.attached("t9", rows = 30, cols = 50)
+
+        h.client.detach("t9")
+        h.listed(TerminalSessionInfo("t9", "bash", 41, 110, deskWindow = true))
+        h.client.attachOrResize("t9", 30, 50)
+        h.attached("t9", rows = 41, cols = 110)
+        assertEquals(null, h.controls(TerminalAction.RESIZE).last().claimSize)
+    }
+
     @Test
     fun aLayoutChangeDuringAnAttachDoesNotUndoTheDesktopsGeometry() {
         val h = Harness()

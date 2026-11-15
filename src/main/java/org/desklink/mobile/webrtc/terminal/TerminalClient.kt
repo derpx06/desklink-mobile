@@ -702,6 +702,9 @@ class TerminalClient(
         session.wanted = false
         session.attached = false
         session.awaitingAttach = false
+        // The desk gives the size back on a detach; opening the session again must not take it from a desk window
+        // (F38). Only "Use phone size" claims it again. A dropped link is not a detach: that keeps the claim.
+        session.wantsClaim = false
         if (linkUp) sendControl(control(TerminalAction.DETACH).copy(terminalId = id))
         publish()
     }
