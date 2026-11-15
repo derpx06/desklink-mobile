@@ -75,4 +75,39 @@ class ScreenAskTest {
         plugin().askForCapture(offered = true, capturing = false)
         assertTrue(notices().isEmpty())
     }
+
+    /** Owner (11-15): the ask must be a pop-up over the open app whenever Android lets one start; a notification otherwise. */
+    @Test
+    fun theAskIsAPopUpWheneverAndroidLetsOneStart() {
+        fun route(front: Boolean = false, overlay: Boolean = false, companion: Boolean = false, fullScreen: Boolean = false) =
+            ScreenControlPlugin.askRoute(front, overlay, companion, fullScreen)
+        assertEquals(ScreenControlPlugin.AskRoute.POPUP, route(front = true))
+        assertEquals(ScreenControlPlugin.AskRoute.POPUP, route(overlay = true))
+        assertEquals(ScreenControlPlugin.AskRoute.POPUP, route(companion = true, fullScreen = true))
+        assertEquals(ScreenControlPlugin.AskRoute.FULL_SCREEN, route(fullScreen = true))
+        assertEquals(ScreenControlPlugin.AskRoute.NOTICE, route())
+    }
+
+    /** Allowed to draw over other apps: the pop-up opens, and the heads-up follows only if it never came up. */
+    @Test
+    fun aPopUpThatNeverCameUpFallsBackToTheNotification() {
+        org.robolectric.shadows.ShadowSettings.setCanDrawOverlays(true)
+        plugin().askForCapture(offered = false, capturing = false)
+        val started = shadowOf(app).nextStartedActivity
+        assertEquals(ScreenAskActivity::class.java.name, started.component?.className)
+        assertEquals("desk-screen", started.getStringExtra(ScreenAskActivity.EXTRA_DEVICE_ID))
+        assertTrue("no notification over the pop-up", notices().isEmpty())
+        org.robolectric.shadows.ShadowLooper.idleMainLooper(2, java.util.concurrent.TimeUnit.SECONDS)
+        assertEquals("Workbench wants to see your screen", notices().single().extras.getString("android.title"))
+    }
+
+    /** Only a paired desk's ask comes up (the activity is not exported either). */
+    @Test
+    fun anAskFromAnUnknownDeskOpensNoPopUp() {
+        val activity = org.robolectric.Robolectric.buildActivity(
+            ScreenAskActivity::class.java,
+            ScreenControlPlugin.askIntent(app, "desk-screen"),
+        ).create().get()
+        assertTrue("an unknown desk gets no pop-up", activity.isFinishing)
+    }
 }

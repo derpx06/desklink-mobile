@@ -395,28 +395,49 @@ class ScreenControlPlugin : Plugin() {
     }
 
     /**
-     * Android's consent prompt, opened directly when Android lets this app start it (it is in front), and always a heads-up
-     * notification with Allow and Not now: an activity started from the background is blocked on Android 10+ and ColorOS
-     * without a word. One per desk, posted again (alerting again) on each ask, gone when answered or after
+     * A desk's ask: a pop-up over whatever is open ([ScreenAskActivity]) when Android lets this app start one from the
+     * background ([askRoute]); otherwise, and whenever the pop-up did not come up, the heads-up notification with Allow and
+     * Not now (full-screen when the phone is locked and Android allows it). Offered from this phone's own Share screen, the
+     * person is already in the app: Android's consent prompt at once. One per desk, gone when answered or after
      * [PROMPT_TIMEOUT_MS] (the desk's own wait).
      */
     private fun promptForCapture(offered: Boolean) {
         val now = android.os.SystemClock.elapsedRealtime()
-        // Not twice within the window: a second system prompt would stack on the first.
-        if (promptedAt?.let { now - it < PROMPT_PENDING_MS } != true) {
-            promptedAt = now
-            try {
-                context.startActivity(projectionIntent(context, device.deviceId))
-            } catch (exception: RuntimeException) {
-                Log.w(TAG, "Could not open the screen-sharing prompt directly", exception)
-            }
+        // Not twice within the window: a second prompt would stack on the first.
+        if (promptedAt?.let { now - it < PROMPT_PENDING_MS } == true) {
+            if (ScreenAskActivity.showing != device.deviceId) postAsk(AskRoute.NOTICE)
+            return
         }
-        // Offered from this phone's own Share screen: the person is in the app, no notification.
-        if (offered) return
-        Log.i(TAG, "The desk asks to see this screen: prompt posted")
+        promptedAt = now
+        if (offered) {
+            runCatching { context.startActivity(projectionIntent(context, device.deviceId)) }
+                .onFailure { Log.w(TAG, "Could not open the screen-sharing prompt", it) }
+            return
+        }
+        val route = askRoute(
+            inFront = org.desklink.mobile.helpers.LifecycleHelper.isInForeground,
+            overlayAllowed = android.provider.Settings.canDrawOverlays(context),
+            companion = hasCompanionAssociation(context),
+            // In use, ColorOS showed a full-screen-intent ask nowhere (not even as a heads-up, RMX5070 11-15):
+            // full screen only on a locked or sleeping phone, where Android really opens it.
+            fullScreenAllowed = canUseFullScreenIntent(context) && lockedOrAsleep(context),
+        )
+        Log.i(TAG, "The desk asks to see this screen: $route")
+        if (route != AskRoute.POPUP) return postAsk(route)
+        runCatching { context.startActivity(askIntent(context, device.deviceId)) }
+            .onFailure { Log.w(TAG, "Could not open the screen-sharing pop-up", it) }
+        // Android may refuse a background start without a word: the notification then, unless the pop-up is up.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (!ScreenAskActivity.shownSince(device.deviceId, now) && promptedAt == now) postAsk(AskRoute.NOTICE)
+        }, POPUP_GRACE_MS)
+    }
+
+    private fun postAsk(route: AskRoute) {
         @android.annotation.SuppressLint("MissingPermission")
-        fun post() = androidx.core.app.NotificationManagerCompat.from(context)
-            .notify(askTag(device.deviceId), PROMPT_NOTIFICATION_ID, askNotice(context, device.deviceId, device.name))
+        fun post() = androidx.core.app.NotificationManagerCompat.from(context).notify(
+            askTag(device.deviceId), PROMPT_NOTIFICATION_ID,
+            askNotice(context, device.deviceId, device.name, fullScreen = route == AskRoute.FULL_SCREEN),
+        )
         runCatching { post() }.onFailure { Log.w(TAG, "The screen-sharing prompt could not be shown (${it.javaClass.simpleName})") }
     }
 
@@ -452,6 +473,9 @@ class ScreenControlPlugin : Plugin() {
     override val supportedPacketTypes: Array<String> = SCREEN_PACKET_TYPES
     override val outgoingPacketTypes: Array<String> = SCREEN_PACKET_TYPES
 
+    /** How a desk's ask reaches the person. */
+    enum class AskRoute { POPUP, FULL_SCREEN, NOTICE }
+
     companion object {
         private const val TAG = "DeskLink/ScreenControl"
         const val PACKET_TYPE_SCREEN_REQUEST = DeskLinkProtocol.PACKET_TYPE_SCREEN_REQUEST
@@ -479,6 +503,45 @@ class ScreenControlPlugin : Plugin() {
         @JvmStatic
         fun askTag(deviceId: String) = "screen-ask-$deviceId"
 
+        /** How long a pop-up started from the background has to appear before the notification is posted instead. */
+        private const val POPUP_GRACE_MS = 1_500L
+
+        /**
+         * Pure. A pop-up when Android lets this app start an activity from the background: it is in front, it may draw over
+         * other apps (the person granted Display over other apps), or it has a companion-device association. Otherwise a
+         * full-screen notification where allowed and the phone is locked or asleep, and a plain heads-up notification last.
+         */
+        @JvmStatic
+        fun askRoute(inFront: Boolean, overlayAllowed: Boolean, companion: Boolean, fullScreenAllowed: Boolean): AskRoute = when {
+            inFront || overlayAllowed || companion -> AskRoute.POPUP
+            fullScreenAllowed -> AskRoute.FULL_SCREEN
+            else -> AskRoute.NOTICE
+        }
+
+        private fun hasCompanionAssociation(context: android.content.Context): Boolean {
+            if (android.os.Build.VERSION.SDK_INT < 26) return false
+            return runCatching {
+                val manager = context.getSystemService(android.companion.CompanionDeviceManager::class.java) ?: return false
+                if (android.os.Build.VERSION.SDK_INT >= 33) manager.myAssociations.isNotEmpty()
+                else @Suppress("DEPRECATION") manager.associations.isNotEmpty()
+            }.getOrDefault(false)
+        }
+
+        private fun lockedOrAsleep(context: android.content.Context): Boolean =
+            context.getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true ||
+                context.getSystemService(android.os.PowerManager::class.java)?.isInteractive == false
+
+        /** Android 14+ grants full-screen intents only to call and alarm apps unless the person turns it on. */
+        private fun canUseFullScreenIntent(context: android.content.Context): Boolean =
+            android.os.Build.VERSION.SDK_INT < 34 ||
+                context.getSystemService(android.app.NotificationManager::class.java)?.canUseFullScreenIntent() == true
+
+        @JvmStatic
+        fun askIntent(context: android.content.Context, deviceId: String): Intent =
+            Intent(context, ScreenAskActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(ScreenAskActivity.EXTRA_DEVICE_ID, deviceId)
+
         @JvmStatic
         fun cancelAsk(context: android.content.Context, deviceId: String) =
             androidx.core.app.NotificationManagerCompat.from(context).cancel(askTag(deviceId), PROMPT_NOTIFICATION_ID)
@@ -491,7 +554,12 @@ class ScreenControlPlugin : Plugin() {
 
         /** "<desk> wants to see your screen" with Allow (Android's own consent prompt next) and Not now. */
         @JvmStatic
-        fun askNotice(context: android.content.Context, deviceId: String, deskName: String): android.app.Notification {
+        fun askNotice(
+            context: android.content.Context,
+            deviceId: String,
+            deskName: String,
+            fullScreen: Boolean = false,
+        ): android.app.Notification {
             val code = askTag(deviceId).hashCode()
             val flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
             val allow = android.app.PendingIntent.getActivity(context, code, projectionIntent(context, deviceId), flags)
@@ -501,7 +569,7 @@ class ScreenControlPlugin : Plugin() {
                 flags,
             )
             val text = context.getString(R.string.screen_share_prompt_text)
-            return androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS)
+            val builder = androidx.core.app.NotificationCompat.Builder(context, org.desklink.mobile.helpers.NotificationHelper.Channels.REQUESTS)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(context.getString(R.string.screen_share_prompt_title, deskName))
                 .setContentText(text)
@@ -518,7 +586,12 @@ class ScreenControlPlugin : Plugin() {
                 .addAction(0, context.getString(R.string.screen_share_prompt_not_now), notNow)
                 .setAutoCancel(true)
                 .setTimeoutAfter(PROMPT_TIMEOUT_MS)
-                .build()
+            // Locked or asleep: Android opens the pop-up itself (unlocking first). Never a share without its Allow.
+            if (fullScreen) {
+                builder.setCategory(androidx.core.app.NotificationCompat.CATEGORY_CALL)
+                    .setFullScreenIntent(android.app.PendingIntent.getActivity(context, code + 2, askIntent(context, deviceId), flags), true)
+            }
+            return builder.build()
         }
 
         /** "Not now": the prompt goes and the desk hears it was declined (it stops waiting and says so). */

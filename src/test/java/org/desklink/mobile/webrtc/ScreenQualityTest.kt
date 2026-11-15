@@ -98,7 +98,29 @@ class ScreenQualityTest {
     }
 
     @Test
-    fun thePlayoutDelayTrialIsZero() {
-        assertEquals("WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/", WebRtcRuntime.FIELD_TRIALS)
+    fun onTheLanTheScreenNeverFallsBelowFourMegabits() {
+        // A still screen sends far below its target, and one Wi-Fi delay spike used to drop the
+        // estimate to 300 kbps: a smeared picture for the first seconds of every share.
+        assertEquals(4_000_000, minScreenBitrate(lan = true))
+        assertEquals(300_000, minScreenBitrate(lan = false))
+        assertTrue(minScreenBitrate(lan = true) <= startScreenBitrate(lan = true))
+        assertTrue(minScreenBitrate(lan = false) <= startScreenBitrate(lan = false))
+    }
+
+    @Test
+    fun theFieldTrialsKeepPlayoutAtZeroAndFlushTheQueueOnKeyframes() {
+        assertEquals(
+            "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/" +
+                "WebRTC-Pacer-KeyframeFlushing/Enabled/WebRTC-Pacer-FastRetransmissions/Enabled/",
+            WebRtcRuntime.FIELD_TRIALS,
+        )
+        // libwebrtc's format: name/group/ pairs, so an odd count of separators would garble every trial after it.
+        assertEquals(0, WebRtcRuntime.FIELD_TRIALS.count { it == '/' } % 2)
+    }
+
+    @Test
+    fun thePacerWaitIsTheMeanOverTheLastPackets() {
+        assertEquals(437L, pacerWaitMs(344, 4.271, 1124, 345.26))
+        assertEquals(null, pacerWaitMs(80, 1.0, 80, 1.0))
     }
 }

@@ -97,6 +97,10 @@ internal fun screenDegradationPreference(controlled: Boolean, lan: Boolean = fal
  */
 internal fun screenMaxFramerate(displayFps: Int, lan: Boolean): Int = if (lan) displayFps else minOf(displayFps, 30)
 
+/** Mean pacer wait (ms) of the packets sent between two stats reads; null when none were sent. */
+internal fun pacerWaitMs(lastPackets: Long, lastDelaySeconds: Double, packets: Long, delaySeconds: Double): Long? =
+    (packets - lastPackets).takeIf { it > 0 }?.let { Math.round((delaySeconds - lastDelaySeconds) * 1000.0 / it) }
+
 /** The display rate a share is captured at: 60 when the panel runs at 60 Hz or more, else 30. */
 internal fun phoneScreenFps(refreshHz: Float): Int = if (refreshHz >= 59f) 60 else 30
 
@@ -106,6 +110,15 @@ internal fun phoneScreenFps(refreshHz: Float): Int = if (refreshHz >= 59f) 60 el
  * leave the phone; on the LAN it starts at 8 Mbps (~60 ms) and probes up from there.
  */
 internal fun startScreenBitrate(lan: Boolean): Int = if (lan) 8_000_000 else 2_500_000
+
+/**
+ * The screen's bitrate floor: 4 Mbps on the LAN, 300 kbps elsewhere. A phone screen is mostly still,
+ * so the stream sends far less than its target; the first Wi-Fi delay spike then cut congestion
+ * control to 0.85x that small acknowledged rate and the floor. Measured on the RMX5070: every share
+ * opened at 300 kbps for ~6 s (a smeared 864x1920 picture, 70-160 ms per packet in the pacer), and
+ * mid-share spikes fell to ~2 Mbps. The LAN carries 16 Mbps at 6 ms RTT, so 4 is far inside it.
+ */
+internal fun minScreenBitrate(lan: Boolean): Int = if (lan) 4_000_000 else 300_000
 
 /** The screen's bitrate ceiling: ~16 Mbps on the LAN, 8 elsewhere; congestion control backs off below it. */
 internal fun maxScreenBitrate(lan: Boolean): Int = if (lan) 16_000_000 else 8_000_000
@@ -897,6 +910,8 @@ class WebRtcTransport(
      * the only way to see why libwebrtc holds frames back on a real network. */
     private fun startScreenStatsLog() {
         screenStatsTimer?.cancel()
+        var lastPackets = 0L
+        var lastDelay = 0.0
         screenStatsTimer = java.util.Timer("DeskLink-screen-stats", true).apply {
             schedule(object : java.util.TimerTask() {
                 override fun run() {
@@ -912,9 +927,15 @@ class WebRtcTransport(
                             val source = report.statsMap.values.firstOrNull {
                                 it.type == "media-source" && it.members["kind"] == "video"
                             }?.members
+                            val packets = (out["packetsSent"] as? Number)?.toLong() ?: 0L
+                            val delay = (out["totalPacketSendDelay"] as? Number)?.toDouble() ?: 0.0
+                            // Mean time a packet of the last 2 s waited in the pacer: the phone's share of the lag.
+                            val pacerMs = pacerWaitMs(lastPackets, lastDelay, packets, delay)
+                            lastPackets = packets
+                            lastDelay = delay
                             Log.i(
                                 TAG,
-                                "screen-stats encoder=${out["encoderImplementation"]} " +
+                                "screen-stats pacerMs=$pacerMs encoder=${out["encoderImplementation"]} " +
                                     "srcFps=${source?.get("framesPerSecond")} encFps=${out["framesPerSecond"]} " +
                                     "framesEncoded=${out["framesEncoded"]} framesSent=${out["framesSent"]} " +
                                     "target=${out["targetBitrate"]} availOut=${pair?.get("availableOutgoingBitrate")} " +
@@ -939,12 +960,12 @@ class WebRtcTransport(
      */
     @Synchronized
     private fun configureScreenSender(fps: Int) {
-        val max = maxScreenBitrate(onLan)
-        runCatching { peer.setBitrate(MIN_SCREEN_BITRATE, startScreenBitrate(onLan), max) }
+        val (min, max) = minScreenBitrate(onLan) to maxScreenBitrate(onLan)
+        runCatching { peer.setBitrate(min, startScreenBitrate(onLan), max) }
         updateScreenSender { parameters ->
             parameters.degradationPreference = screenDegradationPreference(screenControlled, onLan)
             parameters.encodings.forEach { encoding ->
-                encoding.minBitrateBps = MIN_SCREEN_BITRATE
+                encoding.minBitrateBps = min
                 encoding.maxBitrateBps = max
                 encoding.maxFramerate = screenMaxFramerate(fps, onLan)
             }
@@ -1141,7 +1162,6 @@ class WebRtcTransport(
 
     companion object {
         private const val TAG = "DeskLink/WebRTC"
-        const val MIN_SCREEN_BITRATE = 300_000
         /** How long after the last frame (and between repeats) the capture re-delivers it for refinement. */
         const val REFINE_AFTER_MS = 100L
         val REQUIRED_LABELS = WebRtcChannel.REQUIRED.map { it.label }.toSet()
