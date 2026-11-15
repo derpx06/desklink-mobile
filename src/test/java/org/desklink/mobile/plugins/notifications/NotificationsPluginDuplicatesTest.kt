@@ -58,4 +58,14 @@ class NotificationsPluginDuplicatesTest {
         assertEquals("a re-post a minute later, or sent again as a resync", first, NotificationsPlugin.contentSignature(packet("hi", "60000", true)))
         assertNotEquals(first, NotificationsPlugin.contentSignature(packet("hi again", "1", false)))
     }
+
+    /** Posted while the link was down (never acknowledged by the desk): the resync is its first arrival, and it banners. */
+    @Test
+    fun aResyncIsSilentOnlyForWhatTheDeskAlreadyHas() {
+        val start = 1_000L
+        assertFalse("posted during the outage", NotificationsPlugin.resyncIsSilent(null, "s1", postTime = 5_000, processStart = start))
+        assertFalse("new words during the outage", NotificationsPlugin.resyncIsSilent("s1", "s2", postTime = 5_000, processStart = start))
+        assertTrue("the desk has it", NotificationsPlugin.resyncIsSilent("s1", "s1", postTime = 5_000, processStart = start))
+        assertTrue("older than this process: maybe delivered", NotificationsPlugin.resyncIsSilent(null, "s1", postTime = 500, processStart = start))
+    }
 }

@@ -206,6 +206,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         pendingActions.remove(id)
         pendingIntents.removeKey(id)
         dedupe.forget(id)
+        delivered[device.deviceId]?.remove(id)
 
         if (appDatabase.isReady() && !appDatabase.isEnabled(statusBarNotification.packageName)) {
             synchronized(notificationDeliveryLock) {
@@ -375,7 +376,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         val appName = appNameLookup(context, packageName)
         np["appName"] = appName ?: packageName
         np["time"] = statusBarNotification.postTime.toString()
-        np["silent"] = isPreexisting
 
         val hideContents = privacyOf(statusBarNotification) == NotificationPrivacy.Mirror.HIDDEN
         if (hideContents) {
@@ -432,12 +432,15 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             Log.d(TAG, "not sent again: $key (unchanged or a twin)")
             return
         }
+        val deskHas = delivered.getOrPut(device.deviceId) { java.util.concurrent.ConcurrentHashMap() }
+        np["silent"] = isPreexisting && resyncIsSilent(deskHas[key], signature, statusBarNotification.postTime, PROCESS_START_MS)
         // `sendPacket` only queues work. Its return cannot prove that the
         // authenticated WebRTC event channel accepted the notification. Mark
         // it synchronized only from the completion callback so a failed
         // handover/channel write remains eligible for the next resync.
         device.sendPacket(np, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
             override fun onSuccess() {
+                deskHas[key] = signature
                 synchronized(notificationDeliveryLock) {
                     currentNotifications.add(key)
                 }
@@ -733,6 +736,27 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
 
     companion object {
+        /**
+         * What each desk was sent and acknowledged (device id → key → [contentSignature]), for the life of the process: the plugin
+         * is destroyed whenever the phone stops being reachable, and its [NotificationDedupe] with it.
+         */
+        private val delivered = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<String, String>>()
+
+        /** When this process started, on the wall clock of `postTime`. */
+        private val PROCESS_START_MS by lazy {
+            System.currentTimeMillis() - (android.os.SystemClock.elapsedRealtime() - android.os.Process.getStartElapsedRealtime())
+        }
+
+        /**
+         * Whether a resync sends a notification `silent` (no banner on the desk). Only when the desk already has these words, or
+         * the notification is older than this process (an earlier one may have delivered it). A notification posted while the
+         * link was down, or whose send expired in the queue, reached the desk only now: it is news, and banners. Sending all of
+         * them silent was why a phone that had dropped its link (often) never announced what arrived meanwhile.
+         */
+        @androidx.annotation.VisibleForTesting
+        internal fun resyncIsSilent(deskHas: String?, signature: String, postTime: Long, processStart: Long): Boolean =
+            deskHas == signature || postTime < processStart
+
         /** `desklink.notification {snapshot: true, ids}` (contract S1). */
         /** A notification's longest texts are cut so its packet crosses the data channel (wire size fix). */
         const val MAX_TEXT_CHARS = 4_000
