@@ -104,6 +104,8 @@ fun PaletteScreen(
     onClose: () -> Unit,
     onSendLink: () -> Unit,
     initialQuery: String = "",
+    /** A row of "Everything DeskLink does": Home does what its own row there does (its one step, or opens it). */
+    onFeature: (Feature) -> Unit = {},
 ) {
     val t = tokens
     val context = LocalContext.current
@@ -129,6 +131,7 @@ fun PaletteScreen(
     val copied = stringResource(R.string.snippets_copied)
     fun run(id: String) {
         close()
+        if (id.startsWith("feature:")) return Everything.features.firstOrNull { "feature:" + it.id == id }?.let(onFeature) ?: Unit
         // A dimmed action says why and how to fix it; it never sends anything.
         built.items.firstOrNull { it.id == id }?.blocked?.let { b -> return actions.onBlocked(id, built.items.first { it.id == id }.title, b) }
         when {
@@ -183,6 +186,7 @@ fun PaletteScreen(
 private fun groupTitle(group: PaletteGroup): String = stringResource(
     when (group) {
         PaletteGroup.ACTIONS -> R.string.palette_group_actions
+        PaletteGroup.FEATURES -> R.string.everything_title
         PaletteGroup.FILES -> R.string.palette_group_files
         PaletteGroup.NOTES -> R.string.palette_group_notes
         PaletteGroup.SNIPPETS -> R.string.palette_group_snippets
@@ -195,6 +199,8 @@ private fun groupTitle(group: PaletteGroup): String = stringResource(
 private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
     val t = tokens
     val big = LocalDensity.current.fontScale > 1.4f
+    // A sentence (why it is dimmed, or a feature's state and its step) goes whole under the name; a short word stays at the end.
+    val below = big || item.blocked != null || item.group == PaletteGroup.FEATURES
     Row(
         Modifier
             .fillMaxWidth()
@@ -211,22 +217,25 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(item.title, fontSize = 15.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis)
             // What a dimmed action needs is said whole, under its name.
-            if ((big || item.blocked != null) && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
+            if (below && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
         }
-        if (!big && item.blocked == null && item.hint.isNotEmpty()) {
+        if (!below && item.hint.isNotEmpty()) {
             Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(0.6f, fill = false))
         }
     }
 }
 
-private class Built(val items: List<PaletteItem>, val files: Map<String, org.desklink.mobile.plugins.share.TransferRecord>, val snippets: Map<String, String>)
+internal class Built(val items: List<PaletteItem>, val files: Map<String, org.desklink.mobile.plugins.share.TransferRecord>, val snippets: Map<String, String>)
 
-private fun buildItems(context: android.content.Context, state: HomeState, notes: List<org.desklink.mobile.plugins.notes.Note>, snippets: List<org.desklink.mobile.plugins.notes.Snippet>): Built {
+internal fun buildItems(context: android.content.Context, state: HomeState, notes: List<org.desklink.mobile.plugins.notes.Note>, snippets: List<org.desklink.mobile.plugins.notes.Snippet>): Built {
     val items = mutableListOf<PaletteItem>()
     val name = state.name
+    // An action is also found by the name and the everyday words of the features it stands for ("Second screen", "photos").
+    fun featureWords(f: Feature) = context.getString(f.name, name) + " " + (if (f.words != 0) context.getString(f.words) else "")
     fun action(id: String, icon: Int, title: String, hint: String = "", keywords: String = "") {
         val blocked = HomeDerive.blocker(state, id)
-        items.add(PaletteItem(id, PaletteGroup.ACTIONS, title, icon, blocked?.let { context.getString(HomeDerive.needs(it), name) } ?: hint, keywords, blocked))
+        val words = (listOf(keywords) + Everything.features.filter { id in it.palette || (it.palette.isEmpty() && it.open == id) }.map(::featureWords)).joinToString(" ")
+        items.add(PaletteItem(id, PaletteGroup.ACTIONS, title, icon, blocked?.let { context.getString(HomeDerive.needs(it), name) } ?: hint, words, blocked))
     }
     val kwClipboard = context.getString(R.string.palette_keywords_clipboard)
     val kwFiles = context.getString(R.string.palette_keywords_files)
@@ -255,6 +264,13 @@ private fun buildItems(context: android.content.Context, state: HomeState, notes
             Action.PAIR_ANOTHER -> action(id, R.drawable.sym_add, context.getString(R.string.home_pair_another), keywords = kwPair)
             Action.GUIDE -> action(id, R.drawable.sym_info, context.getString(R.string.guide_open), keywords = context.getString(R.string.guide_keywords))
         }
+    }
+    // Features no action stands for (Glide, Calls, Music…): each opens as its row on Home does, with its state as the hint.
+    val offered = items.map { it.id }.toSet()
+    Everything.features.filter { f -> f.palette.isEmpty() && f.open !in offered }.forEach { f ->
+        val status = Everything.status(f, state)
+        val hint = runCatching { context.getString(Everything.line(f, status), name) }.getOrDefault("")
+        items.add(PaletteItem("feature:" + f.id, PaletteGroup.FEATURES, context.getString(f.name, name), f.icon, hint, featureWords(f), (status as? FeatureStatus.Off)?.blocker))
     }
     val sent = context.getString(R.string.home_transfer_sent)
     val received = context.getString(R.string.home_transfer_received)
