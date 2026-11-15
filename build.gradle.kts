@@ -94,6 +94,9 @@ android {
     packaging {
         resources {
             merges += listOf("META-INF/DEPENDENCIES", "META-INF/LICENSE", "META-INF/NOTICE")
+            // BouncyCastle data files read only by classes DeskLink never uses (Picnic post-quantum signatures, the
+            // PKIX certificate path reviewer): 1.2 MB of the release APK. Only certificate building is used.
+            excludes += listOf("org/bouncycastle/pqc/**", "org/bouncycastle/x509/CertPathReviewerMessages*", "org/bouncycastle/pkix/CertPathReviewerMessages*")
         }
         jniLibs {
             // Termux's PTY JNI library. Unused: the terminal runs on the desktop, only the
