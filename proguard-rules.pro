@@ -18,7 +18,10 @@
 
 -dontobfuscate
 -keepattributes SourceFile,LineNumberTable,Signature,*Annotation*
--keep class org.desklink.mobile.** {*;}
+# Plugins are listed by the KSP class index and built by reflection with their no-argument constructor
+# (PluginFactory); their simple name is the plugin key (kept by -dontobfuscate). Everything else in the app
+# is reached from code or the manifest, so R8 may shrink and optimise it.
+-keep class * extends org.desklink.mobile.plugins.Plugin { <init>(); }
 
 # The webrtc-sdk AAR ships no consumer rules, and its native code finds Java
 # classes, fields and methods by name over JNI.
