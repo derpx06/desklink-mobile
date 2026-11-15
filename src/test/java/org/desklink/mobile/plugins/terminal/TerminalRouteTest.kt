@@ -171,4 +171,13 @@ class TerminalRouteTest {
         assertTrue(terminalsControlsOwnRow(411, 2.0f))
         assertFalse(terminalsControlsOwnRow(600, 1.3f))
     }
+
+    /** F43: with a hardware keyboard the terminal takes key focus as it opens; a phone without one is left alone (no IME pop-up). */
+    @Test
+    fun theTerminalTakesKeyFocusOnlyWithAHardwareKeyboard() {
+        fun config(keyboard: Int, hidden: Int) = android.content.res.Configuration().apply { this.keyboard = keyboard; hardKeyboardHidden = hidden }
+        assertTrue(hasHardKeyboard(config(android.content.res.Configuration.KEYBOARD_QWERTY, android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO)))
+        assertFalse(hasHardKeyboard(config(android.content.res.Configuration.KEYBOARD_NOKEYS, android.content.res.Configuration.HARDKEYBOARDHIDDEN_YES)))
+        assertFalse(hasHardKeyboard(config(android.content.res.Configuration.KEYBOARD_QWERTY, android.content.res.Configuration.HARDKEYBOARDHIDDEN_YES)))
+    }
 }

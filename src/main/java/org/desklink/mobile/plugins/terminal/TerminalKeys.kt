@@ -6,6 +6,14 @@ package org.desklink.mobile.plugins.terminal
 import android.view.KeyEvent
 import com.termux.terminal.KeyHandler
 
+/**
+ * A hardware keyboard is there to type with (F43): the terminal then takes key focus as it opens. Without it the keys went to
+ * the screen's own controls, so Enter pressed the Back button and nothing reached the shell.
+ */
+internal fun hasHardKeyboard(config: android.content.res.Configuration): Boolean =
+    config.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS &&
+        config.hardKeyboardHidden != android.content.res.Configuration.HARDKEYBOARDHIDDEN_YES
+
 /** A modifier key on the key bar: tap arms it for the next key, long-press locks it. */
 enum class Sticky {
     OFF,

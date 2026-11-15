@@ -673,7 +673,14 @@ class TerminalActivity : AppCompatActivity() {
                         .clipToBounds()
                         .background(TermBg)
                         .padding(horizontal = 8.dp),
-                    factory = { ctx -> TerminalView(ctx, host).also { it.attach(screen); viewRef = it } },
+                    factory = { ctx ->
+                        TerminalView(ctx, host).also { view ->
+                            view.attach(screen)
+                            viewRef = view
+                            // ponytail: checked as the view opens; a keyboard connected later is focused by the first tap.
+                            if (hasHardKeyboard(ctx.resources.configuration)) view.post { view.requestFocus() }
+                        }
+                    },
                 )
                 if (composing) {
                     // F6: the synced snippets, one tap into the draft.
