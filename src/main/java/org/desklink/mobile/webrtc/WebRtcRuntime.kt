@@ -83,7 +83,14 @@ object WebRtcRuntime {
      * V3: no playout delay. A screen is not a call: frames are shown the moment they decode,
      * never smoothed into a jitter buffer target (local, no wire).
      */
-    internal const val FIELD_TRIALS = "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/"
+    /**
+     * Playout delay 0: the desk shows frames as they decode. KeyframeFlushing: a keyframe (the desk's
+     * PLI after a loss) drops the delta frames still queued in the pacer, which it replaces anyway;
+     * measured on the RMX5070, loss -> PLI -> keyframe bursts held packets 0.5-2 s in the pacer while
+     * congestion control backed off. FastRetransmissions: a NACKed packet jumps that queue.
+     */
+    internal const val FIELD_TRIALS = "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/" +
+        "WebRTC-Pacer-KeyframeFlushing/Enabled/WebRTC-Pacer-FastRetransmissions/Enabled/"
 
     @Synchronized
     fun eglContext(context: Context): EglBase.Context {

@@ -108,7 +108,19 @@ class ScreenQualityTest {
     }
 
     @Test
-    fun thePlayoutDelayTrialIsZero() {
-        assertEquals("WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/", WebRtcRuntime.FIELD_TRIALS)
+    fun theFieldTrialsKeepPlayoutAtZeroAndFlushTheQueueOnKeyframes() {
+        assertEquals(
+            "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/" +
+                "WebRTC-Pacer-KeyframeFlushing/Enabled/WebRTC-Pacer-FastRetransmissions/Enabled/",
+            WebRtcRuntime.FIELD_TRIALS,
+        )
+        // libwebrtc's format: name/group/ pairs, so an odd count of separators would garble every trial after it.
+        assertEquals(0, WebRtcRuntime.FIELD_TRIALS.count { it == '/' } % 2)
+    }
+
+    @Test
+    fun thePacerWaitIsTheMeanOverTheLastPackets() {
+        assertEquals(437L, pacerWaitMs(344, 4.271, 1124, 345.26))
+        assertEquals(null, pacerWaitMs(80, 1.0, 80, 1.0))
     }
 }

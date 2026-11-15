@@ -97,6 +97,10 @@ internal fun screenDegradationPreference(controlled: Boolean, lan: Boolean = fal
  */
 internal fun screenMaxFramerate(displayFps: Int, lan: Boolean): Int = if (lan) displayFps else minOf(displayFps, 30)
 
+/** Mean pacer wait (ms) of the packets sent between two stats reads; null when none were sent. */
+internal fun pacerWaitMs(lastPackets: Long, lastDelaySeconds: Double, packets: Long, delaySeconds: Double): Long? =
+    (packets - lastPackets).takeIf { it > 0 }?.let { Math.round((delaySeconds - lastDelaySeconds) * 1000.0 / it) }
+
 /** The display rate a share is captured at: 60 when the panel runs at 60 Hz or more, else 30. */
 internal fun phoneScreenFps(refreshHz: Float): Int = if (refreshHz >= 59f) 60 else 30
 
@@ -906,6 +910,8 @@ class WebRtcTransport(
      * the only way to see why libwebrtc holds frames back on a real network. */
     private fun startScreenStatsLog() {
         screenStatsTimer?.cancel()
+        var lastPackets = 0L
+        var lastDelay = 0.0
         screenStatsTimer = java.util.Timer("DeskLink-screen-stats", true).apply {
             schedule(object : java.util.TimerTask() {
                 override fun run() {
@@ -921,9 +927,15 @@ class WebRtcTransport(
                             val source = report.statsMap.values.firstOrNull {
                                 it.type == "media-source" && it.members["kind"] == "video"
                             }?.members
+                            val packets = (out["packetsSent"] as? Number)?.toLong() ?: 0L
+                            val delay = (out["totalPacketSendDelay"] as? Number)?.toDouble() ?: 0.0
+                            // Mean time a packet of the last 2 s waited in the pacer: the phone's share of the lag.
+                            val pacerMs = pacerWaitMs(lastPackets, lastDelay, packets, delay)
+                            lastPackets = packets
+                            lastDelay = delay
                             Log.i(
                                 TAG,
-                                "screen-stats encoder=${out["encoderImplementation"]} " +
+                                "screen-stats pacerMs=$pacerMs encoder=${out["encoderImplementation"]} " +
                                     "srcFps=${source?.get("framesPerSecond")} encFps=${out["framesPerSecond"]} " +
                                     "framesEncoded=${out["framesEncoded"]} framesSent=${out["framesSent"]} " +
                                     "target=${out["targetBitrate"]} availOut=${pair?.get("availableOutgoingBitrate")} " +
