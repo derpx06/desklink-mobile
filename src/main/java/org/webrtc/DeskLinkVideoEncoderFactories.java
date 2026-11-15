@@ -93,6 +93,7 @@ public final class DeskLinkVideoEncoderFactories {
         @Override
         public VideoEncoder createEncoder(VideoCodecInfo input) {
             VideoEncoder encoder = super.createEncoder(input);
+            FixedRateClock clock = null;
             if (encoder instanceof HardwareVideoEncoder) {
                 try {
                     Field field = HardwareVideoEncoder.class.getDeclaredField("mediaCodecWrapperFactory");
@@ -102,21 +103,36 @@ public final class DeskLinkVideoEncoderFactories {
                     // The encoder still works, just with libwebrtc's settings.
                     Logging.w(TAG, "Low-latency encoder configuration unavailable", e);
                 }
+                try {
+                    Field field = HardwareVideoEncoder.class.getDeclaredField("bitrateAdjuster");
+                    field.setAccessible(true);
+                    // Only libwebrtc's plain adjuster (Qualcomm and most others); the Exynos ones scale bitrate themselves.
+                    if (field.get(encoder).getClass() == BaseBitrateAdjuster.class) {
+                        clock = new FixedRateClock();
+                        field.set(encoder, clock);
+                    }
+                } catch (ReflectiveOperationException | RuntimeException e) {
+                    clock = null;
+                    Logging.w(TAG, "Fixed-rate encoder clock unavailable", e);
+                }
             }
-            return encoder == null ? null : new FailureReportingEncoder(encoder);
+            return encoder == null ? null : new FailureReportingEncoder(encoder, clock);
         }
     }
 
     /** Passes everything through; reports failed init/encode calls with their size. */
     private static final class FailureReportingEncoder implements VideoEncoder {
         private final VideoEncoder inner;
+        @Nullable private final FixedRateClock clock;
 
-        FailureReportingEncoder(VideoEncoder inner) {
+        FailureReportingEncoder(VideoEncoder inner, @Nullable FixedRateClock clock) {
             this.inner = inner;
+            this.clock = clock;
         }
 
         @Override
         public VideoCodecStatus initEncode(Settings settings, Callback callback) {
+            if (clock != null) clock.pin(settings.maxFramerate);
             VideoCodecStatus status = inner.initEncode(settings, callback);
             reportFailure(status, settings.width, settings.height);
             return status;
@@ -142,6 +158,34 @@ public final class DeskLinkVideoEncoderFactories {
         @Override public ResolutionBitrateLimits[] getResolutionBitrateLimits() { return inner.getResolutionBitrateLimits(); }
         @Override public String getImplementationName() { return inner.getImplementationName(); }
         @Override public EncoderInfo getEncoderInfo() { return inner.getEncoderInfo(); }
+    }
+
+    /**
+     * Keeps the encoder's frame clock at the stream's maximum frame rate.
+     *
+     * <p>libwebrtc's {@code HardwareVideoEncoder} stamps frame N+1 at frame N plus
+     * 1/{@link BitrateAdjuster#getAdjustedFramerateFps}, and its {@link BaseBitrateAdjuster} takes
+     * that rate from libwebrtc's one-second input-rate estimate. A still screen sends 6-9 fps
+     * (refinement), so for the first second of a scroll its 55 fps frames reached the encoder
+     * stamped ~130 ms apart, and a rate control that budgets by timestamp gave each of them several
+     * times its share. Measured on the RMX5070 (c2.qti.avc.encoder): target 10-12 Mbps, ~17 Mbps
+     * encoded, the pacer 1.1-1.9 s behind at every scroll; stamped at the maximum rate it holds the
+     * target and the pacer stays under ~100 ms at the start of a scroll and ~10 ms in it. A still
+     * screen's few frames then get a smaller share each; refinement (5 repeats) still settles on a
+     * fine picture. Bitrate changes are followed as before.
+     */
+    static final class FixedRateClock extends BaseBitrateAdjuster {
+        private double maxFramerateFps;
+
+        /** The stream's maximum frame rate, from each initEncode (it changes with the path). */
+        void pin(int maxFramerate) {
+            if (maxFramerate > 0) maxFramerateFps = maxFramerate;
+        }
+
+        @Override
+        public void setTargets(int targetBitrateBps, double targetFramerateFps) {
+            super.setTargets(targetBitrateBps, maxFramerateFps > 0 ? maxFramerateFps : targetFramerateFps);
+        }
     }
 
     private static final class LowLatencyCodecFactory implements MediaCodecWrapperFactory {

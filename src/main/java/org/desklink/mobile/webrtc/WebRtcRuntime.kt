@@ -88,9 +88,14 @@ object WebRtcRuntime {
      * PLI after a loss) drops the delta frames still queued in the pacer, which it replaces anyway;
      * measured on the RMX5070, loss -> PLI -> keyframe bursts held packets 0.5-2 s in the pacer while
      * congestion control backed off. FastRetransmissions: a NACKed packet jumps that queue.
+     * Video-Pacing max_delay: when more than 250 ms of video waits in the pacer it sends faster than
+     * the estimate to empty it in that time, instead of libwebrtc's 2 s (the ceiling of the 1.1-1.9 s
+     * the RMX5070's overshooting encoder queued at every scroll); a remote view would rather burst
+     * on the LAN than show the past. The pacing factor stays libwebrtc's 1.1.
      */
     internal const val FIELD_TRIALS = "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/" +
-        "WebRTC-Pacer-KeyframeFlushing/Enabled/WebRTC-Pacer-FastRetransmissions/Enabled/"
+        "WebRTC-Pacer-KeyframeFlushing/Enabled/WebRTC-Pacer-FastRetransmissions/Enabled/" +
+        "WebRTC-Video-Pacing/max_delay:250ms/"
 
     @Synchronized
     fun eglContext(context: Context): EglBase.Context {

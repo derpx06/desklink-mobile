@@ -120,8 +120,13 @@ internal fun startScreenBitrate(lan: Boolean): Int = if (lan) 8_000_000 else 2_5
  */
 internal fun minScreenBitrate(lan: Boolean): Int = if (lan) 4_000_000 else 300_000
 
-/** The screen's bitrate ceiling: ~16 Mbps on the LAN, 8 elsewhere; congestion control backs off below it. */
-internal fun maxScreenBitrate(lan: Boolean): Int = if (lan) 16_000_000 else 8_000_000
+/**
+ * The screen's bitrate ceiling: 24 Mbps on the LAN, 8 elsewhere; congestion control backs off below it.
+ * Measured on the RMX5070 with the encoder held to its target: at 16 a scroll encoded at QP 17-20,
+ * at 30 at QP 10-12 but the desk lost packets (its UDP receive buffer, 208 KB here) and congestion
+ * control fell to the floor mid-scroll.
+ */
+internal fun maxScreenBitrate(lan: Boolean): Int = if (lan) 24_000_000 else 8_000_000
 
 /** The capture long side to retry at after the encoder failed at [current]; null to give up. */
 internal fun nextCaptureLongSide(current: Int): Int? = CAPTURE_LONG_SIDES.firstOrNull { it < current }
@@ -912,6 +917,9 @@ class WebRtcTransport(
         screenStatsTimer?.cancel()
         var lastPackets = 0L
         var lastDelay = 0.0
+        var lastBytes = 0L
+        var lastQp = 0L
+        var lastEncoded = 0L
         screenStatsTimer = java.util.Timer("DeskLink-screen-stats", true).apply {
             schedule(object : java.util.TimerTask() {
                 override fun run() {
@@ -933,9 +941,18 @@ class WebRtcTransport(
                             val pacerMs = pacerWaitMs(lastPackets, lastDelay, packets, delay)
                             lastPackets = packets
                             lastDelay = delay
+                            val bytes = (out["bytesSent"] as? Number)?.toLong() ?: 0L
+                            val qpSum = (out["qpSum"] as? Number)?.toLong() ?: 0L
+                            val encoded = (out["framesEncoded"] as? Number)?.toLong() ?: 0L
+                            // Sent rate and mean QP of the last 2 s: what reached the wire and how coarse it was.
+                            val sentKbps = (bytes - lastBytes) * 8 / 2_000
+                            val qp = (qpSum - lastQp).takeIf { encoded > lastEncoded }?.div(encoded - lastEncoded)
+                            lastBytes = bytes
+                            lastQp = qpSum
+                            lastEncoded = encoded
                             Log.i(
                                 TAG,
-                                "screen-stats pacerMs=$pacerMs encoder=${out["encoderImplementation"]} " +
+                                "screen-stats pacerMs=$pacerMs sentKbps=$sentKbps qp=$qp encoder=${out["encoderImplementation"]} " +
                                     "srcFps=${source?.get("framesPerSecond")} encFps=${out["framesPerSecond"]} " +
                                     "framesEncoded=${out["framesEncoded"]} framesSent=${out["framesSent"]} " +
                                     "target=${out["targetBitrate"]} availOut=${pair?.get("availableOutgoingBitrate")} " +

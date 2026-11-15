@@ -102,7 +102,7 @@ class WebRtcConnectionStatsTest {
         assertEquals(RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION, screenDegradationPreference(false))
         // On the LAN there is bandwidth for both: resolution wins even under control (V2).
         assertEquals(RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION, screenDegradationPreference(true, lan = true))
-        assertEquals(16_000_000, maxScreenBitrate(lan = true))
+        assertEquals(24_000_000, maxScreenBitrate(lan = true))
         assertEquals(8_000_000, maxScreenBitrate(lan = false))
     }
 
