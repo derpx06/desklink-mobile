@@ -62,9 +62,9 @@ class LockDevicePlugin : Plugin() {
         // command meant the desktop's confirmation of a lock the user asked for
         // immediately locked this phone as well.
         //
-        // This mirrors the split the desktop already enforces: it keeps
-        // `desklink.lock` out of its incoming capabilities for exactly this
-        // reason, because its handler reads `isLocked` as a command too.
+        // This mirrors the split the desktop enforces: it takes `desklink.lock`
+        // only as this report (a failed `lockResult` is told to the person
+        // there) in its own handler, which never locks or unlocks the desk.
         val requestedLockState = when {
             np.type != PACKET_TYPE_LOCK_REQUEST -> null
             np.has("setLocked") -> np.getBoolean("setLocked")

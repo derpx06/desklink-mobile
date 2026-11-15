@@ -59,6 +59,8 @@ class HandoverCapabilitiesTest {
         "desklink.filelane.v1",
         "desklink.findmyphone.request",
         "desklink.folders",
+        // The phone's answer to the desk's Lock (a report: a failed lock is told there).
+        "desklink.lock",
         "desklink.lock.request",
         "desklink.mousepad.request",
         "desklink.mpris",
