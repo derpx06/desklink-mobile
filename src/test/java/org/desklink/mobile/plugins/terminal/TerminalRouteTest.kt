@@ -10,6 +10,7 @@ import org.desklink.mobile.ui.compose.screen.tabs.TerminalsGate
 import org.desklink.mobile.ui.compose.screen.tabs.TerminalsPanel
 import org.desklink.mobile.ui.compose.screen.tabs.matchingSessions
 import org.desklink.mobile.ui.compose.screen.tabs.sessionStatus
+import org.desklink.mobile.ui.compose.screen.tabs.terminalsControlsOwnRow
 import org.desklink.mobile.ui.compose.screen.tabs.terminalsPanel
 import org.desklink.mobile.webrtc.SessionPasswordDenial
 import org.desklink.mobile.webrtc.terminal.TerminalClientState
@@ -159,5 +160,15 @@ class TerminalRouteTest {
         assertEquals(all, matchingSessions(all, "  ") { names.getValue(it) })
         assertEquals(listOf("a", "b"), matchingSessions(all, "CODE") { names.getValue(it) })
         assertEquals(emptyList<String>(), matchingSessions(all, "zzz") { names.getValue(it) })
+    }
+
+    /** F39: "Terminals" broke mid-word on a 360 dp phone at the default font; a 411 dp phone keeps one row until 1.15. */
+    @Test
+    fun theTitleControlsMoveToTheirOwnRowWhenTheyDoNotFit() {
+        assertTrue(terminalsControlsOwnRow(360, 1.0f))
+        assertFalse(terminalsControlsOwnRow(411, 1.0f))
+        assertTrue(terminalsControlsOwnRow(411, 1.15f))
+        assertTrue(terminalsControlsOwnRow(411, 2.0f))
+        assertFalse(terminalsControlsOwnRow(600, 1.3f))
     }
 }

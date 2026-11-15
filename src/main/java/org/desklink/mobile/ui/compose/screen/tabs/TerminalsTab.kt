@@ -111,6 +111,12 @@ enum class TerminalsPanel {
     LIST,
 }
 
+/**
+ * Whether the Terminals title's controls (search, new, link chip: ~220 dp) go on their own row. "Terminals" at 30 sp
+ * needs ~150 dp per unit of font scale, so on a 360 dp phone it broke mid-word even at the default font (F39).
+ */
+internal fun terminalsControlsOwnRow(screenWidthDp: Int, fontScale: Float): Boolean = screenWidthDp - 260 < 150 * fontScale
+
 fun terminalsPanel(hasClient: Boolean, gate: TerminalsGate, state: TerminalClientState): TerminalsPanel = when {
     !hasClient -> TerminalsPanel.UNAVAILABLE
     gate == TerminalsGate.DENIED -> TerminalsPanel.GATE
@@ -309,8 +315,8 @@ fun TerminalsContent(
     val listed = panel == TerminalsPanel.LIST
 
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
-        // At a larger font the title and its three controls do not fit one line (the title broke mid-word): the controls get their own row.
-        val big = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.15f
+        // When the title and its three controls do not fit one line (the title broke mid-word): the controls get their own row.
+        val big = terminalsControlsOwnRow(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp, androidx.compose.ui.platform.LocalDensity.current.fontScale)
         val controls: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
             if (listed) {
                 if (state.sessions.isNotEmpty()) {
