@@ -52,6 +52,16 @@ object Glide {
         private set
     @Volatile var lastPacketAt = 0L
 
+    /**
+     * How far (px) the pointer goes in before the edge it came in by gives it back, or how far it is pushed
+     * against that edge instead. It enters 1 px from that edge, and a hand's wobble at the crossing used to
+     * hand it straight back (the owner's Glide bounced within a second, every time).
+     */
+    const val ARM_PX = 48
+
+    @Volatile private var armed = false
+    @Volatile private var pushed = 0.0
+
     fun isGliding(deviceId: String, now: Long = android.os.SystemClock.elapsedRealtime()): Boolean =
         activeDesk == deviceId && enterEdge != NONE_EDGE && now - lastPacketAt < IDLE_END_MS
 
@@ -60,6 +70,8 @@ object Glide {
         enterEdge = edge
         edgeLength = length
         lastPacketAt = now
+        armed = false
+        pushed = 0.0
         clearNotices(deviceId)
     }
 
@@ -125,6 +137,29 @@ object Glide {
             LEFT_EDGE -> 1 to along(deltay, height)
             else -> width - 1 to along(deltay, height)
         }
+    }
+
+    /**
+     * Whether the edge the pointer came in by may give it back, the pointer now at ([x], [y]) after a
+     * move of ([dx], [dy]): once it has been [ARM_PX] inside, or pushed [ARM_PX] against that edge.
+     */
+    fun mayHandBack(edge: Int, x: Int, y: Int, dx: Double, dy: Double, width: Int, height: Int): Boolean {
+        val depth = when (edge) {
+            TOP_EDGE -> y
+            BOTTOM_EDGE -> height - y
+            LEFT_EDGE -> x
+            RIGHT_EDGE -> width - x
+            else -> return true
+        }
+        val toward = when (edge) {
+            TOP_EDGE -> -dy
+            BOTTOM_EDGE -> dy
+            LEFT_EDGE -> -dx
+            else -> dx
+        }
+        if (depth >= ARM_PX) armed = true
+        pushed = if (depth <= 0) pushed + toward.coerceAtLeast(0.0) else 0.0
+        return armed || pushed >= ARM_PX
     }
 
     /**

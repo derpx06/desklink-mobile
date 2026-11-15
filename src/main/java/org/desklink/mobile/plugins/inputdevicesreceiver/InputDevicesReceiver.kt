@@ -191,6 +191,8 @@ class InputDevicesReceiverPlugin : Plugin() {
         }
         Glide.lastPacketAt = now
         if (!np.has("dx") || np.getBoolean("scroll", false)) return
+        val (width, height) = metrics.widthPixels to metrics.heightPixels
+        if (!Glide.mayHandBack(Glide.enterEdge, Cursor.x, Cursor.y, np.getDouble("dx", 0.0), np.getDouble("dy", 0.0), width, height)) return
         Glide.release(Glide.enterEdge, Cursor.x, Cursor.y, Glide.edgeLength, metrics.widthPixels, metrics.heightPixels)?.let { (dx, dy) ->
             sendRelease(dx, dy)
             letGoOfThePointer()

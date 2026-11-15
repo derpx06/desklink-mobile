@@ -34,6 +34,24 @@ class GlideTest {
         assertEquals(1 to h - 1, Glide.entry(Glide.LEFT_EDGE, 0.0, 1e300, 1080.0, w, h))
     }
 
+    /** The owner's bounce: a wobble back at the crossing must not hand the pointer straight back. */
+    @Test
+    fun theEntryEdgeGivesThePointerBackOnlyAfterARealMoveInOrAFirmPush() {
+        Glide.begin("desk", Glide.LEFT_EDGE, 1080.0, now = 0)
+        assertFalse("1 px back right after crossing", Glide.mayHandBack(Glide.LEFT_EDGE, 0, 1200, -1.0, 0.0, w, h))
+        assertFalse(Glide.mayHandBack(Glide.LEFT_EDGE, 30, 1200, 30.0, 0.0, w, h))
+        assertFalse("back to the edge before it was ever in", Glide.mayHandBack(Glide.LEFT_EDGE, 0, 1200, -30.0, 0.0, w, h))
+        assertTrue("pushed firmly against the edge", Glide.mayHandBack(Glide.LEFT_EDGE, 0, 1200, -20.0, 0.0, w, h))
+
+        Glide.begin("desk", Glide.LEFT_EDGE, 1080.0, now = 0)
+        assertTrue("armed once well inside; release() still needs the edge", Glide.mayHandBack(Glide.LEFT_EDGE, 200, 1200, 199.0, 0.0, w, h))
+        assertTrue("in, then back out", Glide.mayHandBack(Glide.LEFT_EDGE, 0, 1200, -200.0, 0.0, w, h))
+
+        Glide.begin("desk", Glide.TOP_EDGE, 1920.0, now = 0)
+        assertFalse(Glide.mayHandBack(Glide.TOP_EDGE, 540, 0, 0.0, -2.0, w, h))
+        Glide.end()
+    }
+
     @Test
     fun releaseComesOnlyAtTheEntryEdgeInTheDesksUnits() {
         assertNull(Glide.release(Glide.LEFT_EDGE, 5, 1200, 1080.0, w, h))
