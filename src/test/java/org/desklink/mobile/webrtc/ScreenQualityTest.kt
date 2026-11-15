@@ -98,6 +98,16 @@ class ScreenQualityTest {
     }
 
     @Test
+    fun onTheLanTheScreenNeverFallsBelowFourMegabits() {
+        // A still screen sends far below its target, and one Wi-Fi delay spike used to drop the
+        // estimate to 300 kbps: a smeared picture for the first seconds of every share.
+        assertEquals(4_000_000, minScreenBitrate(lan = true))
+        assertEquals(300_000, minScreenBitrate(lan = false))
+        assertTrue(minScreenBitrate(lan = true) <= startScreenBitrate(lan = true))
+        assertTrue(minScreenBitrate(lan = false) <= startScreenBitrate(lan = false))
+    }
+
+    @Test
     fun thePlayoutDelayTrialIsZero() {
         assertEquals("WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/", WebRtcRuntime.FIELD_TRIALS)
     }

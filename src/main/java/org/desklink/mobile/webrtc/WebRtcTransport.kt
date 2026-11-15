@@ -107,6 +107,15 @@ internal fun phoneScreenFps(refreshHz: Float): Int = if (refreshHz >= 59f) 60 el
  */
 internal fun startScreenBitrate(lan: Boolean): Int = if (lan) 8_000_000 else 2_500_000
 
+/**
+ * The screen's bitrate floor: 4 Mbps on the LAN, 300 kbps elsewhere. A phone screen is mostly still,
+ * so the stream sends far less than its target; the first Wi-Fi delay spike then cut congestion
+ * control to 0.85x that small acknowledged rate and the floor. Measured on the RMX5070: every share
+ * opened at 300 kbps for ~6 s (a smeared 864x1920 picture, 70-160 ms per packet in the pacer), and
+ * mid-share spikes fell to ~2 Mbps. The LAN carries 16 Mbps at 6 ms RTT, so 4 is far inside it.
+ */
+internal fun minScreenBitrate(lan: Boolean): Int = if (lan) 4_000_000 else 300_000
+
 /** The screen's bitrate ceiling: ~16 Mbps on the LAN, 8 elsewhere; congestion control backs off below it. */
 internal fun maxScreenBitrate(lan: Boolean): Int = if (lan) 16_000_000 else 8_000_000
 
@@ -939,12 +948,12 @@ class WebRtcTransport(
      */
     @Synchronized
     private fun configureScreenSender(fps: Int) {
-        val max = maxScreenBitrate(onLan)
-        runCatching { peer.setBitrate(MIN_SCREEN_BITRATE, startScreenBitrate(onLan), max) }
+        val (min, max) = minScreenBitrate(onLan) to maxScreenBitrate(onLan)
+        runCatching { peer.setBitrate(min, startScreenBitrate(onLan), max) }
         updateScreenSender { parameters ->
             parameters.degradationPreference = screenDegradationPreference(screenControlled, onLan)
             parameters.encodings.forEach { encoding ->
-                encoding.minBitrateBps = MIN_SCREEN_BITRATE
+                encoding.minBitrateBps = min
                 encoding.maxBitrateBps = max
                 encoding.maxFramerate = screenMaxFramerate(fps, onLan)
             }
@@ -1141,7 +1150,6 @@ class WebRtcTransport(
 
     companion object {
         private const val TAG = "DeskLink/WebRTC"
-        const val MIN_SCREEN_BITRATE = 300_000
         /** How long after the last frame (and between repeats) the capture re-delivers it for refinement. */
         const val REFINE_AFTER_MS = 100L
         val REQUIRED_LABELS = WebRtcChannel.REQUIRED.map { it.label }.toSet()
