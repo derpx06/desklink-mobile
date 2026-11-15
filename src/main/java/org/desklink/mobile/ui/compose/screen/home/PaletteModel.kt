@@ -3,8 +3,11 @@ package org.desklink.mobile.ui.compose.screen.home
 
 import java.text.Normalizer
 
-/** The groups of the "Find anything" screen, in the order they are listed. */
-enum class PaletteGroup { ACTIONS, FILES, NOTES, SNIPPETS, SETTINGS, COMPUTERS }
+/**
+ * The groups of the "Find anything" screen, in the order they are listed. FEATURES are the rows of "Everything DeskLink does"
+ * that no action stands for (Glide, Calls, Music…): listed only for a query, so the screen opens as it always did.
+ */
+enum class PaletteGroup { ACTIONS, FEATURES, FILES, NOTES, SNIPPETS, SETTINGS, COMPUTERS }
 
 /**
  * One thing the palette can open or do. [id] says which ("action:ring", "note:<id>", "settings:<route>"): the screen
@@ -72,7 +75,11 @@ object PaletteModel {
         return PaletteGroup.entries.mapNotNull { group ->
             val inGroup = items.filter { it.group == group }
             val shown = if (words.isEmpty()) {
-                if (group == PaletteGroup.ACTIONS) inGroup else inGroup.take(IDLE_PER_GROUP)
+                when (group) {
+                    PaletteGroup.ACTIONS -> inGroup
+                    PaletteGroup.FEATURES -> emptyList()
+                    else -> inGroup.take(IDLE_PER_GROUP)
+                }
             } else {
                 inGroup.mapIndexedNotNull { index, item -> score(item, words)?.let { Triple(it, index, item) } }
                     .sortedWith(compareBy({ it.first }, { it.second }))

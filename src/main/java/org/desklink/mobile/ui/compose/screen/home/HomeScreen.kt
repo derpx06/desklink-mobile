@@ -302,10 +302,16 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
     Box(Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize().background(t.bg).statusBarsPadding()) {
             val two = maxWidth >= TWO_COLUMNS
+            // "Finish setting up" comes after what you open the app for (the computer, what is going on, the quick actions),
+            // still near the top. It lists notifications with the rest, so the one-line nudge is for when it is not there.
+            val setup: @Composable () -> Unit = {
+                if (finishSetup != null) finishSetup() else if (state.notificationsOff) NotificationsNudge(actions.onTurnOnNotifications)
+            }
             val doing: @Composable () -> Unit = {
                 if (quiet) {
                     OfflineHero(state, actions) { sheet = true }
                     ThingsToCheck(state)
+                    if (!two) setup()
                     StillWorksOffline(state, actions)
                 } else {
                     Hero(state, gate, actions) { sheet = true }
@@ -313,6 +319,8 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
                 }
             }
             val going: @Composable () -> Unit = {
+                // Two columns: first on the right. One column places it itself (after the offline checks, or the quick actions).
+                if (two) setup()
                 HappeningNow(state, actions, cardArt) { playerOpen = true }
                 RecentFiles(state, actions)
                 org.desklink.mobile.plugins.notes.NotesHomeCard(onOpenList = actions.onNotes, onOpenNote = actions.onNote, onNew = actions.onNewNote, limit = HomeDerive.RECENT_NOTES)
@@ -343,8 +351,6 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Greeting(onSearch = { palette = true })
-                // "Finish setting up" lists notifications with the rest, so the one-line nudge is for when it is not there.
-                if (finishSetup != null) finishSetup() else if (state.notificationsOff) NotificationsNudge(actions.onTurnOnNotifications)
                 if (two) {
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { doing() }
@@ -359,6 +365,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
                         Hero(state, gate, actions) { sheet = true }
                         HappeningNow(state, actions, cardArt) { playerOpen = true }
                         QuickActions(state, gate, actions, notReady, onAll = { palette = true }, onSendLink = { linkDialog = true })
+                        setup()
                         RecentFiles(state, actions)
                         org.desklink.mobile.plugins.notes.NotesHomeCard(onOpenList = actions.onNotes, onOpenNote = actions.onNote, onNew = actions.onNewNote, limit = HomeDerive.RECENT_NOTES)
                         MirroredLine(state)
@@ -371,7 +378,9 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
             }
         }
         NowPlayingOverlay(state.media, actions, cardArt, playerOpen && state.media != null) { playerOpen = false }
-        if (palette) PaletteScreen(state, actions, onClose = { palette = false }, onSendLink = { palette = false; linkDialog = true })
+        if (palette) PaletteScreen(state, actions, onClose = { palette = false }, onSendLink = { palette = false; linkDialog = true }) { f ->
+            onFeatureRow(f, Everything.status(f, state))
+        }
     }
 
     if (sheet) ComputersSheet(state, onDismiss = { sheet = false }, actions)
@@ -817,6 +826,10 @@ private fun RecentFiles(state: HomeState, actions: HomeActions) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SectionHeader(stringResource(R.string.home_recent_files)) {
             if (HomeDerive.moreFiles(state)) DeskTextButton(stringResource(R.string.home_see_all), actions.onOpenFiles)
+            // Nothing yet: the one thing that fills it, while the computer can take it.
+            else if (!HomeDerive.showRecentFiles(state) && HomeDerive.blocker(state, PaletteModel.Action.SEND_FILES) == null) {
+                DeskTextButton(stringResource(R.string.home_send_files), actions.onSendFiles)
+            }
         }
         // One clock for the whole list, once a minute: the rest of Home does not recompose for "2 min ago".
         val now by minuteClock()

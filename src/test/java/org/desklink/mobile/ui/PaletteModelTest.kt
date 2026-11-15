@@ -30,6 +30,7 @@ class PaletteModelTest {
         item("action:send-files", PaletteGroup.ACTIONS, "Send files"),
         item("action:send-clipboard", PaletteGroup.ACTIONS, "Send clipboard", keywords = "copy paste"),
         item("action:ring", PaletteGroup.ACTIONS, "Ring computer", hint = "Makes it ring"),
+        item("feature:glide", PaletteGroup.FEATURES, "Glide", keywords = "mouse pointer"),
         item("file:1", PaletteGroup.FILES, "invoice-october.pdf", hint = "Received"),
         item("file:2", PaletteGroup.FILES, "october-photos.zip", hint = "Sent"),
         item("file:3", PaletteGroup.FILES, "notes.txt"),
@@ -47,7 +48,9 @@ class PaletteModelTest {
     @Test
     fun aBlankQueryListsEveryActionAndAFewOfTheRest() {
         val sections = PaletteModel.search(items, "  ")
-        assertEquals(PaletteGroup.entries, sections.map { it.group })
+        // Features are found by a query only, so the screen opens on what it always listed.
+        assertEquals(PaletteGroup.entries - PaletteGroup.FEATURES, sections.map { it.group })
+        assertEquals(listOf("feature:glide"), ids("mouse"))
         assertEquals(3, sections.first { it.group == PaletteGroup.ACTIONS }.items.size)
         assertEquals(PaletteModel.IDLE_PER_GROUP, sections.first { it.group == PaletteGroup.FILES }.items.size)
     }
@@ -55,7 +58,7 @@ class PaletteModelTest {
     @Test
     fun groupsComeInTheirOwnOrderWhateverTheInputOrder() {
         val shuffled = items.reversed()
-        assertEquals(PaletteGroup.entries.filter { g -> items.any { it.group == g } }, PaletteModel.search(shuffled, "").map { it.group })
+        assertEquals(PaletteGroup.entries.filter { g -> g != PaletteGroup.FEATURES && items.any { it.group == g } }, PaletteModel.search(shuffled, "").map { it.group })
     }
 
     @Test

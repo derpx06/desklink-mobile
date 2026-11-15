@@ -1173,12 +1173,12 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="kw_settings_bucket_with" translatable="false">folder sync shared folder files drop</string>
     <string name="kw_settings_downloads_folder" translatable="false">save location download location storage received files directory where</string>
     <string name="kw_sg_files_default_folder" translatable="false">reset downloads default</string>
-    <string name="kw_settings_gallery_send" translatable="false">photos screenshots auto upload camera roll</string>
+    <string name="kw_settings_gallery_send" translatable="false">photos pictures gallery screenshots auto upload camera roll</string>
     <string name="kw_settings_gallery_screenshots" translatable="false">screenshot folder photos auto</string>
     <string name="kw_settings_gallery_camera" translatable="false">camera folder photos dcim auto</string>
     <string name="kw_settings_contacts_share" translatable="false">contacts address book people phone book</string>
     <string name="kw_settings_session_password" translatable="false">password pin lock passcode secret security</string>
-    <string name="kw_settings_session_gate" translatable="false">ask permission confirm approve terminal screen access prompt share screen screen sharing biometric</string>
+    <string name="kw_settings_session_gate" translatable="false">ask permission confirm approve terminal screen access prompt share screen screen sharing mirror cast biometric</string>
     <string name="kw_settings_unlock_nearby" translatable="false">unlock lock screen login proximity password</string>
     <string name="kw_device_encryption" translatable="false">key fingerprint certificate security tls</string>
     <string name="kw_privacy_policy" translatable="false">data legal terms</string>
@@ -1189,7 +1189,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="kw_trusted_networks" translatable="false">wifi wi-fi ssid autodiscovery</string>
     <string name="kw_custom_device_list" translatable="false">ip address manual add device</string>
     <string name="kw_settings_permissions" translatable="false">allow access accessibility battery overlay notification camera storage permissions privacy</string>
-    <string name="kw_surfaces_add_tiles" translatable="false">quick settings tile widget shade</string>
+    <string name="kw_surfaces_add_tiles" translatable="false">quick settings tile tiles widget widgets shortcut shade</string>
     <string name="kw_settings_export_logs" translatable="false">debug report bug diagnostics</string>
     <string name="kw_about" translatable="false">version licence license credits authors</string>
     <!-- Settings: what a row does, in one sentence (search results, and rows whose own line is only a value) -->

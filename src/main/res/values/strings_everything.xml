@@ -65,4 +65,28 @@
     <string name="everything_turned_on">%1$s is on for %2$s</string>
     <string name="everything_glide_again">%1$s can Glide onto this phone again</string>
     <string name="everything_glide_cant">%1$s can\'t Glide yet. Update DeskLink there.</string>
+    <!-- Words Home's search finds each feature by, beyond its name: searched, never shown. -->
+    <string name="kw_feature_send_files" translatable="false">upload share send file files photos pictures gallery videos documents transfer</string>
+    <string name="kw_feature_send_link" translatable="false">link url web page website browser address open share</string>
+    <string name="kw_feature_bucket" translatable="false">bucket shared folder files sync drop</string>
+    <string name="kw_feature_desk_screen" translatable="false">remote control computer view mouse touchpad trackpad keyboard</string>
+    <string name="kw_feature_extend" translatable="false">extend second display monitor extra screen</string>
+    <string name="kw_feature_share_screen" translatable="false">mirror cast show phone screen stream share screen</string>
+    <string name="kw_feature_glide" translatable="false">glide mouse pointer cursor touchpad trackpad keyboard edge control phone</string>
+    <string name="kw_feature_terminals" translatable="false">terminal terminals shell command line console</string>
+    <string name="kw_feature_lock" translatable="false">lock screen computer secure</string>
+    <string name="kw_feature_unlock" translatable="false">unlock computer login log in password sign in</string>
+    <string name="kw_feature_notifications" translatable="false">notifications alerts messages mirror reply</string>
+    <string name="kw_feature_desk_notifications" translatable="false">notifications alerts messages computer</string>
+    <string name="kw_feature_calls" translatable="false">calls phone ringing answer dial caller</string>
+    <string name="kw_feature_contacts" translatable="false">contacts people address book phone book names</string>
+    <string name="kw_feature_clipboard" translatable="false">clipboard copy paste text</string>
+    <string name="kw_feature_notes" translatable="false">notes memo write text</string>
+    <string name="kw_feature_media" translatable="false">music player play pause song video videos now playing</string>
+    <string name="kw_feature_sound" translatable="false">sound audio speaker microphone mic</string>
+    <string name="kw_feature_ring" translatable="false">find my computer lost locate ring</string>
+    <string name="kw_feature_ping" translatable="false">nudge hello wave ping</string>
+    <string name="kw_feature_tiles" translatable="false">widgets quick settings tiles shortcut shortcuts</string>
+    <string name="kw_feature_pair" translatable="false">add computer new computer pair connect qr code scan</string>
+    <string name="kw_feature_guide" translatable="false">help how to guide tutorial learn</string>
 </resources>
