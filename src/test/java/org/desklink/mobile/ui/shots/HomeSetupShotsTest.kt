@@ -33,6 +33,18 @@ abstract class HomeSetupShots : ShotTest() {
         org.desklink.mobile.ui.compose.screen.home.PaletteScreen(state(DeviceConnection.LOCAL), actions, onClose = {}, onSendLink = {}, initialQuery = "mouse")
     }
 
+    /** A feature's state and step ("Off. Turn it on…") are shown whole, under its name. */
+    @Test fun searchGlide() = shoot("palette-glide") {
+        org.desklink.mobile.ui.compose.screen.home.PaletteScreen(state(DeviceConnection.LOCAL), actions, onClose = {}, onSendLink = {}, initialQuery = "glide")
+    }
+
+    @Test fun searchGlideLargeText() = shoot("palette-glide-1.3") {
+        val d = androidx.compose.ui.platform.LocalDensity.current
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density, 1.3f)) {
+            org.desklink.mobile.ui.compose.screen.home.PaletteScreen(state(DeviceConnection.LOCAL), actions, onClose = {}, onSendLink = {}, initialQuery = "glide")
+        }
+    }
+
     @Test fun offline() = shoot("home-setup-offline") {
         HomeScreen(state(DeviceConnection.OFFLINE), actions) { FinishSetupCard(rows, expanded = false, onExpanded = {}, onAllowAll = {}) }
     }

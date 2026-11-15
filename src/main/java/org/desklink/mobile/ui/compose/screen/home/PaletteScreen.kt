@@ -199,6 +199,8 @@ private fun groupTitle(group: PaletteGroup): String = stringResource(
 private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
     val t = tokens
     val big = LocalDensity.current.fontScale > 1.4f
+    // A sentence (why it is dimmed, or a feature's state and its step) goes whole under the name; a short word stays at the end.
+    val below = big || item.blocked != null || item.group == PaletteGroup.FEATURES
     Row(
         Modifier
             .fillMaxWidth()
@@ -215,9 +217,9 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(item.title, fontSize = 15.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis)
             // What a dimmed action needs is said whole, under its name.
-            if ((big || item.blocked != null) && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
+            if (below && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
         }
-        if (!big && item.blocked == null && item.hint.isNotEmpty()) {
+        if (!below && item.hint.isNotEmpty()) {
             Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(0.6f, fill = false))
         }
     }
