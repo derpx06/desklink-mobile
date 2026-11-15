@@ -44,7 +44,8 @@ class PhoneAudioActivity : AppCompatActivity() {
         PhoneAudio.screen = { runOnUiThread { finish() } }
         // Rotated or recreated after the person answered: that answer is already being acted on.
         if (savedInstanceState?.getBoolean(STATE_ANSWERED) == true) return
-        if (PhoneAudio.consented(this, deviceId)) { PhoneAudio.answered = true; return allowed() }
+        val remembers = PhoneAudio.remembersAnswer(request.source)
+        if (remembers && PhoneAudio.consented(this, deviceId)) { PhoneAudio.answered = true; return allowed() }
         val desk = DeskNames.of(deviceId)
         val mic = request.source == "mic"
         AlertDialog.Builder(this)
@@ -53,7 +54,7 @@ class PhoneAudioActivity : AppCompatActivity() {
             .setPositiveButton(R.string.audio_allow) { _, _ ->
                 answered = true
                 PhoneAudio.answered = true
-                PhoneAudio.rememberConsent(this, deviceId)
+                if (remembers) PhoneAudio.rememberConsent(this, deviceId)
                 allowed()
             }
             .setNegativeButton(R.string.audio_deny) { _, _ -> deny("declined") }
@@ -70,7 +71,7 @@ class PhoneAudioActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putBoolean(STATE_ANSWERED, answered || PhoneAudio.consented(this, deviceId))
+        outState.putBoolean(STATE_ANSWERED, answered || (::request.isInitialized && PhoneAudio.remembersAnswer(request.source) && PhoneAudio.consented(this, deviceId)))
     }
 
     /** Playback capture is an AudioRecord too: both sources need RECORD_AUDIO. */

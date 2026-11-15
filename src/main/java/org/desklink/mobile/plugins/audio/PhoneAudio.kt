@@ -104,6 +104,13 @@ object PhoneAudio {
 
     fun setVolume(context: Context, deviceId: String, percent: Int) = prefs(context).edit { putInt("desk_sound_volume_$deviceId", percent.coerceIn(0, 100)) }
 
+    /**
+     * Whether the answer to a [source] request is remembered (and a remembered yes skips the question). Only the microphone's:
+     * its question says so. The phone's sound is asked each time (Android asks too); F44: a yes to sound was stored as this
+     * consent and let the microphone start unasked.
+     */
+    internal fun remembersAnswer(source: String) = source == "mic"
+
     private fun consentKey(deviceId: String) = "mic_consent_$deviceId"
 
     fun consented(context: Context, deviceId: String) = prefs(context).getBoolean(consentKey(deviceId), false)

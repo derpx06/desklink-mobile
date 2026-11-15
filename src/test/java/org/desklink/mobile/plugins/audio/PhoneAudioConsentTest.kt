@@ -28,4 +28,11 @@ class PhoneAudioConsentTest {
         assertTrue(PhoneAudio.mayReset("desk-A", "desk-A"))
         assertFalse("desk B is hearing the phone; desk A reconnecting must not silence it", PhoneAudio.mayReset("desk-B", "desk-A"))
     }
+
+    /** F44: a yes to the phone's sound was stored as the microphone's consent, and the microphone then started unasked. */
+    @Test
+    fun onlyTheMicrophonesAnswerIsRememberedAndOnlyItSkipsTheQuestion() {
+        assertTrue(PhoneAudio.remembersAnswer("mic"))
+        assertFalse("phone sound is asked each time; its question promises nothing", PhoneAudio.remembersAnswer("system"))
+    }
 }
