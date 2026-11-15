@@ -514,6 +514,35 @@ class WebRtcSessionCoordinator(
         publish("ScreenFailed", reason)
     }
 
+    /** Whether the desk still waits for this phone's screen (it may have stopped while Android's sheet was up). */
+    fun awaitsPhoneScreen(): Boolean = remoteSession.snapshot().awaitsPhoneScreen
+
+    /**
+     * Allow on the desk's ask (F25): Android's own "Share your screen" sheet comes next and can take a while. Another
+     * `view-granted` for the same session tells the desk the person is answering, so it waits again.
+     */
+    fun keepPhoneScreenAskAlive() {
+        synchronized(lock) {
+            val snapshot = remoteSession.snapshot()
+            val remoteSessionId = snapshot.remoteSessionId ?: return
+            if (!snapshot.awaitsPhoneScreen || transport?.isCapturingScreen() == true) return
+            val binding = activeBinding ?: return
+            val attemptId = activeAttemptId ?: return
+            val wire = activeWireBinding ?: return
+            if (transport?.isReadyForPackets() != true) return
+            sendRemoteSessionControlLocked(
+                binding,
+                attemptId,
+                remoteSession.makeMessage(
+                    WebRtcRemoteSessionControlKind.VIEW_GRANTED,
+                    attemptId,
+                    wire,
+                    remoteSessionId = remoteSessionId,
+                ),
+            )
+        }
+    }
+
     /**
      * Share screen from the phone: offers this phone's screen to the desk (`offer-view`). The desk
      * answers with a `request-view` for the same id, which runs the usual consent and capture.

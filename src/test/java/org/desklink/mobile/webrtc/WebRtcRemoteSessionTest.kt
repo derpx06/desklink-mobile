@@ -497,6 +497,31 @@ class WebRtcRemoteSessionTest {
         }
     }
 
+    /** F25: Share tapped after the desk released its ask finds no session to show the screen in. */
+    @Test
+    fun `a share after the desk released its ask has no session to show it in`() {
+        val controller = WebRtcRemoteSessionController { "phone" }
+        val id = java.util.UUID.randomUUID().toString()
+        controller.accept(control(WebRtcRemoteSessionControlKind.REQUEST_VIEW, id, 1), wire, attemptId)
+        assertTrue(controller.snapshot().awaitsPhoneScreen)
+        controller.accept(control(WebRtcRemoteSessionControlKind.RELEASE, id, 2), wire, attemptId)
+        assertFalse(controller.snapshot().awaitsPhoneScreen)
+    }
+
+    private fun control(kind: WebRtcRemoteSessionControlKind, remoteSessionId: String, sequence: Long) =
+        WebRtcRemoteSessionControlMessage(
+            remoteSessionVersion = WebRtcRemoteSessionControlMessage.VERSION,
+            kind = kind,
+            sessionAttemptId = attemptId,
+            deviceId = "desktop",
+            sessionId = wire.sessionId,
+            connectionGeneration = wire.generation,
+            remoteSessionId = remoteSessionId,
+            direction = WebRtcScreenDirection.PHONE_TO_DESKTOP,
+            sequence = sequence,
+            timestamp = System.currentTimeMillis(),
+        )
+
     private fun grant(
         remoteSessionId: String,
         owner: String,

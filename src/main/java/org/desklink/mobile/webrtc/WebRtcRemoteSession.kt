@@ -338,7 +338,11 @@ class WebRtcRemoteSessionController(
          * must be mapped into this, not into the (downscaled) decoded frame. */
         val screenWidth: Int? = null,
         val screenHeight: Int? = null,
-    )
+    ) {
+        /** A desk is still waiting for this phone's screen: a share started now has a session to show it in. */
+        val awaitsPhoneScreen: Boolean
+            get() = remoteSessionId != null && direction == WebRtcScreenDirection.PHONE_TO_DESKTOP
+    }
 
     @Synchronized
     fun snapshot(): Snapshot =

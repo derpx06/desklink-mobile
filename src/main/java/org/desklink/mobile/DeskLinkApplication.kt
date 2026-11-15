@@ -282,6 +282,17 @@ class DeskLinkApplication : Application() {
         }.isSuccess
     }
 
+    /** Allow tapped on a desk's ask: the desk waits again while Android's sheet is up (F25). */
+    fun keepPhoneScreenAskAlive(deviceId: String?) {
+        getDevice(deviceId)?.let { device -> runCatching { webRtcCoordinatorFor(device).keepPhoneScreenAskAlive() } }
+    }
+
+    /** Whether that desk still waits for this phone's screen. */
+    fun deskAwaitsPhoneScreen(deviceId: String?): Boolean {
+        val device = getDevice(deviceId) ?: return false
+        return runCatching { webRtcCoordinatorFor(device).awaitsPhoneScreen() }.getOrDefault(false)
+    }
+
     fun stopWebRtcScreenCapture(deviceId: String?) {
         getDevice(deviceId)?.let { webRtcCoordinatorFor(it).stopPhoneScreenCapture() }
     }
