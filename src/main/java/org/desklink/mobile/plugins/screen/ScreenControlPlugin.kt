@@ -517,11 +517,14 @@ class ScreenControlPlugin : Plugin() {
             else -> AskRoute.NOTICE
         }
 
-        private fun hasCompanionAssociation(context: android.content.Context): Boolean = runCatching {
-            val manager = context.getSystemService(android.companion.CompanionDeviceManager::class.java) ?: return false
-            if (android.os.Build.VERSION.SDK_INT >= 33) manager.myAssociations.isNotEmpty()
-            else @Suppress("DEPRECATION") manager.associations.isNotEmpty()
-        }.getOrDefault(false)
+        private fun hasCompanionAssociation(context: android.content.Context): Boolean {
+            if (android.os.Build.VERSION.SDK_INT < 26) return false
+            return runCatching {
+                val manager = context.getSystemService(android.companion.CompanionDeviceManager::class.java) ?: return false
+                if (android.os.Build.VERSION.SDK_INT >= 33) manager.myAssociations.isNotEmpty()
+                else @Suppress("DEPRECATION") manager.associations.isNotEmpty()
+            }.getOrDefault(false)
+        }
 
         /** Android 14+ grants full-screen intents only to call and alarm apps unless the person turns it on. */
         private fun canUseFullScreenIntent(context: android.content.Context): Boolean =
