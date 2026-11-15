@@ -122,6 +122,7 @@ import org.desklink.mobile.ui.compose.screen.transfers.VideoViewer
 import org.desklink.mobile.plugins.terminal.TerminalActivity
 import org.desklink.mobile.ui.about.EasterEggActivity
 import org.desklink.mobile.ui.about.LicensesActivity
+import org.desklink.mobile.ui.about.aboutReportDetails
 import org.desklink.mobile.ui.about.getApplicationAboutData
 import org.desklink.mobile.ui.compose.DeskLinkTheme
 import org.desklink.mobile.ui.compose.components.ScreenHeader
@@ -1576,16 +1577,18 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     @Composable
     private fun AboutRoute(onBack: () -> Unit) {
         val about = androidx.compose.runtime.remember { getApplicationAboutData(this) }
-        fun open(url: String?) = url?.let { runCatching { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(it))) } }
         Column(Modifier.fillMaxSize().background(tokens.bg).statusBarsPadding()) {
             ScreenHeader(onBack)
             Box(Modifier.weight(1f)) {
                 AboutScreen(
                     aboutData = about,
+                    onOpenUrl = { url -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) } },
+                    onCopyDetails = {
+                        getSystemService(android.content.ClipboardManager::class.java)
+                            ?.setPrimaryClip(android.content.ClipData.newPlainText(getString(R.string.about_copy_details), aboutReportDetails(about)))
+                        showMessage(getString(R.string.about_copied))
+                    },
                     onEasterEggTriggered = { startActivity(Intent(this@MainActivity, EasterEggActivity::class.java)) },
-                    onReportBugClicked = { open(about.bugURL) },
-                    onDonateClicked = { open(about.donateURL) },
-                    onSourceCodeClicked = { open(about.sourceCodeURL) },
                     onLicensesClicked = { startActivity(Intent(this@MainActivity, LicensesActivity::class.java)) },
                     onReplayTour = { push(ONBOARDING) },
                 )

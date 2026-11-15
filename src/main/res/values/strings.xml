@@ -281,6 +281,39 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="easter_egg">Easter egg</string>
     <string name="version">Version %s</string>
 
+    <!-- About -->
+    <string name="about_developer" translatable="false">derpx06</string>
+    <string name="about_developer_url" translatable="false">https://github.com/derpx06</string>
+    <string name="about_issues_url" translatable="false">https://github.com/derpx06/desklink-mobile/issues</string>
+    <string name="about_tagline">Your phone and your Linux computer, working together.</string>
+    <string name="about_build">Build %s</string>
+    <string name="about_made_by">Made by %s</string>
+    <string name="about_whats_new">What\'s new in %s</string>
+    <string name="about_whats_new_show">Tap to see the changes</string>
+    <string-array name="about_whats_new_items">
+        <item>Comes back by itself after sleep, a new network or a restart, and says clearly when it can\'t.</item>
+        <item>File transfers pick up where they stopped and never arrive twice.</item>
+        <item>Shared terminals: open one on the phone or the computer and use it from both.</item>
+        <item>Notes, snippets, contacts and calls on the computer, off until you turn them on.</item>
+        <item>Sound both ways, and Glide: the computer\'s mouse and keyboard carry on onto the phone.</item>
+        <item>Home-screen widgets for status, quick actions, notes and transfers.</item>
+        <item>Tighter privacy: secret notifications are never sent and private screens stay out of screenshots.</item>
+        <item>Removed: browsing the phone\'s files, the presentation remote and Bluetooth.</item>
+    </string-array>
+    <string name="about_report_problem">Report a problem</string>
+    <string name="about_report_problem_summary">Opens the issue list on GitHub</string>
+    <string name="about_copy_details">Copy details for a report</string>
+    <string name="about_copy_details_summary">Version, Android version, phone model and paired computers. Nothing personal.</string>
+    <string name="about_copied">Details copied. Paste them into your report.</string>
+    <string name="about_source_code_summary">DeskLink is free software on GitHub</string>
+    <string name="about_licenses_summary">The open-source code DeskLink uses</string>
+    <string name="about_welcome_tour_summary">See the first-run tour again</string>
+    <string name="about_credits">Credits</string>
+    <string name="about_developer_role">Builds and looks after DeskLink</string>
+    <string name="about_based_on">Based on KDE Connect</string>
+    <string name="about_based_on_body">DeskLink grew from KDE Connect, free software by the KDE community. These people wrote the code it started from.</string>
+    <string name="about_not_kde">DeskLink is an independent project. It is not made or endorsed by KDE.</string>
+
   <string name="click_here_to_type">Tap here to type</string>
   <string name="remote_screen_requesting">Requesting live screen</string>
   <string name="remote_screen_look_at_desk">Waiting for you to allow it on %1$s. Look at its screen.</string>
