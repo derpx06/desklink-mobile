@@ -418,7 +418,9 @@ class ScreenControlPlugin : Plugin() {
             inFront = org.desklink.mobile.helpers.LifecycleHelper.isInForeground,
             overlayAllowed = android.provider.Settings.canDrawOverlays(context),
             companion = hasCompanionAssociation(context),
-            fullScreenAllowed = canUseFullScreenIntent(context),
+            // In use, ColorOS showed a full-screen-intent ask nowhere (not even as a heads-up, RMX5070 11-15):
+            // full screen only on a locked or sleeping phone, where Android really opens it.
+            fullScreenAllowed = canUseFullScreenIntent(context) && lockedOrAsleep(context),
         )
         Log.i(TAG, "The desk asks to see this screen: $route")
         if (route != AskRoute.POPUP) return postAsk(route)
@@ -507,8 +509,7 @@ class ScreenControlPlugin : Plugin() {
         /**
          * Pure. A pop-up when Android lets this app start an activity from the background: it is in front, it may draw over
          * other apps (the person granted Display over other apps), or it has a companion-device association. Otherwise a
-         * full-screen notification where allowed (Android shows it full screen only when the phone is locked or asleep; in use
-         * it is a heads-up) and a plain heads-up notification last.
+         * full-screen notification where allowed and the phone is locked or asleep, and a plain heads-up notification last.
          */
         @JvmStatic
         fun askRoute(inFront: Boolean, overlayAllowed: Boolean, companion: Boolean, fullScreenAllowed: Boolean): AskRoute = when {
@@ -525,6 +526,10 @@ class ScreenControlPlugin : Plugin() {
                 else @Suppress("DEPRECATION") manager.associations.isNotEmpty()
             }.getOrDefault(false)
         }
+
+        private fun lockedOrAsleep(context: android.content.Context): Boolean =
+            context.getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true ||
+                context.getSystemService(android.os.PowerManager::class.java)?.isInteractive == false
 
         /** Android 14+ grants full-screen intents only to call and alarm apps unless the person turns it on. */
         private fun canUseFullScreenIntent(context: android.content.Context): Boolean =
