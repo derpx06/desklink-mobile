@@ -52,6 +52,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <!-- Remote screen -->
     <string name="remote_connecting_to">Connecting to %1$s…</string>
+    <string name="remote_not_shown">Couldn\'t show %1$s\'s screen</string>
 
     <!-- Settings -->
     <string name="settings_category_connection">Connection</string>

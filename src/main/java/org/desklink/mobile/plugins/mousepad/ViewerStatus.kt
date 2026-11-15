@@ -119,6 +119,9 @@ fun ViewerStatus(
     }
 }
 
+/** The Mirror heading: "Connecting to <desk>…" only while it is (F46: it stayed above "This computer is locked" and Try again). */
+internal fun mirrorHeading(waiting: Boolean): Int = if (waiting) R.string.remote_connecting_to else R.string.remote_not_shown
+
 @Composable
 private fun MirrorStatus(deviceName: String, stage: String, waiting: Boolean, onRetry: () -> Unit, onClose: () -> Unit, modifier: Modifier) {
     Column(
@@ -130,7 +133,7 @@ private fun MirrorStatus(deviceName: String, stage: String, waiting: Boolean, on
             Spacer(Modifier.height(16.dp))
         }
         Text(
-            stringResource(R.string.remote_connecting_to, deviceName),
+            stringResource(mirrorHeading(waiting), deviceName),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
