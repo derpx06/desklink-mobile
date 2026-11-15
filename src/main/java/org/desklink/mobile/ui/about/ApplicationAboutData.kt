@@ -7,43 +7,56 @@
 package org.desklink.mobile.ui.about
 
 import android.content.Context
+import android.os.Build
 import org.desklink.mobile.BuildConfig
+import org.desklink.mobile.DeskLinkApplication
 import org.desklink.mobile.R
 
+fun getApplicationAboutData(context: Context): AboutData = AboutData(
+    name = context.getString(R.string.app_name),
+    icon = R.drawable.desklink_mark,
+    versionName = BuildConfig.VERSION_NAME.removeSuffix("-debug"),
+    build = "${BuildConfig.VERSION_CODE} · ${BuildConfig.BUILD_TYPE}",
+    developer = context.getString(R.string.about_developer),
+    developerURL = context.getString(R.string.about_developer_url),
+    bugURL = context.getString(R.string.about_issues_url),
+    sourceCodeURL = context.getString(R.string.source_code_url),
+    privacyURL = context.getString(R.string.privacy_policy_url),
+    // KDE Connect for Android, which DeskLink grew from. Names kept for attribution; their copyright notices,
+    // with contact details, stay in the source files they wrote.
+    upstreamAuthors = listOf(
+        AboutPerson("Albert Vaca Cintora", R.string.maintainer_and_developer),
+        AboutPerson("Aleix Pol", R.string.developer),
+        AboutPerson("Inoki Shaw", R.string.apple_support),
+        AboutPerson("Matthijs Tijink", R.string.developer),
+        AboutPerson("Nicolas Fella", R.string.developer),
+        AboutPerson("Philip Cohn-Cort", R.string.developer),
+        AboutPerson("Piyush Aggarwal", R.string.developer),
+        AboutPerson("Simon Redman", R.string.developer),
+        AboutPerson("Erik Duisters", R.string.developer),
+        AboutPerson("Isira Seneviratne", R.string.developer),
+        AboutPerson("Vineet Garg", R.string.developer),
+        AboutPerson("Anjani Kumar", R.string.bug_fixes_and_general_improvements),
+        AboutPerson("Samoilenko Yuri", R.string.samoilenko_yuri_task),
+        AboutPerson("Aniket Kumar", R.string.aniket_kumar_task),
+        AboutPerson("Àlex Fiestas", R.string.alex_fiestas_task),
+        AboutPerson("Daniel Tang", R.string.bug_fixes_and_general_improvements),
+        AboutPerson("Maxim Leshchenko", R.string.maxim_leshchenko_task),
+        AboutPerson("Holger Kaelberer", R.string.holger_kaelberer_task),
+        AboutPerson("Saikrishna Arcot", R.string.saikrishna_arcot_task),
+        AboutPerson("ShellWen Chen", R.string.shellwen_chen_task),
+    ),
+)
+
 /**
-* Add authors and credits here
+ * The lines "Copy details" puts on the clipboard for a bug report: the app's version and build, Android's version,
+ * the phone model and how many computers are paired. No names, addresses, ids or keys.
  */
-fun getApplicationAboutData(context: Context): AboutData {
-    val aboutData = AboutData(
-        context.getString(R.string.app_name),
-        R.drawable.desklink_mark,
-        BuildConfig.VERSION_NAME,
-        sourceCodeURL = context.getString(R.string.source_code_url),
-        authorsFooterText = R.string.everyone_else
-    )
+fun aboutReportDetails(about: AboutData, pairedComputers: Int = pairedComputerCount()): String = listOf(
+    "${about.name} ${about.versionName} (build ${about.build})",
+    "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+    "Phone: ${Build.MANUFACTURER} ${Build.MODEL}",
+    "Paired computers: $pairedComputers",
+).joinToString("\n")
 
-    aboutData.authors += AboutPerson("Albert Vaca Cintora", R.string.maintainer_and_developer, "albertvaka+kde@gmail.com")
-    aboutData.authors += AboutPerson("Aleix Pol", R.string.developer, "aleixpol@kde.org")
-    aboutData.authors += AboutPerson("Inoki Shaw", R.string.apple_support, "veyx.shaw@gmail.com")
-    aboutData.authors += AboutPerson("Matthijs Tijink", R.string.developer, "matthijstijink@gmail.com")
-    aboutData.authors += AboutPerson("Nicolas Fella", R.string.developer, "nicolas.fella@gmx.de")
-    aboutData.authors += AboutPerson("Philip Cohn-Cort", R.string.developer, "cliabhach@gmail.com")
-    aboutData.authors += AboutPerson("Piyush Aggarwal", R.string.developer, "piyushaggarwal002@gmail.com")
-    aboutData.authors += AboutPerson("Simon Redman", R.string.developer, "simon@ergotech.com")
-    aboutData.authors += AboutPerson("Erik Duisters", R.string.developer, "e.duisters1@gmail.com")
-    aboutData.authors += AboutPerson("Isira Seneviratne", R.string.developer, "isirasen96@gmail.com")
-    aboutData.authors += AboutPerson("Vineet Garg", R.string.developer, "grg.vineet@gmail.com")
-    aboutData.authors += AboutPerson("Anjani Kumar", R.string.bug_fixes_and_general_improvements, "anjanik012@gmail.com")
-    aboutData.authors += AboutPerson("Samoilenko Yuri", R.string.samoilenko_yuri_task, "kinnalru@gmail.com")
-    aboutData.authors += AboutPerson("Aniket Kumar", R.string.aniket_kumar_task, "anikketkumar786@gmail.com")
-    aboutData.authors += AboutPerson("Àlex Fiestas", R.string.alex_fiestas_task, "afiestas@kde.org")
-    aboutData.authors += AboutPerson("Daniel Tang", R.string.bug_fixes_and_general_improvements, "danielzgtg.opensource@gmail.com")
-    aboutData.authors += AboutPerson("Maxim Leshchenko", R.string.maxim_leshchenko_task, "cnmaks90@gmail.com")
-    aboutData.authors += AboutPerson("Holger Kaelberer", R.string.holger_kaelberer_task, "holger.k@elberer.de")
-    aboutData.authors += AboutPerson("Saikrishna Arcot", R.string.saikrishna_arcot_task, "saiarcot895@gmail.com")
-    aboutData.authors += AboutPerson("ShellWen Chen", R.string.shellwen_chen_task, "me@shellwen.com")
-
-    // Have you made some contributions and think your name should be here? Open a MR to add yourself to the list :)
-
-    return aboutData
-}
+private fun pairedComputerCount(): Int = DeskLinkApplication.getInstance().devices.values.count { it.isPaired }

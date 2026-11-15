@@ -107,15 +107,32 @@ abstract class Wave5Shots : ShotTest() {
         Column(Modifier.fillMaxSize().background(tokens.bg)) { ScreenHeader({}, title = "Holidays 2026") {} }
     }
 
-    private val about = AboutData("DeskLink", R.drawable.desklink_mark, "1.3.0", bugURL = "https://example.org/bug", sourceCodeURL = "https://example.org/src", donateURL = "https://example.org/donate", authorsFooterText = R.string.everyone_else).apply {
-        authors += AboutPerson("Albert Vaca Cintora", R.string.maintainer_and_developer)
-        authors += AboutPerson("Aleix Pol", R.string.developer)
-    }
+    private val about = AboutData(
+        "DeskLink", R.drawable.desklink_mark, "1.3.0", build = "20300 · debug", developer = "derpx06",
+        developerURL = "https://github.com/derpx06", bugURL = "https://example.org/bug", sourceCodeURL = "https://example.org/src",
+        privacyURL = "https://example.org/privacy",
+        upstreamAuthors = listOf(AboutPerson("Albert Vaca Cintora", R.string.maintainer_and_developer), AboutPerson("Aleix Pol", R.string.developer)),
+    )
 
     @Test fun about() = shoot("w5-about") {
         Column(Modifier.fillMaxSize().background(tokens.bg)) {
             ScreenHeader({})
-            AboutScreen(about, {}, {}, {}, {}, {}, onReplayTour = {})
+            AboutScreen(about, onOpenUrl = {}, onCopyDetails = {}, onLicensesClicked = {}, onReplayTour = {})
+        }
+    }
+
+    @Test fun aboutWhatsNew() = shoot("w5-about-whats-new") {
+        Column(Modifier.fillMaxSize().background(tokens.bg)) {
+            ScreenHeader({})
+            AboutScreen(about, onOpenUrl = {}, onCopyDetails = {}, onLicensesClicked = {}, onReplayTour = {}, whatsNewOpen = true)
+        }
+    }
+
+    /** The whole page, credits included: a tall window so nothing is below the fold. */
+    @Test @Config(qualifiers = "w412dp-h2400dp-xxhdpi") fun aboutFull() = shoot("w5-about-full") {
+        Column(Modifier.fillMaxSize().background(tokens.bg)) {
+            ScreenHeader({})
+            AboutScreen(about, onOpenUrl = {}, onCopyDetails = {}, onLicensesClicked = {}, onReplayTour = {})
         }
     }
 

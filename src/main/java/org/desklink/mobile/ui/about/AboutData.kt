@@ -6,41 +6,20 @@
 
 package org.desklink.mobile.ui.about
 
-import android.os.Parcel
-import android.os.Parcelable
+import androidx.annotation.DrawableRes
 
-class AboutData(var name: String, var icon: Int, var versionName: String, var bugURL: String? = null,
-                var websiteURL: String? = null, var sourceCodeURL: String? = null, var donateURL: String? = null,
-                var authorsFooterText: Int? = null) : Parcelable {
-    val authors: MutableList<AboutPerson> = mutableListOf()
-
-    constructor(parcel: Parcel) : this(parcel.readString()!!, parcel.readInt(), parcel.readString()!!,
-                                       parcel.readString(), parcel.readString(), parcel.readString(), parcel.readString(),
-                                       if (parcel.readByte() == 0x01.toByte()) parcel.readInt() else null) {
-        parcel.readList(authors as List<*>, AboutPerson::class.java.classLoader)
-    }
-
-    companion object CREATOR : Parcelable.Creator<AboutData> {
-        override fun createFromParcel(parcel: Parcel): AboutData = AboutData(parcel)
-        override fun newArray(size: Int): Array<AboutData?> = arrayOfNulls(size)
-    }
-
-    override fun writeToParcel(parcel: Parcel, flags: Int) {
-        parcel.writeString(name)
-        parcel.writeInt(icon)
-        parcel.writeString(versionName)
-        parcel.writeList(authors.toList())
-
-        parcel.writeString(bugURL)
-        parcel.writeString(websiteURL)
-        parcel.writeString(sourceCodeURL)
-        parcel.writeString(donateURL)
-
-        authorsFooterText?.let {
-            parcel.writeByte(0x01)
-            parcel.writeInt(it)
-        } ?: parcel.writeByte(0x00)
-    }
-
-    override fun describeContents(): Int = 0
-}
+/** What the About screen shows. A null link hides its row. */
+data class AboutData(
+    val name: String,
+    @DrawableRes val icon: Int,
+    val versionName: String,
+    /** "20300 · debug": the version code and the build type. */
+    val build: String,
+    val developer: String,
+    val developerURL: String? = null,
+    val bugURL: String? = null,
+    val sourceCodeURL: String? = null,
+    val privacyURL: String? = null,
+    /** The KDE Connect authors DeskLink's code started from: credited by name, never as DeskLink's makers. */
+    val upstreamAuthors: List<AboutPerson> = emptyList(),
+)
