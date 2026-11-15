@@ -83,8 +83,8 @@ class HomeInteractionTest {
         val expected = listOf(
             "Send files" to "files", "Send clipboard" to "clipboard", "Send a link" to "link", "Desk screen" to "screen",
             "New terminal" to "newTerminal", "Open the terminals" to "terminals", "New note" to "newNote", "Open the Bucket" to "bucket",
-            "Ring computer" to "ring", "Ping computer" to "ping", "Lock computer" to "lock", "Unlock arch-desk" to "unlock",
-            "Share screen" to "share", "Pair another computer" to "pair",
+            "Ring computer" to "ring", "Send a nudge" to "ping", "Lock computer" to "lock", "Unlock arch-desk" to "unlock",
+            "Phone screen" to "share", "Pair another computer" to "pair",
             "invoice.pdf" to "open:r1", "Connection" to "settings:connection", "work-laptop" to "select:d2",
         )
         for ((text, call) in expected) {

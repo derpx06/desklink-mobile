@@ -292,7 +292,7 @@ fun HomeScreen(state: HomeState, actions: HomeActions, finishSetup: (@Composable
             }
             RowAction.RETRY -> actions.onRetry()
             RowAction.EXPLAIN -> (status as FeatureStatus.Off).let { off ->
-                off.why?.let { actions.onMessage(resources.getString(it, state.name)) } ?: actions.onBlocked(f.action ?: f.id, resources.getString(f.name), off.blocker)
+                off.why?.let { actions.onMessage(resources.getString(it, state.name)) } ?: actions.onBlocked(f.action ?: f.id, resources.getString(f.name, state.name), off.blocker)
             }
         }
     }

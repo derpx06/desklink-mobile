@@ -86,6 +86,7 @@ class Feature(
     val id: String,
     val group: FeatureGroup,
     @DrawableRes val icon: Int,
+    /** Formatted with the computer's name ("arch-desk's screen"); a name without one ignores it. */
     @StringRes val name: Int,
     @StringRes val line: Int,
     val open: String,
@@ -123,7 +124,7 @@ object Everything {
         Feature("bucket", FeatureGroup.SHARE, R.drawable.sym_inventory, R.string.bucket_title, R.string.everything_bucket_line,
             Action.OPEN_BUCKET, R.string.settings_open, palette = listOf(Action.OPEN_BUCKET), words = R.string.kw_feature_bucket),
 
-        Feature("desk-screen", FeatureGroup.SCREEN, R.drawable.sym_desktop_windows, R.string.home_desk_screen, R.string.everything_desk_screen_line,
+        Feature("desk-screen", FeatureGroup.SCREEN, R.drawable.sym_desktop_windows, R.string.everything_desk_screen, R.string.everything_desk_screen_line,
             Action.DESK_SCREEN, R.string.settings_open, action = Action.DESK_SCREEN, palette = listOf(Action.DESK_SCREEN), guide = listOf("desk_screen"), words = R.string.kw_feature_desk_screen),
         Feature("extend", FeatureGroup.SCREEN, R.drawable.sym_aspect_ratio, R.string.everything_extend, R.string.everything_extend_line,
             Action.DESK_SCREEN, R.string.settings_open, action = Action.DESK_SCREEN, guide = listOf("extend"), words = R.string.kw_feature_extend),

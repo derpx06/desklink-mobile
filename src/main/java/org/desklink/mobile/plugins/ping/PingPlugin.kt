@@ -49,7 +49,7 @@ class PingPlugin : Plugin() {
             Pair(id, np.getString("message").take(MAX_MESSAGE_CHARS))
         } else {
             val id = 42 // A unique id to create only one notification
-            Pair(id, "Ping!")
+            Pair(id, context.getString(R.string.ping_received, device.name))
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

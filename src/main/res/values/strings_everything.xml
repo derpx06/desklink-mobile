@@ -5,22 +5,22 @@
     <string name="everything_title">Everything DeskLink does</string>
     <string name="everything_subtitle">Where each thing is, and one tap to start it with %1$s.</string>
 
-    <string name="everything_group_share">Share &amp; files</string>
-    <string name="everything_group_screen">Screen &amp; control</string>
-    <string name="everything_group_calls">Calls &amp; messages</string>
-    <string name="everything_group_notes">Notes, clipboard &amp; sound</string>
+    <string name="everything_group_share">Share and files</string>
+    <string name="everything_group_screen">Screen and control</string>
+    <string name="everything_group_calls">Calls and notifications</string>
+    <string name="everything_group_notes">Notes, clipboard and sound</string>
     <string name="everything_group_more">More</string>
 
     <string name="everything_status_ready">Ready</string>
-    <string name="everything_status_step">One step needed</string>
-    <string name="everything_status_off">Not possible right now</string>
+    <string name="everything_status_step">One step</string>
+    <string name="everything_status_off">Not available</string>
 
     <string name="everything_send">Send</string>
     <string name="everything_share">Share</string>
     <string name="everything_lock">Lock</string>
     <string name="everything_unlock">Unlock</string>
     <string name="everything_ring">Ring</string>
-    <string name="everything_ping">Ping</string>
+    <string name="everything_ping">Nudge</string>
     <string name="everything_add">Add</string>
     <string name="everything_pair">Pair</string>
     <string name="everything_what_to_do">What to do</string>
@@ -29,16 +29,18 @@
     <string name="everything_send_link_line">Open a web page on %1$s</string>
     <string name="everything_bucket_line">A folder that stays the same on both, even offline</string>
     <string name="everything_desk_screen_line">See %1$s and use this phone as its touchpad</string>
-    <string name="everything_extend">Second screen</string>
+    <!-- The Everything row for Desk screen, seen from the phone: %1$s is the computer's name. The tiles keep "Desk screen". -->
+    <string name="everything_desk_screen">%1$s\'s screen</string>
+    <string name="everything_extend">Phone as a second screen</string>
     <string name="everything_extend_line">In Desk screen, choose Extend to add this phone as a screen</string>
     <string name="everything_share_screen_line">Show this phone on %1$s and use it from there</string>
     <string name="everything_glide_line">Move %1$s\'s mouse past its screen edge onto this phone</string>
     <string name="everything_terminals_line">Command lines you can use on both</string>
     <string name="everything_lock_line">Lock %1$s from here</string>
     <string name="everything_unlock_line">Unlock %1$s with this phone when you are close by</string>
-    <string name="everything_notifications">Notifications on the computer</string>
+    <string name="everything_notifications">Notifications on %1$s</string>
     <string name="everything_notifications_line">See and answer this phone\'s notifications on %1$s</string>
-    <string name="everything_desk_notifications">Computer notifications here</string>
+    <string name="everything_desk_notifications">%1$s\'s notifications here</string>
     <string name="everything_desk_notifications_line">%1$s\'s notifications show on this phone</string>
     <string name="everything_calls_line">See who is calling, answer and dial from %1$s</string>
     <string name="everything_contacts_line">Caller names and contacts on %1$s</string>
@@ -69,15 +71,15 @@
     <string name="kw_feature_send_files" translatable="false">upload share send file files photos pictures gallery videos documents transfer</string>
     <string name="kw_feature_send_link" translatable="false">link url web page website browser address open share</string>
     <string name="kw_feature_bucket" translatable="false">bucket shared folder files sync drop</string>
-    <string name="kw_feature_desk_screen" translatable="false">remote control computer view mouse touchpad trackpad keyboard</string>
-    <string name="kw_feature_extend" translatable="false">extend second display monitor extra screen</string>
-    <string name="kw_feature_share_screen" translatable="false">mirror cast show phone screen stream share screen</string>
+    <string name="kw_feature_desk_screen" translatable="false">desk screen remote control computer view mouse touchpad trackpad keyboard</string>
+    <string name="kw_feature_extend" translatable="false">extend second screen second display monitor extra screen</string>
+    <string name="kw_feature_share_screen" translatable="false">share screen mirror cast show phone screen stream</string>
     <string name="kw_feature_glide" translatable="false">glide mouse pointer cursor touchpad trackpad keyboard edge control phone</string>
     <string name="kw_feature_terminals" translatable="false">terminal terminals shell command line console</string>
     <string name="kw_feature_lock" translatable="false">lock screen computer secure</string>
     <string name="kw_feature_unlock" translatable="false">unlock computer login log in password sign in</string>
-    <string name="kw_feature_notifications" translatable="false">notifications alerts messages mirror reply</string>
-    <string name="kw_feature_desk_notifications" translatable="false">notifications alerts messages computer</string>
+    <string name="kw_feature_notifications" translatable="false">notifications alerts messages mirror reply computer</string>
+    <string name="kw_feature_desk_notifications" translatable="false">notifications alerts messages computer here</string>
     <string name="kw_feature_calls" translatable="false">calls phone ringing answer dial caller</string>
     <string name="kw_feature_contacts" translatable="false">contacts people address book phone book names</string>
     <string name="kw_feature_clipboard" translatable="false">clipboard copy paste text</string>
@@ -85,7 +87,7 @@
     <string name="kw_feature_media" translatable="false">music player play pause song video videos now playing</string>
     <string name="kw_feature_sound" translatable="false">sound audio speaker microphone mic</string>
     <string name="kw_feature_ring" translatable="false">find my computer lost locate ring</string>
-    <string name="kw_feature_ping" translatable="false">nudge hello wave ping</string>
+    <string name="kw_feature_ping" translatable="false">nudge ping hello wave</string>
     <string name="kw_feature_tiles" translatable="false">widgets quick settings tiles shortcut shortcuts</string>
     <string name="kw_feature_pair" translatable="false">add computer new computer pair connect qr code scan</string>
     <string name="kw_feature_guide" translatable="false">help how to guide tutorial learn</string>

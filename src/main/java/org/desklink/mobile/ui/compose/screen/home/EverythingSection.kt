@@ -62,7 +62,7 @@ internal fun EverythingSection(state: HomeState, onRow: (Feature, FeatureStatus)
 @Composable
 private fun FeatureRow(f: Feature, status: FeatureStatus, state: HomeState, onRow: (Feature, FeatureStatus) -> Unit) {
     val t = tokens
-    val name = stringResource(f.name)
+    val name = stringResource(f.name, state.name)
     val line = stringResource(Everything.line(f, status), state.name)
     val label = stringResource(if (f.id == "share-screen" && status == FeatureStatus.Ready && state.live.phoneScreen) R.string.home_stop_sharing else Everything.label(f, status))
     val word = stringResource(Everything.statusWord(status))
