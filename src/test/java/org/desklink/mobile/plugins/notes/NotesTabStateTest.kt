@@ -6,10 +6,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.desklink.mobile.ui.compose.DeskLinkFixedTheme
 import org.desklink.mobile.ui.compose.screen.tabs.NotesTab
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,5 +54,25 @@ class NotesTabStateTest {
         compose.waitForIdle()
         compose.onNodeWithText("Second note title").assertExists()
         compose.onNodeWithText("First note title").assertDoesNotExist()
+    }
+
+    /**
+     * F41: the caller reads the setting from preferences, which Compose does not observe, so it kept passing "on" after a tap
+     * turned sharing off. The switch must follow the tap, and a second tap must turn it back on, not send "off" again.
+     */
+    @Test fun theClipboardSwitchFollowsATapEvenWhileTheCallerStillSaysOn() {
+        val sent = mutableListOf<Boolean>()
+        compose.setContent {
+            DeskLinkFixedTheme(compose.activity, false) {
+                NotesTab(androidx.compose.runtime.remember { NotesUi(compose.activity, mutableStateOf(null)) }, compose.activity, "desk", clipboardOn = true, onClipboard = { sent += it }, onSendClipboard = {}, onMessage = {})
+            }
+        }
+        val header = compose.onNodeWithContentDescription("Clipboard sync")
+        header.assertIsOn()
+        header.performClick()
+        header.assertIsOff()
+        header.performClick()
+        header.assertIsOn()
+        assertEquals(listOf(false, true), sent)
     }
 }

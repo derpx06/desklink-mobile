@@ -224,6 +224,10 @@ fun NotesTab(
     var segment by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(segmentRequest) { segmentRequest?.let { segment = it; onSegmentShown() } }
     var query by rememberSaveable { mutableStateOf("") }
+    // The caller reads the setting from preferences, which Compose does not observe: the switch follows a tap at once, and
+    // the caller's value whenever that changes (F41: it stayed "on" after a tap turned sharing off, and the next tap sent "off" again).
+    var shared by remember(clipboardOn) { mutableStateOf(clipboardOn) }
+    val setShared: (Boolean) -> Unit = { shared = it; onClipboard(it) }
     val editing = notes.editing.value
     if (editing != null) {
         // The editor has its own header. A different note (or a new one) starts a fresh editor; the tab bar floats over it,
@@ -236,7 +240,7 @@ fun NotesTab(
     val collapse = org.desklink.mobile.ui.compose.components.rememberHeaderCollapse()
     Column(Modifier.fillMaxSize().background(t.bg).statusBarsPadding().nestedScroll(collapse.connection).dismissKeyboardOnScroll()) {
         LargeTitle(stringResource(R.string.notes_title), Modifier.padding(top = 12.dp), subtitle = stringResource(R.string.notes_subtitle), collapse = collapse.fraction) {
-            ClipboardSwitch(clipboardOn, onClipboard)
+            ClipboardSwitch(shared, setShared)
         }
         val segments = listOf(stringResource(R.string.notes_tab_notes), stringResource(R.string.notes_tab_snippets), stringResource(R.string.notes_tab_clipboard))
         val search: @Composable (Modifier) -> Unit = { m -> DeskSearchField(query, { query = it }, stringResource(R.string.notes_search_all), stringResource(R.string.palette_clear), m) }
@@ -256,7 +260,7 @@ fun NotesTab(
             when (segment) {
                 0 -> notes.NotesList(query)
                 1 -> notes.SnippetsList(query)
-                else -> ClipboardPanel(host, deskName, clipboardOn, onClipboard, onSendClipboard, onMessage)
+                else -> ClipboardPanel(host, deskName, shared, setShared, onSendClipboard, onMessage)
             }
         }
     }

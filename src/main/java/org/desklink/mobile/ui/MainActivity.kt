@@ -858,6 +858,8 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
     @Composable
     private fun NotesContent(device: Device) {
+        // Re-read the devices on every refresh tick: they are not observable state (the clipboard switch reads a preference).
+        @Suppress("UNUSED_VARIABLE") val refresh = tick
         androidx.activity.compose.BackHandler(enabled = notesEditing.value != null) { notesEditing.value = null }
         NotesTab(
             notes = notesUi,
