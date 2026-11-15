@@ -223,20 +223,66 @@ fun GroupRow(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         if (icon != null) Icon(painterResource(icon), contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, fontSize = 16.sp, lineHeight = 21.sp, color = titleColor)
-            subtitle?.let {
-                Text(
-                    it,
-                    style = if (monoSubtitle) TextStyle(fontFamily = MonoFamily, fontSize = 13.sp) else TextStyle(fontSize = 13.sp, lineHeight = 17.sp),
-                    // Never cut: what a setting says is what it does (and a command to copy must be whole).
-                    color = t.textDim,
-                )
-            }
-        }
-        trailing()
+        TextAndTrailing(
+            Modifier.weight(1f),
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(title, fontSize = 16.sp, lineHeight = 21.sp, color = titleColor)
+                    subtitle?.let {
+                        Text(
+                            it,
+                            style = if (monoSubtitle) TextStyle(fontFamily = MonoFamily, fontSize = 13.sp) else TextStyle(fontSize = 13.sp, lineHeight = 17.sp),
+                            // Never cut: what a setting says is what it does (and a command to copy must be whole).
+                            color = t.textDim,
+                        )
+                    }
+                }
+            },
+            trailing = trailing,
+        )
         if (chevron) Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = t.textDim, modifier = Modifier.size(22.dp))
         if (checked != null) Switch(checked = checked, onCheckedChange = null, enabled = enabled, colors = deskSwitchColors())
+    }
+}
+
+/** The width a row's words keep beside what trails them (a button); with less, the button goes under the words. */
+private val TEXT_MIN = 120.dp
+
+/**
+ * Whether a row's trailing part ([trailingWidth] px, a button) goes under its words instead of beside them: beside, the words would
+ * keep under [textMin] of [maxWidth] and break inside words ("Off / on / man / as-8 / 2xf" at a large font, F47).
+ */
+internal fun stacksTrailing(maxWidth: Int, trailingWidth: Int, gap: Int, textMin: Int): Boolean =
+    trailingWidth > 0 && maxWidth - trailingWidth - gap < textMin
+
+/** A row's words and what trails them: side by side while the words keep [TEXT_MIN], else the trailing part under them, at the end. */
+@Composable
+private fun TextAndTrailing(modifier: Modifier, text: @Composable () -> Unit, trailing: @Composable RowScope.() -> Unit) {
+    androidx.compose.ui.layout.Layout(
+        content = { text(); Row(verticalAlignment = Alignment.CenterVertically, content = trailing) },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val (words, tail) = measurables
+        val gap = 14.dp.roundToPx()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val end = tail.measure(loose)
+        if (!stacksTrailing(constraints.maxWidth, end.width, gap, TEXT_MIN.roundToPx())) {
+            val room = if (end.width > 0) constraints.maxWidth - end.width - gap else constraints.maxWidth
+            val body = words.measure(loose.copy(maxWidth = room.coerceAtLeast(0)))
+            val height = maxOf(body.height, end.height, constraints.minHeight)
+            layout(constraints.maxWidth, height) {
+                body.place(0, (height - body.height) / 2)
+                end.place(constraints.maxWidth - end.width, (height - end.height) / 2)
+            }
+        } else {
+            val body = words.measure(loose)
+            val spacing = 8.dp.roundToPx()
+            val height = maxOf(body.height + spacing + end.height, constraints.minHeight)
+            layout(constraints.maxWidth, height) {
+                body.place(0, 0)
+                end.place(constraints.maxWidth - end.width, body.height + spacing)
+            }
+        }
     }
 }
 

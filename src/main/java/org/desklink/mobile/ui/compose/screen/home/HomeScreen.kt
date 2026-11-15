@@ -566,7 +566,7 @@ private fun Hero(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActi
             { m -> tile(PaletteModel.Action.SEND_FILES, R.drawable.sym_upload_file, stringResource(R.string.home_send_files), actions.onSendFiles, false, m) },
             { m -> ActionTile(R.drawable.sym_terminal, stringResource(R.string.tab_terminals), actions.onTerminals, m, hint = terminalsHint) },
         )
-        if (LocalDensity.current.fontScale > 1.4f) {
+        if (heroTilesStacked(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp, LocalDensity.current.fontScale)) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { tiles.forEach { it(Modifier.fillMaxWidth()) } }
         } else {
             Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -575,6 +575,9 @@ private fun Hero(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActi
         }
     }
 }
+
+/** The three hero tiles go one under another when their names would break inside a word ("Termina / ls" at 1.3 on 360 dp, F47). */
+internal fun heroTilesStacked(screenWidthDp: Int, fontScale: Float): Boolean = screenWidthDp / fontScale < 300f
 
 /** What each tile says under its name: why it is off, or what it will do. */
 @Composable
