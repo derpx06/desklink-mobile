@@ -293,6 +293,87 @@ class DeviceTest {
         }
     }
 
+    /** A device on a mocked LAN link that accepts every send, not paired. */
+    private fun unpairedDeviceOnLan(): Pair<Device, LanLink> {
+        val fakeNetworkPacket = NetworkPacket(NetworkPacket.PACKET_TYPE_IDENTITY)
+        // The certificate below is issued to this id (its CN); an unpaired
+        // link must present a certificate for the id it claims.
+        val deviceId = "_da179a91_f064_478e_be8c_1935d7544d54_"
+        fakeNetworkPacket["deviceId"] = deviceId
+        fakeNetworkPacket["deviceName"] = "Unpaired Test Device"
+        fakeNetworkPacket["protocolVersion"] = DeviceHelper.PROTOCOL_VERSION
+        fakeNetworkPacket["deviceType"] = DeviceType.PHONE.toString()
+        val certificateString = """
+            MIIDVzCCAj+gAwIBAgIBCjANBgkqhkiG9w0BAQUFADBVMS8wLQYDVQQDDCZfZGExNzlhOTFfZjA2
+            NF80NzhlX2JlOGNfMTkzNWQ3NTQ0ZDU0XzEMMAoGA1UECgwDS0RFMRQwEgYDVQQLDAtLZGUgY29u
+            bmVjdDAeFw0xNTA2MDMxMzE0MzhaFw0yNTA2MDMxMzE0MzhaMFUxLzAtBgNVBAMMJl9kYTE3OWE5
+            MV9mMDY0XzQ3OGVfYmU4Y18xOTM1ZDc1NDRkNTRfMQwwCgYDVQQKDANLREUxFDASBgNVBAsMC0tk
+            ZSBjb25uZWN0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzH9GxS1lctpwYdSGAoPH
+            ws+MnVaL0PVDCuzrpxzXc+bChR87xofhQIesLPLZEcmUJ1MlEJ6jx4W+gVhvY2tUN7SoiKKbnq8s
+            WjI5ovs5yML3C1zPbOSJAdK613FcdkK+UGd/9dQk54gIozinC58iyTAChVVpB3pAF38EPxwKkuo2
+            qTzwk24d6PRxz1skkzwEphUQQzGboyHsAlJHN1MzM2/yFGB4l8iUua2d3ETyfy/xFEh/SwtGtXE5
+            KLz4cpb0fxjeYQZVruBKxzE07kgDO3zOhmP3LJ/KSPHWYImd1DWmpY9iDvoXr6+V7FAnRloaEIyg
+            7WwdlSCpo3TXVuIjLwIDAQABozIwMDAdBgNVHQ4EFgQUwmbHo8YbiR463GRKSLL3eIKyvDkwDwYD
+            VR0TAQH/BAUwAwIBADANBgkqhkiG9w0BAQUFAAOCAQEAydijH3rbnvpBDB/30w2PCGMT7O0N/XYM
+            wBtUidqa4NFumJrNrccx5Ehp4UP66BfP61HW8h2U/EekYfOsZyyWd4KnsDD6ycR8h/WvpK3BC2cn
+            I299wbqCEZmk5ZFFaEIDHdLAdgMCuxJkAzy9mMrWEa05Soxi2/ZXdrU9nXo5dzuPGYlirVPDHl7r
+            /urBxD6HVX3ObQJRJ7r/nAWyUVdX3/biJaDRsydftOpGU6Gi5c1JK4MWIz8Bsjh6mEjCsVatbPPl
+            yygGiJbDZfAvN2XoaVEBii2GDDCWfaFwPVPYlNTvjkUkMP8YThlMsiJ8Q4693XoLOL94GpNlCfUg
+            7n+KOQ==
+            """.trimIndent()
+        val certificateBytes = android.util.Base64.decode(certificateString, 0)
+        val certificate = SslHelper.parseCertificate(certificateBytes)
+        val deviceInfo = fromIdentityPacketAndCert(fakeNetworkPacket, certificate)
+
+        val linkProvider = mockk<LanLinkProvider>()
+        every { linkProvider.name } returns "LanLinkProvider"
+        val link = mockk<LanLink>()
+        every { link.linkProvider } returns linkProvider
+        every { link.deviceId } returns deviceId
+        every { link.deviceInfo } returns deviceInfo
+        every { link.addPacketReceiver(any()) } returns Unit
+        every { link.sendPacket(any(), any(), any()) } returns true
+        val device = Device(context, link)
+        Assert.assertFalse(device.isPaired)
+        return device to link
+    }
+
+    /** Unpaired, a feature packet goes nowhere: the queue stays open after an unpair (for pairing again), never to LAN. */
+    @Test
+    fun anUnpairedDeviceSendsNoFeaturePacketOnTheLanLink() {
+        val (device, link) = unpairedDeviceOnLan()
+        val callback = mockk<Device.SendPacketStatusCallback>(relaxed = true)
+        val sent = device.sendPacketBlocking(NetworkPacket("desklink.notification"), callback, false)
+        Assert.assertFalse(sent)
+        verify { callback.onFailure(any()) }
+        verify(exactly = 0) { link.sendPacket(any(), any(), any()) }
+    }
+
+    /** An unpair landing in the middle of a send (paired at the first look, not at the next) never sends it on LAN. */
+    @Test
+    fun anUnpairDuringASendNeverPutsTheFeaturePacketOnTheLanLink() {
+        val (plain, link) = unpairedDeviceOnLan()
+        val device = io.mockk.spyk(plain)
+        every { device.isPaired } returnsMany listOf(true, false)
+        // Paired at the one read, and outside the shared profile: refused there. Read twice, the second read said
+        // "not paired", skipped every paired branch and fell through to the LAN line.
+        io.mockk.mockkObject(org.desklink.mobile.webrtc.WebRtcFeatureProfile)
+        every { org.desklink.mobile.webrtc.WebRtcFeatureProfile.peerAccepts(any(), any()) } returns false
+        val callback = mockk<Device.SendPacketStatusCallback>(relaxed = true)
+        Assert.assertFalse(device.sendPacketBlocking(NetworkPacket("desklink.notification"), callback, false))
+        verify { callback.onFailure(any()) }
+        verify(exactly = 0) { link.sendPacket(any(), any(), any()) }
+    }
+
+    /** A bootstrap packet still goes on the LAN link while unpaired (pair requests, identity). */
+    @Test
+    fun anUnpairedDeviceStillSendsBootstrapPacketsOnTheLanLink() {
+        val (device, link) = unpairedDeviceOnLan()
+        val callback = mockk<Device.SendPacketStatusCallback>(relaxed = true)
+        Assert.assertTrue(device.sendPacketBlocking(NetworkPacket(NetworkPacket.PACKET_TYPE_PAIR), callback, false))
+        verify(exactly = 1) { link.sendPacket(any(), any(), any()) }
+    }
+
     @Test
     fun unpairSweepsThePeersStateOnTheLifecycleWorkerNotTheCallersThread() {
         io.mockk.mockkObject(org.desklink.mobile.helpers.PeerState)

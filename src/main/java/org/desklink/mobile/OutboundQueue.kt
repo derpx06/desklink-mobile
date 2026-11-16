@@ -78,6 +78,14 @@ class OutboundQueue<T>(
 
     fun reopen() = lock.withLock { closed = false }
 
+    /** Removes and returns what is queued except what [keep] says stays, and stays open (unpair: the link stays for pairing again). */
+    fun drain(keep: (T) -> Boolean = { false }): List<T> = lock.withLock {
+        val gone = (interactive + bulk).filterNot { keep(it.item) }
+        interactive.removeAll(gone.toSet())
+        bulk.removeAll(gone.toSet())
+        gone.map { it.item }
+    }
+
     fun size(): Int = lock.withLock { interactive.size + bulk.size }
 
     companion object {

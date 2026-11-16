@@ -102,4 +102,24 @@ class OutboundQueueTest {
         q.offer("manifest", true); q.offer("remove", true)
         assertEquals(listOf("manifest", "remove"), List(2) { q.take() })
     }
+
+    @Test
+    fun aDrainedQueueStillTakesNewSendsAfterAnUnpair() {
+        // Unpair empties the queue but the LAN link stays: pairing again must still be sent.
+        val q = OutboundQueue<String>()
+        q.offer("feature", false)
+        assertEquals(listOf("feature"), q.drain())
+        assertTrue(q.offer("pair", false))
+        assertEquals("pair", q.take())
+    }
+
+    @Test
+    fun anUnpairDrainKeepsThePairFalseItJustQueued() {
+        // PairingHandler.unpair() queues pair:false, then the drain fails the rest: the pair:false must still go out.
+        val q = OutboundQueue<String>()
+        q.offer("notification", false); q.offer("pair:false", false); q.offer("contacts", true)
+        assertEquals(listOf("notification", "contacts"), q.drain { it == "pair:false" })
+        assertEquals("pair:false", q.take())
+        assertEquals(0, q.size())
+    }
 }

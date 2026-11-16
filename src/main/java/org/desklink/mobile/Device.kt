@@ -341,6 +341,10 @@ class Device : PacketReceiver {
 
                 hidePairingNotification()
                 runCatching { org.desklink.mobile.helpers.OwedPairFalse.clear(context, deviceInfo.id) } // paired again: nothing is owed
+                // Features queued for the pairing before this one (an offer that raced the unpair) are not for this one.
+                pendingFeaturePackets.drain().forEach { queued ->
+                    queued.callback.onFailure(IllegalStateException("Queued before this pairing"))
+                }
 
                 // Pin the certificate of the link the pairing was negotiated
                 // on, then mark trusted — certificate first, both committed
@@ -736,7 +740,10 @@ class Device : PacketReceiver {
             queued.callback.onFailure(IllegalStateException("Device was unpaired"))
         }
         webRtcRecoveryPending = false
-        outbound.close().forEach { queued ->
+        // Drained, not closed: the LAN link stays after an unpair, and closing stopped every later send on it (pairing
+        // again said "not reachable" until the link died, up to 5 minutes).
+        // Bootstrap packets stay: the pair:false PairingHandler.unpair() just queued must still go out.
+        outbound.drain { queued -> isBootstrapPacketType(queued.np.type) }.forEach { queued ->
             queued.np.payload?.close()
             queued.callback.onFailure(IllegalStateException("Device was unpaired"))
         }
@@ -1304,13 +1311,21 @@ class Device : PacketReceiver {
             callback.onFailure(IllegalArgumentException("Unsupported packet type ${np.type}"))
             return false
         }
+        // Read once: an unpair landing between two reads of the pairing state let a feature packet fall through to the LAN
+        // line below. Not paired: only bootstrap packets go anywhere (the outbound queue stays open for pairing again).
+        val paired = isPaired
+        if (!paired && !bootstrapPacket) {
+            callback.onFailure(IllegalStateException("${deviceInfo.name} is not paired"))
+            np.payload?.close()
+            return false
+        }
 
         val transport = webRtcTransport
         val readyTransport = transport?.takeIf { it.isReadyForPackets() }
         val filePayload = np.type == DeskLinkProtocol.PACKET_TYPE_SHARE_REQUEST &&
             np.getString("filename").isNotEmpty() && np.payload != null
         // The intersection: in this profile, and in what the peer said it receives.
-        if (isPaired && !bootstrapPacket && !WebRtcFeatureProfile.peerAccepts(deviceId, np.type)) {
+        if (paired && !bootstrapPacket && !WebRtcFeatureProfile.peerAccepts(deviceId, np.type)) {
             val error = IllegalStateException(
                 "${np.type} is not enabled with ${deviceInfo.name} (outside the shared feature profile)",
             )
@@ -1319,7 +1334,7 @@ class Device : PacketReceiver {
             countSent(deviceId, np.type, false)
             return false
         }
-        if (isPaired && !bootstrapPacket && filePayload) {
+        if (paired && !bootstrapPacket && filePayload) {
             val handler = payloadPacketHandler
             if (readyTransport != null && handler != null) {
                 return runCatching { handler.sendPayload(np, callback) }
@@ -1336,7 +1351,7 @@ class Device : PacketReceiver {
             return false
         }
         if (
-            isPaired &&
+            paired &&
             np.type == DeskLinkProtocol.PACKET_TYPE_NOTIFICATION &&
             np.payload != null
         ) {
@@ -1346,7 +1361,7 @@ class Device : PacketReceiver {
             np.payload = null
             np.payloadTransferInfo = org.json.JSONObject()
         }
-        if (isPaired && !bootstrapPacket && np.payload != null) {
+        if (paired && !bootstrapPacket && np.payload != null) {
             val error = IllegalStateException(
                 "Payload-bearing ${np.type} has no WebRTC media/attachment transport",
             )
@@ -1355,7 +1370,7 @@ class Device : PacketReceiver {
             countSent(deviceId, np.type, false)
             return false
         }
-        if (isPaired && !bootstrapPacket) {
+        if (paired && !bootstrapPacket) {
             val activeTransport = readyTransport
             if (activeTransport == null) {
                 // WebRTC is the only feature transport. The LAN socket used to
@@ -1426,6 +1441,14 @@ class Device : PacketReceiver {
                 return false
             }
             return sendOnTransport(activeTransport, packetForTransport, np.type, callback)
+        }
+
+        // The LAN link carries bootstrap packets only, paired or not: nothing else may ever reach the line below.
+        if (!bootstrapPacket) {
+            callback.onFailure(IllegalStateException("${np.type} is not a bootstrap packet: never sent on the LAN link"))
+            np.payload?.close()
+            countSent(deviceId, np.type, false)
+            return false
         }
 
         val success = links.any { link ->
