@@ -688,7 +688,12 @@ class WebRtcTransport(
                 cancel = { task -> handler.removeCallbacks(task) },
                 force = { runCatching { helper.forceFrame() } },
             )
-            capturer.initialize(helper, context, RefiningCapturerObserver(videoSource.capturerObserver, requireNotNull(refinement)))
+            val observer = RefiningCapturerObserver(videoSource.capturerObserver, requireNotNull(refinement))
+            capturer.initialize(
+                helper,
+                context,
+                if (org.desklink.mobile.BuildConfig.DEBUG) firstFrameLogged(observer) else observer,
+            )
             val longSide = minOf(CAPTURE_LONG_SIDES.first(), maxOf(width, height, 1))
             captureLongSide.set(longSide)
             DeskLinkVideoEncoderFactories.setFailureListener(encoderFailureListener)
@@ -700,6 +705,21 @@ class WebRtcTransport(
         }
         configureScreenSender(captureFps)
         if (org.desklink.mobile.BuildConfig.DEBUG) startScreenStatsLog()
+    }
+
+    /** Debug builds: when the share's first frame left the capture, after the capture was asked for. */
+    private fun firstFrameLogged(target: org.webrtc.CapturerObserver): org.webrtc.CapturerObserver {
+        val asked = android.os.SystemClock.elapsedRealtime()
+        val first = java.util.concurrent.atomic.AtomicBoolean(true)
+        Log.i(TAG, "screen-start capture asked at unix ${System.currentTimeMillis()}")
+        return object : org.webrtc.CapturerObserver by target {
+            override fun onFrameCaptured(frame: org.webrtc.VideoFrame) {
+                if (first.getAndSet(false)) {
+                    Log.i(TAG, "screen-start first frame captured +${android.os.SystemClock.elapsedRealtime() - asked} ms at unix ${System.currentTimeMillis()}")
+                }
+                target.onFrameCaptured(frame)
+            }
+        }
     }
 
     /**
@@ -911,8 +931,8 @@ class WebRtcTransport(
         }
     }
 
-    /** Debug builds: one line every 2 s of what the screen sender is doing —
-     * the only way to see why libwebrtc holds frames back on a real network. */
+    /** Debug builds: a line every 500 ms for a share's first 3 s, then every 2 s, of what the screen
+     * sender is doing — the only way to see why libwebrtc holds frames back on a real network. */
     private fun startScreenStatsLog() {
         screenStatsTimer?.cancel()
         var lastPackets = 0L
@@ -920,9 +940,15 @@ class WebRtcTransport(
         var lastBytes = 0L
         var lastQp = 0L
         var lastEncoded = 0L
+        var lastAt = android.os.SystemClock.elapsedRealtime()
+        var tick = 0
         screenStatsTimer = java.util.Timer("DeskLink-screen-stats", true).apply {
             schedule(object : java.util.TimerTask() {
                 override fun run() {
+                    // Every 500 ms for the first 3 s of a share (its start is what lags), then every 2 s.
+                    // Only this timer's thread touches tick and the last* values.
+                    tick++
+                    if (tick > 6 && tick % 4 != 0) return
                     runCatching {
                         peer.getStats { report ->
                             val out = report.statsMap.values.firstOrNull {
@@ -944,15 +970,17 @@ class WebRtcTransport(
                             val bytes = (out["bytesSent"] as? Number)?.toLong() ?: 0L
                             val qpSum = (out["qpSum"] as? Number)?.toLong() ?: 0L
                             val encoded = (out["framesEncoded"] as? Number)?.toLong() ?: 0L
-                            // Sent rate and mean QP of the last 2 s: what reached the wire and how coarse it was.
-                            val sentKbps = (bytes - lastBytes) * 8 / 2_000
+                            // Sent rate and mean QP since the last line: what reached the wire and how coarse it was.
+                            val now = android.os.SystemClock.elapsedRealtime()
+                            val sentKbps = (bytes - lastBytes) * 8 / maxOf(1L, now - lastAt)
+                            lastAt = now
                             val qp = (qpSum - lastQp).takeIf { encoded > lastEncoded }?.div(encoded - lastEncoded)
                             lastBytes = bytes
                             lastQp = qpSum
                             lastEncoded = encoded
                             Log.i(
                                 TAG,
-                                "screen-stats pacerMs=$pacerMs sentKbps=$sentKbps qp=$qp encoder=${out["encoderImplementation"]} " +
+                                "screen-stats t=${tick * 500}ms pacerMs=$pacerMs sentKbps=$sentKbps qp=$qp encoder=${out["encoderImplementation"]} " +
                                     "srcFps=${source?.get("framesPerSecond")} encFps=${out["framesPerSecond"]} " +
                                     "framesEncoded=${out["framesEncoded"]} framesSent=${out["framesSent"]} " +
                                     "target=${out["targetBitrate"]} availOut=${pair?.get("availableOutgoingBitrate")} " +
@@ -965,7 +993,7 @@ class WebRtcTransport(
                         }
                     }
                 }
-            }, 2_000, 2_000)
+            }, 500, 500)
         }
     }
 
@@ -979,6 +1007,7 @@ class WebRtcTransport(
     private fun configureScreenSender(fps: Int) {
         val (min, max) = minScreenBitrate(onLan) to maxScreenBitrate(onLan)
         runCatching { peer.setBitrate(min, startScreenBitrate(onLan), max) }
+        if (org.desklink.mobile.BuildConfig.DEBUG) Log.i(TAG, "screen sender lan=$onLan bitrate $min/${startScreenBitrate(onLan)}/$max fps=${screenMaxFramerate(fps, onLan)}")
         updateScreenSender { parameters ->
             parameters.degradationPreference = screenDegradationPreference(screenControlled, onLan)
             parameters.encodings.forEach { encoding ->
