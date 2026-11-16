@@ -94,6 +94,8 @@ class InputDevicesReceiverPlugin : Plugin() {
     /** "Not now" on the desk's ask: the desk hears it was declined (and stops waiting). Still a state report. */
     fun reportDeclined() {
         if (glideAllowed() && !locked()) return reportAllowed()
+        // The service is off while the switch is on: that is not a "no", the desk keeps showing the step.
+        if (Glide.allowed(context, device.deviceId) && MouseReceiverService.instance == null) return reportAllowed()
         device.sendPacket(statePacket(false, entered = false, reason = REASON_DECLINED))
     }
 

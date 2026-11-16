@@ -72,6 +72,14 @@ class GlideAllowedTest {
     }
 
     @Test
+    fun notNowWithTheServiceOffStillSaysAccessibilityNotDeclined() {
+        Glide.setAllowed(app, "desk-1", true)
+        val p = plugin()
+        p.reportDeclined()
+        assertEquals(InputDevicesReceiverPlugin.REASON_ACCESSIBILITY, sent.single().getString("reason"))
+    }
+
+    @Test
     fun withTheSwitchOffThereIsNoAccessibilityReason() {
         Glide.setAllowed(app, "desk-1", false)
         val p = plugin()
