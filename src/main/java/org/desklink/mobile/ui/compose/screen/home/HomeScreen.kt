@@ -433,8 +433,15 @@ private fun Hero(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActi
     }
 }
 
-/** The three hero tiles go one under another when their names would break inside a word ("Termina / ls" at 1.3 on 360 dp, F47). */
-internal fun heroTilesStacked(screenWidthDp: Int, fontScale: Float): Boolean = screenWidthDp / fontScale < 300f
+/**
+ * The three hero tiles go one under another when their names would break inside a word ("Termina / ls" at 1.3 on
+ * 360 dp, F47; at 1.0 on a 320 dp phone too). About 156 dp of the width is margins and padding that do not grow with
+ * the font; each tile's third of the rest must hold "Terminals", about 63 dp at 1.0.
+ */
+internal fun heroTilesStacked(screenWidthDp: Int, fontScale: Float): Boolean = (screenWidthDp - 156f) / fontScale < 189f
+
+/** The "While it's offline" tiles: one column when two across would break "Terminals" (1.3 on 360 dp). */
+internal fun offlineTileColumns(screenWidthDp: Int, fontScale: Float): Int = if (fontScale > 1.4f || screenWidthDp / fontScale < 300f) 1 else 2
 
 /** What each tile says under its name: why it is off, or what it will do. */
 @Composable
@@ -527,7 +534,7 @@ private fun StillWorksOffline(state: HomeState, actions: HomeActions) {
         Tile(R.drawable.sym_edit_note, stringResource(R.string.tab_notes), works, true) { actions.onNotes() },
         Tile(R.drawable.sym_folder, stringResource(R.string.bucket_title), works, true) { actions.onBucket() },
     )
-    val columns = if (LocalDensity.current.fontScale > 1.4f) 1 else 2
+    val columns = offlineTileColumns(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp, LocalDensity.current.fontScale)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SectionHeader(stringResource(R.string.home_still_works))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
