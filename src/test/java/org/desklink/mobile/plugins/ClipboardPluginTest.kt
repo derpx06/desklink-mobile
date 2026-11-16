@@ -59,6 +59,15 @@ class ClipboardPluginTest {
         io.mockk.unmockkAll() // the object/static mocks must not leak into the next test class
     }
 
+    @Test
+    fun anImageCopyIsNeverSentAsTextOnConnectNorPreviewedAsText() {
+        // The image's dedupe key ("image:<uri>") once rode the connect packet as clipboard text and replaced the desk's copy.
+        clipboardListener.setImage(android.net.Uri.parse("content://org.desklink.test/clip/1"))
+        clipboardPlugin.onFeatureReady()
+        Assert.assertNull("an image copy goes as a file, never as text", packet)
+        Assert.assertNull(clipboardListener.preview())
+    }
+
     // REMOTE -> LOCAL
 
     @Test

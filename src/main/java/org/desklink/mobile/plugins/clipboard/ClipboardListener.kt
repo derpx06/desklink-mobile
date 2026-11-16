@@ -62,8 +62,12 @@ class ClipboardListener private constructor(ctx: Context) {
     private val main = Handler(Looper.getMainLooper())
     private val cm: ClipboardManager = ContextCompat.getSystemService(context, ClipboardManager::class.java)!!
 
+    /** The clipboard's text as DeskLink last saw it; null while the copy is an image (that goes as a file, never as text). */
     @Volatile var currentContent: String? = null
         private set
+
+    /** The current image copy ("image:<uri>"), so the same image is not sent twice; never sent or shown as text. */
+    @Volatile private var currentImage: String? = null
     @Volatile var updateTimestamp: Long = 0
         private set
 
@@ -200,6 +204,7 @@ class ClipboardListener private constructor(ctx: Context) {
         }
         if (content.isNullOrEmpty()) return null
         currentContent = content
+        currentImage = null
         updateTimestamp = System.currentTimeMillis()
         return content
     }
@@ -258,8 +263,9 @@ class ClipboardListener private constructor(ctx: Context) {
         val uri = try { cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri } catch (_: Exception) { null } ?: return false
         val at = cm.primaryClipDescription?.let { copyTime(it) } ?: System.currentTimeMillis()
         val key = "image:$uri"
-        if (!force && key == currentContent) return false
-        currentContent = key
+        if (!force && key == currentImage) return false
+        currentImage = key
+        currentContent = null
         updateTimestamp = System.currentTimeMillis()
         val targets = observers.filter { only == null || it === only }
         ClipboardOffer.cancel(context)
@@ -275,7 +281,8 @@ class ClipboardListener private constructor(ctx: Context) {
     fun setImage(uri: android.net.Uri) {
         remoteSetAt = SystemClock.elapsedRealtime()
         updateTimestamp = System.currentTimeMillis()
-        currentContent = "image:$uri"
+        currentImage = "image:$uri"
+        currentContent = null
         cm.setPrimaryClip(ClipData.newUri(context.contentResolver, "DeskLink", uri))
     }
 
@@ -285,6 +292,7 @@ class ClipboardListener private constructor(ctx: Context) {
         remoteSetAt = SystemClock.elapsedRealtime()
         updateTimestamp = System.currentTimeMillis()
         currentContent = text
+        currentImage = null
         cm.setPrimaryClip(ClipData.newPlainText("DeskLink", text))
     }
 
