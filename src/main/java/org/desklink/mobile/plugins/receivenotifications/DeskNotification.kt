@@ -48,6 +48,28 @@ data class DeskNotification(
 
         fun channelId(deviceId: String) = "desk_notifications_$deviceId"
 
+        /** How many of one desk's notifications the shade holds; Android drops an app's new ones past 50, DeskLink's own too. */
+        const val SHADE_CAP = 24
+
+        /**
+         * [deviceId]'s newest [cap] stay in the shade, newest by the desk's own time: the shown tags to take down, and whether
+         * [incoming] (tag, time) is posted at all. By the notification's time, not when it was posted here: a resync re-posting the
+         * same set (oldest first) used to evict on every post and churn the shade. [shown] is (tag, time) of what it holds now.
+         */
+        fun overCap(
+            shown: List<Pair<String, Long>>,
+            incoming: Pair<String, Long>,
+            deviceId: String,
+            cap: Int = SHADE_CAP,
+        ): Pair<List<String>, Boolean> {
+            val prefix = "$deviceId/"
+            val out = (shown.filter { it.first.startsWith(prefix) && it.first != incoming.first } + incoming)
+                .sortedWith(compareByDescending<Pair<String, Long>> { it.second }.thenBy { it.first })
+                .drop(cap)
+                .map { it.first }
+            return out.filter { it != incoming.first } to (incoming.first !in out)
+        }
+
         /** Posted tags of [deviceId] whose id is not in [keep]: the desk no longer has them. */
         fun stale(posted: Collection<String>, deviceId: String, keep: Set<String>): List<String> {
             val prefix = "$deviceId/"

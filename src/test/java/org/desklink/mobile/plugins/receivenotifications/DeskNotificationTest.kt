@@ -49,4 +49,25 @@ class DeskNotificationTest {
         assertEquals(listOf("deskA/desk:2"), DeskNotification.stale(posted, "deskA", setOf("desk:1")))
         assertEquals(listOf("deskA/desk:1", "deskA/desk:2"), DeskNotification.stale(posted, "deskA", emptySet()))
     }
+
+    @Test
+    fun aDeskNeverFillsTheShadeItsOldestGoFirst() {
+        val shown = (1..30).map { "desk/$it" to it.toLong() } + ("other/1" to 0L)
+        val (drop, post) = DeskNotification.overCap(shown, "desk/31" to 31L, "desk")
+        assertEquals((1..7).map { "desk/$it" }, drop.sortedBy { it.removePrefix("desk/").toInt() })
+        assertTrue(post)
+        assertEquals(emptyList<String>() to true, DeskNotification.overCap(shown.take(10), "desk/31" to 31L, "desk"))
+    }
+
+    @Test
+    fun aResyncOfTheSameNotificationsChangesNothingInTheShade() {
+        // The newest 24 are shown; a resync re-posts all 30, oldest first: nothing comes down, the old ones are not posted.
+        val all = (1..30).map { "desk/$it" to it.toLong() }
+        val shown = all.drop(6)
+        for (incoming in all) {
+            val (drop, post) = DeskNotification.overCap(shown, incoming, "desk")
+            assertEquals(emptyList<String>(), drop)
+            assertEquals(incoming.second > 6, post)
+        }
+    }
 }

@@ -195,7 +195,12 @@ class ReceiveNotificationsPlugin : Plugin() {
                 .apply { if (note.time > 0) setWhen(note.time).setShowWhen(true) }
                 .build()
 
-        notificationManager.notify(tag, NOTIFICATION_ID, noti)
+        // A desk with many open notifications must not fill the shade: past 50 Android drops this app's own (transfers, ring).
+        // Its newest 24 by its own time stay; an older one is not posted at all.
+        val shown = runCatching { notificationManager.activeNotifications.map { (it.tag ?: "") to it.notification.`when` } }.getOrDefault(emptyList())
+        val (takeDown, post) = DeskNotification.overCap(shown, tag to noti.`when`, device.deviceId)
+        takeDown.forEach { notificationManager.cancel(it, NOTIFICATION_ID) }
+        if (post) notificationManager.notify(tag, NOTIFICATION_ID, noti)
 
         return true
     }
