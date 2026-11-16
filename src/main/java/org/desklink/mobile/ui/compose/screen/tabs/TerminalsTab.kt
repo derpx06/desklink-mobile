@@ -506,7 +506,7 @@ private fun Loading() {
 private fun LinkChip(connected: Boolean) {
     val t = tokens
     val color = if (connected) t.mintText else t.amber
-    Row(
+    org.desklink.mobile.ui.compose.components.CappedFontScale(1.3f) { Row(
         Modifier.padding(end = 8.dp, bottom = 6.dp).heightIn(min = 28.dp).background(t.surface, RoundedCornerShape(14.dp)).padding(start = 8.dp, end = 10.dp)
             .semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -514,9 +514,9 @@ private fun LinkChip(connected: Boolean) {
         StatusDot(color)
         Text(
             stringResource(if (connected) R.string.connection_connected else R.string.terminal_status_reconnecting),
-            fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (connected) t.mintText else t.text,
+            fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (connected) t.mintText else t.text, maxLines = 1, softWrap = false,
         )
-    }
+    } }
 }
 
 /** One "New terminal" tile: a shell on the computer (agent CLIs are started from it, not offered here). */
