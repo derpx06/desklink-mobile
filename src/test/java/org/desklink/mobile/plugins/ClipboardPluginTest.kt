@@ -68,6 +68,42 @@ class ClipboardPluginTest {
         Assert.assertNull(clipboardListener.preview())
     }
 
+    @Test
+    fun aCopyReadAtAppStartKeepsItsOwnCopyTime() {
+        // Every app start reads the clipboard; stamped "now", the phone's old copy replaced a newer copy on the laptop.
+        assertEquals(1_000L, clipboardListener.readStamp(stamp = 1_000L, seenAt = 0L, now = 9_000_000L))
+        // Without the clip's own stamp: when the change was seen, never the read time when that is known.
+        assertEquals(2_000L, clipboardListener.readStamp(stamp = 0L, seenAt = 2_000L, now = 9_000_000L))
+        // Neither known (a fresh process on Android 7): unknown, which the desk never places over its own copy.
+        assertEquals(0L, clipboardListener.readStamp(stamp = 0L, seenAt = 0L, now = 9_000_000L))
+    }
+
+    @Test
+    fun theConnectPacketCarriesWhenTheCopyWasMadeNotWhenItWasRead() {
+        val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("t", "made before the app looked"))
+        clipboardListener.clipChangedForTest()
+        val copiedAt = clipboardListener.copiedAt
+        Thread.sleep(50)
+        val readAt = System.currentTimeMillis()
+        clipboardListener.readNow()
+        clipboardPlugin.onFeatureReady()
+        val sent = checkNotNull(packet)
+        assertEquals("desklink.clipboard.connect", sent.type)
+        val timestamp = sent.getLong("timestamp")
+        Assert.assertTrue("stamped $timestamp: the copy ($copiedAt), not the read ($readAt)", timestamp in 1..copiedAt)
+        assertEquals(timestamp, sent.getLong("copiedAt"))
+    }
+
+    @Test
+    fun aFreshProcessWithNoCopyTimeNeverAutoSendsWhatWasAlreadyThere() {
+        // Android 7: no clip stamp, nothing copied since the process started.
+        Assert.assertFalse(clipboardListener.autoSendable(previous = null, stamp = 0L, seenAt = 0L))
+        Assert.assertTrue(clipboardListener.autoSendable(previous = null, stamp = 0L, seenAt = 5L))
+        Assert.assertTrue(clipboardListener.autoSendable(previous = null, stamp = 5L, seenAt = 0L))
+        Assert.assertTrue(clipboardListener.autoSendable(previous = "older", stamp = 0L, seenAt = 0L))
+    }
+
     // REMOTE -> LOCAL
 
     @Test

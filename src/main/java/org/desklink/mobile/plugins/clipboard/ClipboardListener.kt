@@ -205,7 +205,13 @@ class ClipboardListener private constructor(ctx: Context) {
         if (content.isNullOrEmpty()) return null
         currentContent = content
         currentImage = null
-        updateTimestamp = System.currentTimeMillis()
+        // When the copy was made, not when it was read: every app start reads the clipboard, and a connect packet
+        // stamped "now" made the phone's old copy look newer than the laptop's, which it then replaced.
+        updateTimestamp = readStamp(
+            stamp = try { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) cm.primaryClipDescription?.timestamp ?: 0L else 0L } catch (_: Exception) { 0L },
+            seenAt = copiedAt,
+            now = System.currentTimeMillis(),
+        )
         return content
     }
 
@@ -240,6 +246,9 @@ class ClipboardListener private constructor(ctx: Context) {
         val previous = currentContent
         val content = readNow() ?: return false
         if (!force && content == previous) return false
+        // A fresh process on Android 7 knows no copy time: this is what was there before the app started, not a new copy.
+        // Sent as one "made now", it replaced a newer copy made on the computer.
+        if (!force && !autoSendable(previous, stamp, copiedAt)) return false
         // One message carries the whole copy: a larger one is said to be too large, never "sent".
         if (!ClipboardPlugin.fitsWire(content)) {
             lastRefusedTooLarge = true
@@ -266,7 +275,7 @@ class ClipboardListener private constructor(ctx: Context) {
         if (!force && key == currentImage) return false
         currentImage = key
         currentContent = null
-        updateTimestamp = System.currentTimeMillis()
+        updateTimestamp = at
         val targets = observers.filter { only == null || it === only }
         ClipboardOffer.cancel(context)
         Log.i(TAG, "clipboard: image to ${targets.size} desk(s) (${if (force) "asked" else "new copy"})")
@@ -388,6 +397,18 @@ class ClipboardListener private constructor(ctx: Context) {
         fun of(clipStamp: Long, seenAt: Long, now: Long, lastSent: Long = 0L): Long =
             (clipStamp.takeIf { it > 0 } ?: seenAt.takeIf { it > 0 } ?: now).coerceAtMost(now).coerceAtLeast(lastSent)
     }
+
+    /**
+     * The stamp a read copy carries in the connect packet: the clip's own stamp, else when the change was seen, else
+     * 0 (unknown), which the desk never takes as newer than its own clipboard. Never the read time.
+     */
+    @VisibleForTesting
+    internal fun readStamp(stamp: Long, seenAt: Long, now: Long): Long =
+        if (stamp > 0 || seenAt > 0) CopyTime.of(stamp, seenAt, now) else 0L
+
+    /** Whether a read that was not asked for may go out: not the first one of a process that knows no copy time. */
+    @VisibleForTesting
+    internal fun autoSendable(previous: String?, stamp: Long, seenAt: Long): Boolean = previous != null || stamp > 0 || seenAt > 0
 
     /** The 500 ms pacing, pure for the test. */
     object SendPacing {
