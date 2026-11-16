@@ -18,10 +18,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -390,20 +389,25 @@ fun TerminalsContent(
                     s.id to (labels[s.id] ?: previews[s.id]?.name ?: SessionPreviews.agentName(context, s.title) ?: s.cwd?.takeIf { it.isNotBlank() } ?: s.title.ifBlank { s.id.take(8) })
                 }
                 val shown = matchingSessions(state.sessions, query) { names[it.id].orEmpty() }
-                LazyColumn(
-                    Modifier.fillMaxSize(),
+                // One column on a phone; side by side on a tablet or an unfolded phone (two from 2 x 340 dp).
+                val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> androidx.compose.foundation.lazy.grid.GridItemSpan) =
+                    { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }
+                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(minSize = 340.dp),
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item(key = "launchers") { NewTerminalTile(connected && !busy, actions.onNew) { if (!connected) actions.onUnavailable() } }
+                    item(key = "launchers", span = full) { NewTerminalTile(connected && !busy, actions.onNew) { if (!connected) actions.onUnavailable() } }
                     if (state.sessions.isEmpty()) {
-                        item(key = "none") {
+                        item(key = "none", span = full) {
                             Text(stringResource(R.string.terminal_empty_hint), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp))
                         }
                     } else {
-                        item(key = "open") { SectionHeader(stringResource(R.string.terminals_open_sessions)) }
+                        item(key = "open", span = full) { SectionHeader(stringResource(R.string.terminals_open_sessions)) }
                         if (shown.isEmpty()) {
-                            item(key = "nomatch") {
+                            item(key = "nomatch", span = full) {
                                 Text(stringResource(R.string.terminals_no_match, query.trim()), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp))
                             }
                         }
@@ -438,7 +442,7 @@ fun TerminalsContent(
                                 }
                             }
                         }
-                        item(key = "footnote") {
+                        item(key = "footnote", span = full) {
                             Row(Modifier.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Icon(painterResource(R.drawable.sym_terminal), contentDescription = null, tint = t.textDim, modifier = Modifier.size(18.dp))
                                 Text(stringResource(R.string.terminals_keep_running, deskName), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
