@@ -50,6 +50,25 @@ must stay byte-identical to `DESKTOP_INCOMING` ∪ `DESKTOP_OUTGOING` in the
 desktop's `features/registry.rs`, because the handover compares each peer's
 filtered capability list for exact equality. Tests on both sides pin the list.
 
+### Control, typing and the accessibility service
+
+Control of the phone from the computer (taps, swipes, Glide) and typing into it
+go through DeskLink's accessibility service. On Android 13+ it is also an input
+method for the focused field (`flagInputMethodEditor`), so typed text is
+committed and keys are sent the way a keyboard sends them, whatever keyboard is
+selected; older phones edit the focused field directly. A key that reaches no
+field is never dropped in silence: the phone logs why and tells the computer's
+Phone Screen window ("no text field is selected", "turn on DeskLink in
+Accessibility"), which says so in its strip.
+
+**ColorOS (realme, OPPO, OnePlus) switches an app's accessibility service off
+whenever the app is force-stopped, and so after every update.** Nothing tells
+the person, and control and typing stop. DeskLink remembers that the service
+was running; when it is not running again after a restart and was not switched
+off by the person, the phone posts one notification ("Android turned off
+DeskLink's accessibility service", one tap to the setup) and the computer's
+Phone Screen window says the same when it asks for control.
+
 ## Not yet implemented
 
 Wi-Fi Direct and a shared virtual library.
