@@ -64,6 +64,7 @@ public class MouseReceiverService extends AccessibilityService {
 
     @Override
     protected void onServiceConnected() {
+        AccessibilitySetupActivity.Companion.markRunning(this);
         // Create an overlay and display the cursor
         windowManager = ContextCompat.getSystemService(this, WindowManager.class);
         DisplayMetrics displayMetrics = new DisplayMetrics();
@@ -465,6 +466,9 @@ public class MouseReceiverService extends AccessibilityService {
 
     @Override
     public boolean onUnbind(android.content.Intent intent) {
+        // Unbound while the app runs: switched off in Settings by the person (a force stop or an update kills the
+        // process instead, and that stop is told once: AccessibilitySetupActivity.tellIfStopped).
+        AccessibilitySetupActivity.Companion.markSwitchedOff(this);
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.endActive(true);
         if (instance == this) instance = null;
         org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin.reportAllowedToAll();

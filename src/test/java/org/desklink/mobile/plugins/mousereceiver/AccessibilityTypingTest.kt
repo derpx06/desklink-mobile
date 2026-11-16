@@ -1,6 +1,10 @@
 package org.desklink.mobile.plugins.mousereceiver
 
+import android.text.InputType
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
 import org.desklink.mobile.plugins.mousereceiver.AccessibilityTyping.Field
+import org.desklink.mobile.plugins.mousereceiver.AccessibilityTyping.Step
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -44,5 +48,63 @@ class AccessibilityTypingTest {
         assertEquals(Field("hello", 0, 5), edit(Field("hello", 2, 2), "a", ctrl = true))
         assertNull(edit(Field("hello", 2, 2), "z", ctrl = true))
         assertNull(edit(Field("hello", 2, 2), special = 5))
+    }
+
+    private val singleLineSearch = EditorInfo.IME_ACTION_SEARCH
+    private val text = InputType.TYPE_CLASS_TEXT
+    private fun steps(key: String? = null, special: Int = 0, ctrl: Boolean = false, shift: Boolean = false, alt: Boolean = false,
+                      imeOptions: Int = 0, inputType: Int = text) =
+        AccessibilityTyping.steps(key, special, ctrl, shift, alt, imeOptions, inputType)
+
+    /** Through the editor's connection: text in any script is committed whole, as typed. */
+    @Test
+    fun textInAnyScriptIsCommittedAsItIs() {
+        for (typed in listOf("a", "A", " ", "नमस्कार", "मराठी", "😀", "👍🏽", "é")) {
+            assertEquals(typed, listOf(Step.Commit(typed)), steps(typed))
+        }
+        assertNull(steps(""))
+        assertNull(steps(null))
+    }
+
+    @Test
+    fun specialKeysAreTheKeysAKeyboardSends() {
+        fun key(special: Int) = (steps(special = special)!!.single() as Step.Key).code
+        assertEquals(KeyEvent.KEYCODE_DEL, key(1))
+        assertEquals(KeyEvent.KEYCODE_TAB, key(2))
+        assertEquals(KeyEvent.KEYCODE_DPAD_LEFT, key(4))
+        assertEquals(KeyEvent.KEYCODE_DPAD_UP, key(5))
+        assertEquals(KeyEvent.KEYCODE_DPAD_RIGHT, key(6))
+        assertEquals(KeyEvent.KEYCODE_DPAD_DOWN, key(7))
+        assertEquals(KeyEvent.KEYCODE_PAGE_UP, key(8))
+        assertEquals(KeyEvent.KEYCODE_PAGE_DOWN, key(9))
+        assertEquals(KeyEvent.KEYCODE_MOVE_HOME, key(10))
+        assertEquals(KeyEvent.KEYCODE_MOVE_END, key(11))
+        assertEquals(KeyEvent.KEYCODE_ENTER, key(12))
+        assertEquals(KeyEvent.KEYCODE_FORWARD_DEL, key(13))
+        assertEquals(KeyEvent.KEYCODE_F5, key(25))
+        assertNull("Escape is Back, never a key here; unknown codes are nothing", steps(special = 99))
+    }
+
+    @Test
+    fun shortcutsCarryTheirModifiers() {
+        val ctrl = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        for ((letter, code) in listOf("a" to KeyEvent.KEYCODE_A, "c" to KeyEvent.KEYCODE_C, "v" to KeyEvent.KEYCODE_V, "x" to KeyEvent.KEYCODE_X, "Z" to KeyEvent.KEYCODE_Z)) {
+            assertEquals(letter, listOf(Step.Key(code, ctrl)), steps(letter, ctrl = true))
+        }
+        val shift = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        assertEquals("Shift+Left extends the selection", listOf(Step.Key(KeyEvent.KEYCODE_DPAD_LEFT, shift)), steps(special = 4, shift = true))
+        assertEquals(listOf(Step.Key(KeyEvent.KEYCODE_DEL, ctrl)), steps(special = 1, ctrl = true))
+        assertNull("no key for Ctrl+a symbol", steps("€", ctrl = true))
+    }
+
+    @Test
+    fun enterRunsASingleLineFieldsActionAndIsANewlineOrKeyOtherwise() {
+        assertEquals(listOf(Step.EditorAction(EditorInfo.IME_ACTION_SEARCH)), steps(special = 12, imeOptions = singleLineSearch))
+        assertEquals(listOf(Step.EditorAction(EditorInfo.IME_ACTION_GO)), steps(special = 12, imeOptions = EditorInfo.IME_ACTION_GO))
+        val enter = listOf(Step.Key(KeyEvent.KEYCODE_ENTER, 0))
+        assertEquals("a message box: a new line", enter, steps(special = 12, imeOptions = EditorInfo.IME_ACTION_SEND, inputType = text or InputType.TYPE_TEXT_FLAG_MULTI_LINE))
+        assertEquals(enter, steps(special = 12, imeOptions = EditorInfo.IME_ACTION_SEARCH or EditorInfo.IME_FLAG_NO_ENTER_ACTION))
+        assertEquals(enter, steps(special = 12, imeOptions = EditorInfo.IME_ACTION_UNSPECIFIED))
+        assertEquals(enter, steps(special = 12, imeOptions = EditorInfo.IME_ACTION_NONE))
     }
 }

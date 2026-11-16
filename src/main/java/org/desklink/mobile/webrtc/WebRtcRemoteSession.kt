@@ -49,8 +49,9 @@ enum class WebRtcRemoteSessionControlKind(val wireName: String) {
     SCREEN_ERROR("screen-error"),
     PAUSE_LOCKED("pause-locked"),
     RESUME("resume"),
-    /** Desktop → phone report: a text input on the desktop gained or lost
-     * focus, so the phone raises or drops its keyboard. */
+    /** The sharing side's text focus. Desktop → phone: a text input on the desktop gained or lost
+     * focus, so the phone raises or drops its keyboard. Phone → desktop: whether the keys typed in the desk's
+     * Phone Screen window reached a text field here (`editable`, and `reason` when not: DeskLinkProtocol.TYPING_*). */
     INPUT_FOCUS("input-focus"),
     /** Phone → desktop: show the next shared screen. */
     SWITCH_SCREEN("switch-screen"),
@@ -430,6 +431,7 @@ class WebRtcRemoteSessionController(
         password: String? = null,
         maxDimension: Int? = null,
         fps: Int? = null,
+        editable: Boolean? = null,
     ): WebRtcRemoteSessionControlMessage = WebRtcRemoteSessionControlMessage(
         remoteSessionVersion = WebRtcRemoteSessionControlMessage.VERSION,
         kind = kind,
@@ -451,6 +453,7 @@ class WebRtcRemoteSessionController(
         password = password,
         maxDimension = maxDimension,
         fps = fps,
+        editable = editable,
     )
 
     /** Applies a validated peer control message and returns the automatic

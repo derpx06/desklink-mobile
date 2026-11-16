@@ -238,6 +238,11 @@ class BackgroundService : Service() {
         if (org.desklink.mobile.helpers.CrashLoop.safeMode(this)) { safeStart = true; return }
         this.applicationInstance = DeskLinkApplication.getInstance()
         instance = this
+        // Android binds the accessibility service within a second or two of the process starting; still unbound after
+        // that, when it ran before, means the system stopped it (ColorOS: every force stop and update). Said once.
+        android.os.Handler(mainLooper).postDelayed({
+            org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.tellIfStopped(this)
+        }, 10_000)
 
         DeskLinkApplication.getInstance().addDeviceListChangedCallback(
             "BackgroundService",

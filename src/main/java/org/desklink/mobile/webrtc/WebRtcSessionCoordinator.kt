@@ -820,6 +820,40 @@ class WebRtcSessionCoordinator(
 
     fun remoteSessionSnapshot(): WebRtcRemoteSessionController.Snapshot = remoteSession.snapshot()
 
+    private val typingReports = TypingReports()
+
+    /**
+     * Tells the desk's Phone Screen window whether its keys reached a text field here (`input-focus`, the report the
+     * desk sends the other way): [refusal] is one of AccessibilityTyping.REFUSALS, null when typed. Paced by
+     * [TypingReports]; only while this phone's screen is shown there.
+     */
+    fun reportTyping(refusal: String?) {
+        if (!typingReports.shouldSend(refusal, android.os.SystemClock.elapsedRealtime())) return
+        remoteActionExecutor.execute {
+            synchronized(lock) {
+                val binding = activeBinding ?: return@synchronized
+                val attemptId = activeAttemptId ?: return@synchronized
+                val wire = activeWireBinding ?: return@synchronized
+                val snapshot = remoteSession.snapshot()
+                val remoteSessionId = snapshot.remoteSessionId ?: return@synchronized
+                if (snapshot.direction != WebRtcScreenDirection.PHONE_TO_DESKTOP) return@synchronized
+                if (transport?.isReadyForPackets() != true) return@synchronized
+                sendRemoteSessionControlLocked(
+                    binding,
+                    attemptId,
+                    remoteSession.makeMessage(
+                        WebRtcRemoteSessionControlKind.INPUT_FOCUS,
+                        attemptId,
+                        wire,
+                        remoteSessionId = remoteSessionId,
+                        reason = refusal,
+                        editable = refusal == null,
+                    ),
+                )
+            }
+        }
+    }
+
     /** Asks the desktop to show its next shared screen (a laptop and a
      * monitor, say). */
     fun switchRemoteScreen() {
@@ -1995,7 +2029,12 @@ class WebRtcSessionCoordinator(
                             attemptId,
                             wire,
                             remoteSessionId = message.remoteSessionId,
-                            reason = "Enable DeskLink accessibility control on this Android device",
+                            reason = if (org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.stoppedByAndroid(context)) {
+                                // Said apart: the person turned it on, and Android (ColorOS on a force stop or an update) turned it off.
+                                "Android turned off DeskLink accessibility control on this Android device (after an update or a force stop)"
+                            } else {
+                                "Enable DeskLink accessibility control on this Android device"
+                            },
                         ),
                     )
                 } else {

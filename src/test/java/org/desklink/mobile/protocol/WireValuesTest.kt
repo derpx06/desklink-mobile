@@ -52,6 +52,11 @@ class WireValuesTest {
     }
 
     @Test
+    fun `every typing refusal the phone reports is one the desk words`() {
+        assertEquals(strings(f.getJSONArray("typingRefusals")), org.desklink.mobile.plugins.mousereceiver.AccessibilityTyping.REFUSALS)
+    }
+
+    @Test
     fun `call states, actions, errors and emergency numbers are the desk's`() {
         val t = f.getJSONObject("telephony")
         assertEquals(

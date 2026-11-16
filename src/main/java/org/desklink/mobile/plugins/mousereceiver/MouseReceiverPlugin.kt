@@ -51,18 +51,26 @@ class MouseReceiverPlugin : Plugin() {
             return false
         }
 
+        // Keys go to the focused field while the desk's pointer glides here (F4), or while the desk controls this phone's
+        // shared screen (its Phone Screen window): there every key was dropped since typing without gliding was removed.
+        // Never moved as a pointer. A key that reaches no field is logged and, for the Phone Screen window, reported
+        // back (`input-focus`), so the desk says why instead of the key vanishing.
+        if (np.has("key") || np.has("specialKey")) {
+            val gliding = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(device.deviceId)
+            val coordinator = org.desklink.mobile.DeskLinkApplication.getInstance().webRtcCoordinator(device.deviceId)
+            if (!gliding && !takesKeys(coordinator?.remoteSessionSnapshot())) {
+                keyDrops.dropped("no control of the shared screen")
+                return false
+            }
+            val refusal = AccessibilityTyping.handle(np)
+            refusal?.let(keyDrops::dropped)
+            if (!gliding) coordinator?.reportTyping(refusal)
+            return refusal == null
+        }
+
         if (MouseReceiverService.instance == null) {
             Log.w("MouseReceiverPlugin", "Accessibility service is not enabled, dropping remote mouse input")
             return false
-        }
-
-        // Keys go to the focused field while the desk's pointer glides here (F4), or while the desk controls this phone's
-        // shared screen (its Phone Screen window): there every key was dropped since typing without gliding was removed.
-        // Never moved as a pointer.
-        if (np.has("key") || np.has("specialKey")) {
-            val gliding = org.desklink.mobile.plugins.inputdevicesreceiver.Glide.isGliding(device.deviceId)
-            val snapshot = org.desklink.mobile.DeskLinkApplication.getInstance().webRtcCoordinator(device.deviceId)?.remoteSessionSnapshot()
-            return if (gliding || takesKeys(snapshot)) AccessibilityTyping.handle(np) else false
         }
 
         // Motion keeps its fractions (the pointer adds them up); only a scroll is counted in whole units.
@@ -161,6 +169,9 @@ class MouseReceiverPlugin : Plugin() {
     override val supportedPacketTypes: Array<String> = arrayOf(PACKET_TYPE_MOUSEPAD_REQUEST)
 
     override val outgoingPacketTypes: Array<String> = emptyArray()
+
+    /** Keys that reached no field: one warning every few seconds with a count and the reason (never the text). */
+    private val keyDrops = org.desklink.mobile.webrtc.DropLog("MouseReceiverPlugin", sink = { Log.w("MouseReceiverPlugin", "keys: $it") })
 
     companion object {
         /** The desk holds control of this phone's screen, shared to it: its keys type here. */

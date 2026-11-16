@@ -27,7 +27,11 @@ class TypeRemovedTest {
         val plugin = source("plugins/mousereceiver/MouseReceiverPlugin.kt")
         val keys = plugin.substringAfter("Keys go to the focused field while the desk's pointer glides here")
         assertTrue(keys.contains("Glide.isGliding(device.deviceId)"))
-        assertTrue(keys.substringBefore("val dx").contains("if (gliding || takesKeys(snapshot)) AccessibilityTyping.handle(np) else false"))
+        val branch = keys.substringBefore("val dx")
+        assertTrue(branch.contains("if (!gliding && !takesKeys(coordinator?.remoteSessionSnapshot()))"))
+        assertTrue(branch.contains("AccessibilityTyping.handle(np)"))
+        assertFalse("ahead of the pointer's own service check: a missing service is reported, not silent",
+            branch.substringBefore("AccessibilityTyping.handle(np)").contains("MouseReceiverService.instance == null"))
         // Its consent is the glide switch alone (the packet gate in the coordinator).
         val gate = source("webrtc/WebRtcSessionCoordinator.kt").substringAfter("internal fun deliverFeaturePacket").substringBefore("verifyInboundInput")
         assertTrue(gate.contains("glide.isGliding(device.deviceId) && glide.allowed(context, device.deviceId)"))

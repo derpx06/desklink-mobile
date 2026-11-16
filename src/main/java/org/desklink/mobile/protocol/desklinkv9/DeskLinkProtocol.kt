@@ -91,4 +91,13 @@ object DeskLinkProtocol {
         "desklink.contacts.response_uids_timestamps"
     const val PACKET_TYPE_CONTACTS_RESPONSE_VCARDS = "desklink.contacts.response_vcards"
     const val PACKET_TYPE_TELEPHONY = "desklink.telephony"
+
+    /**
+     * Why keys typed in the desk's Phone Screen window reached no text field here: the `reason` of this phone's
+     * `input-focus {editable: false}` remote-session report (`editable: true` clears it). Pinned by wire_values.json.
+     */
+    const val TYPING_ACCESSIBILITY_OFF = "accessibility-off"
+    const val TYPING_NO_TEXT_FIELD = "no-text-field"
+    const val TYPING_NOT_EDITABLE = "not-editable"
+    const val TYPING_TEXT_REFUSED = "text-refused"
 }

@@ -115,7 +115,40 @@ class AccessibilitySetupActivity : AppCompatActivity() {
         )
 
         /** A desk asked for control and could not have it: say why on the phone, one tap from the fix. */
-        fun ask(context: Context, deskName: String) {
+        fun ask(context: Context, deskName: String) = notify(
+            context,
+            context.getString(R.string.accessibility_setup_ask, deskName),
+            context.getString(R.string.accessibility_setup_ask_text),
+            timeoutMs = 120_000,
+        )
+
+        private const val KEY_WAS_RUNNING = "was_running"
+        private const val KEY_TOLD_STOPPED = "told_stopped"
+        private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+        /** The service is bound ([running] = true); remembered so a later stop that the person did not make is seen. */
+        fun markRunning(context: Context) =
+            prefs(context).edit().putBoolean(KEY_WAS_RUNNING, true).putBoolean(KEY_TOLD_STOPPED, false).apply()
+
+        /** Switched off while the app ran (the person, in Settings): not Android's doing, nothing to tell. */
+        fun markSwitchedOff(context: Context) = prefs(context).edit().putBoolean(KEY_WAS_RUNNING, false).apply()
+
+        /**
+         * It was running and went without being switched off while the app ran: ColorOS (and some other builds) turn an
+         * app's accessibility service off when the app is force-stopped or updated, and Android may leave it on in
+         * Settings but unbound. Control, typing and Glide then stop with no word, so this is said.
+         */
+        fun stoppedByAndroid(context: Context): Boolean = !running() && prefs(context).getBoolean(KEY_WAS_RUNNING, false)
+
+        /** Once per stop: a notification one tap from the setup (which says "off and on again" when it is still on). */
+        fun tellIfStopped(context: Context) {
+            if (!stoppedByAndroid(context) || prefs(context).getBoolean(KEY_TOLD_STOPPED, false)) return
+            android.util.Log.w("MouseReceiverService", "accessibility service was stopped by the system (enabled in settings: ${enabled(context)})")
+            prefs(context).edit().putBoolean(KEY_TOLD_STOPPED, true).apply()
+            notify(context, context.getString(R.string.accessibility_stopped_title), context.getString(R.string.accessibility_stopped_text), timeoutMs = 0)
+        }
+
+        private fun notify(context: Context, title: String, text: String, timeoutMs: Long) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
             ) return
@@ -125,11 +158,12 @@ class AccessibilitySetupActivity : AppCompatActivity() {
                 NOTIFICATION_ASK,
                 NotificationCompat.Builder(context, NotificationHelper.Channels.REQUESTS)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(context.getString(R.string.accessibility_setup_ask, deskName))
-                    .setContentText(context.getString(R.string.accessibility_setup_ask_text))
+                    .setContentTitle(title)
+                    .setContentText(text)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                     .setContentIntent(tap)
                     .setAutoCancel(true)
-                    .setTimeoutAfter(120_000)
+                    .apply { if (timeoutMs > 0) setTimeoutAfter(timeoutMs) }
                     .build(),
             )
         }
