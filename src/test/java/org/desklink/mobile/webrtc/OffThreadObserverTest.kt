@@ -37,6 +37,28 @@ class OffThreadObserverTest {
         override fun onFailure(error: Throwable) = Unit
     }
 
+    @Test
+    fun `the required channels opening reaches the coordinator`() {
+        val reached = CountDownLatch(1)
+        val target = object : WebRtcTransport.Observer {
+            override fun onRequiredChannelOpen() = reached.countDown()
+            override fun onConnectionStateChanged(state: WebRtcPeerHealth) = Unit
+            override fun onSignalingNeeded(type: SignalingMessageType, payload: JSONObject) = Unit
+            override fun onEnvelope(envelope: WebRtcEnvelope) = Unit
+            override fun onControlChannelOpen() = Unit
+            override fun onRemoteVideoTrack(track: VideoTrack) = Unit
+            override fun onScreenCaptureStopped(reason: String) = Unit
+            override fun onFailure(error: Throwable) = Unit
+        }
+        val events = DeferredTaskExecutor("test-observer-required")
+        try {
+            OffThreadObserver(target, events).onRequiredChannelOpen()
+            assertTrue("feature-ready waits for this", reached.await(1, TimeUnit.SECONDS))
+        } finally {
+            events.close()
+        }
+    }
+
     /**
      * libwebrtc runs every observer callback on one signaling thread shared by
      * all peers in the process. A callback that waits on the coordinator lock

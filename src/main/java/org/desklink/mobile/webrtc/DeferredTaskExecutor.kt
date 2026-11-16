@@ -113,6 +113,8 @@ internal class OffThreadObserver(
     // Liveness is answered where it arrives: queued behind a slow handler, a healthy peer would look dead.
     override fun onLivenessEnvelope(envelope: WebRtcEnvelope) = target.onLivenessEnvelope(envelope)
     override fun onControlChannelOpen() = post { target.onControlChannelOpen() }
+    // Without it the interface's no-op ran: capabilities that came while a channel was still opening never got feature-ready.
+    override fun onRequiredChannelOpen() = post { target.onRequiredChannelOpen() }
     override fun onRemoteVideoTrack(track: VideoTrack) = post { target.onRemoteVideoTrack(track) }
     override fun onScreenCaptureStopped(reason: String) = post { target.onScreenCaptureStopped(reason) }
     override fun onConnectionStateChanged(state: WebRtcPeerHealth) =
