@@ -112,7 +112,7 @@ class ScreenQualityTest {
         assertEquals(
             "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/" +
                 "WebRTC-Pacer-KeyframeFlushing/Enabled/WebRTC-Pacer-FastRetransmissions/Enabled/" +
-                "WebRTC-Video-Pacing/max_delay:250ms/",
+                "WebRTC-ProbingScreenshareBwe/2.5,250,80,40,-60,3/",
             WebRtcRuntime.FIELD_TRIALS,
         )
         // libwebrtc's format: name/group/ pairs, so an odd count of separators would garble every trial after it.

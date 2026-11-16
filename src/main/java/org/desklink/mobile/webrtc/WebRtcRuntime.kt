@@ -88,14 +88,17 @@ object WebRtcRuntime {
      * PLI after a loss) drops the delta frames still queued in the pacer, which it replaces anyway;
      * measured on the RMX5070, loss -> PLI -> keyframe bursts held packets 0.5-2 s in the pacer while
      * congestion control backed off. FastRetransmissions: a NACKed packet jumps that queue.
-     * Video-Pacing max_delay: when more than 250 ms of video waits in the pacer it sends faster than
-     * the estimate to empty it in that time, instead of libwebrtc's 2 s (the ceiling of the 1.1-1.9 s
-     * the RMX5070's overshooting encoder queued at every scroll); a remote view would rather burst
-     * on the LAN than show the past. The pacing factor stays libwebrtc's 1.1.
+     * ProbingScreenshareBwe: a screen track (this phone's only video) never reads WebRTC-Video-Pacing;
+     * libwebrtc (M144 video_send_stream_impl.cc, alr_experiment.cc) gives screen content this trial,
+     * default "1.0,2875,80,40,-60,3": pacing factor 1.0 and a 2875 ms pacer queue limit, so every
+     * keyframe and scroll burst left at exactly the target (4 Mbps at the LAN floor: ~300 ms for a
+     * keyframe). Factor 2.5 and a 250 ms limit, the rest as libwebrtc has it (ALR probing on).
+     * Measured on the RMX5070 (n=7 against n=6): the worst frame in a share's first second 793 -> 378 ms
+     * old, the pacer peak 549 -> 214 ms; scrolls and still screens unchanged.
      */
     internal const val FIELD_TRIALS = "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/" +
         "WebRTC-Pacer-KeyframeFlushing/Enabled/WebRTC-Pacer-FastRetransmissions/Enabled/" +
-        "WebRTC-Video-Pacing/max_delay:250ms/"
+        "WebRTC-ProbingScreenshareBwe/2.5,250,80,40,-60,3/"
 
     @Synchronized
     fun eglContext(context: Context): EglBase.Context {
