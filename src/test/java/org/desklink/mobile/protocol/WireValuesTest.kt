@@ -57,6 +57,13 @@ class WireValuesTest {
     }
 
     @Test
+    fun `the control denials for a service that is not running are the desk's`() {
+        val denials = f.getJSONObject("controlDenials")
+        assertEquals(denials.getString("accessibilityOff"), DeskLinkProtocol.CONTROL_DENIED_ACCESSIBILITY_OFF)
+        assertEquals(denials.getString("stoppedByAndroid"), DeskLinkProtocol.CONTROL_DENIED_STOPPED_BY_ANDROID)
+    }
+
+    @Test
     fun `call states, actions, errors and emergency numbers are the desk's`() {
         val t = f.getJSONObject("telephony")
         assertEquals(

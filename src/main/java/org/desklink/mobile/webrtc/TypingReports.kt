@@ -9,10 +9,16 @@ package org.desklink.mobile.webrtc
 class TypingReports(private val everyMs: Long = 3_000) {
     private var last: String? = null
     private var lastAt = Long.MIN_VALUE
+    private var share: String? = null
 
-    /** Whether to report [refusal] (null: typed) now. */
+    /** Whether to report [refusal] (null: typed) now, in the share [share] (a new share starts with nothing said). */
     @Synchronized
-    fun shouldSend(refusal: String?, now: Long): Boolean {
+    fun shouldSend(refusal: String?, now: Long, share: String? = null): Boolean {
+        if (share != this.share) {
+            this.share = share
+            last = null
+            lastAt = Long.MIN_VALUE
+        }
         val send = if (refusal == null) last != null else refusal != last || now - lastAt >= everyMs
         if (send) {
             last = refusal

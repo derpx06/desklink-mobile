@@ -100,4 +100,15 @@ object DeskLinkProtocol {
     const val TYPING_NO_TEXT_FIELD = "no-text-field"
     const val TYPING_NOT_EDITABLE = "not-editable"
     const val TYPING_TEXT_REFUSED = "text-refused"
+    /** The phone is locked: nothing is typed into its lock screen. */
+    const val TYPING_LOCKED = "locked"
+
+    /**
+     * The `reason` of a remote-session `control-denied` when DeskLink's accessibility service is not running: never
+     * turned on, or stopped by Android after it ran (some phones do on a force stop or an update). Worded apart by the
+     * desk; pinned by wire_values.json.
+     */
+    const val CONTROL_DENIED_ACCESSIBILITY_OFF = "Enable DeskLink accessibility control on this Android device"
+    const val CONTROL_DENIED_STOPPED_BY_ANDROID =
+        "Android turned off DeskLink accessibility control on this Android device (after an update or a force stop)"
 }

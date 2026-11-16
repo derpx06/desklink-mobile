@@ -68,8 +68,8 @@ ColorOS (realme, OPPO, OnePlus) also does it on every app update, which stock
 Android does not (an `install -r` keeps it on there). Nothing tells the
 person, and control and typing stop. DeskLink remembers that the service
 was running; when it is not running again after a restart and was not switched
-off by the person, the phone posts one notification ("Android turned off
-DeskLink's accessibility service", one tap to the setup) and the computer's
+off by the person while the app ran, the phone posts one notification
+("DeskLink's accessibility service is not running", one tap to the setup) and the computer's
 Phone Screen window says the same when it asks for control. Some builds leave it
 shown as on in Settings while it is not running; then it has to be turned off
 and on again, which the setup screen says.

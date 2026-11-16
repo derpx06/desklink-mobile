@@ -51,13 +51,14 @@ object AccessibilityTyping {
         DeskLinkProtocol.TYPING_NO_TEXT_FIELD,
         DeskLinkProtocol.TYPING_NOT_EDITABLE,
         DeskLinkProtocol.TYPING_TEXT_REFUSED,
+        DeskLinkProtocol.TYPING_LOCKED,
     )
 
     data class Field(val text: String, val start: Int, val end: Int)
 
-    /** The selection this path last set, with its direction (the field reports it in order). */
+    /** The selection this path last set, with its direction (the field reports it in order), and which field it was in. */
     @Volatile
-    private var lastSet: Field? = null
+    private var lastSet: Pair<Int, Field>? = null
 
     /**
      * The field as [reported], with the direction of the selection this path set last when it is still that one: a
@@ -186,31 +187,71 @@ object AccessibilityTyping {
     private fun extends(codePoint: Int) =
         codePoint in 0x1F3FB..0x1F3FF || codePoint == 0xFE0F || codePoint == 0xFE0E || codePoint == 0x20E3 || codePoint in 0xE0020..0xE007F
 
+    /** An emoji picture (ponytail: the emoji blocks, not Unicode's Extended_Pictographic table). */
+    private fun pictographic(codePoint: Int) =
+        codePoint in 0x1F000..0x1FAFF || codePoint in 0x2600..0x27BF || codePoint in 0x2300..0x23FF || codePoint in 0x2B00..0x2BFF
+
+    /** Part of an emoji a zero-width joiner may join from. */
+    private fun emojiPart(codePoint: Int) = pictographic(codePoint) || extends(codePoint)
+
+    private fun regionalIndicator(codePoint: Int) = codePoint in 0x1F1E6..0x1F1FF
+
+    /** How many regional indicators (two chars each) end right at [index]. */
+    private fun indicatorsBefore(text: String, index: Int): Int {
+        var count = 0
+        var at = index
+        while (at >= 2 && regionalIndicator(text.codePointBefore(at))) {
+            count++
+            at -= 2
+        }
+        return count
+    }
+
     /**
-     * Where the character before [index] starts: one code point (an Indic vowel sign goes alone, as with Android's own
-     * Backspace), but a whole emoji with what rides on it and what a zero-width joiner joins to it.
+     * Where the character before [index] starts: one code point (an Indic vowel sign or half form goes alone, as with
+     * Android's own Backspace), but a whole emoji: what rides on it, a flag's two indicators, and an emoji a zero-width
+     * joiner joins to it (only between emoji: in Devanagari a ZWJ shapes a half form and joins nothing).
      */
     private fun previousCharacter(text: String, index: Int): Int {
+        val indicators = indicatorsBefore(text, index)
+        if (indicators >= 2 && indicators % 2 == 0) return index - 4
         var i = previousCodePoint(text, index)
         while (i > 0) {
-            i = when {
-                extends(text.codePointAt(i)) || text.codePointAt(i) == ZWJ -> previousCodePoint(text, i)
-                text.codePointBefore(i) == ZWJ -> previousCodePoint(text, previousCodePoint(text, i))
-                else -> return i
+            val codePoint = text.codePointAt(i)
+            if (extends(codePoint)) {
+                i = previousCodePoint(text, i)
+                continue
             }
+            if (pictographic(codePoint) && text.codePointBefore(i) == ZWJ) {
+                val joiner = previousCodePoint(text, i)
+                if (joiner > 0 && emojiPart(text.codePointBefore(joiner))) {
+                    i = previousCodePoint(text, joiner)
+                    continue
+                }
+            }
+            return i
         }
-        return i
+        return i.coerceAtLeast(0)
     }
 
     /** Where the character at [index] ends: the mirror of [previousCharacter]. */
     private fun nextCharacter(text: String, index: Int): Int {
+        if (index + 4 <= text.length && regionalIndicator(text.codePointAt(index)) &&
+            regionalIndicator(text.codePointAt(index + 2)) && indicatorsBefore(text, index) % 2 == 0
+        ) return index + 4
         var j = nextCodePoint(text, index)
         while (j < text.length) {
-            j = when {
-                extends(text.codePointAt(j)) -> nextCodePoint(text, j)
-                text.codePointAt(j) == ZWJ && j + 1 < text.length -> nextCodePoint(text, nextCodePoint(text, j))
-                else -> return j
+            val codePoint = text.codePointAt(j)
+            if (extends(codePoint)) {
+                j = nextCodePoint(text, j)
+                continue
             }
+            val after = nextCodePoint(text, j)
+            if (codePoint == ZWJ && after < text.length && pictographic(text.codePointAt(after)) && emojiPart(text.codePointBefore(j))) {
+                j = nextCodePoint(text, after)
+                continue
+            }
+            return j
         }
         return j
     }
@@ -223,9 +264,18 @@ object AccessibilityTyping {
     private fun nextCodePoint(text: String, index: Int) =
         if (index + 1 < text.length && Character.isHighSurrogate(text[index]) && Character.isLowSurrogate(text[index + 1])) index + 2 else index + 1
 
+    /** Why no key may be typed at all now, before any field is looked at: no service, or a locked phone. */
+    fun refusalBefore(serviceRunning: Boolean, locked: Boolean): String? = when {
+        !serviceRunning -> DeskLinkProtocol.TYPING_ACCESSIBILITY_OFF
+        // Never into the lock screen (its PIN field, its notifications' replies), Glide or Phone Screen alike.
+        locked -> DeskLinkProtocol.TYPING_LOCKED
+        else -> null
+    }
+
     /** Applies a mousepad key packet to the focused field: null when it was typed, else why not (one of [REFUSALS]). */
     fun handle(np: NetworkPacket): String? {
-        val service = MouseReceiverService.instance ?: return DeskLinkProtocol.TYPING_ACCESSIBILITY_OFF
+        val service = MouseReceiverService.instance ?: return refusalBefore(serviceRunning = false, locked = false)
+        refusalBefore(serviceRunning = true, locked = org.desklink.mobile.helpers.LockedActions.isLocked(service))?.let { return it }
         val special = np.getInt("specialKey", 0)
         val key = np.getString("key", "").takeIf { it.isNotEmpty() }
         val ctrl = np.getBoolean("ctrl", false)
@@ -243,7 +293,7 @@ object AccessibilityTyping {
         val node = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return DeskLinkProtocol.TYPING_NO_TEXT_FIELD
         try {
             return when {
-                typeIntoNode(service, node, key, special, ctrl, np.getBoolean("shift", false)) -> null
+                typeIntoNode(node, key, special, ctrl, np.getBoolean("shift", false)) { paste(service, node, it) } -> null
                 !node.isEditable -> DeskLinkProtocol.TYPING_NOT_EDITABLE
                 else -> DeskLinkProtocol.TYPING_TEXT_REFUSED
             }
@@ -262,22 +312,23 @@ object AccessibilityTyping {
         val ime = service.inputMethod ?: return null
         val info = ime.currentInputEditorInfo ?: return null
         val connection = ime.currentInputConnection ?: return null
-        // A window with no editor focused still starts input, as a field that takes no text: such a view (a terminal
-        // reads raw keys) is typed into only while it really has input focus.
-        if (info.inputType == InputType.TYPE_NULL) {
-            val focused = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
-            @Suppress("DEPRECATION")
-            focused.recycle()
-        } else if (connection.getSurroundingText(0, 0, 0) == null) {
-            // A stale session: an editor that restarts input after an edit (Chrome's address bar, after every key) gets a
-            // new session that Android never hands this service, and the app drops every later call ("Session id
-            // mismatch") while each looks sent. A stale connection answers nothing, so it is asked first: the focused
-            // node is edited instead (emulator, Android 16, 11-16).
-            android.util.Log.d("MouseReceiverPlugin", "keys: the editor's input connection is stale, editing the focused field")
-            return null
-        }
         val steps = steps(key, special, ctrl, np.getBoolean("shift", false), np.getBoolean("alt", false), info.imeOptions, info.inputType)
             ?: return false
+        // A window with no editor focused still starts input, as a field that takes no text (TYPE_NULL): keys go to
+        // what has input focus (Enter presses a button, a raw-key view reads them), text only to an editable one.
+        if (info.inputType == InputType.TYPE_NULL) {
+            val focused = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
+            val editable = focused.isEditable
+            @Suppress("DEPRECATION")
+            focused.recycle()
+            if (!nullEditorTakes(steps, editable)) return null
+        } else if (staleEditors.stale(info) { connection.getSurroundingText(0, 0, 0) == null }) {
+            // A stale session: an editor that restarts input after an edit (Chrome's address bar, after every key) gets a
+            // new session that Android never hands this service, and the app drops every later call ("Session id
+            // mismatch") while each looks sent. A stale connection answers nothing, so it is asked (once per editor):
+            // the focused node is edited instead (emulator, Android 16, 11-16).
+            return null
+        }
         for (step in steps) when (step) {
             is Step.Commit -> connection.commitText(step.text, 1, null)
             is Step.EditorAction -> connection.performEditorAction(step.action)
@@ -291,8 +342,35 @@ object AccessibilityTyping {
         return true
     }
 
-    /** Older phones, or no editor connected: actions on the focused node. False if nothing took the key. */
-    private fun typeIntoNode(service: AccessibilityService, node: AccessibilityNodeInfo, key: String?, special: Int, ctrl: Boolean, shift: Boolean): Boolean {
+    /** Whether a TYPE_NULL editor is typed into: keys always, text only when what has input focus is editable. */
+    fun nullEditorTakes(steps: List<Step>, focusedEditable: Boolean): Boolean = focusedEditable || steps.none { it is Step.Commit }
+
+    private val staleEditors = StaleEditors { android.util.Log.d("MouseReceiverPlugin", "keys: the editor's input connection is stale, editing the focused field") }
+
+    /**
+     * Which editor's connection was found stale: asked once per editor (a synchronous call into the app), remembered
+     * until the focus moves (Android hands over a new editor then, and its connection is asked afresh).
+     */
+    class StaleEditors(private val found: () -> Unit = {}) {
+        @Volatile
+        private var stale: Any? = null
+
+        fun stale(editor: Any, ask: () -> Boolean): Boolean {
+            if (editor === stale) return true
+            if (!ask()) return false
+            stale = editor
+            found()
+            return true
+        }
+    }
+
+    /**
+     * Older phones, or no editor connected: actions on the focused node. False if nothing took the key. [paste] puts
+     * text in through the clipboard, for a field that refuses SET_TEXT.
+     */
+    internal fun typeIntoNode(
+        node: AccessibilityNodeInfo, key: String?, special: Int, ctrl: Boolean, shift: Boolean, paste: (String) -> Boolean,
+    ): Boolean {
         if (ctrl && key != null) {
             val action = when (key.lowercase()) {
                 "c" -> AccessibilityNodeInfo.ACTION_COPY
@@ -321,6 +399,9 @@ object AccessibilityTyping {
             return apply(node, key = "\n", special = 0, ctrl = false)
         }
         if (!node.isEditable) return false
+        // A password field reads as bullets: an edit computed from them would replace the password with bullets, and a
+        // paste would leave the typed characters in the clipboard's history. Only its own editor connection types there.
+        if (node.isPassword) return false
         if (special == UP || special == DOWN) {
             // A line up or down: what the arrow means in a multi-line field.
             val arguments = Bundle().apply {
@@ -332,7 +413,7 @@ object AccessibilityTyping {
         }
         if (apply(node, key, special, ctrl, shift)) return true
         // A field that refuses SET_TEXT (some web views, custom editors) still takes a paste.
-        return key != null && special == 0 && !ctrl && paste(service, node, key)
+        return key != null && special == 0 && !ctrl && paste(key)
     }
 
     /** Through the clipboard, as the desk's own copy so it is never sent back. */
@@ -347,7 +428,8 @@ object AccessibilityTyping {
         val current = if (showingHint) "" else node.text?.toString().orEmpty()
         val reported = Field(current, node.textSelectionStart.takeIf { it >= 0 } ?: current.length,
             node.textSelectionEnd.takeIf { it >= 0 } ?: current.length)
-        val before = oriented(reported, lastSet)
+        val owner = node.hashCode() // the node's window and id: another field never inherits a direction
+        val before = oriented(reported, lastSet?.takeIf { it.first == owner }?.second)
         val after = edit(before, key, special, ctrl, shift) ?: return false
         if (after.text != before.text) {
             val arguments = Bundle().apply {
@@ -361,7 +443,7 @@ object AccessibilityTyping {
             putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, maxOf(after.start, after.end))
         }
         node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selection)
-        lastSet = after
+        lastSet = owner to after
         return true
     }
 }

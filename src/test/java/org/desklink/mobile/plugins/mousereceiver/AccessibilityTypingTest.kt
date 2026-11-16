@@ -6,7 +6,9 @@ import android.view.inputmethod.EditorInfo
 import org.desklink.mobile.plugins.mousereceiver.AccessibilityTyping.Field
 import org.desklink.mobile.plugins.mousereceiver.AccessibilityTyping.Step
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AccessibilityTypingTest {
@@ -26,6 +28,69 @@ class AccessibilityTypingTest {
         val heart = "x\u2764\uFE0F"
         assertEquals(Field("x", 1, 1), edit(Field(heart, heart.length, heart.length), special = 1))
         assertEquals(Field("मराठ", 4, 4), edit(Field("मराठी", 5, 5), special = 1))
+    }
+
+    /** A ZWJ at the very start never puts the caret before the text (the key was lost to a swallowed throw). */
+    @Test
+    fun aLeadingJoinerNeverMovesTheCaretBeforeTheText() {
+        val text = "\u200D\uD83D\uDC68" // ZWJ + man
+        assertEquals(Field("\u200D", 1, 1), edit(Field(text, 3, 3), special = 1))
+        assertEquals(Field(text, 3, 1), edit(Field(text, 3, 3), special = 4, shift = true))
+        assertEquals(Field(text, 1, 1), edit(Field(text, 3, 3), special = 4))
+    }
+
+    /** In Marathi and Hindi a ZWJ shapes a half form: Backspace still takes one code point at a time there. */
+    @Test
+    fun aJoinerInDevanagariJoinsNothing() {
+        assertEquals(Field("क्\u200D", 3, 3), edit(Field("क्\u200Dष", 4, 4), special = 1))
+        assertEquals(Field("र्\u200D", 3, 3), edit(Field("र्\u200Dक", 4, 4), special = 1))
+        assertEquals(Field("्\u200Dष", 0, 0), edit(Field("क्\u200Dष", 0, 0), special = 13))
+        assertEquals(Field("क्\u200Dष", 2, 2), edit(Field("क्\u200Dष", 1, 1), special = 6))
+    }
+
+    /** A flag is two regional indicators, paired from the start of their run. */
+    @Test
+    fun aFlagGoesWhole() {
+        val india = "\uD83C\uDDEE\uD83C\uDDF3"
+        val us = "\uD83C\uDDFA\uD83C\uDDF8"
+        assertEquals(Field(india, 4, 4), edit(Field(india + us, 8, 8), special = 1))
+        assertEquals(Field(us, 0, 0), edit(Field(india + us, 0, 0), special = 13))
+        assertEquals(Field(india + us, 4, 4), edit(Field(india + us, 0, 0), special = 6))
+        // An odd one out goes alone.
+        val odd = india + "\uD83C\uDDFA"
+        assertEquals(Field(india, 4, 4), edit(Field(odd, 6, 6), special = 1))
+    }
+
+    /** Nothing is typed with no service, or into a locked phone (its lock screen); the desk is told which. */
+    @Test
+    fun noServiceOrALockedPhoneRefusesEveryKey() {
+        assertEquals("accessibility-off", AccessibilityTyping.refusalBefore(serviceRunning = false, locked = false))
+        assertEquals("accessibility-off", AccessibilityTyping.refusalBefore(serviceRunning = false, locked = true))
+        assertEquals("locked", AccessibilityTyping.refusalBefore(serviceRunning = true, locked = true))
+        assertNull(AccessibilityTyping.refusalBefore(serviceRunning = true, locked = false))
+    }
+
+    /** A TYPE_NULL editor (no field focused) takes keys, but text only when what has input focus is editable. */
+    @Test
+    fun aFieldThatTakesNoTextTakesKeysOnly() {
+        assertTrue(AccessibilityTyping.nullEditorTakes(listOf(Step.Key(KeyEvent.KEYCODE_ENTER, 0)), focusedEditable = false))
+        assertFalse(AccessibilityTyping.nullEditorTakes(listOf(Step.Commit("a")), focusedEditable = false))
+        assertTrue(AccessibilityTyping.nullEditorTakes(listOf(Step.Commit("a")), focusedEditable = true))
+    }
+
+    /** A stale editor connection is asked once (a synchronous call into the app), until another editor has the focus. */
+    @Test
+    fun aStaleEditorIsAskedOncePerEditor() {
+        var asked = 0
+        val stale = AccessibilityTyping.StaleEditors()
+        val chrome = Any()
+        assertTrue(stale.stale(chrome) { asked++; true })
+        assertTrue(stale.stale(chrome) { asked++; true })
+        assertEquals(1, asked)
+        val other = Any()
+        assertFalse(stale.stale(other) { asked++; false })
+        assertFalse(stale.stale(other) { asked++; false })
+        assertEquals("a live connection is asked each time", 3, asked)
     }
 
     /** A field reports a selection in order; the one this path made keeps its direction while it is still the same. */

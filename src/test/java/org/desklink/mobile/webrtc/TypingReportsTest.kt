@@ -19,4 +19,13 @@ class TypingReportsTest {
         assertFalse(reports.shouldSend(null, 3_500))
         assertTrue(reports.shouldSend("not-editable", 3_600))
     }
+
+    @Test
+    fun aNewShareStartsWithNothingSaid() {
+        val reports = TypingReports(everyMs = 3_000)
+        assertTrue(reports.shouldSend("no-text-field", 0, "share-1"))
+        assertFalse(reports.shouldSend("no-text-field", 10, "share-1"))
+        assertTrue("the new window hears it at once", reports.shouldSend("no-text-field", 20, "share-2"))
+        assertFalse("nothing to clear in a new share", reports.shouldSend(null, 30, "share-3"))
+    }
 }

@@ -828,7 +828,8 @@ class WebRtcSessionCoordinator(
      * [TypingReports]; only while this phone's screen is shown there.
      */
     fun reportTyping(refusal: String?) {
-        if (!typingReports.shouldSend(refusal, android.os.SystemClock.elapsedRealtime())) return
+        val share = remoteSession.snapshot().remoteSessionId
+        if (!typingReports.shouldSend(refusal, android.os.SystemClock.elapsedRealtime(), share)) return
         remoteActionExecutor.execute {
             synchronized(lock) {
                 val binding = activeBinding ?: return@synchronized
@@ -2035,9 +2036,9 @@ class WebRtcSessionCoordinator(
                             remoteSessionId = message.remoteSessionId,
                             reason = if (org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.stoppedByAndroid(context)) {
                                 // Said apart: the person turned it on, and Android (ColorOS on a force stop or an update) turned it off.
-                                "Android turned off DeskLink accessibility control on this Android device (after an update or a force stop)"
+                                org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.CONTROL_DENIED_STOPPED_BY_ANDROID
                             } else {
-                                "Enable DeskLink accessibility control on this Android device"
+                                org.desklink.mobile.protocol.desklinkv9.DeskLinkProtocol.CONTROL_DENIED_ACCESSIBILITY_OFF
                             },
                         ),
                     )

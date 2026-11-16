@@ -135,7 +135,7 @@ class AccessibilitySetupActivity : AppCompatActivity() {
         /** Once per stop: a notification one tap from the setup (which says "off and on again" when it is still on). */
         fun tellIfStopped(context: Context) {
             if (!stoppedByAndroid(context) || prefs(context).getBoolean(KEY_TOLD_STOPPED, false)) return
-            android.util.Log.w("MouseReceiverService", "accessibility service was stopped by the system (enabled in settings: ${enabled(context)})")
+            android.util.Log.w("MouseReceiverService", "accessibility service is not running after it ran, not switched off while the app ran (enabled in settings: ${enabled(context)})")
             prefs(context).edit().putBoolean(KEY_TOLD_STOPPED, true).apply()
             notify(context, context.getString(R.string.accessibility_stopped_title), context.getString(R.string.accessibility_stopped_text))
         }
