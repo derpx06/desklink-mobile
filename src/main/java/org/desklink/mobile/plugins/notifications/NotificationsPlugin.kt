@@ -68,6 +68,12 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
     private lateinit var mainHandler: Handler
     private val postedNotificationsLock = Any()
     private val dedupe = NotificationDedupe()
+    /** The app icons the desk was sent (and acknowledged) on this connection, by hash: cleared on every feature-ready. */
+    private val iconsSent: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /** The notifying app's icon; replaced by a test. */
+    @androidx.annotation.VisibleForTesting
+    internal var appIconOf: (String) -> AppIcon? = { packageName -> AppIcons.forPackage(context, packageName) }
 
     override val displayName: String
         get() = context.getString(R.string.pref_plugin_notifications)
@@ -162,6 +168,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
      * dismissed while the link was down (no retried cancellations needed), then each body silent.
      */
     override fun onFeatureReady() {
+        // A new connection: the desk may be a restarted one, so each app's icon goes once more.
+        iconsSent.clear()
         if (!appDatabase.isReady()) {
             resyncWhenReady = true // the snapshot lists only what is mirrored: sent when the settings are known
             gate.start()
@@ -359,8 +367,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
         val key = getNotificationKeyCompat(statusBarNotification)
         val np = NetworkPacket(PACKET_TYPE_NOTIFICATION)
-        // No icon is rendered, encoded or sent: the computer never shows it (the transport strips a notification's payload).
-        // Doing it cost a bitmap render and a PNG encode on the main thread for every notification of a resync.
+        // The app's launcher icon goes as a field (not a payload, which the transport strips): rendered once per app per
+        // process ([AppIcons]), and its picture sent once per app per connection.
 
         val messagingStyle = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
 
@@ -425,6 +433,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
         }
         fitToWire(np)
+        val icon = runCatching { appIconOf(packageName) }.getOrNull()
+        val iconGoes = icon != null && AppIcons.addTo(np, icon, icon.hash in iconsSent)
         // The same content again (an app re-posting on a timer) or the same words under a second key is not sent twice.
         val signature = contentSignature(np)
         val words = "$packageName|${np.getStringOrNull("title")}|${np.getStringOrNull("text") ?: np.getStringOrNull("ticker")}"
@@ -441,6 +451,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         device.sendPacket(np, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
             override fun onSuccess() {
                 deskHas[key] = signature
+                if (iconGoes && icon != null) iconsSent.add(icon.hash)
                 synchronized(notificationDeliveryLock) {
                     currentNotifications.add(key)
                 }
