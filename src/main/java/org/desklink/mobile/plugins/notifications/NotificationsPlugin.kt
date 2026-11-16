@@ -433,8 +433,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             }
         }
         fitToWire(np)
-        val icon = runCatching { appIconOf(packageName) }.getOrNull()
-        val iconGoes = icon != null && AppIcons.addTo(np, icon, icon.hash in iconsSent)
         // The same content again (an app re-posting on a timer) or the same words under a second key is not sent twice.
         val signature = contentSignature(np)
         val words = "$packageName|${np.getStringOrNull("title")}|${np.getStringOrNull("text") ?: np.getStringOrNull("ticker")}"
@@ -442,6 +440,11 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
             Log.d(TAG, "not sent again: $key (unchanged or a twin)")
             return
         }
+        val icon = runCatching { appIconOf(packageName) }.getOrNull()
+        // Counted as sent at once (so a burst from one app carries it once), and forgotten again if this send fails.
+        val fresh = icon != null && iconsSent.add(icon.hash)
+        val iconGoes = icon != null && AppIcons.addTo(np, icon, deskHas = !fresh)
+        if (fresh && !iconGoes && icon != null) iconsSent.remove(icon.hash) // too big for this packet: the next one tries
         val deskHas = delivered.getOrPut(device.deviceId) { java.util.concurrent.ConcurrentHashMap() }
         np["silent"] = isPreexisting && resyncIsSilent(deskHas[key], signature, statusBarNotification.postTime, PROCESS_START_MS)
         // `sendPacket` only queues work. Its return cannot prove that the
@@ -451,7 +454,6 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         device.sendPacket(np, object : org.desklink.mobile.Device.SendPacketStatusCallback() {
             override fun onSuccess() {
                 deskHas[key] = signature
-                if (iconGoes && icon != null) iconsSent.add(icon.hash)
                 synchronized(notificationDeliveryLock) {
                     currentNotifications.add(key)
                 }
@@ -459,6 +461,7 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
 
             override fun onFailure(e: Throwable) {
                 dedupe.forget(key)
+                if (iconGoes && icon != null) iconsSent.remove(icon.hash)
                 synchronized(notificationDeliveryLock) {
                     currentNotifications.remove(key)
                 }
