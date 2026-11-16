@@ -164,9 +164,13 @@ object Guarded {
         /** Restarts whatever owns this executor's periodic tasks; also what "Tap to restart" runs. */
         var owner: (() -> Unit)? = null
             set(value) {
+                val before = field
                 field = value
-                if (value != null) owners[name] = value else owners.remove(name)
+                if (value != null) owners[name] = value else before?.let { owners.remove(name, it) }
             }
+
+        /** Only this executor's own owner: a replacement for the same device has the same name and its own owner. */
+        private fun forgetOwner() { owner?.let { owners.remove(name, it) } }
 
         override fun scheduleAtFixedRate(command: Runnable, initialDelay: Long, period: Long, unit: TimeUnit) =
             super.scheduleAtFixedRate(PeriodicGuard(name, command) { owner?.invoke() }, initialDelay, period, unit)
@@ -175,12 +179,12 @@ object Guarded {
             super.scheduleWithFixedDelay(PeriodicGuard(name, command) { owner?.invoke() }, initialDelay, delay, unit)
 
         override fun shutdown() {
-            owners.remove(name)
+            forgetOwner()
             super.shutdown()
         }
 
         override fun shutdownNow(): MutableList<Runnable> {
-            owners.remove(name)
+            forgetOwner()
             return super.shutdownNow()
         }
 

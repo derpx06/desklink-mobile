@@ -116,4 +116,18 @@ class GuardedPeriodicTest {
         val periodic = Regex("""(\w+)\.(scheduleWithFixedDelay|scheduleAtFixedRate)\(""").findAll(source).map { it.groupValues[1] }.toSet()
         assertEquals("every periodic task of the coordinator is on the guarded executor", setOf("recoveryExecutor"), periodic)
     }
+
+    @Test
+    fun anOldExecutorShuttingDownKeepsItsReplacementsRestart() {
+        // Executors are named per device: the old coordinator's shutdown removed the new one's "Tap to restart".
+        val old = Guarded.Scheduled("t-same-name")
+        old.owner = {}
+        val fresh = Guarded.Scheduled("t-same-name")
+        val restart: () -> Unit = {}
+        fresh.owner = restart
+        old.shutdownNow()
+        org.junit.Assert.assertSame(restart, Guarded.owners["t-same-name"])
+        fresh.shutdownNow()
+        org.junit.Assert.assertNull(Guarded.owners["t-same-name"])
+    }
 }
