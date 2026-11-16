@@ -342,7 +342,21 @@ class BackgroundService : Service() {
         updateConnectionPowerLease()
     }
 
+    /**
+     * Called from link, coordinator and pairing threads: the notification and the locks are the main
+     * looper's (two threads at once each created a Wi-Fi lock, and one was never released), and a burst
+     * of changes is one update.
+     */
     private fun onDeviceConnectionStateChanged() {
+        leaseRecheck.removeCallbacks(stateChangedTask)
+        leaseRecheck.post(stateChangedTask)
+    }
+
+    @Volatile private var destroyed = false
+
+    private val stateChangedTask = Runnable {
+        // Posted before onDestroy and run after it: a destroyed service must not bring its notification or locks back.
+        if (destroyed) return@Runnable
         updateForegroundNotification()
         updateConnectionPowerLease()
     }
@@ -543,6 +557,8 @@ class BackgroundService : Service() {
         screenReceiver?.let { runCatching { unregisterReceiver(it) } }
         screenReceiver = null
         leaseRecheck.removeCallbacks(leaseRecheckTask)
+        destroyed = true
+        leaseRecheck.removeCallbacks(stateChangedTask)
         networkMovedDebounce.removeCallbacks(networkMovedTask)
         networkCallback?.let { callback ->
             getSystemService<ConnectivityManager>()?.unregisterNetworkCallback(callback)
