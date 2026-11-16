@@ -265,7 +265,10 @@ private fun PageRow(page: SettingsPage, summary: String, badge: Int, onClick: ()
         Modifier.fillMaxWidth().background(t.surface).clickable(role = Role.Button, onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        IconTile(page.icon, size = 40.dp, radius = 12.dp, container = if (badge > 0) t.coralContainer else t.accentContainer, content = if (badge > 0) t.coralText else t.onAccentContainer)
+        // At the largest font the tile would leave the title a sliver ("Notification|s", "Advance|d"): it goes, as on the computer card.
+        if (androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.4f) {
+            IconTile(page.icon, size = 40.dp, radius = 12.dp, container = if (badge > 0) t.coralContainer else t.accentContainer, content = if (badge > 0) t.coralText else t.onAccentContainer)
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(stringResource(page.title), fontSize = 16.sp, lineHeight = 21.sp, color = t.text)
             Text(summary, fontSize = 13.sp, lineHeight = 17.sp, color = if (badge > 0) t.coralText else t.textDim)

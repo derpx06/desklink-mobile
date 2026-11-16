@@ -51,6 +51,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.desklink.mobile.R
@@ -167,20 +168,12 @@ fun LargeTitle(title: String, modifier: Modifier = Modifier, subtitle: String? =
 /** "Open on arch-desk", "Quick actions": 14/500 dim, a heading for TalkBack. */
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier, trailing: @Composable RowScope.() -> Unit = {}) {
-    val label = @Composable { m: Modifier -> Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = tokens.textDim, modifier = m.semantics { heading() }) }
-    val outer = modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 4.dp)
-    // Past a font scale of 1.3 the trailing item ("2 need your OK") squeezed the label to "Permis|sions": it goes underneath.
-    if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) {
-        Column(outer) {
-            label(Modifier)
-            Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
-        }
-    } else {
-        Row(outer, verticalAlignment = Alignment.CenterVertically) {
-            label(Modifier.weight(1f))
-            trailing()
-        }
-    }
+    // Measured like a row: a trailing item ("2 need your OK") that would squeeze the label to "Permis|sions" goes under it, at the end.
+    TextAndTrailing(
+        modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 4.dp),
+        text = { Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = tokens.textDim, modifier = Modifier.semantics { heading() }) },
+        trailing = trailing,
+    )
 }
 
 /** Rows on one rounded group, 2dp apart so the window shows between them. */
@@ -248,10 +241,14 @@ fun GroupRow(
                     }
                 }
             },
-            trailing = trailing,
+            keepWordsWhole = !monoSubtitle,
+            // The switch is measured with the words: it goes under them when beside it a word would break.
+            trailing = {
+                trailing()
+                if (checked != null) Switch(checked = checked, onCheckedChange = null, enabled = enabled, colors = deskSwitchColors())
+            },
         )
         if (chevron) Icon(painterResource(R.drawable.sym_chevron_right), contentDescription = null, tint = t.textDim, modifier = Modifier.size(22.dp))
-        if (checked != null) Switch(checked = checked, onCheckedChange = null, enabled = enabled, colors = deskSwitchColors())
     }
 }
 
@@ -265,9 +262,18 @@ private val TEXT_MIN = 120.dp
 internal fun stacksTrailing(maxWidth: Int, trailingWidth: Int, gap: Int, textMin: Int): Boolean =
     trailingWidth > 0 && maxWidth - trailingWidth - gap < textMin
 
-/** A row's words and what trails them: side by side while the words keep [TEXT_MIN], else the trailing part under them, at the end. */
+/**
+ * A row's words and what trails them: side by side while the words keep [TEXT_MIN] and their longest word whole, else the
+ * trailing part under them, at the end.
+ */
 @Composable
-private fun TextAndTrailing(modifier: Modifier, text: @Composable () -> Unit, trailing: @Composable RowScope.() -> Unit) {
+internal fun TextAndTrailing(
+    modifier: Modifier,
+    text: @Composable () -> Unit,
+    trailing: @Composable RowScope.() -> Unit,
+    /** Off for words that may break anywhere (a path or a key in mono): their whole length is not a word to keep. */
+    keepWordsWhole: Boolean = true,
+) {
     androidx.compose.ui.layout.Layout(
         content = { text(); Row(verticalAlignment = Alignment.CenterVertically, content = trailing) },
         modifier = modifier,
@@ -276,7 +282,9 @@ private fun TextAndTrailing(modifier: Modifier, text: @Composable () -> Unit, tr
         val gap = 14.dp.roundToPx()
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val end = tail.measure(loose)
-        if (!stacksTrailing(constraints.maxWidth, end.width, gap, TEXT_MIN.roundToPx())) {
+        // A text's smallest width is its longest word: less than that beside the trailing part breaks it ("Notification|s").
+        val longestWord = if (keepWordsWhole) words.minIntrinsicWidth(Constraints.Infinity) else 0
+        if (!stacksTrailing(constraints.maxWidth, end.width, gap, maxOf(TEXT_MIN.roundToPx(), longestWord))) {
             val room = if (end.width > 0) constraints.maxWidth - end.width - gap else constraints.maxWidth
             val body = words.measure(loose.copy(maxWidth = room.coerceAtLeast(0)))
             val height = maxOf(body.height, end.height, constraints.minHeight)

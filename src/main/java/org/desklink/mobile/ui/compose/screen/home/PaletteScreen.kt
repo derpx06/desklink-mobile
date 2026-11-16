@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -198,9 +197,9 @@ private fun groupTitle(group: PaletteGroup): String = stringResource(
 @Composable
 private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
     val t = tokens
-    val big = LocalDensity.current.fontScale > 1.4f
-    // A sentence (why it is dimmed, or a feature's state and its step) goes whole under the name; a short word stays at the end.
-    val below = big || item.blocked != null || item.group == PaletteGroup.FEATURES
+    // A sentence (why it is dimmed, or a feature's state and its step) goes whole under the name; a short word stays at
+    // the end while it fits beside the name, else it goes under it too (measured: never "Make it ri…", never "Notificat…").
+    val below = item.blocked != null || item.group == PaletteGroup.FEATURES
     Row(
         Modifier
             .fillMaxWidth()
@@ -214,14 +213,17 @@ private fun PaletteRow(item: PaletteItem, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         IconTile(item.icon, size = 36.dp, radius = 18.dp)
-        Column(Modifier.weight(1f)) {
-            Text(item.title, fontSize = 15.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis)
-            // What a dimmed action needs is said whole, under its name.
-            if (below && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
-        }
-        if (!below && item.hint.isNotEmpty()) {
-            Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(0.6f, fill = false))
-        }
+        org.desklink.mobile.ui.compose.components.TextAndTrailing(
+            Modifier.weight(1f),
+            text = {
+                Column {
+                    Text(item.title, fontSize = 15.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.MiddleEllipsis)
+                    // What a dimmed action needs is said whole, under its name.
+                    if (below && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
+                }
+            },
+            trailing = { if (!below && item.hint.isNotEmpty()) Text(item.hint, fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim) },
+        )
     }
 }
 
