@@ -167,9 +167,19 @@ fun LargeTitle(title: String, modifier: Modifier = Modifier, subtitle: String? =
 /** "Open on arch-desk", "Quick actions": 14/500 dim, a heading for TalkBack. */
 @Composable
 fun SectionLabel(text: String, modifier: Modifier = Modifier, trailing: @Composable RowScope.() -> Unit = {}) {
-    Row(modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = tokens.textDim, modifier = Modifier.weight(1f).semantics { heading() })
-        trailing()
+    val label = @Composable { m: Modifier -> Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = tokens.textDim, modifier = m.semantics { heading() }) }
+    val outer = modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 4.dp)
+    // Past a font scale of 1.3 the trailing item ("2 need your OK") squeezed the label to "Permis|sions": it goes underneath.
+    if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) {
+        Column(outer) {
+            label(Modifier)
+            Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+        }
+    } else {
+        Row(outer, verticalAlignment = Alignment.CenterVertically) {
+            label(Modifier.weight(1f))
+            trailing()
+        }
     }
 }
 
