@@ -186,6 +186,9 @@ private const val STATE_NOTE = "note"
 private const val STATE_SELECTED_DEVICE = "selected_device" // Saved persistently in preferences
 private const val REFRESH_MS = 1_000L
 
+/** System queries (the shade, permissions) are refreshed every this many refreshes, not every second. */
+private const val SLOW_EVERY = 5
+
 /**
  * One Compose root. With a paired computer it is the tab shell (Home, Files, Notes, Terminals, Settings: [nav]
  * keeps a back stack per tab); pairing, the viewer and the like are pushed full screen on a small back stack
@@ -212,6 +215,37 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private val notesUi by lazy { NotesUi(this, notesEditing, undoable = ::showUndo) }
     private var selectedId by mutableStateOf<String?>(null)
     private var tick by mutableIntStateOf(0)
+
+    /** Bumped every [SLOW_EVERY] refreshes; a plain field (not state): it re-keys the system queries when a refresh draws. */
+    private var slowRound = 0
+
+    /** The last system-query results Home shows, per round; part of [homeStamp]. */
+    private var slowFacts: Any? = null
+    private var slowFactsRound = -1
+
+    /**
+     * What Home's tab shows, as one comparable value, so an idle Home is not redrawn every second
+     * ([RefreshGate]); null on every other screen, which keeps the plain one-second refresh.
+     * Covers everything the tick re-reads for Home: the paired list, the computer's asks, and
+     * [HomeModel.build] (connection, transfer, live sessions, media, offers, ...). The history and
+     * the bucket are observable state already. It relies on two builds of an unchanged Home being
+     * equal (HomeState is data classes all the way down, built without the wall clock: pinned by
+     * HomeStateStableTest); a field that changed every build would only bring the old redraw back.
+     */
+    private fun homeStamp(paired: List<Device>): Any? {
+        if (stack.lastOrNull() != HOME || nav.selected != AppTab.HOME) return null
+        val device = paired.firstOrNull { it.deviceId == selectedId } ?: paired.firstOrNull() ?: return null
+        if (slowFactsRound != slowRound) {
+            slowFactsRound = slowRound
+            slowFacts = waitingPermissions(this, device.name) to HomeModel.deskNotificationCount(this, device)
+        }
+        return listOf(
+            paired.map { it.deviceId to it.name },
+            org.desklink.mobile.plugins.desksettings.Asks.waiting(),
+            HomeModel.build(this, device, paired),
+            slowFacts,
+        )
+    }
     private val snackbar = SnackbarHostState()
     private var knownPaired: Set<String>? = null
     private val defaultPrefs: SharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(applicationContext) }
@@ -263,8 +297,13 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                val gate = RefreshGate()
+                var round = 0
                 while (true) {
-                    tick++
+                    val paired = HomeModel.pairedDevices()
+                    reconcile(paired)
+                    if (round++ % SLOW_EVERY == 0) slowRound++
+                    if (gate.next(homeStamp(paired))) tick++
                     delay(REFRESH_MS)
                 }
             }
@@ -484,6 +523,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
     private fun Root() {
         @Suppress("UNUSED_VARIABLE") val refresh = tick
         val paired = HomeModel.pairedDevices()
+        // Also from the refresh loop, which keeps running while an idle Home is not redrawn; here it follows an action's tick at once.
         LaunchedEffect(tick) { reconcile(paired) }
         val holder = rememberSaveableStateHolder()
         ForgetLeftRoutes(stack.last(), holder, setOf(ONBOARDING, GUIDE))
@@ -649,7 +689,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val running = TransferProgress.visibleFor(id)?.takeIf { !it.finished }
         val bucket = bucketViews[id]?.summary?.takeIf { !it.paused }
         val (filesBusy, filesProgress) = filesBadge(bucket != null, bucket?.fraction, running != null, running?.percent?.let { it / 100f })
-        val settingsWaiting = androidx.compose.runtime.remember(tick / 5, id, device.name) { waitingPermissions(this, device.name) > 0 }
+        val settingsWaiting = androidx.compose.runtime.remember(slowRound, id, device.name) { waitingPermissions(this, device.name) > 0 }
         val badges = TabBadges(
             link = device.toUiModel().connection,
             filesProgress = filesProgress,
@@ -747,7 +787,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         val history = TransferHistory.revision
         val records = androidx.compose.runtime.remember(history, device.deviceId) { TransferHistory.store(this).forDevice(device.deviceId) }
         // The computer's notifications in the shade: a system query, so every five seconds, not every second.
-        val mirrored = androidx.compose.runtime.remember(tick / 5, device.deviceId) { HomeModel.deskNotificationCount(this, device) }
+        val mirrored = androidx.compose.runtime.remember(slowRound, device.deviceId) { HomeModel.deskNotificationCount(this, device) }
         var sharingInfo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
         // One actions object per computer: a new one every second would make Home recompose even when nothing changed.
         val actions = androidx.compose.runtime.remember(device, computersRequest) { homeActions(device) { sharingInfo = true } }
