@@ -77,8 +77,8 @@ fun StatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp) {
 /**
  * Three-way switch between views of one screen (Notes / Snippets / Clipboard): a 56 dp track on the faint fill (48 dp
  * segments, 4 dp padding), the selected segment on the card colour in light and on the accent container with an accent
- * edge in dark (the card is only 1.1:1 against the dark track). The label scales with the system font up to 1.3, then
- * stays at that size on one line, ellipsized.
+ * edge in dark (the card is only 1.1:1 against the dark track). The label scales with the system font up to 1.3 and
+ * stays on one line, shrinking to fit its segment (down to 11 sp) rather than cutting a word ("Clipbo…").
  */
 @Composable
 fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
@@ -107,10 +107,11 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
                         .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        label, fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal,
-                        color = ink,
-                        textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    androidx.compose.foundation.text.BasicText(
+                        label,
+                        style = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal, color = ink, textAlign = TextAlign.Center),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 15.sp, stepSize = 0.5.sp),
                     )
                 }
             }
