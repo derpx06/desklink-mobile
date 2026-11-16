@@ -514,7 +514,7 @@ private fun LinkChip(connected: Boolean) {
         StatusDot(color)
         Text(
             stringResource(if (connected) R.string.connection_connected else R.string.terminal_status_reconnecting),
-            fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (connected) t.mintText else t.text, maxLines = 1, softWrap = false,
+            fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (connected) t.mintText else t.text, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
     } }
 }
