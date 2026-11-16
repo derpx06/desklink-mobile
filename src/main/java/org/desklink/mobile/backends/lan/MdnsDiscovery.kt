@@ -183,7 +183,8 @@ class MdnsDiscovery {
         }
 
         override fun onServiceLost(serviceInfo: NsdServiceInfo?) {
-            Log.w(LOG_TAG, "Service lost: $serviceInfo")
+            // Benign and frequent (the emulator's mDNS drops and re-finds the desk about twice a minute): not a warning.
+            Log.d(LOG_TAG, "Service lost: ${serviceInfo?.serviceName}")
             // We can't see this device via mdns. This probably means it's not reachable anymore
             // but we do nothing here since we have other ways to do detect unreachable devices
             // that hopefully will also trigger.
