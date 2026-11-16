@@ -191,7 +191,9 @@ fun DeskControls(
                                 val headline = if (onAllowControl != null || !asking) R.string.remote_control_view_only else R.string.remote_control_asking
                                 Text(stringResource(headline, deviceName), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
                                 reason?.takeIf(String::isNotBlank)?.let {
-                                    Text(it, fontSize = 11.sp, color = OnAmber, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    // One line at a very large font: the headline and Ask again come first, the video stays in view.
+                                    val lines = if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.5f) 1 else 2
+                                    Text(it, fontSize = 11.sp, color = OnAmber, maxLines = lines, overflow = TextOverflow.Ellipsis)
                                 }
                             } else {
                                 Text(stringResource(R.string.remote_view_only_hint), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)

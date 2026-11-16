@@ -288,17 +288,20 @@ internal fun TextAndTrailing(
             val room = if (end.width > 0) constraints.maxWidth - end.width - gap else constraints.maxWidth
             val body = words.measure(loose.copy(maxWidth = room.coerceAtLeast(0)))
             val height = maxOf(body.height, end.height, constraints.minHeight)
-            layout(constraints.maxWidth, height) {
+            // As wide as asked (a row fills its slot), else only as wide as it needs (a banner hugs its words).
+            val width = maxOf(constraints.minWidth, body.width + (if (end.width > 0) gap + end.width else 0))
+            layout(width, height) {
                 body.place(0, (height - body.height) / 2)
-                end.place(constraints.maxWidth - end.width, (height - end.height) / 2)
+                end.place(width - end.width, (height - end.height) / 2)
             }
         } else {
             val body = words.measure(loose)
             val spacing = 8.dp.roundToPx()
             val height = maxOf(body.height + spacing + end.height, constraints.minHeight)
-            layout(constraints.maxWidth, height) {
+            val width = maxOf(constraints.minWidth, body.width, end.width)
+            layout(width, height) {
                 body.place(0, 0)
-                end.place(constraints.maxWidth - end.width, body.height + spacing)
+                end.place(width - end.width, body.height + spacing)
             }
         }
     }
