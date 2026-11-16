@@ -69,7 +69,7 @@ class MouseReceiverPlugin : Plugin() {
         }
 
         if (MouseReceiverService.instance == null) {
-            Log.w("MouseReceiverPlugin", "Accessibility service is not enabled, dropping remote mouse input")
+            pointerDrops.dropped("accessibility service not running")
             return false
         }
 
@@ -171,9 +171,15 @@ class MouseReceiverPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = emptyArray()
 
     /** Keys that reached no field: one warning every few seconds with a count and the reason (never the text). */
-    private val keyDrops = org.desklink.mobile.webrtc.DropLog("MouseReceiverPlugin", sink = { Log.w("MouseReceiverPlugin", "keys: $it") })
+    private val keyDrops = org.desklink.mobile.webrtc.DropLog("MouseReceiverPlugin", now = { monotonicMs() }, sink = { Log.w("MouseReceiverPlugin", "keys: $it") })
+
+    /** Pointer input with no accessibility service to move it: paced the same way (a drag is dozens a second). */
+    private val pointerDrops = org.desklink.mobile.webrtc.DropLog("MouseReceiverPlugin", now = { monotonicMs() }, sink = { Log.w("MouseReceiverPlugin", "pointer: $it") })
 
     companion object {
+        /** The drop logs' clock: monotonic, and plain JVM (the routing tests build this plugin without Android). */
+        private fun monotonicMs() = System.nanoTime() / 1_000_000
+
         /** The desk holds control of this phone's screen, shared to it: its keys type here. */
         @JvmStatic
         fun takesKeys(snapshot: org.desklink.mobile.webrtc.WebRtcRemoteSessionController.Snapshot?): Boolean =

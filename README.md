@@ -69,7 +69,9 @@ person, and control and typing stop. DeskLink remembers that the service
 was running; when it is not running again after a restart and was not switched
 off by the person, the phone posts one notification ("Android turned off
 DeskLink's accessibility service", one tap to the setup) and the computer's
-Phone Screen window says the same when it asks for control.
+Phone Screen window says the same when it asks for control. Some builds leave it
+shown as on in Settings while it is not running; then it has to be turned off
+and on again, which the setup screen says.
 
 ## Not yet implemented
 
