@@ -93,8 +93,8 @@ object WebRtcRuntime {
      * default "1.0,2875,80,40,-60,3": pacing factor 1.0 and a 2875 ms pacer queue limit, so every
      * keyframe and scroll burst left at exactly the target (4 Mbps at the LAN floor: ~300 ms for a
      * keyframe). Factor 2.5 and a 250 ms limit, the rest as libwebrtc has it (ALR probing on).
-     * Measured on the RMX5070 (n=7 against n=6): the worst frame in a share's first second 793 -> 378 ms
-     * old, the pacer peak 549 -> 214 ms; scrolls and still screens unchanged.
+     * Measured on the RMX5070 (n=7 against n=6): the worst frame in a share's first second 793 -> 378 ms,
+     * the pacer peak 549 -> 214 ms; scrolls and still screens unchanged.
      */
     internal const val FIELD_TRIALS = "WebRTC-ForcePlayoutDelay/min_ms:0,max_ms:0/" +
         "WebRTC-Pacer-KeyframeFlushing/Enabled/WebRTC-Pacer-FastRetransmissions/Enabled/" +
