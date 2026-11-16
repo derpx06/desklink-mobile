@@ -824,6 +824,8 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                 noticeVisible = dismissedKey != noticeKey,
                 onDismissNotice = { dismissedKey = noticeKey },
                 onAllowControl = if (plugin?.remoteControlRefused == true) ({ requestDesktopScreen() }) else null,
+                // The same conditions as the asking loop: not while the password is asked for or was declined, nor in View.
+                asking = controlMode != ControlMode.View && !controlPasswordDeclined && plugin?.passwordPrompt == null,
                 hint = hint,
                 display = displayMode,
                 onDisplay = { mode ->
@@ -870,7 +872,7 @@ class MousePadActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferen
                             )
                         }
                         androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(stringResource(if (screenControlPlugin()?.remoteControlRefused == true) R.string.remote_allow_control_action else R.string.remote_screen_retry)) },
+                            text = { Text(stringResource(if (screenControlPlugin()?.remoteControlRefused == true) R.string.remote_ask_again else R.string.remote_screen_retry)) },
                             // Both start the view again, which brings the computer's permission prompt back.
                             onClick = { more = false; requestDesktopScreen() },
                         )

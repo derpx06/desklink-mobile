@@ -49,6 +49,36 @@ class Wave5BehaviourTest {
         }
     }
 
+    private fun refused(reason: String?, onAskAgain: (() -> Unit)?, asking: Boolean = true) = compose.setContent {
+        DeskLinkFixedTheme(compose.activity, true) {
+            DeskControls(
+                visible = true, deviceName = "arch-desk", rttMs = 12, live = true, controlEnabled = false, mode = ControlMode.Touch,
+                onMode = {}, onBack = {}, onEnd = {}, onLeft = {}, onRight = {}, onKeyboard = {}, onMore = {},
+                fill = false, onFill = {}, soundOn = false, onSound = {}, reason = reason, onAllowControl = onAskAgain, asking = asking,
+            )
+        }
+    }
+
+    @Test fun aViewOnlyDesktopSaysViewOnlyAndOffersToAskAgain() {
+        // Nothing to "allow" on sway: the headline says what is, the desk's reason says why, the button asks again.
+        refused("This computer's desktop lets the phone watch its screen but not control it.", onAskAgain = {})
+        compose.onNodeWithText("View only on arch-desk").assertExists()
+        compose.onNodeWithText("Allow control on arch-desk first").assertDoesNotExist()
+        compose.onNodeWithText("Ask again").assertExists()
+    }
+
+    @Test fun whileControlIsBeingAskedForTheStripSaysSo() {
+        refused(reason = null, onAskAgain = null)
+        compose.onNodeWithText("Asking arch-desk for control…").assertExists()
+        compose.onNodeWithText("Ask again").assertDoesNotExist()
+    }
+
+    @Test fun aDeclinedPasswordOrViewModeIsNotCalledAsking() {
+        refused(reason = null, onAskAgain = null, asking = false)
+        compose.onNodeWithText("View only on arch-desk").assertExists()
+        compose.onNodeWithText("Asking arch-desk for control…").assertDoesNotExist()
+    }
+
     @Test fun controlsAreEnabledOnlyWhenGranted() {
         desk(granted = true)
         for (label in listOf("Left click", "Right click", "Keyboard")) compose.onNodeWithContentDescription(label).assertIsEnabled()

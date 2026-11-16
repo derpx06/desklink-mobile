@@ -294,8 +294,9 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_compose_hide">Type straight into the terminal</string>
     <!-- UI v4: desk screen -->
     <string name="remote_mode_view">View</string>
-    <string name="remote_allow_control_first">Allow control on %1$s first</string>
-    <string name="remote_allow_control_action">Allow control</string>
+    <string name="remote_control_asking">Asking %1$s for control…</string>
+    <string name="remote_control_view_only">View only on %1$s</string>
+    <string name="remote_ask_again">Ask again</string>
     <string name="remote_notice_dismiss">Dismiss</string>
     <string name="remote_view_only_hint">Watching only. Switch to Touch or Touchpad to control.</string>
     <string name="remote_toolbar_label">Controls for %1$s: mouse buttons, keyboard and Super key</string>

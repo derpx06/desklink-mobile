@@ -137,6 +137,8 @@ fun DeskControls(
     onDismissNotice: () -> Unit = {},
     /** Set once the computer has refused: asks it to share again (its permission prompt comes back). */
     onAllowControl: (() -> Unit)? = null,
+    /** Control is being asked for right now (not refused, declined, waiting for a password, or in View). */
+    asking: Boolean = true,
     /** One-time line above the bottom pill saying what it is for. */
     hint: String? = null,
     /** F2: "mirror" or "extend", and switching between them (re-asks the desk). */
@@ -180,7 +182,9 @@ fun DeskControls(
                 Icon(painterResource(R.drawable.sym_front_hand), contentDescription = null, tint = OnAmber, modifier = Modifier.size(16.dp))
                 Column(Modifier.weight(1f, fill = false).widthIn(max = 380.dp)) {
                     if (!controlEnabled) {
-                        Text(stringResource(R.string.remote_allow_control_first, deviceName), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
+                        // Refused (the desk said why; `onAllowControl` is set only then): view only, ask again. Before that: asking.
+                        val headline = if (onAllowControl != null || !asking) R.string.remote_control_view_only else R.string.remote_control_asking
+                        Text(stringResource(headline, deviceName), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
                         reason?.takeIf(String::isNotBlank)?.let {
                             Text(it, fontSize = 11.sp, color = OnAmber, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
@@ -193,7 +197,7 @@ fun DeskControls(
                         Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onAllowControl),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(stringResource(R.string.remote_allow_control_action), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OnAmber, modifier = Modifier.padding(horizontal = 8.dp))
+                        Text(stringResource(R.string.remote_ask_again), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OnAmber, modifier = Modifier.padding(horizontal = 8.dp))
                     }
                 }
                 IconButton(onClick = onDismissNotice, modifier = Modifier.size(48.dp)) {
