@@ -101,9 +101,12 @@ public class MprisReceiverPlugin extends Plugin {
             mediaSessionChangeListener = new MediaSessionChangeListener();
             manager.addOnActiveSessionsChangedListener(mediaSessionChangeListener, new ComponentName(context, NotificationReceiver.class), new Handler(Looper.getMainLooper()));
 
-            createPlayers(manager.getActiveSessions(new ComponentName(context, NotificationReceiver.class)));
-            sendFullState();
-            handler.postDelayed(positionTick, POSITION_INTERVAL_MS);
+            // The maps are the main looper's (see onMain): the first players are made there too.
+            onMain(() -> {
+                createPlayers(manager.getActiveSessions(new ComponentName(context, NotificationReceiver.class)));
+                sendFullState();
+                handler.postDelayed(positionTick, POSITION_INTERVAL_MS);
+            });
         } catch (Exception e) {
             Log.e(TAG, "Exception", e);
         }
@@ -111,9 +114,29 @@ public class MprisReceiverPlugin extends Plugin {
         return true;
     }
 
+    /**
+     * The players and the throttle maps are plain maps owned by the main looper (the session listener, controller callbacks
+     * and the position tick run there); packets, feature-ready and destroy arrive on other threads and are moved onto it.
+     */
+    private void onMain(Runnable work) {
+        // Off Device.dispatch's guard when posted: a failure is logged, never a crash on the main thread.
+        Runnable guarded = () -> {
+            try {
+                work.run();
+            } catch (RuntimeException e) {
+                Log.e(TAG, "Media work failed", e);
+            }
+        };
+        if (Looper.myLooper() == Looper.getMainLooper()) guarded.run(); else handler.post(guarded);
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
+        onMain(this::destroyOnMain);
+    }
+
+    private void destroyOnMain() {
         handler.removeCallbacksAndMessages(null);
         MediaSessionManager manager = ContextCompat.getSystemService(context, MediaSessionManager.class);
         if (manager != null && mediaSessionChangeListener != null) {
@@ -154,6 +177,12 @@ public class MprisReceiverPlugin extends Plugin {
 
     @Override
     public boolean onPacketReceived(@NonNull NetworkPacket np) {
+        if (Looper.myLooper() == Looper.getMainLooper()) return handlePacket(np);
+        onMain(() -> handlePacket(np));
+        return true;
+    }
+
+    private boolean handlePacket(@NonNull NetworkPacket np) {
         if (players == null || playerCbs == null) {
             Log.w(TAG, "Ignoring MPRIS request because media receiver is not initialized");
             return false;
@@ -282,11 +311,13 @@ public class MprisReceiverPlugin extends Plugin {
     /** Feature-ready: the whole state, list and each player, past the throttle (contract S2). */
     @Override
     public void onFeatureReady() {
-        if (players == null) {
-            sendEmptyPlayerList();
-            return;
-        }
-        sendFullState();
+        onMain(() -> {
+            if (players == null) {
+                sendEmptyPlayerList();
+                return;
+            }
+            sendFullState();
+        });
     }
 
     /** Turned off: the desk stops showing this phone's media. */

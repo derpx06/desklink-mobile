@@ -112,6 +112,8 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
     }
 
     override fun onDestroy() {
+        destroyed = true
+        mainHandler.removeCallbacksAndMessages(null)
         lookups.shutdownNow()
         unregister?.invoke()
         unregister = null
@@ -167,6 +169,18 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
 
     override fun onPacketReceived(np: NetworkPacket): Boolean {
         if (np.type != DeskLinkProtocol.PACKET_TYPE_TELEPHONY_REQUEST) return false
+        // The tracker and the flags are the main looper's (the line callbacks run there): a decline racing the line
+        // going idle could lose its mark and be reported as missed.
+        mainHandler.post {
+            // Off Device.dispatch's guard now: a failure is logged here, never a crash on the main thread.
+            if (!destroyed) runCatching { handleRequest(np) }.onFailure { Log.e(TAG, "Desk call request failed", it) }
+        }
+        return true
+    }
+
+    @Volatile private var destroyed = false
+
+    private fun handleRequest(np: NetworkPacket) {
         val action = np.getString("action", "")
         val error = CallRequests.handle(action, np.getStringOrNull("number"), tracker, controls, flags)
         if (error != null) {
@@ -175,7 +189,6 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             if (action == "answer") notifyAnswered()
             sendSnapshot()
         }
-        return true
     }
 
     // ---- the platform behind CallRequests --------------------------------------------------------
@@ -330,6 +343,7 @@ class TelephonyPlugin : Plugin(), NotificationReceiver.NotificationListener {
             val uid = if (share) ContactsPlugin.uidFor(context, number, title.takeIf { number == null }) else null
             val name = if (show) (if (number != null) contactName(number) else title) else null
             mainHandler.post {
+                if (destroyed) return@post // the lookup outlived the plugin: no snapshot from a destroyed one
                 val annotated = if (show) tracker.annotate(name, number, uid, callId) else tracker.annotate(null, null, uid, callId)
                 if (annotated) sendSnapshot()
             }
