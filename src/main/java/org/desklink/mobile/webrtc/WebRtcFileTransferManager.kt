@@ -17,57 +17,9 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-
-/** Where file work runs: one dedicated thread per manager, so nothing on libwebrtc's callback thread touches a file. */
-interface FileRunner {
-    fun post(task: Runnable)
-    fun postDelayed(delayMs: Long, task: Runnable)
-    fun every(periodMs: Long, task: Runnable)
-
-    /** Runs [step] every [periodMs] for as long as it returns true, then stops (nothing ticks while idle). */
-    fun tickWhile(periodMs: Long, step: () -> Boolean) = Unit
-}
-
-class ThreadFileRunner : FileRunner {
-    private val executor: ScheduledExecutorService = org.desklink.mobile.helpers.Guarded.Scheduled("DeskLink-file")
-
-    override fun post(task: Runnable) {
-        runCatching { executor.execute(task) }
-    }
-
-    override fun postDelayed(delayMs: Long, task: Runnable) {
-        runCatching { executor.schedule(task, delayMs, TimeUnit.MILLISECONDS) }
-    }
-
-    override fun every(periodMs: Long, task: Runnable) {
-        runCatching { executor.scheduleWithFixedDelay(task, periodMs, periodMs, TimeUnit.MILLISECONDS) }
-    }
-
-    override fun tickWhile(periodMs: Long, step: () -> Boolean) {
-        val loop = object : Runnable {
-            private var failures = 0
-            override fun run() {
-                // A step that throws is recorded and tried again (it used to end the ticker silently); after five in a row the
-                // ticker stops and the next transfer arms it again.
-                val again = try {
-                    step().also { failures = 0 }
-                } catch (error: Throwable) {
-                    if (org.desklink.mobile.helpers.Guarded.fatal(error)) throw error
-                    org.desklink.mobile.helpers.Guarded.record("DeskLink-file", error)
-                    ++failures < org.desklink.mobile.helpers.Guarded.PeriodicGuard.MAX_CONSECUTIVE_FAILURES
-                }
-                if (again) runCatching { executor.schedule(this, periodMs, TimeUnit.MILLISECONDS) }
-            }
-        }
-        runCatching { executor.schedule(loop, periodMs, TimeUnit.MILLISECONDS) }
-    }
-
-    fun shutdown() = executor.shutdownNow()
-}
 
 /**
  * Transfers v2 (W3): 1 MiB blocks, per-block SHA-256, the file read in place (no copy), an
@@ -1026,35 +978,3 @@ class WebRtcFileTransferManager(
     }
 }
 
-/** The link went away mid-send; the checkpoint is kept and the next connection resumes it. */
-class TransferResumingException(reason: String) : IllegalStateException(reason)
-
-/** The disk is full: somewhere in what caused [error] Android said so. */
-internal fun isStorageFull(error: Throwable): Boolean = org.desklink.mobile.plugins.share.UnpublishedFiles.isStorageFull(error)
-
-/** One thread that puts finished files in place, one at a time, apart from the file thread. */
-internal object ThreadPublisher {
-    val shared: java.util.concurrent.Executor by lazy {
-        org.desklink.mobile.helpers.Guarded.single("DeskLink-publish")
-    }
-}
-
-/** The link under a transfer closed or is not open yet: pause it, never fail it. */
-internal fun linkClosed(error: Throwable): Boolean =
-    error is org.desklink.mobile.transport.TransportError &&
-        error.code == org.desklink.mobile.transport.TransportErrorCode.CLOSED
-
-/**
- * What the peer is told when a transfer ends here: short human text, never a class name or a
- * raw platform message (those reached the desk as "org.desklink…TransportError: …").
- */
-internal fun peerReason(error: Throwable, fallback: String): String {
-    val message = error.message.orEmpty()
-    return when {
-        isStorageFull(error) -> "Not enough space on the phone"
-        // Our own checks (require/check) say what went wrong in plain words.
-        (error is IllegalArgumentException || error is IllegalStateException) && message.isNotBlank() &&
-            !Regex("""Exception|Error:|org\.|java\.|android\.|/""").containsMatchIn(message) -> message.take(256)
-        else -> fallback
-    }
-}

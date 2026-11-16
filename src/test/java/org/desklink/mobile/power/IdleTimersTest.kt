@@ -19,7 +19,7 @@ class IdleTimersTest {
         "webrtc/WebRtcSessionCoordinator.kt" to "the link's heartbeat and liveness probes: the one thing that runs while connected",
         "webrtc/WebRtcTransport.kt" to "debug-only stats logs: each starts with the first decoded frame (or a screen share) and ends two polls after the pictures stop, so nothing polls getStats while idle",
         "plugins/folders/BucketEngine.kt" to "the Bucket's tick: returns at once when there is no Bucket, link or offer, and rescans rarely with the screen off",
-        "webrtc/WebRtcFileTransferManager.kt" to "ThreadFileRunner.every, unused by the manager: its clock runs through tickWhile, only while a transfer is live",
+        "webrtc/FileRunner.kt" to "ThreadFileRunner.every, unused by the file transfer manager: its clock runs through tickWhile, only while a transfer is live",
     )
 
     @Test
