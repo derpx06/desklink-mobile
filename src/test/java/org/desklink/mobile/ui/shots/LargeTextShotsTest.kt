@@ -35,6 +35,15 @@ class LargeTextWave5Shots : Wave5Shots() {
     @Before fun fontScale() = RuntimeEnvironment.setFontScale(1.3f)
 }
 
+/** The system's "Large" font size (1.15) on a 360 dp phone: between one and three tiles across, where a fixed threshold went wrong. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w360dp-h640dp-xhdpi")
+class SlightlyLargerTextScreenShots : ScreenShots() {
+    override val form = "larger"
+    @Before fun fontScale() = RuntimeEnvironment.setFontScale(1.15f)
+}
+
 /** Right to left: where a chevron, a progress bar or a padding is mirrored wrongly or a row's parts trade places. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

@@ -107,10 +107,10 @@ fun SegmentedControl(options: List<String>, selected: Int, onSelect: (Int) -> Un
                         .padding(horizontal = 4.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    androidx.compose.foundation.text.BasicText(
-                        label,
-                        style = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal, color = ink, textAlign = TextAlign.Center),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    Text(
+                        label, fontWeight = if (on) FontWeight.Medium else FontWeight.Normal,
+                        color = ink,
+                        textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 15.sp, stepSize = 0.5.sp),
                     )
                 }
@@ -223,7 +223,8 @@ fun QuickActionTile(
 }
 
 /**
- * The big tile of the hero card (three across): a 22 dp glyph at the top, the label at the bottom, 84 dp tall at least.
+ * The big tile of the hero card (three across): a 22 dp glyph at the top, the label at the bottom, 84 dp tall at least;
+ * [compact] (one under another) puts the glyph at the start of a 56 dp row (UI-REDESIGN 2.8.7).
  * [primary] fills it with the accent; one per screen. A disabled tile says why in [hint], which stays at full strength
  * (only the glyph and the label go dim); [onDisabledClick] keeps it tappable so it can say it aloud too.
  */
@@ -237,6 +238,7 @@ fun ActionTile(
     enabled: Boolean = true,
     hint: String? = null,
     onDisabledClick: (() -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     val t = tokens
     val shape = DeskLinkShape.card
@@ -248,20 +250,17 @@ fun ActionTile(
         enabled -> t.text
         else -> t.textDim
     }
-    Column(
-        modifier
+    val box = modifier
             .pressScale(source)
-            .heightIn(min = 84.dp)
+            .heightIn(min = if (compact) 56.dp else 84.dp)
             .clip(shape)
             .background(if (filled) t.accent else t.surface)
             .then(if (filled) Modifier else Modifier.border(1.dp, t.hairline, shape))
             .clickable(interactionSource = source, indication = ripple(), enabled = enabled || onDisabledClick != null, role = Role.Button) {
                 if (enabled) onClick() else { haptics.perform(Haptic.FAILURE); onDisabledClick?.invoke() }
             }
-            .padding(12.dp),
-        // Icon, then the word, always at the same height: a tile whose word wraps or has a hint must not move its neighbours' words.
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
+            .padding(12.dp)
+    val glyph = @Composable {
         Icon(
             painterResource(icon), contentDescription = null,
             tint = when {
@@ -271,6 +270,8 @@ fun ActionTile(
             },
             modifier = Modifier.size(22.dp),
         )
+    }
+    val words = @Composable {
         CappedFontScale(1.3f) {
             Column {
                 Text(label, fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, color = fg)
@@ -278,6 +279,12 @@ fun ActionTile(
                 if (hint != null) Text(hint, fontSize = 12.sp, lineHeight = 16.sp, color = if (filled) t.onAccent else t.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
+    }
+    if (compact) {
+        Row(box, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { glyph(); words() }
+    } else {
+        // Icon, then the word, always at the same height: a tile whose word wraps or has a hint must not move its neighbours' words.
+        Column(box, verticalArrangement = Arrangement.spacedBy(10.dp)) { glyph(); words() }
     }
 }
 

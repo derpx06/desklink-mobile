@@ -65,6 +65,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -410,38 +411,65 @@ private fun Hero(state: HomeState, gate: (() -> Unit) -> Unit, actions: HomeActi
         val terminalsHint = if (state.live.terminals > 0) pluralStringResource(R.plurals.home_live_terminals, state.live.terminals, state.live.terminals) else null
         // Dimmed, never hidden: the hint says what is missing and a tap says how to get it.
         @Composable
-        fun tile(action: String, icon: Int, title: String, run: () -> Unit, primary: Boolean, m: Modifier) {
+        fun tile(action: String, icon: Int, title: String, run: () -> Unit, primary: Boolean, m: Modifier, compact: Boolean) {
             val blocked = HomeDerive.blocker(state, action)
             ActionTile(
-                icon, title, { gate(run) }, m, primary = primary, enabled = blocked == null,
+                icon, title, { gate(run) }, m, primary = primary, enabled = blocked == null, compact = compact,
                 hint = off ?: blocked?.let { stringResource(HomeDerive.needs(it), state.name) },
                 onDisabledClick = { blocked?.let { actions.onBlocked(action, title, it) } },
             )
         }
-        val tiles: List<@Composable (Modifier) -> Unit> = listOf(
-            { m -> tile(PaletteModel.Action.DESK_SCREEN, R.drawable.sym_desktop_windows, stringResource(R.string.home_desk_screen), actions.onDeskScreen, true, m) },
-            { m -> tile(PaletteModel.Action.SEND_FILES, R.drawable.sym_upload_file, stringResource(R.string.home_send_files), actions.onSendFiles, false, m) },
-            { m -> ActionTile(R.drawable.sym_terminal, stringResource(R.string.tab_terminals), actions.onTerminals, m, hint = terminalsHint) },
+        val labels = listOf(stringResource(R.string.home_desk_screen), stringResource(R.string.home_send_files), stringResource(R.string.tab_terminals))
+        val tiles: List<@Composable (Modifier, Boolean) -> Unit> = listOf(
+            { m, c -> tile(PaletteModel.Action.DESK_SCREEN, R.drawable.sym_desktop_windows, labels[0], actions.onDeskScreen, true, m, c) },
+            { m, c -> tile(PaletteModel.Action.SEND_FILES, R.drawable.sym_upload_file, labels[1], actions.onSendFiles, false, m, c) },
+            { m, c -> ActionTile(R.drawable.sym_terminal, labels[2], actions.onTerminals, m, hint = terminalsHint, compact = c) },
         )
-        if (heroTilesStacked(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp, LocalDensity.current.fontScale)) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { tiles.forEach { it(Modifier.fillMaxWidth()) } }
-        } else {
-            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                tiles.forEach { it(Modifier.weight(1f).fillMaxHeight()) }
+        // From the width the tiles really get (a two-pane fold gives them less than the screen): three across while each
+        // keeps its longest word whole (the label is capped at 1.3, as ActionTile draws it), else one under another,
+        // in the compact icon-at-start form (UI-REDESIGN 2.8.7).
+        androidx.compose.foundation.layout.BoxWithConstraints {
+            // The names, and the one-word hints under them ("Connecting…").
+            val word = longestWordDp(labels + listOfNotNull(off, terminalsHint), TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium), maxFontScale = 1.3f)
+            if (tilesAcross(maxWidth.value, 3, gap = 8f, fixed = ACTION_TILE_PADDING, word = word) < 3) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { tiles.forEach { it(Modifier.fillMaxWidth(), true) } }
+            } else {
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    tiles.forEach { it(Modifier.weight(1f).fillMaxHeight(), false) }
+                }
             }
         }
     }
 }
 
-/**
- * The three hero tiles go one under another when their names would break inside a word ("Termina / ls" at 1.3 on
- * 360 dp, F47; at 1.0 on a 320 dp phone too). About 156 dp of the width is margins and padding that do not grow with
- * the font; each tile's third of the rest must hold "Terminals", about 63 dp at 1.0.
- */
-internal fun heroTilesStacked(screenWidthDp: Int, fontScale: Float): Boolean = (screenWidthDp - 156f) / fontScale < 189f
+/** An ActionTile's padding, both sides (dp): what of its width is not for words. */
+private const val ACTION_TILE_PADDING = 24f
 
-/** The "While it's offline" tiles: one column when two across would break "Terminals" (1.3 on 360 dp). */
-internal fun offlineTileColumns(screenWidthDp: Int, fontScale: Float): Int = if (fontScale > 1.4f || screenWidthDp / fontScale < 300f) 1 else 2
+/** An offline tile's padding, glyph circle and the gap after it (dp). */
+private const val OFFLINE_TILE_FIXED = 12f * 2 + 40f + 10f
+
+/**
+ * How many of [count] tiles fit side by side in [width] dp, [gap] apart, when each spends [fixed] dp on padding and
+ * glyph and must hold its longest word ([word] dp) whole; at least 1. Too few, and a name breaks inside a word
+ * ("Termina / ls", F47).
+ */
+internal fun tilesAcross(width: Float, count: Int, gap: Float, fixed: Float, word: Float): Int =
+    (count downTo 1).firstOrNull { n -> (width - gap * (n - 1)) / n - fixed >= word } ?: 1
+
+/** The width in dp of the longest word of [labels] in [style], at the system font scale capped at [maxFontScale]. */
+@Composable
+private fun longestWordDp(labels: List<String>, style: TextStyle, maxFontScale: Float = Float.MAX_VALUE): Float {
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val density = LocalDensity.current
+    // As Text draws it: the theme's style (its letter spacing) under the given size and weight.
+    val drawn = androidx.compose.material3.LocalTextStyle.current.merge(style)
+    return remember(labels, drawn, density, maxFontScale) {
+        val capped = androidx.compose.ui.unit.Density(density.density, minOf(density.fontScale, maxFontScale))
+        labels.flatMap { it.split(' ') }.maxOfOrNull { word ->
+            measurer.measure(word, drawn, softWrap = false, maxLines = 1, density = capped).size.width / density.density
+        } ?: 0f
+    }
+}
 
 /** What each tile says under its name: why it is off, or what it will do. */
 @Composable
@@ -534,14 +562,18 @@ private fun StillWorksOffline(state: HomeState, actions: HomeActions) {
         Tile(R.drawable.sym_edit_note, stringResource(R.string.tab_notes), works, true) { actions.onNotes() },
         Tile(R.drawable.sym_folder, stringResource(R.string.bucket_title), works, true) { actions.onBucket() },
     )
-    val columns = offlineTileColumns(androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp, LocalDensity.current.fontScale)
+    val word = longestWordDp(tiles.map { it.label }, TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium))
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SectionHeader(stringResource(R.string.home_still_works))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            tiles.chunked(columns).forEach { row ->
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // A lone last tile takes the whole row instead of leaving a hole beside it.
-                    row.forEach { tile -> OfflineTile(tile, Modifier.weight(columns.toFloat() / row.size).fillMaxHeight(), unreachable) }
+        // Two across while each tile keeps "Terminals" whole in the width it really gets, else one.
+        androidx.compose.foundation.layout.BoxWithConstraints {
+            val columns = if (tilesAcross(maxWidth.value, 2, gap = 8f, fixed = OFFLINE_TILE_FIXED, word = word) >= 2) 2 else 1
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                tiles.chunked(columns).forEach { row ->
+                    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // A lone last tile takes the whole row instead of leaving a hole beside it.
+                        row.forEach { tile -> OfflineTile(tile, Modifier.weight(columns.toFloat() / row.size).fillMaxHeight(), unreachable) }
+                    }
                 }
             }
         }
@@ -638,8 +670,12 @@ private fun NotificationsNudge(onTurnOn: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(painterResource(R.drawable.sym_notifications), contentDescription = null, tint = t.amber, modifier = Modifier.size(22.dp))
-        Text(stringResource(R.string.home_notifications_off), fontSize = 14.sp, lineHeight = 19.sp, color = t.text, modifier = Modifier.weight(1f).padding(vertical = 8.dp))
-        org.desklink.mobile.ui.compose.DeskTextButton(stringResource(R.string.home_notifications_turn_on), onTurnOn)
+        // "Turn on" goes under the words when beside them "Notifications" would break.
+        org.desklink.mobile.ui.compose.components.TextAndTrailing(
+            Modifier.weight(1f),
+            text = { Text(stringResource(R.string.home_notifications_off), fontSize = 14.sp, lineHeight = 19.sp, color = t.text, modifier = Modifier.padding(vertical = 8.dp)) },
+            trailing = { org.desklink.mobile.ui.compose.DeskTextButton(stringResource(R.string.home_notifications_turn_on), onTurnOn) },
+        )
     }
 }
 
