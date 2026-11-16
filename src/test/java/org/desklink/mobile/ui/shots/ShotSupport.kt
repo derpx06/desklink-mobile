@@ -58,19 +58,39 @@ object A11y {
 }
 
 /**
- * Words broken in the middle at a line end ("Canc|el", "Permis|sions"): every laid-out text of the merged tree whose
- * line ends between two letters. Paths, links and addresses (with `/`, `.` or `:`) may break anywhere and are skipped.
+ * Words cut where a person would read them wrong: a line that ends between two letters ("Canc|el", "Permis|sions"), and a
+ * one-word label cut short ("Clipbo…"). Walks every laid-out text of the unmerged tree. A word with `/`, `:` or a dotted
+ * name in it (a path, a link, an address) may break anywhere: only that word is skipped, not the rest of its text.
  */
 object MidWord {
     /**
-     * Shots allowed to break a word for now, all at font 2.0 on a 320 dp phone: long single words beside a switch or
-     * a chevron ("Notifications", "screenshots") where only hyphenation would help; a test-only demo row; the desk
-     * screen's waiting banner (DeskControls.kt, fixed after phase 3.5/3.6 merge).
+     * The breaks accepted for now, each as its whole `midword.txt` line: any other break, also a new one in the same
+     * screenshot, fails the shot. A test-only demo sheet (four tiles across, a status line of three words); the desk
+     * screen's waiting banner and its name capsule (DeskControls.kt: fixed after the phase 3.5/3.6 branches merge).
      */
     val ACCEPTED = setOf(
-        "huge-components-rows", "huge-components-tiles", "huge-fr-home-nudge", "huge-settings-files", "huge-settings-list",
-        "huge-settings-notifications", "huge-w5-desk-waiting",
+        "huge-components-rows: \"Failed\" breaks at \"F|ailed\"",
+        "huge-components-rows: \"Failed\" breaks at \"Fa|iled\"",
+        "huge-components-rows: \"Failed\" breaks at \"Fai|led\"",
+        "huge-components-rows: \"Failed\" breaks at \"Fail|ed\"",
+        "huge-components-rows: \"Failed\" breaks at \"Faile|d\"",
+        "huge-components-tiles: \"Terminal\" breaks at \"Termin|al\"",
+        "huge-components-tiles: \"Ring computer\" breaks at \"comput|er\"",
+        "huge-components-tiles: \"Lock computer\" breaks at \"comput|er\"",
+        "huge-components-tiles: \"Unlock arch-desk\" breaks at \"ch-des|k\"",
+        "huge-w5-desk-waiting: \"Allow control on arch-desk first\" breaks at \"A|llow c\"",
+        "huge-w5-desk-waiting: \"Allow remote interaction on arch-desk\" breaks at \"A|llow r\"",
+        "huge-w5-desk-view: \"arch-desk\" is cut short",
+        "huge-w5-desk-granted: \"arch-desk\" is cut short",
+        "huge-w5-desk-keys: \"arch-desk\" is cut short",
+        "huge-w5-desk-waiting: \"arch-desk\" is cut short",
+        "large-w5-desk-view: \"arch-desk\" is cut short",
+        "large-w5-desk-granted: \"arch-desk\" is cut short",
+        "large-w5-desk-keys: \"arch-desk\" is cut short",
+        "large-w5-desk-waiting: \"arch-desk\" is cut short",
     )
+
+    private fun loose(word: String) = word.any { it == '/' || it == ':' } || Regex("""\w\.\w""").containsMatchIn(word)
 
     fun breaks(compose: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>): List<String> {
         val out = mutableListOf<String>()
@@ -81,10 +101,17 @@ object MidWord {
                 get.action?.invoke(results)
                 for (layout in results) {
                     val text = layout.layoutInput.text.text
-                    if (text.any { it == '/' || it == ':' } || Regex("""\w\.\w""").containsMatchIn(text)) continue
+                    // Ellipsized, not just taller than its box (hasVisualOverflow says that too, for a line height).
+                    val ellipsized = layout.lineCount > 0 && layout.isLineEllipsized(layout.lineCount - 1)
+                    if (ellipsized && text.isNotBlank() && text.none(Char::isWhitespace) && !loose(text)) {
+                        out += "\"${text.take(60)}\" is cut short"
+                    }
                     for (line in 0 until layout.lineCount - 1) {
                         val end = layout.getLineEnd(line)
                         if (end in 1 until text.length && text[end - 1].isLetterOrDigit() && text[end].isLetterOrDigit()) {
+                            val from = text.lastIndexOf(' ', end - 1) + 1
+                            val to = text.indexOf(' ', end).let { if (it < 0) text.length else it }
+                            if (loose(text.substring(from, to))) continue
                             out += "\"${text.take(60)}\" breaks at \"${text.substring(maxOf(0, end - 6), end)}|${text.substring(end, minOf(text.length, end + 6))}\""
                         }
                     }
@@ -131,11 +158,12 @@ abstract class ShotTest {
         val bad = A11y.violations(compose)
         check(bad.isEmpty()) { "$form $name is not accessible:\n" + bad.joinToString("\n") }
         texts.forEach { t -> check(!BLANK_NAME.containsMatchIn(t)) { "$form $name shows a blank where a name should be: \"$t\"" } }
-        // Every word broken mid-word is listed in `midword.txt` beside the images, and fails the shot unless it is a
-        // known one (MidWord.ACCEPTED).
+        // Every word broken mid-word or cut short is listed in `midword.txt` beside the images, and fails the shot unless
+        // that very line is a known one (MidWord.ACCEPTED).
         val broken = MidWord.breaks(compose)
         broken.forEach { File(ShotDir.dir, "midword.txt").appendText("$form-$name: $it\n") }
-        check(broken.isEmpty() || "$form-$name" in MidWord.ACCEPTED) { "$form $name breaks a word in the middle:\n" + broken.joinToString("\n") }
+        val unexpected = broken.filter { "$form-$name: $it" !in MidWord.ACCEPTED }
+        check(unexpected.isEmpty()) { "$form $name breaks a word in the middle:\n" + unexpected.joinToString("\n") }
         for (isDark in listOf(false, true)) {
             dark.value = isDark
             compose.waitForIdle()
