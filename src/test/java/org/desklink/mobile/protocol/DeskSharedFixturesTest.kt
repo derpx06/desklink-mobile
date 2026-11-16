@@ -37,6 +37,7 @@ class DeskSharedFixturesTest {
             "entered needs allowed" to InputDevicesReceiverPlugin.statePacket(false, true),
             "locked" to InputDevicesReceiverPlugin.statePacket(false, false, InputDevicesReceiverPlugin.REASON_LOCKED),
             "declined" to InputDevicesReceiverPlugin.statePacket(false, false, InputDevicesReceiverPlugin.REASON_DECLINED),
+            "accessibility off" to InputDevicesReceiverPlugin.statePacket(false, false, InputDevicesReceiverPlugin.REASON_ACCESSIBILITY),
         )
         for (case in cases(fixture("glide_bodies"))) {
             val expected = ours[case.getString("name")] ?: continue

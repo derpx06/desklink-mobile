@@ -73,9 +73,22 @@ class InputDevicesReceiverPlugin : Plugin() {
         val ready = glideAllowed()
         // Locked: not now, and why (the desk says "Unlock <phone> to use Glide"); allowed again once unlocked (USER_PRESENT).
         val locked = ready && locked()
+        // Switched on here but the accessibility service is off or not bound (ColorOS does that after an update or a
+        // force-stop): the desk is told why, so it does not offer "Allow" for a switch that is already on.
+        val noService = Glide.allowed(context, device.deviceId) && MouseReceiverService.instance == null
         // Allowed now, however it came about: the desk's ask is answered, its prompt goes.
         if (ready && !locked) cancelAsk(context, device.deviceId)
-        device.sendPacket(statePacket(ready && !locked, entered = false, reason = if (locked) REASON_LOCKED else null))
+        device.sendPacket(
+            statePacket(
+                ready && !locked,
+                entered = false,
+                reason = when {
+                    locked -> REASON_LOCKED
+                    noService -> REASON_ACCESSIBILITY
+                    else -> null
+                },
+            ),
+        )
     }
 
     /** "Not now" on the desk's ask: the desk hears it was declined (and stops waiting). Still a state report. */
@@ -211,6 +224,9 @@ class InputDevicesReceiverPlugin : Plugin() {
 
         /** `reason` of an `allowed: false` report: the phone is locked (glide_bodies.json). */
         const val REASON_LOCKED = "locked"
+
+        /** `reason` of an `allowed: false` report: the switch is on but the accessibility service is off (glide_bodies.json). */
+        const val REASON_ACCESSIBILITY = "accessibility"
 
         /** `reason` of an `allowed: false` report: the person tapped "Not now" on the desk's ask (glide_bodies.json). */
         const val REASON_DECLINED = "declined"

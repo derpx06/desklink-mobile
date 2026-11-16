@@ -67,6 +67,16 @@ class GlideAllowedTest {
         assertEquals("the accessibility service is not running here", false, sent.single().getBoolean("allowed", true))
         assertFalse(p.glideAllowed())
         assertTrue(Glide.allowed(app, "desk-1"))
+        // And it says why, so the desk does not offer Allow for a switch that is already on.
+        assertEquals(InputDevicesReceiverPlugin.REASON_ACCESSIBILITY, sent.single().getString("reason"))
+    }
+
+    @Test
+    fun withTheSwitchOffThereIsNoAccessibilityReason() {
+        Glide.setAllowed(app, "desk-1", false)
+        val p = plugin()
+        p.onFeatureReady()
+        assertFalse(sent.single().has("reason"))
     }
 
     @Test
