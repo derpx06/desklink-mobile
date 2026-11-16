@@ -289,8 +289,8 @@ class DeskLinkApplication : Application() {
 
     /** Whether that desk still waits for this phone's screen. */
     fun deskAwaitsPhoneScreen(deviceId: String?): Boolean {
-        val device = getDevice(deviceId) ?: return false
-        return runCatching { webRtcCoordinatorFor(device).awaitsPhoneScreen() }.getOrDefault(false)
+        // A query: never creates a coordinator (8 executors and disk I/O on the main thread) for a device without one.
+        return runCatching { webRtcCoordinator(deviceId)?.awaitsPhoneScreen() == true }.getOrDefault(false)
     }
 
     fun stopWebRtcScreenCapture(deviceId: String?) {
@@ -350,10 +350,10 @@ class DeskLinkApplication : Application() {
     }
 
     /** The live WebRTC connection's identity for [deviceId], or null (see [org.desklink.mobile.ui.SessionGate]). */
-    fun connectionKey(deviceId: String?): Long? = getDevice(deviceId)?.let { webRtcCoordinatorFor(it).connectionKey() }
+    fun connectionKey(deviceId: String?): Long? = webRtcCoordinator(deviceId)?.connectionKey()
 
     /** The session password known for [deviceId] this run, if any. */
-    fun sessionPassword(deviceId: String?): String? = getDevice(deviceId)?.let { webRtcCoordinatorFor(it).sessionPassword.get() }
+    fun sessionPassword(deviceId: String?): String? = deviceId?.let { sessionPasswords[it]?.get() }
 
     /** The terminal client of a paired device; it outlives any activity, so rotation keeps sessions. */
     /**
