@@ -44,4 +44,21 @@ class LockDevicePluginTest {
         assert("desklink.lock.request" in plugin.outgoingPacketTypes)
         assert(plugin.loadPluginWhenRequiredPermissionsMissing())
     }
+
+    @Test
+    fun aRequestCarryingOnlyIsLockedNeverLocks() {
+        // `isLocked` is the lock-state report's key; only `setLocked` on a request is an instruction.
+        io.mockk.mockkStatic(org.desklink.mobile.plugins.mousereceiver.MouseReceiverService::class)
+        try {
+            every { org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.powerButton() } returns true
+            val plugin = LockDevicePlugin()
+            val context = mockk<Context>(relaxed = true)
+            val device = mockk<Device>(relaxed = true) { every { deviceId } returns "device-id" }
+            plugin.setContext(context, device)
+            plugin.onPacketReceived(org.desklink.mobile.NetworkPacket("desklink.lock.request").apply { set("isLocked", true) })
+            verify(exactly = 0) { org.desklink.mobile.plugins.mousereceiver.MouseReceiverService.powerButton() }
+        } finally {
+            io.mockk.unmockkAll()
+        }
+    }
 }

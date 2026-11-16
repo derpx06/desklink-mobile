@@ -67,8 +67,8 @@ class LockDevicePlugin : Plugin() {
         // there) in its own handler, which never locks or unlocks the desk.
         val requestedLockState = when {
             np.type != PACKET_TYPE_LOCK_REQUEST -> null
+            // `isLocked` is the report's key, never an instruction, even on a request.
             np.has("setLocked") -> np.getBoolean("setLocked")
-            np.has("isLocked") -> np.getBoolean("isLocked")
             else -> null
         }
 
