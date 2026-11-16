@@ -450,7 +450,8 @@ fun PairCodeScreen(state: PairCodeState, onCancel: () -> Unit, onMatch: () -> Un
                 textAlign = TextAlign.Center,
                 modifier = Modifier.semantics { heading(); liveRegion = LiveRegionMode.Polite },
             )
-            Row {
+            // One flowing line: the name moves to the next line whole instead of breaking in the middle.
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.Center) {
                 Text(stringResource(R.string.pair_code_with), fontSize = 15.sp, color = t.textDim)
                 Text(state.name, fontSize = 15.sp, fontFamily = MonoFamily, color = t.text)
             }
@@ -484,12 +485,23 @@ fun PairCodeScreen(state: PairCodeState, onCancel: () -> Unit, onMatch: () -> Un
             state.message?.let { Text(it, fontSize = 14.sp, color = t.red, textAlign = TextAlign.Center) }
             Spacer(Modifier.height(24.dp))
         }
-        Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SecondaryButton(stringResource(R.string.cancel), onCancel, Modifier.weight(1f))
-            when (state.stage) {
-                PairStage.ASKED -> PrimaryButton(stringResource(R.string.pair_codes_match), onMatch, Modifier.weight(1.3f))
-                PairStage.IDLE -> PrimaryButton(stringResource(R.string.request_pairing), onRequest, Modifier.weight(1.3f))
-                PairStage.WAITING -> Unit
+        // Side by side; stacked full width (the primary on top) past a font scale of 1.3, where two
+        // buttons on one row broke "Cancel" and "Request pairing" in the middle (UI-REDESIGN 2.8.13).
+        val primary: (@Composable (Modifier) -> Unit)? = when (state.stage) {
+            PairStage.ASKED -> { m -> PrimaryButton(stringResource(R.string.pair_codes_match), onMatch, m) }
+            PairStage.IDLE -> { m -> PrimaryButton(stringResource(R.string.request_pairing), onRequest, m) }
+            PairStage.WAITING -> null
+        }
+        val padding = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 18.dp)
+        if (LocalDensity.current.fontScale > 1.3f) {
+            Column(padding, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                primary?.invoke(Modifier.fillMaxWidth())
+                SecondaryButton(stringResource(R.string.cancel), onCancel, Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(padding, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                SecondaryButton(stringResource(R.string.cancel), onCancel, Modifier.weight(1f))
+                primary?.invoke(Modifier.weight(1.3f))
             }
         }
     }
