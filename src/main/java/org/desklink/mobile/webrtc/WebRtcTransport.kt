@@ -808,7 +808,7 @@ class WebRtcTransport(
             callback.onStats(null)
             return
         }
-        runCatching {
+        val asked = peerGate.ifOpen { runCatching {
             peer.getStats { report ->
                 // libwebrtc's signalling thread: never take this transport's monitor here. The
                 // monitor is held across proxy calls that wait on this very thread (senders,
@@ -820,7 +820,8 @@ class WebRtcTransport(
                 }
                 callback.onStats(stats)
             }
-        }.onFailure { callback.onStats(null) }
+        } }
+        if (asked == null || asked.isFailure) callback.onStats(null)
     }
 
     /**
@@ -912,7 +913,7 @@ class WebRtcTransport(
                         synchronized(this@WebRtcTransport) { inboundStatsTimer?.cancel(); inboundStatsTimer = null }
                         return
                     }
-                    runCatching {
+                    peerGate.ifOpen { runCatching {
                         peer.getStats { report ->
                             val inbound = report.statsMap.values.firstOrNull {
                                 it.type == "inbound-rtp" && it.members["kind"] == "video"
@@ -925,7 +926,7 @@ class WebRtcTransport(
                             Log.i(TAG, "inbound-stats codec=$codec " + inboundStatsLine(previous, m) + " framesAtTrack=${debugFramesAtTrack.get()}")
                             previous = HashMap(m)
                         }
-                    }
+                    } }
                 }
             }, 2_000, 2_000)
         }
@@ -949,7 +950,7 @@ class WebRtcTransport(
                     // Only this timer's thread touches tick and the last* values.
                     tick++
                     if (tick > 6 && tick % 4 != 0) return
-                    runCatching {
+                    peerGate.ifOpen { runCatching {
                         peer.getStats { report ->
                             val out = report.statsMap.values.firstOrNull {
                                 it.type == "outbound-rtp" && it.members["kind"] == "video"
@@ -991,7 +992,7 @@ class WebRtcTransport(
                                     "sendDelay=${out["totalPacketSendDelay"]} size=${out["frameWidth"]}x${out["frameHeight"]}",
                             )
                         }
-                    }
+                    } }
                 }
             }, 500, 500)
         }
@@ -1006,7 +1007,7 @@ class WebRtcTransport(
     @Synchronized
     private fun configureScreenSender(fps: Int) {
         val (min, max) = minScreenBitrate(onLan) to maxScreenBitrate(onLan)
-        runCatching { peer.setBitrate(min, startScreenBitrate(onLan), max) }
+        peerGate.ifOpen { runCatching { peer.setBitrate(min, startScreenBitrate(onLan), max) } }
         if (org.desklink.mobile.BuildConfig.DEBUG) Log.i(TAG, "screen sender lan=$onLan bitrate $min/${startScreenBitrate(onLan)}/$max fps=${screenMaxFramerate(fps, onLan)}")
         updateScreenSender { parameters ->
             parameters.degradationPreference = screenDegradationPreference(screenControlled, onLan)
@@ -1017,6 +1018,9 @@ class WebRtcTransport(
             }
         }
     }
+
+    /** Guards the peer calls made off libwebrtc's threads against [close]'s dispose. */
+    private val peerGate = PeerGate()
 
     /** Whether the selected ICE pair is on the LAN, as the last stats read said. */
     @Volatile private var onLan = false
@@ -1032,8 +1036,8 @@ class WebRtcTransport(
         if (activeScreenCaptureEpoch != null) configureScreenSender(captureFps)
     }
 
-    private fun updateScreenSender(change: (RtpParameters) -> Unit) {
-        val sender = peer.senders.firstOrNull { it.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND } ?: return
+    private fun updateScreenSender(change: (RtpParameters) -> Unit) = peerGate.ifOpen {
+        val sender = peer.senders.firstOrNull { it.track()?.kind() == MediaStreamTrack.VIDEO_TRACK_KIND } ?: return@ifOpen
         runCatching {
             val parameters = sender.parameters
             change(parameters)
@@ -1100,7 +1104,9 @@ class WebRtcTransport(
         eventsSender.failAll("The WebRTC session closed")
         stopScreenCapture()
         pathExecutor.shutdownNow()
-        inboundStatsTimer?.cancel()
+        // A stats poll or path change already running finishes first; none starts after.
+        peerGate.close()
+        synchronized(this) { inboundStatsTimer?.cancel() }
         // The audio module is the process's one: this peer closing must not silence another computer's live session.
         if (org.desklink.mobile.plugins.audio.PhoneAudio.mayReset(org.desklink.mobile.plugins.audio.PhoneAudio.sendingTo, wireBinding.peerDeviceId)) PhoneAudioEngine.reset()
         videoTrack.dispose()
@@ -1241,4 +1247,25 @@ internal fun inboundStatsLine(previous: Map<String, Any?>, current: Map<String, 
         "freezes=${current["freezeCount"]} dropped=${current["framesDropped"]} " +
         "lost=${current["packetsLost"]} decoded=${current["framesDecoded"]} keyFrames=${current["keyFramesDecoded"]} " +
         "nack=${current["nackCount"]} pli=${current["pliCount"]} size=${current["frameWidth"]}x${current["frameHeight"]}"
+}
+
+/**
+ * Calls into a PeerConnection from timer and worker threads (stats polls, path changes, sender
+ * limits) against the close that disposes it: [close] waits for a call in flight and every later call
+ * is skipped, so none reaches a disposed peer (a native use-after-free; a stats TimerTask that close()
+ * had already cancelled could still be running). Never taken on libwebrtc's own threads: a call in
+ * here may wait on them.
+ */
+internal class PeerGate {
+    private var closed = false
+
+    /** Runs [call] unless the peer is closed; null when it was not run. */
+    @Synchronized
+    fun <T> ifOpen(call: () -> T): T? = if (closed) null else call()
+
+    /** Waits for a call in flight, then refuses every later one. */
+    @Synchronized
+    fun close() {
+        closed = true
+    }
 }
