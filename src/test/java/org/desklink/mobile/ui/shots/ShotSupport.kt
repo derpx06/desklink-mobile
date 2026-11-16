@@ -58,6 +58,46 @@ object A11y {
 }
 
 /**
+ * Words broken in the middle at a line end ("Canc|el", "Permis|sions"): every laid-out text of the merged tree whose
+ * line ends between two letters. Paths, links and addresses (with `/`, `.` or `:`) may break anywhere and are skipped.
+ */
+object MidWord {
+    /**
+     * Shots allowed to break a word for now, all at font 2.0 on a 320 dp phone: long single words beside a switch or
+     * a chevron ("Notifications", "screenshots") where only hyphenation would help; a test-only demo row; the desk
+     * screen's waiting banner (DeskControls.kt, fixed after phase 3.5/3.6 merge).
+     */
+    val ACCEPTED = setOf(
+        "huge-components-rows", "huge-components-tiles", "huge-fr-home-nudge", "huge-settings-files", "huge-settings-list",
+        "huge-settings-notifications", "huge-w5-desk-waiting",
+    )
+
+    fun breaks(compose: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>): List<String> {
+        val out = mutableListOf<String>()
+        fun walk(n: androidx.compose.ui.semantics.SemanticsNode) {
+            val get = n.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult)
+            if (get != null && n.layoutInfo.isPlaced) {
+                val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                get.action?.invoke(results)
+                for (layout in results) {
+                    val text = layout.layoutInput.text.text
+                    if (text.any { it == '/' || it == ':' } || Regex("""\w\.\w""").containsMatchIn(text)) continue
+                    for (line in 0 until layout.lineCount - 1) {
+                        val end = layout.getLineEnd(line)
+                        if (end in 1 until text.length && text[end - 1].isLetterOrDigit() && text[end].isLetterOrDigit()) {
+                            out += "\"${text.take(60)}\" breaks at \"${text.substring(maxOf(0, end - 6), end)}|${text.substring(end, minOf(text.length, end + 6))}\""
+                        }
+                    }
+                }
+            }
+            n.children.forEach(::walk)
+        }
+        compose.onAllNodes(androidx.compose.ui.test.isRoot(), useUnmergedTree = true).fetchSemanticsNodes().forEach(::walk)
+        return out.distinct()
+    }
+}
+
+/**
  * Renders a screen to `<name>-light.png` and `<name>-dark.png`, at the size of the test class's Robolectric
  * qualifiers (a phone class and a tablet class extend this). Debug and test builds only; no device needed.
  */
@@ -91,6 +131,11 @@ abstract class ShotTest {
         val bad = A11y.violations(compose)
         check(bad.isEmpty()) { "$form $name is not accessible:\n" + bad.joinToString("\n") }
         texts.forEach { t -> check(!BLANK_NAME.containsMatchIn(t)) { "$form $name shows a blank where a name should be: \"$t\"" } }
+        // Every word broken mid-word is listed in `midword.txt` beside the images, and fails the shot unless it is a
+        // known one (MidWord.ACCEPTED).
+        val broken = MidWord.breaks(compose)
+        broken.forEach { File(ShotDir.dir, "midword.txt").appendText("$form-$name: $it\n") }
+        check(broken.isEmpty() || "$form-$name" in MidWord.ACCEPTED) { "$form $name breaks a word in the middle:\n" + broken.joinToString("\n") }
         for (isDark in listOf(false, true)) {
             dark.value = isDark
             compose.waitForIdle()
