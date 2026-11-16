@@ -61,9 +61,11 @@ field is never dropped in silence: the phone logs why and tells the computer's
 Phone Screen window ("no text field is selected", "turn on DeskLink in
 Accessibility"), which says so in its strip.
 
-**ColorOS (realme, OPPO, OnePlus) switches an app's accessibility service off
-whenever the app is force-stopped, and so after every update.** Nothing tells
-the person, and control and typing stop. DeskLink remembers that the service
+**A force stop switches an app's accessibility service off** (it is removed
+from the enabled services: seen on stock Android 16 and on ColorOS), and
+ColorOS (realme, OPPO, OnePlus) also does it on every app update, which stock
+Android does not (an `install -r` keeps it on there). Nothing tells the
+person, and control and typing stop. DeskLink remembers that the service
 was running; when it is not running again after a restart and was not switched
 off by the person, the phone posts one notification ("Android turned off
 DeskLink's accessibility service", one tap to the setup) and the computer's
