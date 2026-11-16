@@ -1328,23 +1328,30 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             }
         },
         onShare = { record ->
-            val share = Intent(Intent.ACTION_SEND).setType(record.mime ?: "*/*")
-                .putExtra(Intent.EXTRA_STREAM, shareableUri(record))
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            startActivity(Intent.createChooser(share, record.name))
+            handOver {
+                val share = Intent(Intent.ACTION_SEND).setType(record.mime ?: "*/*")
+                    .putExtra(Intent.EXTRA_STREAM, shareableUri(record))
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                Intent.createChooser(share, record.name)
+            }
         },
         onOpenWith = ::openWith,
         onRemove = { record -> TransferHistory.remove(this, record.id) },
     )
 
     /** Another app opens it, read access granted through our FileProvider for local files. */
-    private fun openWith(record: TransferRecord) {
+    private fun openWith(record: TransferRecord) = handOver {
         val view = Intent(Intent.ACTION_VIEW).setDataAndType(shareableUri(record), record.mime ?: "*/*")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        try {
-            startActivity(Intent.createChooser(view, record.name))
-        } catch (_: android.content.ActivityNotFoundException) {
-            showMessage(getString(R.string.transfers_no_app))
+        Intent.createChooser(view, record.name)
+    }
+
+    /** Share / Open with: a file DeskLink may no longer read is said, never a crash. */
+    private fun handOver(intent: () -> Intent) {
+        when (OpenElsewhere.start(this, intent)) {
+            OpenElsewhere.Outcome.STARTED -> Unit
+            OpenElsewhere.Outcome.NO_APP -> showMessage(getString(R.string.transfers_no_app))
+            OpenElsewhere.Outcome.NOT_ALLOWED -> showMessage(getString(R.string.transfers_not_allowed))
         }
     }
 
