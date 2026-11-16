@@ -655,6 +655,8 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
         val mirrored = notifications.filter { runCatching { isMirrored(it) }.getOrDefault(false) }
         // The ids first: the desk drops every other notification it holds from this phone.
         val ids = mirrored.map(::getNotificationKeyCompat)
+        // What the desk was sent for notifications dismissed while the link was down goes too (it held their text).
+        forgetGone(device.deviceId, ids)
         if (resync) {
             // A new link where the desk already holds this exact set (same ids, same post times): nothing to send.
             val rev = snapshotRev(mirrored.map { getNotificationKeyCompat(it) to it.postTime })
@@ -755,6 +757,16 @@ class NotificationsPlugin : Plugin(), NotificationReceiver.NotificationListener 
          * is destroyed whenever the phone stops being reachable, and its [NotificationDedupe] with it.
          */
         private val delivered = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ConcurrentHashMap<String, String>>()
+
+        /** Keeps only [active] in what [deviceId]'s desk was sent: the snapshot is the whole live set. */
+        @androidx.annotation.VisibleForTesting
+        internal fun forgetGone(deviceId: String, active: Collection<String>) {
+            delivered[deviceId]?.keys?.retainAll(active.toSet())
+        }
+
+        @androidx.annotation.VisibleForTesting
+        internal fun deliveredFor(deviceId: String): MutableMap<String, String> =
+            delivered.getOrPut(deviceId) { java.util.concurrent.ConcurrentHashMap() }
 
         /** When this process started, on the wall clock of `postTime`. */
         private val PROCESS_START_MS by lazy {
