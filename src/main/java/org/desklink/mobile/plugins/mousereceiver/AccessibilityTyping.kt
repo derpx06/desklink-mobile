@@ -55,6 +55,20 @@ object AccessibilityTyping {
 
     data class Field(val text: String, val start: Int, val end: Int)
 
+    /** The selection this path last set, with its direction (the field reports it in order). */
+    @Volatile
+    private var lastSet: Field? = null
+
+    /**
+     * The field as [reported], with the direction of the selection this path set last when it is still that one: a
+     * selection made with Shift+Left is reported in order, and the next Shift+Left must move its left end.
+     */
+    fun oriented(reported: Field, lastSet: Field?): Field =
+        if (lastSet != null && lastSet.text == reported.text &&
+            minOf(lastSet.start, lastSet.end) == minOf(reported.start, reported.end) &&
+            maxOf(lastSet.start, lastSet.end) == maxOf(reported.start, reported.end)
+        ) lastSet else reported
+
     /** One thing done through the focused editor's input connection. */
     sealed interface Step {
         data class Commit(val text: String) : Step
@@ -116,12 +130,22 @@ object AccessibilityTyping {
      * `start`/`end` are the selection (equal for a caret); out-of-range or
      * reversed values from a node are normalised first.
      */
-    fun edit(field: Field, key: String?, special: Int, ctrl: Boolean): Field? {
+    fun edit(field: Field, key: String?, special: Int, ctrl: Boolean, shift: Boolean = false): Field? {
         val length = field.text.length
         val a = field.start.coerceIn(0, length)
         val b = field.end.coerceIn(0, length)
         val (start, end) = if (a <= b) a to b else b to a
         val text = field.text
+        // Shift moves the selection's moving end (`end`); its anchor (`start`) stays.
+        if (shift && special in listOf(LEFT, RIGHT, HOME, END)) {
+            val to = when (special) {
+                LEFT -> if (b > 0) previousCharacter(text, b) else 0
+                RIGHT -> if (b < length) nextCharacter(text, b) else length
+                HOME -> 0
+                else -> length
+            }
+            return Field(text, a, to)
+        }
         if (ctrl && key != null) {
             return if (key.equals("a", ignoreCase = true)) Field(text, 0, length) else null
         }
@@ -134,22 +158,22 @@ object AccessibilityTyping {
             BACKSPACE -> when {
                 start != end -> Field(text.removeRange(start, end), start, start)
                 start > 0 -> {
-                    val from = previousCodePoint(text, start)
+                    val from = previousCharacter(text, start)
                     Field(text.removeRange(from, start), from, from)
                 }
                 else -> field.copy(start = 0, end = 0)
             }
             DELETE -> when {
                 start != end -> Field(text.removeRange(start, end), start, start)
-                start < length -> Field(text.removeRange(start, nextCodePoint(text, start)), start, start)
+                start < length -> Field(text.removeRange(start, nextCharacter(text, start)), start, start)
                 else -> Field(text, start, start)
             }
             LEFT -> {
-                val caret = if (start != end) start else if (start > 0) previousCodePoint(text, start) else 0
+                val caret = if (start != end) start else if (start > 0) previousCharacter(text, start) else 0
                 Field(text, caret, caret)
             }
             RIGHT -> {
-                val caret = if (start != end) end else if (end < length) nextCodePoint(text, end) else length
+                val caret = if (start != end) end else if (end < length) nextCharacter(text, end) else length
                 Field(text, caret, caret)
             }
             HOME -> Field(text, 0, 0)
@@ -157,6 +181,41 @@ object AccessibilityTyping {
             else -> null
         }
     }
+
+    /** What rides on the emoji before it: a skin tone, an emoji or text variation, a keycap, a flag tag. */
+    private fun extends(codePoint: Int) =
+        codePoint in 0x1F3FB..0x1F3FF || codePoint == 0xFE0F || codePoint == 0xFE0E || codePoint == 0x20E3 || codePoint in 0xE0020..0xE007F
+
+    /**
+     * Where the character before [index] starts: one code point (an Indic vowel sign goes alone, as with Android's own
+     * Backspace), but a whole emoji with what rides on it and what a zero-width joiner joins to it.
+     */
+    private fun previousCharacter(text: String, index: Int): Int {
+        var i = previousCodePoint(text, index)
+        while (i > 0) {
+            i = when {
+                extends(text.codePointAt(i)) || text.codePointAt(i) == ZWJ -> previousCodePoint(text, i)
+                text.codePointBefore(i) == ZWJ -> previousCodePoint(text, previousCodePoint(text, i))
+                else -> return i
+            }
+        }
+        return i
+    }
+
+    /** Where the character at [index] ends: the mirror of [previousCharacter]. */
+    private fun nextCharacter(text: String, index: Int): Int {
+        var j = nextCodePoint(text, index)
+        while (j < text.length) {
+            j = when {
+                extends(text.codePointAt(j)) -> nextCodePoint(text, j)
+                text.codePointAt(j) == ZWJ && j + 1 < text.length -> nextCodePoint(text, nextCodePoint(text, j))
+                else -> return j
+            }
+        }
+        return j
+    }
+
+    private const val ZWJ = 0x200D
 
     private fun previousCodePoint(text: String, index: Int) =
         if (index >= 2 && Character.isLowSurrogate(text[index - 1]) && Character.isHighSurrogate(text[index - 2])) index - 2 else index - 1
@@ -184,7 +243,7 @@ object AccessibilityTyping {
         val node = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return DeskLinkProtocol.TYPING_NO_TEXT_FIELD
         try {
             return when {
-                typeIntoNode(service, node, key, special, ctrl) -> null
+                typeIntoNode(service, node, key, special, ctrl, np.getBoolean("shift", false)) -> null
                 !node.isEditable -> DeskLinkProtocol.TYPING_NOT_EDITABLE
                 else -> DeskLinkProtocol.TYPING_TEXT_REFUSED
             }
@@ -209,6 +268,13 @@ object AccessibilityTyping {
             val focused = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
             @Suppress("DEPRECATION")
             focused.recycle()
+        } else if (connection.getSurroundingText(0, 0, 0) == null) {
+            // A stale session: an editor that restarts input after an edit (Chrome's address bar, after every key) gets a
+            // new session that Android never hands this service, and the app drops every later call ("Session id
+            // mismatch") while each looks sent. A stale connection answers nothing, so it is asked first: the focused
+            // node is edited instead (emulator, Android 16, 11-16).
+            android.util.Log.d("MouseReceiverPlugin", "keys: the editor's input connection is stale, editing the focused field")
+            return null
         }
         val steps = steps(key, special, ctrl, np.getBoolean("shift", false), np.getBoolean("alt", false), info.imeOptions, info.inputType)
             ?: return false
@@ -226,7 +292,7 @@ object AccessibilityTyping {
     }
 
     /** Older phones, or no editor connected: actions on the focused node. False if nothing took the key. */
-    private fun typeIntoNode(service: AccessibilityService, node: AccessibilityNodeInfo, key: String?, special: Int, ctrl: Boolean): Boolean {
+    private fun typeIntoNode(service: AccessibilityService, node: AccessibilityNodeInfo, key: String?, special: Int, ctrl: Boolean, shift: Boolean): Boolean {
         if (ctrl && key != null) {
             val action = when (key.lowercase()) {
                 "c" -> AccessibilityNodeInfo.ACTION_COPY
@@ -235,6 +301,16 @@ object AccessibilityTyping {
                 else -> 0
             }
             if (action != 0) return node.performAction(action)
+        }
+        // Tab moves the focus, as a keyboard's Tab does (Shift+Tab back).
+        if (special == TAB) {
+            val next = node.focusSearch(if (shift) android.view.View.FOCUS_BACKWARD else android.view.View.FOCUS_FORWARD) ?: return false
+            try {
+                return next.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+            } finally {
+                @Suppress("DEPRECATION")
+                next.recycle()
+            }
         }
         if (special == ENTER) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
@@ -254,7 +330,7 @@ object AccessibilityTyping {
             val action = if (special == UP) AccessibilityNodeInfo.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY else AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY
             return node.performAction(action, arguments)
         }
-        if (apply(node, key, special, ctrl)) return true
+        if (apply(node, key, special, ctrl, shift)) return true
         // A field that refuses SET_TEXT (some web views, custom editors) still takes a paste.
         return key != null && special == 0 && !ctrl && paste(service, node, key)
     }
@@ -265,25 +341,27 @@ object AccessibilityTyping {
         return node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
     }
 
-    private fun apply(node: AccessibilityNodeInfo, key: String?, special: Int, ctrl: Boolean): Boolean {
+    private fun apply(node: AccessibilityNodeInfo, key: String?, special: Int, ctrl: Boolean, shift: Boolean = false): Boolean {
         // An empty field reports its hint as its text.
         val showingHint = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && node.isShowingHintText
         val current = if (showingHint) "" else node.text?.toString().orEmpty()
-        val before = Field(current, node.textSelectionStart.takeIf { it >= 0 } ?: current.length,
+        val reported = Field(current, node.textSelectionStart.takeIf { it >= 0 } ?: current.length,
             node.textSelectionEnd.takeIf { it >= 0 } ?: current.length)
-        val after = edit(before, key, special, ctrl) ?: return false
+        val before = oriented(reported, lastSet)
+        val after = edit(before, key, special, ctrl, shift) ?: return false
         if (after.text != before.text) {
             val arguments = Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, after.text)
             }
             if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) return false
         }
-        // SET_TEXT puts the caret at the end; put it where the edit left it.
+        // SET_TEXT puts the caret at the end; put it where the edit left it. In order: a TextView refuses start > end.
         val selection = Bundle().apply {
-            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, after.start)
-            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, after.end)
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, minOf(after.start, after.end))
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, maxOf(after.start, after.end))
         }
         node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selection)
+        lastSet = after
         return true
     }
 }

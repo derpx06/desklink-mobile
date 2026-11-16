@@ -56,7 +56,8 @@ Control of the phone from the computer (taps, swipes, Glide) and typing into it
 go through DeskLink's accessibility service. On Android 13+ it is also an input
 method for the focused field (`flagInputMethodEditor`), so typed text is
 committed and keys are sent the way a keyboard sends them, whatever keyboard is
-selected; older phones edit the focused field directly. A key that reaches no
+selected; older phones, and an editor whose connection Android left stale
+(Chrome's address bar after its first key), edit the focused field directly. A key that reaches no
 field is never dropped in silence: the phone logs why and tells the computer's
 Phone Screen window ("no text field is selected", "turn on DeskLink in
 Accessibility"), which says so in its strip.

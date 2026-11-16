@@ -10,8 +10,48 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AccessibilityTypingTest {
-    private fun edit(field: Field, key: String? = null, special: Int = 0, ctrl: Boolean = false) =
-        AccessibilityTyping.edit(field, key, special, ctrl)
+    private fun edit(field: Field, key: String? = null, special: Int = 0, ctrl: Boolean = false, shift: Boolean = false) =
+        AccessibilityTyping.edit(field, key, special, ctrl, shift)
+
+    /** A whole emoji goes and is stepped over (skin tone, joiners, variation); an Indic vowel sign goes alone, as Android's Backspace. */
+    @Test
+    fun backspaceDeleteAndArrowsTakeAWholeEmoji() {
+        val thumb = "a\uD83D\uDC4D\uD83C\uDFFD" // a + thumbs up + medium skin tone
+        assertEquals(Field("a", 1, 1), edit(Field(thumb, thumb.length, thumb.length), special = 1))
+        assertEquals(Field("a", 1, 1), edit(Field(thumb, 1, 1), special = 13))
+        assertEquals(Field(thumb, 1, 1), edit(Field(thumb, thumb.length, thumb.length), special = 4))
+        assertEquals(Field(thumb, thumb.length, thumb.length), edit(Field(thumb, 1, 1), special = 6))
+        val family = "\uD83D\uDC68\u200D\uD83D\uDC69" // man ZWJ woman
+        assertEquals(Field("", 0, 0), edit(Field(family, family.length, family.length), special = 1))
+        val heart = "x\u2764\uFE0F"
+        assertEquals(Field("x", 1, 1), edit(Field(heart, heart.length, heart.length), special = 1))
+        assertEquals(Field("मराठ", 4, 4), edit(Field("मराठी", 5, 5), special = 1))
+    }
+
+    /** A field reports a selection in order; the one this path made keeps its direction while it is still the same. */
+    @Test
+    fun aSelectionKeepsTheDirectionItWasMadeIn() {
+        val madeLeftward = Field("hello", 3, 1)
+        assertEquals(madeLeftward, AccessibilityTyping.oriented(Field("hello", 1, 3), madeLeftward))
+        // Shift+Left again moves the left end.
+        assertEquals(Field("hello", 3, 0), edit(AccessibilityTyping.oriented(Field("hello", 1, 3), madeLeftward), special = 4, shift = true))
+        // Changed since (a tap, typing on the phone): the field's own word.
+        assertEquals(Field("hello", 2, 4), AccessibilityTyping.oriented(Field("hello", 2, 4), madeLeftward))
+        assertEquals(Field("hallo", 1, 3), AccessibilityTyping.oriented(Field("hallo", 1, 3), madeLeftward))
+        assertEquals(Field("hello", 1, 3), AccessibilityTyping.oriented(Field("hello", 1, 3), null))
+    }
+
+    /** Shift with an arrow, Home or End moves one end of the selection; the other stays where it was. */
+    @Test
+    fun shiftExtendsTheSelection() {
+        assertEquals(Field("hello", 3, 2), edit(Field("hello", 3, 3), special = 4, shift = true))
+        assertEquals(Field("hello", 3, 1), edit(Field("hello", 3, 2), special = 4, shift = true))
+        assertEquals(Field("hello", 3, 4), edit(Field("hello", 3, 3), special = 6, shift = true))
+        assertEquals(Field("hello", 3, 0), edit(Field("hello", 3, 3), special = 10, shift = true))
+        assertEquals(Field("hello", 3, 5), edit(Field("hello", 3, 3), special = 11, shift = true))
+        // Then Backspace removes what is selected, whichever way it was made.
+        assertEquals(Field("hlo", 1, 1), edit(Field("hello", 3, 1), special = 1))
+    }
 
     @Test
     fun typingInsertsAtTheCaretAndReplacesASelection() {
