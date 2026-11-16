@@ -2020,7 +2020,11 @@ class WebRtcSessionCoordinator(
                         ),
                     )
                 } else if (MouseReceiverService.instance == null) {
-                    org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.ask(context, device.name)
+                    // No prompt here: the desk asks for control on every share (and again, backing off), so a phone
+                    // without the service posted "<desk> wants to control this phone" for merely viewing it (16:31).
+                    // The desk's window says why and offers Ask on phone, whose Allow opens the setup; only a stop
+                    // that Android made is told here, once.
+                    org.desklink.mobile.plugins.mousereceiver.AccessibilitySetupActivity.tellIfStopped(context)
                     sendRemoteSessionControlLocked(
                         binding,
                         attemptId,

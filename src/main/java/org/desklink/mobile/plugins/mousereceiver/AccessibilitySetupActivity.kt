@@ -114,14 +114,6 @@ class AccessibilitySetupActivity : AppCompatActivity() {
             Intent(context, AccessibilitySetupActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
 
-        /** A desk asked for control and could not have it: say why on the phone, one tap from the fix. */
-        fun ask(context: Context, deskName: String) = notify(
-            context,
-            context.getString(R.string.accessibility_setup_ask, deskName),
-            context.getString(R.string.accessibility_setup_ask_text),
-            timeoutMs = 120_000,
-        )
-
         private const val KEY_WAS_RUNNING = "was_running"
         private const val KEY_TOLD_STOPPED = "told_stopped"
         private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -145,10 +137,10 @@ class AccessibilitySetupActivity : AppCompatActivity() {
             if (!stoppedByAndroid(context) || prefs(context).getBoolean(KEY_TOLD_STOPPED, false)) return
             android.util.Log.w("MouseReceiverService", "accessibility service was stopped by the system (enabled in settings: ${enabled(context)})")
             prefs(context).edit().putBoolean(KEY_TOLD_STOPPED, true).apply()
-            notify(context, context.getString(R.string.accessibility_stopped_title), context.getString(R.string.accessibility_stopped_text), timeoutMs = 0)
+            notify(context, context.getString(R.string.accessibility_stopped_title), context.getString(R.string.accessibility_stopped_text))
         }
 
-        private fun notify(context: Context, title: String, text: String, timeoutMs: Long) {
+        private fun notify(context: Context, title: String, text: String) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
             ) return
@@ -163,7 +155,6 @@ class AccessibilitySetupActivity : AppCompatActivity() {
                     .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                     .setContentIntent(tap)
                     .setAutoCancel(true)
-                    .apply { if (timeoutMs > 0) setTimeoutAfter(timeoutMs) }
                     .build(),
             )
         }

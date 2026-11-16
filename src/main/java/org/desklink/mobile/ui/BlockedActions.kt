@@ -22,7 +22,6 @@ object BlockedActions {
         "settings_clipboard_auto_grant_oem" to "the row copies the adb command (Copy command)",
         "accessibility_setup_title" to "the dialog's button opens Accessibility settings",
         "accessibility_setup_step" to "the dialog's button opens Accessibility settings",
-        "accessibility_setup_ask_text" to "the notification opens the accessibility setup",
         "accessibility_stopped_text" to "the notification opens the accessibility setup",
         "settings_glide_accessibility" to "the Allow row under it opens the accessibility setup",
         "widget_cd_open_app" to "is the action: opens DeskLink",
