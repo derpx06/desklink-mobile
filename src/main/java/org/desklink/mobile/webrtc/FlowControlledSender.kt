@@ -59,7 +59,8 @@ class FlowControlledSender(
         while (true) {
             val next = synchronized(this) {
                 if (draining || held.isEmpty()) return
-                val buffered = bufferedAmount()
+                // A disposed channel throws here too: read as empty, the send below reports CLOSED once.
+                val buffered = runCatching { bufferedAmount() }.getOrDefault(0L)
                 if (backedUp && buffered > lowWater) return
                 if (buffered > highWater) {
                     backedUp = true
@@ -71,9 +72,14 @@ class FlowControlledSender(
             }
             try {
                 // A callback that throws must not strand the messages behind it.
+                // A channel disposed under the send throws: that message is told CLOSED, never lost silently.
+                val sent = runCatching { rawSend(next.bytes) }
                 runCatching {
-                    if (rawSend(next.bytes)) next.callback.onSuccess()
-                    else next.callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "WebRTC data channel rejected message"))
+                    when {
+                        sent.isFailure -> next.callback.onFailure(TransportError(TransportErrorCode.CLOSED, "WebRTC data channel is closed"))
+                        sent.getOrThrow() -> next.callback.onSuccess()
+                        else -> next.callback.onFailure(TransportError(TransportErrorCode.SEND_FAILED, "WebRTC data channel rejected message"))
+                    }
                 }
             } finally {
                 synchronized(this) { draining = false }

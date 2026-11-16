@@ -124,4 +124,20 @@ class FlowControlledSenderTest {
         assertEquals(800, sent.size)
         for (t in 0 until 4) assertEquals((0 until 200).map { "$t:$it" }, sent.filter { it.startsWith("$t:") })
     }
+
+    @Test
+    fun aSendThatThrowsIsReportedClosedNeverDropped() {
+        // A data channel disposed under the send throws IllegalStateException; the message was lost silently.
+        val disposed = FlowControlledSender({ 0L }, { throw IllegalStateException("DataChannel has been disposed.") }, highWater = 100, lowWater = 20)
+        disposed.send("a".toByteArray(), cb("a"))
+        assertEquals(listOf("a CLOSED"), results)
+    }
+
+    @Test
+    fun aDisposedChannelsBufferedAmountThrowingIsReportedClosedToo() {
+        // bufferedAmount() on a disposed channel throws as well; it escaped drain() to the caller's thread.
+        val disposed = FlowControlledSender({ throw IllegalStateException("DataChannel has been disposed.") }, { throw IllegalStateException("DataChannel has been disposed.") }, highWater = 100, lowWater = 20)
+        disposed.send("a".toByteArray(), cb("a"))
+        assertEquals(listOf("a CLOSED"), results)
+    }
 }
