@@ -180,26 +180,35 @@ fun DeskControls(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(painterResource(R.drawable.sym_front_hand), contentDescription = null, tint = OnAmber, modifier = Modifier.size(16.dp))
-                Column(Modifier.weight(1f, fill = false).widthIn(max = 380.dp)) {
-                    if (!controlEnabled) {
-                        // Refused (the desk said why; `onAllowControl` is set only then): view only, ask again. Before that: asking.
-                        val headline = if (onAllowControl != null || !asking) R.string.remote_control_view_only else R.string.remote_control_asking
-                        Text(stringResource(headline, deviceName), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
-                        reason?.takeIf(String::isNotBlank)?.let {
-                            Text(it, fontSize = 11.sp, color = OnAmber, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                // Measured: "Ask again" goes under the words when beside them a word would break (at font 2.0 it took
+                // the row and left the words one letter wide).
+                org.desklink.mobile.ui.compose.components.TextAndTrailing(
+                    Modifier.weight(1f, fill = false).widthIn(max = 380.dp),
+                    text = {
+                        Column {
+                            if (!controlEnabled) {
+                                // Refused (the desk said why; `onAllowControl` is set only then): view only, ask again. Before that: asking.
+                                val headline = if (onAllowControl != null || !asking) R.string.remote_control_view_only else R.string.remote_control_asking
+                                Text(stringResource(headline, deviceName), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
+                                reason?.takeIf(String::isNotBlank)?.let {
+                                    Text(it, fontSize = 11.sp, color = OnAmber, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                            } else {
+                                Text(stringResource(R.string.remote_view_only_hint), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
+                            }
                         }
-                    } else {
-                        Text(stringResource(R.string.remote_view_only_hint), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OnAmber, maxLines = 2)
-                    }
-                }
-                if (onAllowControl != null && !controlEnabled) {
-                    Box(
-                        Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onAllowControl),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(stringResource(R.string.remote_ask_again), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OnAmber, modifier = Modifier.padding(horizontal = 8.dp))
-                    }
-                }
+                    },
+                    trailing = {
+                        if (onAllowControl != null && !controlEnabled) {
+                            Box(
+                                Modifier.heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onAllowControl),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(stringResource(R.string.remote_ask_again), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = OnAmber, modifier = Modifier.padding(horizontal = 8.dp))
+                            }
+                        }
+                    },
+                )
                 IconButton(onClick = onDismissNotice, modifier = Modifier.size(48.dp)) {
                     Icon(painterResource(R.drawable.sym_close), contentDescription = stringResource(R.string.remote_notice_dismiss), tint = OnAmber, modifier = Modifier.size(16.dp))
                 }

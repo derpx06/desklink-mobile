@@ -66,7 +66,7 @@ object MidWord {
     /**
      * The breaks accepted for now, each as its whole `midword.txt` line: any other break, also a new one in the same
      * screenshot, fails the shot. A test-only demo sheet (four tiles across, a status line of three words); the desk
-     * screen's waiting banner and its name capsule (DeskControls.kt: fixed after the phase 3.5/3.6 branches merge).
+     * screen's name capsule, which shortens a long name on purpose at large text (TalkBack still reads it whole).
      */
     val ACCEPTED = setOf(
         "huge-components-rows: \"Failed\" breaks at \"F|ailed\"",
@@ -78,8 +78,6 @@ object MidWord {
         "huge-components-tiles: \"Ring computer\" breaks at \"comput|er\"",
         "huge-components-tiles: \"Lock computer\" breaks at \"comput|er\"",
         "huge-components-tiles: \"Unlock arch-desk\" breaks at \"ch-des|k\"",
-        "huge-w5-desk-waiting: \"Allow control on arch-desk first\" breaks at \"A|llow c\"",
-        "huge-w5-desk-waiting: \"Allow remote interaction on arch-desk\" breaks at \"A|llow r\"",
         "huge-w5-desk-view: \"arch-desk\" is cut short",
         "huge-w5-desk-granted: \"arch-desk\" is cut short",
         "huge-w5-desk-keys: \"arch-desk\" is cut short",
