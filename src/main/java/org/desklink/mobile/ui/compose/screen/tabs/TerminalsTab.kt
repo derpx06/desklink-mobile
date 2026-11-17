@@ -371,6 +371,8 @@ fun TerminalsContent(
             Modifier.padding(top = 12.dp),
             subtitle = when {
                 panel == TerminalsPanel.UNAVAILABLE || panel == TerminalsPanel.DISCONNECTED || !connected -> stringResource(R.string.terminal_status_reconnecting)
+                // Not "No terminals" while the list is unknown.
+                panel == TerminalsPanel.LOAD_FAILED -> stringResource(R.string.terminals_load_failed_title)
                 live.isEmpty() -> stringResource(R.string.terminals_subtitle_none, deskName)
                 else -> pluralStringResource(R.plurals.terminal_count_on, live.size, live.size, deskName)
             },
