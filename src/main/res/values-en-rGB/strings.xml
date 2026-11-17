@@ -18,9 +18,9 @@
   <string name="pref_plugin_ping">Ping</string>
   <string name="pref_plugin_ping_desc">Send and receive pings</string>
   <string name="pref_plugin_notifications">Notification sync</string>
-  <string name="pref_plugin_notifications_desc">Access your notifications from other devices</string>
+  <string name="pref_plugin_notifications_desc">Access your notifications from your computer</string>
   <string name="pref_plugin_receive_notifications">Receive notifications</string>
-  <string name="pref_plugin_receive_notifications_desc">Receive notifications from the other device and display them on Android</string>
+  <string name="pref_plugin_receive_notifications_desc">Receive notifications from your computer and show them on this phone</string>
   <string name="pref_plugin_sharereceiver">Share and receive</string>
   <string name="pref_plugin_sharereceiver_desc">Share files and URLs between devices</string>
   <string name="device_list_empty">No devices</string>
@@ -42,7 +42,7 @@
   </string-array>
   <string name="mouse_receiver_plugin_description">Receive remote mouse movement</string>
   <string name="mouse_receiver_plugin_name">Mouse receiver</string>
-  <string name="mouse_receiver_no_permissions">To receive touch inputs remotely you need to grant Accessibility permissions to fully control your device</string>
+  <string name="mouse_receiver_no_permissions">To receive touch inputs remotely you need to grant Accessibility permissions to fully control this phone</string>
   <string name="device_menu_unpair">Unpair</string>
   <string name="error_not_reachable">Device not reachable</string>
   <string name="error_already_paired">Device already paired</string>
@@ -126,20 +126,20 @@
   <string name="findmyphone_title">Find my phone</string>
   <string name="findmyphone_title_tablet">Find my tablet</string>
   <string name="findmyphone_title_tv">Find my TV</string>
-  <string name="findmyphone_description">Rings this device so you can find it</string>
+  <string name="findmyphone_description">Rings this phone so you can find it</string>
   <string name="findmyphone_found">Found it</string>
   <string name="permission_explanation">This feature needs permission to work</string>
   <string name="optional_permission_explanation">Allow a few more things to use every feature</string>
   <string name="share_optional_permission_explanation">To receive files you need to allow storage access</string>
   <string name="share_notifications_explanation">To see the progress when sending and receiving files you need to allow notifications</string>
-  <string name="contacts_permission_explanation">To share your contacts book with the desktop, you need to give contacts permission</string>
+  <string name="contacts_permission_explanation">To share your contacts with the computer, DeskLink needs to read them</string>
   <string name="select_ringtone">Select a ringtone</string>
   <string name="pref_plugin_mprisreceiver">Media Player Control</string>
-  <string name="pref_plugin_mprisreceiver_desc">Control your phone\'s media players from another device</string>
+  <string name="pref_plugin_mprisreceiver_desc">Control your phone\'s media players from your computer</string>
   <string name="notification_channel_media_control">Media control</string>
   <string name="device_not_reachable">Device is not reachable</string>
-  <string name="pref_plugin_findremotedevice">Find remote device</string>
-  <string name="pref_plugin_findremotedevice_desc">Ring your remote device</string>
+  <string name="pref_plugin_findremotedevice">Find the computer</string>
+  <string name="pref_plugin_findremotedevice_desc">Ring your computer</string>
   <string name="ring">Ring</string>
   <string name="all">All</string>
   <string name="setting_persistent_notification_oreo">Always-on notification</string>
@@ -189,7 +189,7 @@
   <string name="shellwen_chen_task">Improve the security of SFTP, improve the maintainability of this project, bug fixes and general improvements</string>
   <string name="everyone_else">Everyone else who has contributed to DeskLink over the years</string>
   <string name="send_clipboard">Send clipboard</string>
-  <string name="receive_notifications_permission_explanation">Notifications need to be allowed to receive them from other devices</string>
+  <string name="receive_notifications_permission_explanation">Notifications need to be allowed to receive them from your computer</string>
   <string name="findmyphone_notifications_explanation">The notifications permission is needed so the phone can ring when the app is in the background</string>
   <string name="mpris_keepwatching">Continue playing</string>
   <string name="notification_channel_keepwatching">Continue playing</string>

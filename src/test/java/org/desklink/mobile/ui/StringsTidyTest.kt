@@ -29,4 +29,10 @@ class StringsTidyTest {
         emptyList<String>(),
         problems { _, line -> Regex(""">[^<]*(?:WiFi|Wifi|Wi‑Fi|[Cc]anceled)""").containsMatchIn(line) },
     )
+
+    /** The two sides are "phone" and "computer": no "remote device" or "the desktop" in what a person reads. */
+    @Test fun noRemoteDeviceOrDesktopInShownText() = assertEquals(
+        emptyList<String>(),
+        problems { _, line -> Regex(""">[^<]*(?:[Rr]emote device|[Tt]he desktop|[Oo]ther device)""").containsMatchIn(line) },
+    )
 }

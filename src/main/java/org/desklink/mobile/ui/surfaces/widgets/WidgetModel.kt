@@ -47,7 +47,6 @@ data class ComputerFacts(
 /** The words on the status chip. */
 enum class WidgetStatus(@StringRes val label: Int) {
     WIFI(R.string.home_connected_wifi),
-    RELAY(R.string.home_connected_relay),
     TURN(R.string.home_connected_turn),
     INTERNET(R.string.home_connected_internet),
     CONNECTED(R.string.connection_connected),
@@ -60,7 +59,7 @@ enum class WidgetStatus(@StringRes val label: Int) {
     /** The dot beside the words: mint only while connected, amber while waiting. */
     val tone: Tone
         get() = when (this) {
-            WIFI, RELAY, TURN, INTERNET, CONNECTED -> Tone.OK
+            WIFI, TURN, INTERNET, CONNECTED -> Tone.OK
             CONNECTING, UPDATE -> Tone.WAIT
             CANT_REACH, NO_COMPUTER -> Tone.OFF
         }
@@ -119,7 +118,7 @@ object WidgetRules {
     fun status(f: ComputerFacts?): WidgetStatus = when {
         f == null -> WidgetStatus.NO_COMPUTER
         f.ready -> when (linkGlyphState(f.connection, f.path)) {
-            LinkGlyphState.RELAY -> if (f.path == WebRtcConnectionPath.TURN) WidgetStatus.TURN else WidgetStatus.RELAY
+            LinkGlyphState.RELAY -> if (f.path == WebRtcConnectionPath.TURN) WidgetStatus.TURN else WidgetStatus.INTERNET
             LinkGlyphState.DIRECT -> when {
                 f.connection == DeviceConnection.LOCAL || f.path == WebRtcConnectionPath.LAN -> WidgetStatus.WIFI
                 f.path == WebRtcConnectionPath.DIRECT || f.connection == DeviceConnection.AWAY -> WidgetStatus.INTERNET

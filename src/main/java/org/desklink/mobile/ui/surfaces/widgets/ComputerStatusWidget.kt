@@ -52,7 +52,8 @@ class ComputerStatusWidget : FamilyWidget() {
 
     private fun shortLabel(status: WidgetStatus): Int = when (status) {
         WidgetStatus.WIFI -> R.string.home_short_wifi
-        WidgetStatus.RELAY, WidgetStatus.TURN -> R.string.home_short_relay
+        WidgetStatus.TURN -> R.string.home_short_relay
+        WidgetStatus.INTERNET -> R.string.home_short_internet
         else -> status.label
     }
 }

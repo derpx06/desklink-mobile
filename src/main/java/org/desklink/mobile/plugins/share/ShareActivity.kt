@@ -257,12 +257,12 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
     }
 
     companion object {
-        /** Runs [share] on [intent]: whether it handed something on; a read that throws (a revoked grant) is a failure, not a crash. */
         /** What to tell the person when nothing was sent: a file that could not be read, or nothing found to share. */
         internal fun failureMessage(intent: Intent): Int =
             if (intent.hasExtra(Intent.EXTRA_STREAM) || Intent.ACTION_SEND_MULTIPLE == intent.action) R.string.share_unreadable_toast
             else R.string.share_nothing_toast
 
+        /** Runs [share] on [intent]: whether it handed something on; a read that throws (a revoked grant) is a failure, not a crash. */
         internal fun runShare(share: (Intent) -> Boolean, intent: Intent): Boolean =
             runCatching { share(intent) }.getOrDefault(false)
 

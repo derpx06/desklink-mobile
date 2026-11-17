@@ -38,7 +38,7 @@ class WidgetRulesTest {
     @Test
     fun statusUsesHomesPlainWords() {
         assertEquals("Connected over Wi-Fi", words(WidgetRules.status(facts())))
-        assertEquals("Connected through the relay", words(WidgetRules.status(facts(DeviceConnection.AWAY, null))))
+        assertEquals("Connected over the internet", words(WidgetRules.status(facts(DeviceConnection.AWAY, null))))
         assertEquals("Connected through a relay server", words(WidgetRules.status(facts(DeviceConnection.AWAY, WebRtcConnectionPath.TURN))))
         assertEquals("Connected over the internet", words(WidgetRules.status(facts(DeviceConnection.AWAY, WebRtcConnectionPath.DIRECT))))
         assertEquals("Connected", words(WidgetRules.status(facts(DeviceConnection.CONNECTED, null))))
