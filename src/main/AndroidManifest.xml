@@ -82,8 +82,6 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <!-- F1: the phone's microphone for the desk, started only from a visible DeskLink window. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- A desk's screen ask opens as a pop-up on a locked or sleeping phone (Android 14+: only once the person allows it). -->
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- A marker, no prompt: it lists DeskLink under Do Not Disturb access. Used only when the person turns on Share Do Not Disturb. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.CAMERA" />

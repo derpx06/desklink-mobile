@@ -31,6 +31,17 @@ class ManifestPermissionsTest {
         assertFalse("BLUETOOTH" in main)
     }
 
+    /** The data-safety doc lists what was removed: none of it may be back in the manifest (it was, once: a full-screen intent). */
+    @Test
+    fun nothingThePlayDocSaysWasRemovedIsInTheManifest() {
+        val doc = listOf(File("docs/PLAY_DATA_SAFETY.md"), File("desklink-mobile/docs/PLAY_DATA_SAFETY.md")).first { it.exists() }.readText()
+        val removed = doc.substringAfter("- Removed:").substringBefore("\n\n")
+        val names = Regex("`([A-Z_]{6,})`").findAll(removed).map { it.groupValues[1] }.toList()
+        assertTrue("the Removed list names permissions: $names", "USE_FULL_SCREEN_INTENT" in names && names.size >= 3)
+        val main = manifest("src/main/AndroidManifest.xml")
+        for (name in names) assertFalse("$name is listed as removed in PLAY_DATA_SAFETY.md but is in the manifest", "android.permission.$name" in main)
+    }
+
     @Test
     fun doNotDisturbAccessCanBeGrantedBecauseTheMarkerPermissionIsDeclared() {
         assertTrue("android.permission.ACCESS_NOTIFICATION_POLICY" in manifest("src/main/AndroidManifest.xml"))

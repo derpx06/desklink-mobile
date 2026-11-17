@@ -419,9 +419,6 @@ class ScreenControlPlugin : Plugin() {
             inFront = org.desklink.mobile.helpers.LifecycleHelper.isInForeground,
             overlayAllowed = android.provider.Settings.canDrawOverlays(context),
             companion = hasCompanionAssociation(context),
-            // In use, ColorOS showed a full-screen-intent ask nowhere (not even as a heads-up, RMX5070 11-15):
-            // full screen only on a locked or sleeping phone, where Android really opens it.
-            fullScreenAllowed = canUseFullScreenIntent(context) && lockedOrAsleep(context),
         )
         Log.i(TAG, "The desk asks to see this screen: $route")
         if (route != AskRoute.POPUP) return postAsk(route)
@@ -437,7 +434,7 @@ class ScreenControlPlugin : Plugin() {
         @android.annotation.SuppressLint("MissingPermission")
         fun post() = androidx.core.app.NotificationManagerCompat.from(context).notify(
             askTag(device.deviceId), PROMPT_NOTIFICATION_ID,
-            askNotice(context, device.deviceId, device.name, fullScreen = route == AskRoute.FULL_SCREEN),
+            askNotice(context, device.deviceId, device.name),
         )
         runCatching { post() }.onFailure { Log.w(TAG, "The screen-sharing prompt could not be shown (${it.javaClass.simpleName})") }
     }
@@ -475,7 +472,7 @@ class ScreenControlPlugin : Plugin() {
     override val outgoingPacketTypes: Array<String> = SCREEN_PACKET_TYPES
 
     /** How a desk's ask reaches the person. */
-    enum class AskRoute { POPUP, FULL_SCREEN, NOTICE }
+    enum class AskRoute { POPUP, NOTICE }
 
     companion object {
         private const val TAG = "DeskLink/ScreenControl"
@@ -509,13 +506,13 @@ class ScreenControlPlugin : Plugin() {
 
         /**
          * Pure. A pop-up when Android lets this app start an activity from the background: it is in front, it may draw over
-         * other apps (the person granted Display over other apps), or it has a companion-device association. Otherwise a
-         * full-screen notification where allowed and the phone is locked or asleep, and a plain heads-up notification last.
+         * other apps (the person granted Display over other apps), or it has a companion-device association. Otherwise
+         * a heads-up notification (high-importance channel) with Allow and Not now. Never a full-screen intent: Play
+         * grants USE_FULL_SCREEN_INTENT to calling and alarm apps only.
          */
         @JvmStatic
-        fun askRoute(inFront: Boolean, overlayAllowed: Boolean, companion: Boolean, fullScreenAllowed: Boolean): AskRoute = when {
+        fun askRoute(inFront: Boolean, overlayAllowed: Boolean, companion: Boolean): AskRoute = when {
             inFront || overlayAllowed || companion -> AskRoute.POPUP
-            fullScreenAllowed -> AskRoute.FULL_SCREEN
             else -> AskRoute.NOTICE
         }
 
@@ -527,15 +524,6 @@ class ScreenControlPlugin : Plugin() {
                 else @Suppress("DEPRECATION") manager.associations.isNotEmpty()
             }.getOrDefault(false)
         }
-
-        private fun lockedOrAsleep(context: android.content.Context): Boolean =
-            context.getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked == true ||
-                context.getSystemService(android.os.PowerManager::class.java)?.isInteractive == false
-
-        /** Android 14+ grants full-screen intents only to call and alarm apps unless the person turns it on. */
-        private fun canUseFullScreenIntent(context: android.content.Context): Boolean =
-            android.os.Build.VERSION.SDK_INT < 34 ||
-                context.getSystemService(android.app.NotificationManager::class.java)?.canUseFullScreenIntent() == true
 
         @JvmStatic
         fun askIntent(context: android.content.Context, deviceId: String): Intent =
@@ -559,7 +547,6 @@ class ScreenControlPlugin : Plugin() {
             context: android.content.Context,
             deviceId: String,
             deskName: String,
-            fullScreen: Boolean = false,
         ): android.app.Notification {
             val code = askTag(deviceId).hashCode()
             val flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
@@ -587,11 +574,6 @@ class ScreenControlPlugin : Plugin() {
                 .addAction(0, context.getString(R.string.screen_share_prompt_not_now), notNow)
                 .setAutoCancel(true)
                 .setTimeoutAfter(PROMPT_TIMEOUT_MS)
-            // Locked or asleep: Android opens the pop-up itself (unlocking first). Never a share without its Allow.
-            if (fullScreen) {
-                builder.setCategory(androidx.core.app.NotificationCompat.CATEGORY_CALL)
-                    .setFullScreenIntent(android.app.PendingIntent.getActivity(context, code + 2, askIntent(context, deviceId), flags), true)
-            }
             return builder.build()
         }
 

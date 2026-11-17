@@ -79,12 +79,13 @@ class ScreenAskTest {
     /** Owner (11-15): the ask must be a pop-up over the open app whenever Android lets one start; a notification otherwise. */
     @Test
     fun theAskIsAPopUpWheneverAndroidLetsOneStart() {
-        fun route(front: Boolean = false, overlay: Boolean = false, companion: Boolean = false, fullScreen: Boolean = false) =
-            ScreenControlPlugin.askRoute(front, overlay, companion, fullScreen)
+        fun route(front: Boolean = false, overlay: Boolean = false, companion: Boolean = false) =
+            ScreenControlPlugin.askRoute(front, overlay, companion)
         assertEquals(ScreenControlPlugin.AskRoute.POPUP, route(front = true))
         assertEquals(ScreenControlPlugin.AskRoute.POPUP, route(overlay = true))
-        assertEquals(ScreenControlPlugin.AskRoute.POPUP, route(companion = true, fullScreen = true))
-        assertEquals(ScreenControlPlugin.AskRoute.FULL_SCREEN, route(fullScreen = true))
+        assertEquals(ScreenControlPlugin.AskRoute.POPUP, route(companion = true))
+        // Never a full-screen intent (Play grants it to calling and alarm apps only): the heads-up notification, which the
+        // high-importance channel shows over whatever is open, and Allow in it opens the consent.
         assertEquals(ScreenControlPlugin.AskRoute.NOTICE, route())
     }
 
