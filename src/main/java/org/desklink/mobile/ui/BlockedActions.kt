@@ -33,6 +33,7 @@ object BlockedActions {
         "setup_step_notification_access" to "the step's button opens Android's notification access page",
         "home_turn_on" to "is the action",
         "home_notifications_turn_on" to "is the action",
+        "terminal_not_allowed_message" to "the notice's Ask on computer button (Try again on a computer that cannot be asked)",
         "ask_blocked" to "Ask again (and the desk's window shows the request)",
     )
 

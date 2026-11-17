@@ -129,8 +129,10 @@ fun FilesTab(
         if (sendAgain.isNotEmpty() || unsaved.isNotEmpty()) {
             // Notices scroll inside a share of the screen: several of them, or a large font, must not push the files off it.
             // At a large font one card is taller than 45 %: its button was cut off at the edge of the scrolling box, unseen.
-            val fraction = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 0.7f else 0.45f
-            val share = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp * fraction).dp
+            // A short (landscape) screen keeps 45 %: the files must stay in view there.
+            val screenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+            val fraction = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f && screenHeight >= 600) 0.7f else 0.45f
+            val share = (screenHeight * fraction).dp
             Column(Modifier.heightIn(max = share).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 sendAgain.forEach { item -> SendAgainCard(item, onSendAgain, onDismissSendAgain) }
                 unsaved.forEach { item -> UnsavedCard(item, item.id in retrying, onRetryUnsaved, onDiscardUnsaved) }

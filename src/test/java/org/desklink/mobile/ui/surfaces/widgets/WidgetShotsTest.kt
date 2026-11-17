@@ -117,7 +117,7 @@ abstract class WidgetShots {
     @Test fun actionsUnreachable() = shoot("actions-4x2-unreachable", w4, h(2), { QuickActionsWidget().render(it, down.copy(lock = true), SizeF(250f, 110f)) }, "arch-desk")
     @Test fun actionsUnreachableSmall() = shoot("actions-4x1-unreachable", w4, h(1), { QuickActionsWidget().render(it, connecting, SizeF(250f, 40f)) }, "arch-desk")
 
-    private val titles = NotesView.Titles(listOf("Shopping list", "Meeting notes", "Ideas for the weekend", "Wi‑Fi passwords").map { NoteLine(it, it) }, 3)
+    private val titles = NotesView.Titles(listOf("Shopping list", "Meeting notes", "Ideas for the weekend", "Wi-Fi passwords").map { NoteLine(it, it) }, 3)
 
     @Test fun notesSmall() = shoot("notes-2x2", w2, h(2), { NotesWidget().draw(it, NotesView.Titles(titles.lines.take(1), 6)) })
     @Test fun notesMedium() = shoot("notes-4x3", w4, h(3), { NotesWidget().draw(it, NotesView.Titles(titles.lines.take(3), 4)) })
@@ -182,7 +182,7 @@ abstract class WidgetShots {
     @Test
     fun theSpokenNamesSayWhatATapDoesOnWhichComputerAndItsState() {
         val v = QuickActionsWidget().render(base, live, SizeF(250f, 110f)).apply(base, FrameLayout(base))
-        assertEquals("Open arch-desk in DeskLink. Connected over Wi‑Fi", find(v, org.desklink.mobile.R.id.w_header).contentDescription)
+        assertEquals("Open arch-desk in DeskLink. Connected over Wi-Fi", find(v, org.desklink.mobile.R.id.w_header).contentDescription)
         assertEquals("Send clipboard to arch-desk", find(v, org.desklink.mobile.R.id.act_clipboard).contentDescription)
         val off = QuickActionsWidget().render(base, down, SizeF(250f, 110f)).apply(base, FrameLayout(base))
         assertEquals("Open arch-desk in DeskLink. Can't reach", find(off, org.desklink.mobile.R.id.w_header).contentDescription)
@@ -191,7 +191,7 @@ abstract class WidgetShots {
         assertEquals("Open DeskLink. No computer paired. Tap to pair a computer", find(none, org.desklink.mobile.R.id.w_header).contentDescription)
         assertEquals("Lock computer, unavailable. No computer paired", find(none, org.desklink.mobile.R.id.act_lock).contentDescription)
         val status = ComputerStatusWidget().render(base, live.copy(charging = true), SizeF(110f, 40f)).apply(base, FrameLayout(base))
-        assertTrue(status.contentDescription.toString().startsWith("Open arch-desk in DeskLink. Connected over Wi‑Fi. Battery 84%, charging"))
+        assertTrue(status.contentDescription.toString().startsWith("Open arch-desk in DeskLink. Connected over Wi-Fi. Battery 84%, charging"))
         val term = TerminalsWidget().render(base, live, SizeF(110f, 40f)).apply(base, FrameLayout(base))
         assertEquals("Start a new terminal on arch-desk. 2 terminals", term.contentDescription)
         val big = org.desklink.mobile.ui.surfaces.DeskWidgetProvider.build(base, org.desklink.mobile.R.layout.widget_desk_large, desk).apply(base, FrameLayout(base))
