@@ -59,7 +59,7 @@
   </plurals>
   <plurals name="incoming_files_text">
     <item quantity="one">File: %1s</item>
-    <item quantity="other">(File %2$d of %3$d) : %1$s</item>
+    <item quantity="other">(File %2$d of %3$d): %1$s</item>
   </plurals>
   <plurals name="outgoing_file_title">
     <item quantity="one">Sending %1$d file to %2$s</item>
@@ -67,7 +67,7 @@
   </plurals>
   <plurals name="outgoing_files_text">
     <item quantity="one">File: %1$s</item>
-    <item quantity="other">(File %2$d of %3$d) : %1$s</item>
+    <item quantity="other">(File %2$d of %3$d): %1$s</item>
   </plurals>
   <plurals name="received_files_title">
     <item quantity="one">Received file from %1$s</item>
@@ -156,7 +156,7 @@
   <string name="empty_trusted_networks_list_text">You have not added any trusted network yet</string>
   <string name="allow_all_networks_text">Allow all</string>
   <string name="location_permission_needed_title">Permission required</string>
-  <string name="location_permission_needed_desc">DeskLink needs the background location permission to know the WiFi network you are connected to even when the app is in the background. This is because the name of the WiFi networks around you could be used to find your location, even when this is not what DeskLink does.</string>
+  <string name="location_permission_needed_desc">DeskLink needs the background location permission to know the Wi-Fi network you are connected to even when the app is in the background. This is because the name of the Wi-Fi networks around you could be used to find your location, even when this is not what DeskLink does.</string>
   <string-array name="theme_list">
     <item>Set by Battery Saver</item>
     <item>Light</item>
