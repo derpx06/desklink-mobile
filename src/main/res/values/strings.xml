@@ -299,7 +299,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
         <item>Notes, snippets, contacts and calls on the computer, off until you turn them on.</item>
         <item>Sound both ways, and Glide: the computer\'s mouse and keyboard carry on onto the phone.</item>
         <item>Home-screen widgets for status, quick actions, notes and transfers.</item>
-        <item>Tighter privacy: secret notifications are never sent and private screens stay out of screenshots.</item>
+        <item>Tighter privacy: secret notifications are never sent, and the pairing code, the session password and the computer\'s screen stay out of screenshots.</item>
         <item>Removed: browsing the phone\'s files, the presentation remote and Bluetooth.</item>
     </string-array>
     <string name="about_report_problem">Report a problem</string>

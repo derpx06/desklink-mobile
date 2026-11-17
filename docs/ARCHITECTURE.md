@@ -119,3 +119,13 @@ Proposed next, each its own reviewed change with tests first:
   index), R8 keep rules per module, and the debug keystore / package ids stay
   in `:app` (frozen identifiers). Start with `:protocol`, which has no Android
   dependencies.
+
+## Secure windows (screenshots, screen sharing, recents)
+
+Only real secrets set `FLAG_SECURE`: the **pairing code** screen, the **session password** dialog
+(`SecureFlagPolicy.SecureOn`) and the **mouse pad** (it shows the computer's own screen). **Terminals
+(tab and screen), Notes (with Snippets and the Clipboard history tab) and Files are not secure**: the
+owner decided (2026-11-17) that screenshots, screen recording, the desk's Phone Screen share and the
+recents tile must work there, and accepted that their content can appear in Recents thumbnails and
+captures. The terminal keyboard is never a password variation (ColorOS blanks every capture while one
+has the keyboard). `SecureWindowTest` pins the list; there is no debug switch any more.

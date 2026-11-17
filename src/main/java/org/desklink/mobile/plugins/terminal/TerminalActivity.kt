@@ -419,7 +419,11 @@ class TerminalActivity : AppCompatActivity() {
         }
         LaunchedEffect(state.error) {
             state.error?.let {
-                val text = if (it == TerminalProtocol.ERROR_BAD_CWD) getString(R.string.terminal_bad_cwd, deskName()) else it
+                val text = when (it) {
+                    TerminalProtocol.ERROR_BAD_CWD -> getString(R.string.terminal_bad_cwd, deskName())
+                    TerminalProtocol.ERROR_NOT_CONNECTED -> getString(R.string.terminal_input_not_sent, deskName())
+                    else -> it
+                }
                 client.clearError()
                 // Nothing to show yet (a session that could not be started): the tab, with the reason.
                 if (openId == null) toTerminalsTab(text) else snackbar.showSnackbar(text)
@@ -531,7 +535,7 @@ class TerminalActivity : AppCompatActivity() {
                         // tab after START_TIMEOUT_MS, and a link that returns starts it by itself).
                         androidx.compose.material3.Text(
                             stringResource(R.string.terminals_disconnected_title, deskName()), color = TermAccent,
-                            modifier = Modifier.padding(horizontal = 24.dp),
+                            modifier = Modifier.padding(horizontal = 24.dp).semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
                         )
                     }
                 }

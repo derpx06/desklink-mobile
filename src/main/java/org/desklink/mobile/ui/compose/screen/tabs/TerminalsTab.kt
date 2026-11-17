@@ -51,6 +51,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -533,7 +534,8 @@ private fun SessionMenu(name: String, connected: Boolean, onRename: () -> Unit, 
 @Composable
 private fun Notice(icon: Int, title: String, message: String, action: String? = null, onAction: () -> Unit = {}) {
     // Scrolls: at the largest text the explanation and its button are taller than the screen, and a button squeezed under 48 dp is no target.
-    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
+    // A state that appears (disconnected, could not load) is read out when it does.
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }, contentAlignment = Alignment.Center) {
         EmptyState(icon, title, message) { if (action != null) SecondaryButton(action, onAction, tonal = true, height = 48.dp) }
     }
 }

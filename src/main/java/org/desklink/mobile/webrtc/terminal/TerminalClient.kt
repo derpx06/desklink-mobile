@@ -376,7 +376,7 @@ class TerminalClient(
                 // Not queued (it would land in a shell later, unseen) and not lost in silence: said once per outage.
                 if (!downInputSaid) {
                     downInputSaid = true
-                    error = "Not sent: the computer isn't connected"
+                    error = TerminalProtocol.ERROR_NOT_CONNECTED
                     publish()
                 }
                 return@post

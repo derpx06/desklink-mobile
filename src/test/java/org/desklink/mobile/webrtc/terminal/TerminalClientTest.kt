@@ -957,6 +957,25 @@ class TerminalClientTest {
         assertEquals("ls\r", String(input.data))
     }
 
+    /** Typed while the link is down: not queued, not lost in silence: said once per outage, and again after the next one. */
+    @Test
+    fun keysTypedWhileTheLinkIsDownAreSaidNotSentOncePerOutage() {
+        val h = Harness()
+        h.ready(); h.listed(bash); h.open()
+        h.client.onLinkLost(wire)
+        val sentBefore = h.sent.size
+        h.client.sendInput("t1", "a".toByteArray())
+        assertEquals(TerminalProtocol.ERROR_NOT_CONNECTED, h.client.state.value.error)
+        h.client.clearError()
+        h.client.sendInput("t1", "b".toByteArray())
+        assertNull("said once for this outage", h.client.state.value.error)
+        assertEquals("nothing queued or sent", sentBefore, h.sent.size)
+        h.ready(); h.open()
+        h.client.onLinkLost(wire)
+        h.client.sendInput("t1", "c".toByteArray())
+        assertEquals("the next outage says it again", TerminalProtocol.ERROR_NOT_CONNECTED, h.client.state.value.error)
+    }
+
     @Test
     fun keystrokesQueuedTogetherLeaveTogether() {
         val h = Harness(deferred = true)

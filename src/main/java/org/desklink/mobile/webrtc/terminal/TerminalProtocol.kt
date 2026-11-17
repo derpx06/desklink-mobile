@@ -57,6 +57,9 @@ object TerminalProtocol {
     /** Sent as `error` (no terminal id) when a `create` names a folder that is not a readable directory. */
     const val ERROR_BAD_CWD = "bad-cwd"
 
+    /** Keys were typed while the link was down: not sent (the screen says so, in words). */
+    const val ERROR_NOT_CONNECTED = "not-connected"
+
     /** Bounds for the folder fields: the desk refuses longer, and a list of folders is short. */
     const val MAX_CWD_CHARS = 4096
     const val MAX_FOLDERS = 16

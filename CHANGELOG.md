@@ -12,8 +12,8 @@
   Allow on the phone, and USSD/MMI codes are refused.
 - Sound: the phone's microphone or sound on the computer, and the computer's sound on the phone, when you allow it.
 - Glide: the computer's pointer and keyboard continue onto the phone.
-- Privacy: secret notifications are never sent, private ones go without text unless allowed; secret screens (notes,
-  terminals, pairing code, session password) are excluded from screenshots and recents; accessibility has a plain
+- Privacy: secret notifications are never sent, private ones go without text unless allowed; the pairing code, the
+  session password and the computer's screen are excluded from screenshots and recents; accessibility has a plain
   explanation and consent first; the clipboard workaround that read the system log is debug-only; release builds
   log errors only.
 - Security: other apps can no longer make the phone send to the computer unasked or read its private data; strangers on the

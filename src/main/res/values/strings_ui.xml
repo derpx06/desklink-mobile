@@ -1100,6 +1100,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_turn_on">Turn on</string>
     <string name="terminals_disconnected_title">%1$s isn\'t connected</string>
     <string name="terminals_disconnected_message">Terminals show here once it\'s connected. The ones already open keep running there.</string>
+    <string name="terminal_input_not_sent">Not sent: %1$s isn\'t connected.</string>
     <string name="terminals_load_failed_title">Couldn\'t load terminals</string>
     <string name="terminals_load_failed_message">%1$s didn\'t answer. Try again.</string>
     <string name="terminal_needs_link">New terminals start on %1$s, which is not connected. Looking for it again…</string>
