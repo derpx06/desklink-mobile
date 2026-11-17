@@ -30,8 +30,11 @@ public class SendFileActivity extends AppCompatActivity {
 
     private String mDeviceId;
 
-    /** The activity that is on screen: a rotation while the files are read replaces the one that picked them. */
-    private static WeakReference<SendFileActivity> live = new WeakReference<>(null);
+    /**
+     * The activity on screen per computer: a rotation while the files are read replaces the one that picked them, and two
+     * launches (for two computers) each finish their own.
+     */
+    private static final java.util.concurrent.ConcurrentHashMap<String, WeakReference<SendFileActivity>> live = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** The picked files, each once: a picker that returns the first as `data` and again in the clip would send it twice. */
     static ArrayList<Uri> uniqueUris(Uri data, ClipData clip) {
@@ -52,14 +55,16 @@ public class SendFileActivity extends AppCompatActivity {
      * grant on the files ends with the activity that received them, and the reads open one file after another.
      */
     static void sendThenFinish(SendFileActivity from, Executor executor, Runnable work) {
-        live = new WeakReference<>(from);
+        final String key = String.valueOf(from.mDeviceId);
+        live.put(key, new WeakReference<>(from));
         android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
         executor.execute(() -> {
             try {
                 work.run();
             } finally {
                 main.post(() -> {
-                    SendFileActivity activity = live.get();
+                    WeakReference<SendFileActivity> ref = live.remove(key);
+                    SendFileActivity activity = ref == null ? null : ref.get();
                     if (activity != null) activity.finish();
                 });
             }
@@ -71,7 +76,7 @@ public class SendFileActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         mDeviceId = getIntent().getStringExtra("deviceId");
-        live = new WeakReference<>(this);
+        live.put(String.valueOf(mDeviceId), new WeakReference<>(this));
         // Recreated (a rotation) while the picker is up or the files are being read: the picker is already there.
         if (savedInstanceState != null) return;
 

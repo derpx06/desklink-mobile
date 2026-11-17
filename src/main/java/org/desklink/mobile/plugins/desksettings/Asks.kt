@@ -286,9 +286,8 @@ object Asks {
     /** After Allow: the desk hears the new state (on, or still off if Android's part was refused). */
     fun report(deskId: String) {
         val device = device(deskId) ?: return
-        org.desklink.mobile.helpers.ThreadHelper.execute {
-            // What was just granted loads its plugin first: the report must not say on for a plugin that is not loaded.
-            runCatching { device.reloadIfAccessGranted() }
+        // What was just granted loads its plugin first (same lifecycle task): the report must not say on for a plugin not loaded.
+        device.reloadIfAccessGranted {
             runCatching {
                 device.getPlugin(DeskSettingsPlugin::class.java)?.sendReport(force = true)
                 device.getPlugin(org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin::class.java)?.reportAllowed()
@@ -300,11 +299,8 @@ object Asks {
     fun reportAll() {
         val devices = runCatching { DeskLinkApplication.getInstance().devices.values.filter { it.isPaired } }.getOrDefault(emptyList())
         if (devices.isEmpty()) return
-        org.desklink.mobile.helpers.ThreadHelper.execute {
-            // Back from Android's settings: access granted there loads its plugin before the report is made.
-            devices.forEach { runCatching { it.reloadIfAccessGranted() } }
-            devices.forEach { runCatching { it.getPlugin(DeskSettingsPlugin::class.java)?.sendReport() } }
-        }
+        // Back from Android's settings: access granted there loads its plugin before the report is made.
+        devices.forEach { device -> device.reloadIfAccessGranted { runCatching { device.getPlugin(DeskSettingsPlugin::class.java)?.sendReport() } } }
     }
 
     /** Not now on the prompt. Not exported: no other app may answer for the person. */

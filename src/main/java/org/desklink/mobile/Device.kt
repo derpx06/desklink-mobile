@@ -1593,25 +1593,38 @@ class Device : PacketReceiver {
     }
 
     /**
-     * Access granted since the plugins were loaded (see [org.desklink.mobile.helpers.PluginAccess]): reloads only what waited for it.
-     * True if anything was reloaded.
+     * Access granted since the plugins were loaded (see [org.desklink.mobile.helpers.PluginAccess]): reloads only what waited for
+     * it, on the lifecycle worker (serialised with the feature-ready snapshots), and has a plugin loaded mid-link send its
+     * snapshot, which the link's feature-ready missed. [afterwards] runs in the same task (the report that must say what is true).
      */
-    @WorkerThread
-    fun reloadIfAccessGranted(): Boolean {
-        if (!isPaired || !isReachable) return false
+    fun reloadIfAccessGranted(afterwards: () -> Unit = {}) {
+        lifecycle.enqueue("access granted") {
+            runCatching {
+                if (isPaired && isReachable) reloadAccessGrantedLocked()
+            }.onFailure { Log.w("DeskLink/Device", "${deviceInfo.name}: reload for granted access failed", it) }
+            runCatching { afterwards() }
+        }
+    }
+
+    private fun reloadAccessGrantedLocked() = synchronized(this) {
+        // Decided inside the lock: two grants arriving together reload once.
         val change = org.desklink.mobile.helpers.PluginAccess.waiting(
             enabled = ::isPluginEnabled,
             loaded = loadedPlugins.keys,
             noRequired = pluginsWithoutPermissions,
             noOptional = pluginsWithoutOptionalPermissions,
         )
-        if (change.isNone()) return false
+        if (change.isNone()) return@synchronized
         Log.i("Device", "${deviceInfo.name}: access granted for ${change.reload}, loading it")
-        synchronized(this) {
-            change.recreate.forEach(::removePlugin)
-            reloadPluginsFromSettings()
+        change.recreate.forEach(::removePlugin)
+        val before = loadedPlugins.keys.toSet()
+        reloadPluginsFromSettings()
+        val now = org.desklink.mobile.helpers.PluginAccess.newlyLoaded(before, loadedPlugins.keys.toSet())
+        org.desklink.mobile.helpers.PluginAccess.announce(now, linkReady = hasActiveWebRtcFeatureTransport) { key ->
+            loadedPlugins[key]?.let { plugin ->
+                runCatching { plugin.onFeatureReady() }.onFailure { Log.w("DeskLink/Device", "$key failed its snapshot after access was granted", it) }
+            }
         }
-        return true
     }
 
     fun launchBackgroundReloadPluginsFromSettings() {

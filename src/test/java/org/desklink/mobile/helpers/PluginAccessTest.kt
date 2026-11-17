@@ -48,6 +48,29 @@ class PluginAccessTest {
         assertTrue(waiting(required = mapOf("Calls" to plugin(Gate(required = false)))).isNone())
     }
 
+    /** A plugin loaded without its required access (it asks to load anyway) that gains it is created again: onCreate reads the access. */
+    @Test
+    fun aPluginLoadedWithoutItsRequiredAccessIsRecreatedWhenItGainsIt() {
+        val gate = Gate(required = true)
+        val change = waiting(required = mapOf("Mouse" to plugin(gate)), loaded = setOf("Mouse"))
+        assertEquals(setOf("Mouse"), change.recreate)
+        assertEquals(setOf("Mouse"), change.reload)
+    }
+
+    /** A plugin loaded mid-link missed the feature-ready snapshots: it announces itself, once, only when the link is ready. */
+    @Test
+    fun aPluginLoadedMidLinkSendsItsSnapshotOnceWhenTheLinkIsReady() {
+        assertEquals(setOf("Contacts"), PluginAccess.newlyLoaded(setOf("Ping"), setOf("Ping", "Contacts")))
+        assertTrue("nothing new the second time", PluginAccess.newlyLoaded(setOf("Ping", "Contacts"), setOf("Ping", "Contacts")).isEmpty())
+        val sent = mutableListOf<String>()
+        PluginAccess.announce(setOf("Contacts"), linkReady = false) { sent += it }
+        assertTrue("not ready: feature-ready will send it", sent.isEmpty())
+        PluginAccess.announce(setOf("Contacts"), linkReady = true) { sent += it }
+        assertEquals(listOf("Contacts"), sent)
+        PluginAccess.announce(emptySet(), linkReady = true) { sent += it }
+        assertEquals(listOf("Contacts"), sent)
+    }
+
     /** Telephony's notification listener is added only in onCreate: gaining notification access recreates it. */
     @Test
     fun aLoadedPluginThatGainedItsOptionalAccessIsRecreated() {

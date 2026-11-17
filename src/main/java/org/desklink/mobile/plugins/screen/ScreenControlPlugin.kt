@@ -398,7 +398,8 @@ class ScreenControlPlugin : Plugin() {
     /**
      * A desk's ask: a pop-up over whatever is open ([ScreenAskActivity]) when Android lets this app start one from the
      * background ([askRoute]); otherwise, and whenever the pop-up did not come up, the heads-up notification with Allow and
-     * Not now (full-screen when the phone is locked and Android allows it). Offered from this phone's own Share screen, the
+     * Not now. A locked or sleeping phone gets that notification on its lock screen like any other, never a full-screen
+     * intent (Play grants it to calling and alarm apps only), so the ask can time out unseen. Offered from this phone's own Share screen, the
      * person is already in the app: Android's consent prompt at once. One per desk, gone when answered or after
      * [PROMPT_TIMEOUT_MS] (the desk's own wait).
      */

@@ -32,15 +32,25 @@ object PluginAccess {
     ): Change {
         val granted = noRequired.filter { (key, plugin) -> enabled(key) && plugin.checkRequiredPermissions() }.keys
         val gained = noOptional.filter { (key, plugin) -> enabled(key) && key in loaded && key !in granted && plugin.checkOptionalPermissions() }.keys
-        return Change(reload = granted + gained, recreate = gained)
+        // Loaded already (it asked to load without its access) and now has it: `addPlugin` keeps the instance, so it is created anew.
+        return Change(reload = granted + gained, recreate = gained + granted.filter { it in loaded })
+    }
+
+    /** Pure: the plugins a reload loaded that were not loaded before it. */
+    fun newlyLoaded(before: Set<String>, after: Set<String>): Set<String> = after - before
+
+    /**
+     * A plugin loaded while the link is already feature-ready missed the feature-ready snapshots: [send] makes each one speak
+     * now. A link not ready yet sends them itself when it is.
+     */
+    fun announce(loadedNow: Set<String>, linkReady: Boolean, send: (String) -> Unit) {
+        if (linkReady) loadedNow.forEach(send)
     }
 
     /** Every paired, reachable computer, off the main thread: [Asks.report] and the notification listener call this first. */
     @JvmStatic
     fun reloadGranted() {
         val devices = runCatching { org.desklink.mobile.DeskLinkApplication.getInstance().devices.values.toList() }.getOrDefault(emptyList())
-        ThreadHelper.execute {
-            devices.forEach { device -> runCatching { device.reloadIfAccessGranted() } }
-        }
+        devices.forEach { device -> runCatching { device.reloadIfAccessGranted() } }
     }
 }
