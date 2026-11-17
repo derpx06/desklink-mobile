@@ -113,7 +113,11 @@ class LeavingWiringTest {
         assertTrue(source.contains("registerReceiver(") && source.contains("leavingReceiver,") && source.contains("IntentFilter(WifiManager.WIFI_STATE_CHANGED_ACTION)"))
         assertTrue(source.contains("leavingReceiver?.let { runCatching { unregisterReceiver(it) } }"))
         assertTrue(Regex("override fun onTaskRemoved[^}]*LeavingReport.shared.report\\(\"task-removed\"\\)").containsMatchIn(source))
-        assertTrue(source.contains("LeavingReport.shared.report(\"service-stopped\", LeavingReport.DESTROY_WAIT_MS)"))
+        assertTrue(source.contains("reportsOnDestroy(wasInitialized)) LeavingReport.shared.report(\"service-stopped\", LeavingReport.DESTROY_WAIT_MS)"))
+        // A never-started service (refused foreground start -> stopSelf) says nothing.
+        assertFalse(reportsOnDestroy(false))
+        assertTrue(reportsOnDestroy(true))
+        assertTrue(source.indexOf("if (safeStart) return super.onDestroy()") < source.indexOf("val wasInitialized"))
         assertTrue(source.contains("leaseRecheck.postDelayed(networkLostReport, NETWORK_LOST_REPORT_DELAY_MS)"))
         // The report precedes the providers' shutdown in onDestroy.
         assertTrue(source.indexOf("\"service-stopped\"") < source.indexOf("linkProvider.onStop()"))

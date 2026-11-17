@@ -58,6 +58,9 @@ internal class LeavingReport(
 /** The `state` boolean extra of `ACTION_AIRPLANE_MODE_CHANGED` (`Intent.EXTRA_AIRPLANE_MODE` does not exist; the platform documents "state"). */
 internal const val AIRPLANE_STATE_EXTRA = "state"
 
+/** `onDestroy` reports only for a service that finished initialising (the safe-start path returns before). */
+internal fun reportsOnDestroy(wasInitialized: Boolean): Boolean = wasInitialized
+
 /** Why this broadcast means the phone is leaving the network, or null when it does not. */
 internal fun leavingReasonFor(action: String?, wifiState: Int, airplaneOn: Boolean): String? = when (action) {
     WifiManager.WIFI_STATE_CHANGED_ACTION -> "wifi-off".takeIf { wifiState == WifiManager.WIFI_STATE_DISABLING }

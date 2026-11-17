@@ -577,11 +577,14 @@ class BackgroundService : Service() {
     override fun onDestroy() {
         Log.d("DeskLink/BgService", "onDestroy")
         if (safeStart) return super.onDestroy()
+        val wasInitialized = initialized
         initialized = false
         // First, before the providers are stopped below: the desk checks the link now. Written on a
         // thread of its own, waited for at most DESTROY_WAIT_MS (best effort, bounded on main).
         leaseRecheck.removeCallbacks(networkLostReport)
-        LeavingReport.shared.report("service-stopped", LeavingReport.DESTROY_WAIT_MS)
+        // Only a service that was connected: a refused foreground start ends in stopSelf() -> onDestroy
+        // with nothing to report and providers half set up.
+        if (reportsOnDestroy(wasInitialized)) LeavingReport.shared.report("service-stopped", LeavingReport.DESTROY_WAIT_MS)
         screenReceiver?.let { runCatching { unregisterReceiver(it) } }
         screenReceiver = null
         leavingReceiver?.let { runCatching { unregisterReceiver(it) } }
