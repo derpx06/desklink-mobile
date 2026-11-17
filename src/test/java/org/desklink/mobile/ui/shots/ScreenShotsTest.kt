@@ -337,7 +337,7 @@ abstract class ScreenShots : ShotTest() {
     @Test fun settingsMarksTheOpenPageAndNeverDoublesTheList() {
         splitSettings("privacy")
         val selected = compose.onAllNodes(androidx.compose.ui.test.isSelected(), useUnmergedTree = true).fetchSemanticsNodes().size
-        check((selected > 0) == splits) { "$form: the open page is marked: $splits, was $selected" }
+        check(selected == (if (splits) 1 else 0)) { "$form: exactly one page is marked when split: $splits, was $selected" }
         splitSettings("no-such-page")
         check(texts(org.desklink.mobile.R.string.settings_search) <= 1) { "$form: the search field is in the list twice" }
         splitSettings("sound", noComputer = true)

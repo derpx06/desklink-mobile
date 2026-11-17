@@ -575,7 +575,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             }
         }
         // Settings without a computer keep their pages on the Settings tab's stack.
-        if (route == SETTINGS && nav.pop(AppTab.SETTINGS)) return
+        if (route == SETTINGS && nav.up(AppTab.SETTINGS)) return
         pop()
     }
 

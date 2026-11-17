@@ -35,6 +35,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -314,9 +315,12 @@ private fun ComputerCard(desk: DeskSettings, onOpen: () -> Unit, onSwitch: (() -
 @Composable
 private fun PageRow(page: SettingsPage, summary: String, badge: Int, selected: Boolean = false, onClick: () -> Unit) {
     val t = tokens
+    // Beside a page the list can be taller than the screen: the open page's row is scrolled into view.
+    val bring = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    androidx.compose.runtime.LaunchedEffect(selected) { if (selected) { androidx.compose.runtime.withFrameNanos { }; bring.bringIntoView() } }
     Row(
         // The open page beside the list is tinted and announced as selected.
-        Modifier.fillMaxWidth().background(if (selected) t.accentContainer else t.surface).semantics { if (selected) this.selected = true }.clickable(role = Role.Button, onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().bringIntoViewRequester(bring).background(if (selected) t.accentContainer else t.surface).semantics { if (selected) this.selected = true }.clickable(role = Role.Button, onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         // At the largest font the tile would leave the title a sliver ("Notification|s", "Advance|d"): it goes, as on the computer card.
