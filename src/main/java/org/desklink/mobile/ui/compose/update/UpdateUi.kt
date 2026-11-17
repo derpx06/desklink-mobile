@@ -65,6 +65,9 @@ internal class UpdateUi(
     /** Anything else is up (a dialog, a pairing or transfer prompt, a permission step, the first-run tour): the sheet waits for the next open. */
     private val blocked: () -> Boolean,
 ) {
+    /** No update address in this build (and no debug override to look for): nothing is created, read or run. */
+    private val inert = BuildConfig.DEFAULT_UPDATE_URL.isBlank() && !BuildConfig.DEBUG
+
     private val holder by lazy { UpdateRuntime.get(context) }
     private val engine: UpdateEngine get() = holder.engine
     private val store get() = holder.store
@@ -91,6 +94,7 @@ internal class UpdateUi(
 
     /** A launcher launch of the main activity: decided once, from the cache, off the main thread. */
     fun onOpen(openId: String) {
+        if (inert) return
         if (!runCatching { engine.configured() }.getOrDefault(false)) return
         scope.launch(Dispatchers.IO) {
             val state = runCatching { coordinator.onOpen(openId) }.getOrNull() ?: return@launch
@@ -150,6 +154,7 @@ internal class UpdateUi(
     // --- Settings
 
     fun settingsModel(): UpdatesSettingsModel {
+        if (inert) return UpdatesSettingsModel(false, false, false, Channel.BETA, false, CheckStatus.Idle, null)
         @Suppress("UNUSED_EXPRESSION") version // re-read after a change
         val configured = engine.configured()
         val installed = Version.parseLenient(BuildConfig.VERSION_NAME) ?: Version(0, 0, 0)
