@@ -14,7 +14,12 @@
             "title": "Files has a list view",
             "detail": "Switch between grid and list.",
             "glyph": "files",
-            "icon": "x"
+            "icon": "x",
+            "extra": {
+              "a": [
+                1
+              ]
+            }
           },
           {
             "title": "Faster reconnects",
@@ -51,21 +56,18 @@
           {
             "title": "Files has a list view",
             "detail": "Switch between grid and list.",
-            "glyph": "files"
+            "glyph": "files",
+            "icon": "x",
+            "extra": {
+              "a": [
+                1
+              ]
+            }
           },
           {
             "title": "Faster reconnects",
             "detail": "Back online in seconds after a Wi-Fi change.",
             "glyph": "refresh"
-          },
-          {
-            "title": "Clearer Terminals",
-            "detail": "A plain message when the computer is offline.",
-            "glyph": "terminal"
-          },
-          {
-            "title": "Pairing fixed",
-            "glyph": "swap"
           }
         ],
         "size": 41234567,

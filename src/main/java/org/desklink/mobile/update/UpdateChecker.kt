@@ -14,7 +14,7 @@ import okhttp3.Request
  * User-Agent `DeskLink-update-check/<version>`, Accept, Accept-Encoding: identity (so the size cap counts wire bytes) and
  * If-None-Match: no identifier of any kind. https only; http only for the debug loopback ([debugLoopback]). Never throws.
  */
-internal class UpdateChecker(private val appVersion: String, private val debugLoopback: Boolean, private val timeoutS: Long = TIMEOUT_S, client: OkHttpClient = OkHttpClient()) {
+internal class UpdateChecker(private val appVersion: String, private val debugLoopback: Boolean, private val timeoutS: Long = TIMEOUT_S, client: OkHttpClient? = null) {
     sealed interface Result {
         data object NotModified : Result
         data class Body(val bytes: ByteArray, val etag: String?) : Result

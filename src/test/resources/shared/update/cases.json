@@ -2030,6 +2030,50 @@
       ]
     },
     {
+      "id": "envelope-unknown-kid-nonstring-payload",
+      "file": "manifests/envelope-unknown-kid-nonstring-payload.json",
+      "description": "Unknown kid AND a non-string payload: the kid lookup comes first, so the reason is `signature` (never `parse`).",
+      "runs": [
+        {
+          "name": "ignored",
+          "expect": "Ignore:signature"
+        }
+      ]
+    },
+    {
+      "id": "envelope-known-kid-nonstring-payload",
+      "file": "manifests/envelope-known-kid-nonstring-payload.json",
+      "description": "Known kid, payload is a number: `signature` (the shape check only requires the four keys and a string kid).",
+      "runs": [
+        {
+          "name": "ignored",
+          "expect": "Ignore:signature"
+        }
+      ]
+    },
+    {
+      "id": "envelope-known-kid-nonstring-sig",
+      "file": "manifests/envelope-known-kid-nonstring-sig.json",
+      "description": "Known kid, sig is null: `signature`.",
+      "runs": [
+        {
+          "name": "ignored",
+          "expect": "Ignore:signature"
+        }
+      ]
+    },
+    {
+      "id": "envelope-nonstring-kid",
+      "file": "manifests/envelope-nonstring-kid.json",
+      "description": "kid is a number: `parse` (the envelope shape is wrong before any lookup).",
+      "runs": [
+        {
+          "name": "ignored",
+          "expect": "Ignore:parse"
+        }
+      ]
+    },
+    {
       "id": "envelope-v-1.0",
       "file": "manifests/envelope-v-1.0.json",
       "description": "Envelope v = 1.0.",
@@ -2648,6 +2692,18 @@
         {
           "name": "offer",
           "expectNotes": [
+            {
+              "title": "Files has a list view",
+              "detail": "Switch between grid and list.",
+              "glyph": "files"
+            },
+            {
+              "title": "Faster reconnects",
+              "detail": "Back online in seconds after a Wi-Fi change.",
+              "glyph": "refresh"
+            }
+          ],
+          "expectNotesAndroid": [
             {
               "title": "Files has a list view",
               "detail": "Switch between grid and list.",
@@ -3443,6 +3499,28 @@
             "desktop.releaseUrl": "kept",
             "desktop.notesUrl": "kept"
           },
+          "expectNotesAndroid": [
+            {
+              "title": "Files has a list view",
+              "detail": "Switch between grid and list.",
+              "glyph": "files"
+            },
+            {
+              "title": "Faster reconnects",
+              "detail": "Back online in seconds after a Wi-Fi change.",
+              "glyph": "refresh"
+            },
+            {
+              "title": "Clearer Terminals",
+              "detail": "A plain message when the computer is offline.",
+              "glyph": "terminal"
+            },
+            {
+              "title": "Pairing fixed",
+              "detail": null,
+              "glyph": "swap"
+            }
+          ],
           "expectNotes": [
             {
               "title": "Files has a list view",

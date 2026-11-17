@@ -44,14 +44,14 @@ internal object UpdateVerifier {
         class Refused(val reason: FailReason) : Opened
     }
 
-    /** The signed payload bytes, or why not: a malformed envelope is `parse`, an unknown key, bad encoding or bad signature `signature`. */
+    /** The signed payload bytes, or why not: a malformed envelope (shape, non-string kid) is `parse`; once the kid is known (as in dl_update.py) an unknown kid, a non-string or badly encoded payload/sig and a bad signature are all `signature`. */
     private fun openEnvelope(body: ByteArray, keys: Map<String, ByteArray>): Opened {
         val bad = Opened.Refused(FailReason.SIGNATURE)
         val env = StrictJson.parse(body) as? Map<*, *> ?: return Opened.Refused(FailReason.PARSE)
         if (env.keys != setOf("v", "kid", "payload", "sig") || num(env["v"]) != 1L) return Opened.Refused(FailReason.PARSE)
         val pk = keys[env["kid"] as? String ?: return Opened.Refused(FailReason.PARSE)]?.takeIf { it.size == 32 } ?: return bad
-        val msg = base64Url(env["payload"] as? String ?: return Opened.Refused(FailReason.PARSE)) ?: return bad
-        val sig = base64Url(env["sig"] as? String ?: return Opened.Refused(FailReason.PARSE))?.takeIf { it.size == 64 } ?: return bad
+        val msg = base64Url(env["payload"] as? String ?: return bad) ?: return bad
+        val sig = base64Url(env["sig"] as? String ?: return bad)?.takeIf { it.size == 64 } ?: return bad
         return if (sCanonical(sig) && Ed25519.verify(sig, 0, pk, 0, msg, 0, msg.size)) Opened.Bytes(msg) else bad
     }
 

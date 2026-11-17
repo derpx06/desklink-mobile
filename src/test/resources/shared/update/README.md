@@ -55,7 +55,11 @@ nothing is re-serialised, and the payload bytes are NOT parsed or inspected befo
 
 1. Body size <= 65536 bytes, else `oversized` (checked before parsing; exactly 65536 is accepted).
 2. Parse the envelope (rules above), else `parse`. Exactly four keys; `v` is the integer token `1` (`1.0`, `"1"`, `1e0`, `true`: `parse`).
-3. `kid` is looked up exactly (case-sensitive) in the client's key set; unknown = `signature`.
+3. The envelope shape is checked first: exactly the four keys, `v` the integer 1, `kid` a STRING (else `parse`). Then `kid` is looked up
+   exactly (case-sensitive) in the client's key set; unknown = `signature`, decided BEFORE `payload`/`sig` are looked at (so an unknown
+   kid with a non-string payload is `signature`). A known kid with a `payload` or `sig` that is not a string is also `signature`
+   (fixtures `envelope-unknown-kid-nonstring-payload`, `envelope-known-kid-nonstring-payload`, `envelope-known-kid-nonstring-sig`,
+   `envelope-nonstring-kid` = `parse`).
 4. `payload` and `sig` are CANONICAL base64url: alphabet `A-Za-z0-9-_` only (`+`, `/` are not accepted), no `=` padding, no length = 1
    (mod 4), and re-encoding the decoded bytes must reproduce the text exactly (rejects non-zero trailing bits). The empty string
    is a valid encoding of zero bytes (and fails verification). Else `signature`.
@@ -133,8 +137,9 @@ A run's `expect` is either a verdict string for the whole manifest (`Ignore:<rea
 | `Skipped:<v>` / `Snoozed:<v>` | would be `Offer` but for the stored preference |
 | `Ignore:<reason>` | whole manifest rejected; reason in `oversized parse signature schema expired replay` |
 
-Per-run checks on the desktop component: `expectNotes` (the exact notes after the rules above, hand-written in the generator, never
-computed by it; `detail` null when absent), `expectRequiredReason` (string or null), `expectReleased` (string or null), `expectUrls`
+Per-run checks: `expectNotes` applies to the DESKTOP component's notes and `expectNotesAndroid` to the ANDROID component's (the exact
+notes after the rules above, hand-written in the generator, never computed by it; `detail` null when absent; when a run has only
+`expectNotes`, the android component's notes are not asserted). The remaining checks apply to the desktop component: `expectRequiredReason` (string or null), `expectReleased` (string or null), `expectUrls`
 (`"<component>.<field>": "kept" | "dropped"`, field `notesUrl releaseUrl tarball apk`, or `playId` = `"ignored"`).
 Other tables: `ratchetVectors` (`stored = min(issuedAt, now)`), `bucketVectors`, `urlChecks` (`[url, allowed]`), `urlContextChecks`, `installIdChecks`.
 

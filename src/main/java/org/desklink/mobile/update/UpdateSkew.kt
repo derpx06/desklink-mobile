@@ -16,8 +16,8 @@ internal sealed interface UpdateSkew {
             val b = Version.parseLenient(peer) ?: return None
             val c = compareValuesBy(b, a, { it.major }, { it.minor })
             return when {
-                c < 0 -> PeerOlder(peer!!.takeWhile { it.isDigit() || it == '.' })
-                c > 0 -> PeerNewer(peer!!.takeWhile { it.isDigit() || it == '.' })
+                c < 0 -> PeerOlder(peer!!.takeWhile { it in '0'..'9' || it == '.' })
+                c > 0 -> PeerNewer(peer!!.takeWhile { it in '0'..'9' || it == '.' })
                 else -> None
             }
         }

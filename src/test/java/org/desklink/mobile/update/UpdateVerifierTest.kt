@@ -67,6 +67,15 @@ class UpdateVerifierTest {
         assertEquals(FailReason.PARSE, rejected(verify(String(Signer.envelope(Signer.payload())).replace("\"v\":1", "\"v\":1.0").toByteArray())))
     }
 
+    @Test fun theKidIsLookedUpBeforeThePayloadTypesLikeTheReferenceVerifier() {
+        // dl_update.py: a non-string kid is parse; an unknown kid is signature whatever payload/sig hold; a known kid with a
+        // non-string or badly encoded payload/sig is signature too.
+        assertEquals(FailReason.PARSE, rejected(verify("""{"v":1,"kid":5,"payload":"AAAA","sig":"AAAA"}""".toByteArray())))
+        assertEquals(FailReason.SIGNATURE, rejected(verify("""{"v":1,"kid":"nope","payload":5,"sig":null}""".toByteArray())))
+        assertEquals(FailReason.SIGNATURE, rejected(verify("""{"v":1,"kid":"test1","payload":5,"sig":"AAAA"}""".toByteArray())))
+        assertEquals(FailReason.SIGNATURE, rejected(verify("""{"v":1,"kid":"test1","payload":"AAAA","sig":[]}""".toByteArray())))
+    }
+
     @Test fun malformedEnvelopesAreRefusedNotThrown() {
         for (s in listOf("", "{", "[]", "null", """{"v":1}""")) assertEquals(s, FailReason.PARSE, rejected(verify(s.toByteArray())))
         for (s in listOf("""{"v":1,"kid":"test1","payload":"!!","sig":"!!"}""", """{"v":1,"kid":"test1","payload":"AAAA","sig":"AAAA"}""")) assertEquals(s, FailReason.SIGNATURE, rejected(verify(s.toByteArray())))

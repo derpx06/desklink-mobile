@@ -75,8 +75,8 @@ class UpdateSharedCasesTest {
 
     private fun checkExtras(label: String, run: JSONObject, p: Payload) {
         val notes = (p.channels[Channel.BETA] ?: p.channels[Channel.STABLE])?.notes ?: return
-        // expectNotes is the DESKTOP component's list; in this fixture the phone component carries different notes.
-        when (val e = if (label.startsWith("unknown-fields-everywhere")) null else run.opt("expectNotes")) {
+        // expectNotes is the DESKTOP component's list; expectNotesAndroid (when present) is this component's.
+        when (val e = if (run.has("expectNotesAndroid")) run.opt("expectNotesAndroid") else run.opt("expectNotes")) {
             is JSONArray -> {
                 assertEquals(label, e.length(), notes.size)
                 for (k in 0 until e.length()) {
