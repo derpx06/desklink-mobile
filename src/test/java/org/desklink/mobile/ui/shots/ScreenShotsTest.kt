@@ -349,6 +349,8 @@ abstract class ScreenShots : ShotTest() {
     @Test fun terminalsReconnecting() = shoot("terminals-reconnecting", terminals(TerminalsPanel.LIST, connected.copy(link = TerminalLinkState.DISCONNECTED, sessions = sessions.take(2))))
     @Test fun terminalsLoading() = shoot("terminals-loading", terminals(TerminalsPanel.LOADING, TerminalClientState()))
     @Test fun terminalsNotAllowed() = shoot("terminals-not-allowed", terminals(TerminalsPanel.NOT_ALLOWED, connected.copy(notAllowed = true)))
+    @Test fun terminalsDisconnected() = shoot("terminals-disconnected", terminals(TerminalsPanel.DISCONNECTED, TerminalClientState()))
+    @Test fun terminalsLoadFailed() = shoot("terminals-load-failed", terminals(TerminalsPanel.LOAD_FAILED, connected.copy(listLoaded = false)))
     @Test fun terminalsPasswordNeeded() = shoot("terminals-password", terminals(TerminalsPanel.LOCKED, connected.copy(passwordNeeded = SessionPasswordDenial.Required)))
     @Test fun terminalsLockedOut() = shoot("terminals-locked-out", terminals(TerminalsPanel.LOCKED, connected.copy(passwordNeeded = SessionPasswordDenial.Locked(45))))
     @Test fun terminalsPhoneCheck() = shoot("terminals-gate", terminals(TerminalsPanel.GATE, TerminalClientState()))

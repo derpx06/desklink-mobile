@@ -222,7 +222,6 @@ fun NotesTab(
     segmentRequest: Int? = null,
     onSegmentShown: () -> Unit = {},
 ) {
-    org.desklink.mobile.ui.compose.SecureWindow()
     val t = tokens
     // Declared before the editor takes over, so the search and the segment are still there when it closes.
     var segment by rememberSaveable { mutableIntStateOf(0) }

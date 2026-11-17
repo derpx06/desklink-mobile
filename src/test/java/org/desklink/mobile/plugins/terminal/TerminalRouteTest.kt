@@ -141,6 +141,17 @@ class TerminalRouteTest {
         assertEquals(TerminalsPanel.LOCKED, terminalsPanel(true, TerminalsGate.OPEN, up.copy(passwordNeeded = SessionPasswordDenial.Locked(30))))
         assertEquals(TerminalsPanel.LOADING, terminalsPanel(true, TerminalsGate.OPEN, up.copy(listLoaded = false)))
         assertEquals(TerminalsPanel.LIST, terminalsPanel(true, TerminalsGate.OPEN, up))
+        // Owner 11-17: "Loading only, though the device is disconnected": a list never asked for or lost with the link is not
+        // a skeleton for ever.
+        val down = TerminalClientState(link = TerminalLinkState.DISCONNECTED, listLoaded = false)
+        assertEquals("connected, list in flight", TerminalsPanel.LOADING, terminalsPanel(true, TerminalsGate.OPEN, up.copy(listLoaded = false)))
+        assertEquals("connected, loaded", TerminalsPanel.LIST, terminalsPanel(true, TerminalsGate.OPEN, up))
+        assertEquals("not connected, no list", TerminalsPanel.DISCONNECTED, terminalsPanel(true, TerminalsGate.OPEN, down))
+        assertEquals("not connected: whatever the desk said last is stale", TerminalsPanel.DISCONNECTED, terminalsPanel(true, TerminalsGate.OPEN, down.copy(notAllowed = true)))
+        assertEquals("the list in flight timed out", TerminalsPanel.LOAD_FAILED, terminalsPanel(true, TerminalsGate.OPEN, up.copy(listLoaded = false), loadTimedOut = true))
+        assertEquals("a timeout is nothing once the list is there", TerminalsPanel.LIST, terminalsPanel(true, TerminalsGate.OPEN, up, loadTimedOut = true))
+        assertEquals("not connected beats a timeout", TerminalsPanel.DISCONNECTED, terminalsPanel(true, TerminalsGate.OPEN, down, loadTimedOut = true))
+        assertEquals("a list from before the link went stays, dimmed, with its chip", TerminalsPanel.LIST, terminalsPanel(true, TerminalsGate.OPEN, down.copy(listLoaded = true)))
         assertEquals("the phone's own check comes before anything the desk says", TerminalsPanel.GATE, terminalsPanel(true, TerminalsGate.DENIED, up.copy(notAllowed = true)))
     }
 

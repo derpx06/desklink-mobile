@@ -107,7 +107,7 @@ class NotesActivity : AppCompatActivity() {
         savedInstanceState?.let {
             editing.value = it.getString(STATE_EDITING)
         } ?: handle(intent)
-        setContent { DeskLinkTheme(this) { org.desklink.mobile.ui.compose.SecureWindow(); Root() } }
+        setContent { DeskLinkTheme(this) { Root() } }
     }
 
     override fun onStop() {

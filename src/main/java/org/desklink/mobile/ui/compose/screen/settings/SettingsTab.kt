@@ -1100,21 +1100,4 @@ private fun AdvancedGroup(desk: DeskSettings?, actions: SettingsActions, prefs: 
         GroupRow(stringResource(R.string.settings_export_logs), icon = R.drawable.sym_upload_file, subtitle = stringResource(R.string.settings_export_logs_text), onClick = { exportLogs.launch(CreateFileParams("text/plain", "desklink-log.txt")) })
         GroupRow(stringResource(R.string.about), icon = R.drawable.sym_info, subtitle = stringResource(R.string.sum_about), onClick = { onOpen(SettingsPage.ABOUT) }) { Chevron() }
     }
-    if (BuildConfig.DEBUG) {
-        SectionLabel(stringResource(R.string.settings_category_debug))
-        RowGroup {
-            // Files, Notes and Terminals keep the window secure; this lets `adb exec-out screencap` see them. Off by default, never in release.
-            // (a local, like the other debug rows: the parity tests list the rows every build has, and debug builds have more)
-            val allowTitle = stringResource(R.string.setting_debug_allow_screenshots)
-            GroupRow(
-                allowTitle, subtitle = stringResource(R.string.setting_debug_allow_screenshots_description),
-                checked = prefs.getBoolean(org.desklink.mobile.ui.compose.SecureWindows.KEY_ALLOW_SCREENSHOTS, false),
-                onClick = {
-                    val key = org.desklink.mobile.ui.compose.SecureWindows.KEY_ALLOW_SCREENSHOTS
-                    prefs.edit { putBoolean(key, !prefs.getBoolean(key, false)) }
-                    changed()
-                },
-            )
-        }
-    }
 }

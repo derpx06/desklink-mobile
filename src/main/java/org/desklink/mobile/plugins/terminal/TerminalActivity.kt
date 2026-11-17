@@ -251,7 +251,6 @@ class TerminalActivity : AppCompatActivity() {
         SessionGate.check(this, deviceId, onOpen = {
             setContent {
                 DeskLinkTheme(this) {
-                    org.desklink.mobile.ui.compose.SecureWindow()
                     TerminalRoot(terminalClient)
                 }
             }
@@ -522,10 +521,19 @@ class TerminalActivity : AppCompatActivity() {
                     onBack = onBack,
                 ) {}
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(
-                        color = TermAccent,
-                        modifier = Modifier.semantics { contentDescription = getString(R.string.terminal_starting) },
-                    )
+                    if (connected) {
+                        CircularProgressIndicator(
+                            color = TermAccent,
+                            modifier = Modifier.semantics { contentDescription = getString(R.string.terminal_starting) },
+                        )
+                    } else {
+                        // Nothing is being started while the computer is away: said, with no spinner (the screen goes back to the
+                        // tab after START_TIMEOUT_MS, and a link that returns starts it by itself).
+                        androidx.compose.material3.Text(
+                            stringResource(R.string.terminals_disconnected_title, deskName()), color = TermAccent,
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                        )
+                    }
                 }
             }
         }

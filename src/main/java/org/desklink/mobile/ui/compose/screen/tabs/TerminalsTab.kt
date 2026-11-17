@@ -107,8 +107,14 @@ enum class TerminalsPanel {
     /** The desk wants its session password: Enter password (or Retry while locked out). */
     LOCKED,
 
-    /** Waiting for the check or the first list. */
+    /** Waiting for the check, or for a list that was asked for (bounded: [LOAD_FAILED] after [LIST_TIMEOUT_MS]). */
     LOADING,
+
+    /** The computer is not connected and there is no list: said in words, with Try again (a discovery refresh). */
+    DISCONNECTED,
+
+    /** Connected, but the list did not come in time: "Couldn't load terminals", with Try again. */
+    LOAD_FAILED,
 
     /** The sessions, the launchers, search. */
     LIST,
@@ -120,13 +126,18 @@ enum class TerminalsPanel {
  */
 internal fun terminalsControlsOwnRow(screenWidthDp: Int, fontScale: Float): Boolean = screenWidthDp - 260 < 150 * fontScale
 
-fun terminalsPanel(hasClient: Boolean, gate: TerminalsGate, state: TerminalClientState): TerminalsPanel = when {
+/** How long a list request is awaited, link up, before the tab says it could not load. */
+const val LIST_TIMEOUT_MS = 8_000L
+
+fun terminalsPanel(hasClient: Boolean, gate: TerminalsGate, state: TerminalClientState, loadTimedOut: Boolean = false): TerminalsPanel = when {
     !hasClient -> TerminalsPanel.UNAVAILABLE
     gate == TerminalsGate.DENIED -> TerminalsPanel.GATE
     gate == TerminalsGate.PENDING -> TerminalsPanel.LOADING
+    // No list and no link (never connected, or lost with the list): what the desk said before is stale, and a list cannot come.
+    !state.listLoaded && state.link != TerminalLinkState.CONNECTED -> TerminalsPanel.DISCONNECTED
     state.notAllowed -> TerminalsPanel.NOT_ALLOWED
     state.passwordNeeded != null -> TerminalsPanel.LOCKED
-    !state.listLoaded -> TerminalsPanel.LOADING
+    !state.listLoaded -> if (loadTimedOut) TerminalsPanel.LOAD_FAILED else TerminalsPanel.LOADING
     else -> TerminalsPanel.LIST
 }
 
@@ -182,7 +193,6 @@ fun TerminalsTab(
     onNewTerminal: (launcher: String?, cwd: String?) -> Unit,
     onMessage: (String) -> Unit = {},
 ) {
-    org.desklink.mobile.ui.compose.SecureWindow()
     val context = LocalContext.current
     val activity = remember(context) { context.findFragmentActivity() }
     val client = remember(deviceId) { DeskLinkApplication.getInstance().terminalClient(deviceId) }
@@ -200,8 +210,20 @@ fun TerminalsTab(
         }
     }
 
-    val panel = terminalsPanel(client != null, gate, state)
     val connected = state.link == TerminalLinkState.CONNECTED
+    // A list request in flight is awaited for a while only: then "Couldn't load terminals", never a skeleton for ever. Restarted by
+    // the link coming back, by Try again and by the phone's own check; the list arriving (or the link going) ends it.
+    var listTries by remember { mutableIntStateOf(0) }
+    var loadTimedOut by remember(deviceId) { mutableStateOf(false) }
+    val awaitingList = client != null && gate == TerminalsGate.OPEN && connected && !state.listLoaded && !state.notAllowed && state.passwordNeeded == null
+    LaunchedEffect(awaitingList, listTries, gateRuns) {
+        loadTimedOut = false
+        if (awaitingList) {
+            kotlinx.coroutines.delay(LIST_TIMEOUT_MS)
+            loadTimedOut = true
+        }
+    }
+    val panel = terminalsPanel(client != null, gate, state, loadTimedOut)
     // Sessions can also start at the desk, which is not announced: look again while this tab is on screen.
     StartedEffect(client, connected, panel) {
         while (client != null && connected && (panel == TerminalsPanel.LIST || panel == TerminalsPanel.LOADING) && gate == TerminalsGate.OPEN) {
@@ -263,7 +285,12 @@ fun TerminalsTab(
         actions = TerminalsActions(
             onOpen = onOpenSession,
             onNew = start,
-            onRetry = { client?.refresh() },
+            // Not connected: the same action as the Home screen's Try again (look for the computer again); else ask for the list again.
+            onRetry = {
+                if (!connected) org.desklink.mobile.BackgroundService.ForceRefreshConnections(context)
+                listTries++
+                client?.refresh()
+            },
             askable = asker?.let { @Suppress("UNUSED_VARIABLE") val c = it.asksChanged; it.askable("terminalAccess") } == true,
             askState = asker?.askState("terminalAccess"),
             onAskComputer = { asker?.askDesk("terminalAccess") },
@@ -343,7 +370,7 @@ fun TerminalsContent(
             stringResource(R.string.terminal_section),
             Modifier.padding(top = 12.dp),
             subtitle = when {
-                panel == TerminalsPanel.UNAVAILABLE || !connected -> stringResource(R.string.terminal_status_reconnecting)
+                panel == TerminalsPanel.UNAVAILABLE || panel == TerminalsPanel.DISCONNECTED || !connected -> stringResource(R.string.terminal_status_reconnecting)
                 live.isEmpty() -> stringResource(R.string.terminals_subtitle_none, deskName)
                 else -> pluralStringResource(R.plurals.terminal_count_on, live.size, live.size, deskName)
             },
@@ -357,6 +384,14 @@ fun TerminalsContent(
         }
         when (panel) {
             TerminalsPanel.UNAVAILABLE -> Notice(R.drawable.sym_terminal, stringResource(R.string.terminal_section), stringResource(R.string.terminals_unavailable, deskName))
+            TerminalsPanel.DISCONNECTED -> Notice(
+                R.drawable.sym_terminal, stringResource(R.string.terminals_disconnected_title, deskName), stringResource(R.string.terminals_disconnected_message),
+                action = stringResource(R.string.terminal_retry), onAction = actions.onRetry,
+            )
+            TerminalsPanel.LOAD_FAILED -> Notice(
+                R.drawable.sym_terminal, stringResource(R.string.terminals_load_failed_title), stringResource(R.string.terminals_load_failed_message, deskName),
+                action = stringResource(R.string.terminal_retry), onAction = actions.onRetry,
+            )
             TerminalsPanel.GATE -> Notice(
                 R.drawable.sym_lock, stringResource(R.string.terminal_locked_title), stringResource(R.string.terminals_gate_message),
                 action = stringResource(R.string.terminals_unlock), onAction = actions.onUnlock,

@@ -184,6 +184,9 @@ class TerminalClient(
     private val sessions = LinkedHashMap<String, Session>()
     private val pendingInput = LinkedHashMap<String, ByteArrayOutputStream>()
     private var pendingInputBytes = 0
+
+    /** Keys typed while the link is down were said not to be sent, once for this outage. */
+    private var downInputSaid = false
     private var flushQueued = false
 
     /** Sinks are created on the UI thread as well (a view needs one before the first layout). */
@@ -197,6 +200,7 @@ class TerminalClient(
         if (this.wire == wire && linkUp) return@post
         this.wire = wire
         linkUp = true
+        downInputSaid = false
         sessions.values.forEach { it.attached = false; it.awaitingAttach = false }
         sendControl(TerminalAction.LIST)
         sessions.values.filter { it.wanted }.forEach(::sendAttach)
@@ -368,6 +372,15 @@ class TerminalClient(
         if (bytes.isEmpty()) return
         post {
             val session = sessions[id]
+            if (!linkUp && session != null) {
+                // Not queued (it would land in a shell later, unseen) and not lost in silence: said once per outage.
+                if (!downInputSaid) {
+                    downInputSaid = true
+                    error = "Not sent: the computer isn't connected"
+                    publish()
+                }
+                return@post
+            }
             if (!linkUp || session == null || !session.attached) return@post
             if (pendingInputBytes + bytes.size > MAX_PENDING_INPUT_BYTES) {
                 error = "Input dropped: the computer is not keeping up"

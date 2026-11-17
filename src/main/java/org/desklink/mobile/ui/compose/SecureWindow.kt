@@ -6,32 +6,21 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Build
 import android.view.WindowManager
-import org.desklink.mobile.BuildConfig
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * While a screen that shows secrets is composed (terminal output, notes, the pairing code, the session password), the window
- * is secure: no screenshot or screen recording of it by another app, and a blank tile in the recents list. Counted per
- * activity, so two such screens (a tab and a dialog) do not switch it off for each other.
+ * While a screen that shows a real secret is composed (the pairing code, the computer's own screen on the mouse pad), the
+ * window is secure: no screenshot or screen recording of it, and a blank tile in the recents list. Terminals, notes and files
+ * are not such screens (owner, 11-17): their content can appear in captures, the desk's Phone Screen share and recents
+ * thumbnails. The session password's dialog sets the flag itself (`SecureFlagPolicy.SecureOn`). Counted per activity, so two
+ * secret screens do not switch it off for each other.
  */
 object SecureWindows {
     private val users = HashMap<Activity, Int>()
 
-    /** Settings > Advanced > Debug, debug builds only: a developer can screenshot Files, Notes and Terminals over adb. */
-    const val KEY_ALLOW_SCREENSHOTS = "debug_allow_screenshots"
-
-    /** The one rule: the bypass needs a debug build *and* the switch. [debug] is `BuildConfig.DEBUG`, a constant false in release. */
-    fun bypassed(debug: Boolean, switchOn: Boolean) = debug && switchOn
-
-    private fun bypassed(activity: Activity) = BuildConfig.DEBUG && bypassed(
-        BuildConfig.DEBUG,
-        androidx.preference.PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(KEY_ALLOW_SCREENSHOTS, false),
-    )
-
     fun enter(activity: Activity) {
-        if (bypassed(activity)) return
         val first = (users[activity] ?: 0) == 0
         users[activity] = (users[activity] ?: 0) + 1
         if (first) apply(activity, secure = true)
