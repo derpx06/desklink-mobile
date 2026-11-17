@@ -107,3 +107,15 @@ Tests: `aViewOnlyDesktopSaysViewOnlyAndOffersToAskAgain`,
   not sticky) instead of lingering un-foregrounded. It cannot call `startForeground` first the way the safe-mode branch does.
 - **Battery (ROB-4)** with no sticky battery broadcast, and **transfer history (ROB-6)** on a full disk or after a torn last line: no
   exception to the caller; the record stays in memory.
+
+## Security audit (1.3, SEC-4 and SEC-5)
+
+- **SEC-4 (documentation only)**: this phone's private key is kept in plain app-private SharedPreferences (`RsaHelper`), not in
+  the Android Keystore. Backup is disabled and the app's data is excluded from device transfers, but root, a debuggable build or a
+  forensic copy of an unlocked phone can read it. A non-extractable Keystore key cannot sign the existing self-signed certificate
+  flow without a key-type change, which pairing records must survive: it needs an explicit, versioned migration (follow-up). The desk's
+  side of this is in its `SECURITY.md`.
+- **SEC-5**: JitPack is now limited to `com.github.albertvaka` (the KSP class index) and `com.github.termux.termux-app` (the terminal),
+  in both `pluginManagement` and `dependencyResolutionManagement`; the Gradle wrapper carries `distributionSha256Sum` for 9.5.1.
+  Not done: `gradle/verification-metadata.xml` (generate with `./gradlew --write-verification-metadata sha256` and review it).
+
