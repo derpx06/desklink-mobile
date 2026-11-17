@@ -216,6 +216,8 @@ class ScreenControlPlugin : Plugin() {
         val text = reason?.takeIf(String::isNotBlank) ?: context.getString(R.string.remote_control_denied)
         if (remoteControlRefused && controlDenial == text) return
         remoteControlRefused = true
+        // The computer's own words stay out of the UI (a plain sentence is shown) but not out of the log.
+        if (org.desklink.mobile.BuildConfig.DEBUG) Log.d(TAG, "Control refused by the computer: ${reason ?: "(no reason)"}")
         controlDenial = text
         // Never the computer's own words (they are its notes, not ours): a plain sentence.
         latestStatus = if (reason.isNullOrBlank()) text else context.getString(R.string.remote_control_denied_reason)

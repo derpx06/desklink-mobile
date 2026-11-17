@@ -39,7 +39,7 @@ object HomeModel {
             name = device.name,
             connection = connection,
             updateNeeded = !device.hasActiveWebRtcFeatureTransport && org.desklink.mobile.DeviceInfo.versionsSkew(org.desklink.mobile.BuildConfig.VERSION_NAME, device.deviceInfo.appVersion),
-            computers = paired.map { ComputerRow(it.deviceId, it.name, it.toUiModel().connection) },
+            computers = paired.map { ComputerRow(it.deviceId, it.name, it.toUiModel().connection, it.connectionPath) },
             notificationsOff = HomeDerive.notificationsOff(android.os.Build.VERSION.SDK_INT, androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED),
             live = LiveSessions(
                 screen = device.getPlugin(ScreenControlPlugin::class.java)?.remoteLive == true,

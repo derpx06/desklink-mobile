@@ -17,7 +17,7 @@ import org.desklink.mobile.webrtc.WebRtcConnectionPath
 
 /** A paired computer as the switcher sheet lists it. */
 @Immutable
-data class ComputerRow(val id: String, val name: String, val connection: DeviceConnection)
+data class ComputerRow(val id: String, val name: String, val connection: DeviceConnection, val path: org.desklink.mobile.webrtc.WebRtcConnectionPath? = null)
 
 /** The newest file transfer with this computer. */
 @Immutable

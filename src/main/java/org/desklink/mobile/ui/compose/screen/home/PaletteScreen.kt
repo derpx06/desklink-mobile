@@ -304,7 +304,7 @@ internal fun buildItems(context: android.content.Context, state: HomeState, note
     }
     val here = context.getString(R.string.palette_computer_here)
     state.computers.forEach { c ->
-        items.add(PaletteItem("computer:" + c.id, PaletteGroup.COMPUTERS, c.name, R.drawable.sym_desktop_windows, if (c.id == state.deviceId) here else context.getString(connectionShortRes(c.connection))))
+        items.add(PaletteItem("computer:" + c.id, PaletteGroup.COMPUTERS, c.name, R.drawable.sym_desktop_windows, if (c.id == state.deviceId) here else context.getString(connectionShortRes(c.connection, c.path))))
     }
     return Built(items, files, snippets.associate { "snippet:" + it.id to it.text })
 }

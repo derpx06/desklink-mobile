@@ -32,7 +32,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="device_encryption">Encryption</string>
     <string name="device_tap_permission">Tap to allow</string>
     <string name="device_unpair_title">Unpair %1$s?</string>
-    <string name="device_unpair_message">Both devices will stop trusting each other until you pair them again.</string>
+    <string name="device_unpair_message">The phone and the computer will stop trusting each other until you pair them again.</string>
     <string name="device_try_again">Try again</string>
     <string name="active_session_end">End</string>
 
@@ -76,6 +76,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="home_short_wifi">Connected · Wi-Fi</string>
     <string name="home_short_relay">Connected · Relay</string>
     <string name="share_unreadable_toast">Couldn\'t read that file to share it. Try sharing it again or send it from DeskLink\'s Files page.</string>
+    <string name="share_unavailable_toast">This computer can\'t receive shares right now. Try again in a moment.</string>
+    <string name="share_nothing_toast">There was nothing in that to share.</string>
     <string name="home_short_internet">Connected · Internet</string>
     <string name="home_meta_connecting">Wi-Fi, then the internet</string>
     <string name="home_meta_rtt">%1$d ms</string>
@@ -283,7 +285,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_search">Search terminals</string>
     <string name="terminal_search_hint">Name</string>
     <string name="terminal_new_terminal">New terminal</string>
-    <string name="terminal_new_runs_on">Runs on %1$s. Open it from either device.</string>
+    <string name="terminal_new_runs_on">Runs on %1$s. Open it from the phone or the computer.</string>
     <string name="terminal_new_start">Start</string>
     <string name="terminal_open_session">open</string>
     <string name="terminal_new_start_button">Start terminal</string>
@@ -794,7 +796,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="sg_sound">Sound</string>
     <string name="sg_sound_summary">%1$s\'s sound here, this phone\'s media there</string>
     <string name="sg_control">Control</string>
-    <string name="sg_control_summary">Mouse and keyboard across devices, Desk screen</string>
+    <string name="sg_control_summary">Mouse and keyboard from your computer, Desk screen</string>
     <string name="sg_files">Files</string>
     <string name="sg_files_summary">The Bucket and where received files go</string>
     <string name="sg_privacy">Privacy &amp; security</string>
@@ -822,7 +824,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="notes_tab_clipboard">Clipboard</string>
     <string name="notes_clipboard_sync">Clipboard sync</string>
     <string name="notes_clipboard_history_title">No clipboard history</string>
-    <string name="notes_clipboard_history_body">Android does not let an app read what was copied before, so DeskLink cannot list your clipboard history. What was shared is on the other device as it arrives. Pin a copy as a snippet to keep it.</string>
+    <string name="notes_clipboard_history_body">Android does not let an app read what was copied before, so DeskLink cannot list your clipboard history. What was shared is on the computer as it arrives. Pin a copy as a snippet to keep it.</string>
     <string name="notes_clipboard_pin">Pin the clipboard as a snippet</string>
     <string name="terminals_subtitle_none">No terminals on %1$s yet</string>
     <string name="terminals_unavailable">Terminals show here once %1$s is connected. The ones already open keep running there.</string>
@@ -883,7 +885,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="snippets_full">500 snippets are pinned: unpin one first</string>
     <string name="first_share_title">What should DeskLink share with %1$s?</string>
     <string name="first_share_body">Nothing is shared until you say so. You can change both at any time.</string>
-    <string name="first_share_clipboard">Clipboard: what you copy on either device can be pasted on the other</string>
+    <string name="first_share_clipboard">Clipboard: what you copy on the phone or the computer can be pasted on the other</string>
     <string name="first_share_notifications">Notifications: this phone\'s notifications (not secret ones) appear on %1$s, and you can reply from there</string>
     <string name="first_share_later">Files and links are always sent only when you choose to send them.</string>
     <string name="first_share_done">Done</string>

@@ -264,7 +264,7 @@ private fun connectionLabel(connection: DeviceConnection, path: WebRtcConnection
         LinkGlyphState.OFFLINE -> R.string.connection_offline
         LinkGlyphState.CONNECTING -> R.string.connection_connecting
         // TURN is a relay server; the DeskLink relay only when the link really goes through it.
-        LinkGlyphState.RELAY -> if (path == WebRtcConnectionPath.TURN) R.string.home_connected_turn else R.string.home_connected_relay
+        LinkGlyphState.RELAY -> if (path == WebRtcConnectionPath.TURN) R.string.home_connected_turn else R.string.home_connected_internet
         LinkGlyphState.DIRECT -> when {
             connection == DeviceConnection.LOCAL || path == WebRtcConnectionPath.LAN -> R.string.home_connected_wifi
             path == WebRtcConnectionPath.DIRECT || connection == DeviceConnection.AWAY -> R.string.home_connected_internet
@@ -982,7 +982,7 @@ internal fun ComputersContent(state: HomeState, onDismiss: () -> Unit, actions: 
                     ) { LaptopGlyph(if (selected) t.text else t.textDim) }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(computer.name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = fg, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(connectionShort(computer.connection), fontSize = 12.sp, lineHeight = 16.sp, color = if (selected) fg else t.textDim)
+                        Text(connectionShort(computer.connection, computer.path), fontSize = 12.sp, lineHeight = 16.sp, color = if (selected) fg else t.textDim)
                     }
                     if (selected) Icon(painterResource(R.drawable.sym_check_circle), contentDescription = null, tint = fg, modifier = Modifier.size(22.dp))
                 }

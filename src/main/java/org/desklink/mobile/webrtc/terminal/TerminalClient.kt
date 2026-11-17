@@ -370,7 +370,7 @@ class TerminalClient(
             val session = sessions[id]
             if (!linkUp || session == null || !session.attached) return@post
             if (pendingInputBytes + bytes.size > MAX_PENDING_INPUT_BYTES) {
-                error = "Input dropped: the desktop is not keeping up"
+                error = "Input dropped: the computer is not keeping up"
                 publish()
                 return@post
             }

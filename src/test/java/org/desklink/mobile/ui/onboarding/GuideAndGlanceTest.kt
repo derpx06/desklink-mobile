@@ -73,8 +73,8 @@ class GuideAndGlanceTest {
         assertEquals(
             listOf(
                 Triple("Screens", "See it. Steer it.", "Watch one screen on the other, and use your phone as a touchpad and keyboard."),
-                Triple("Share", "Files and copies, both ways", "Send a file in a tap, and copy on one device to paste on the other."),
-                Triple("Terminals", "Terminals that follow you", "Start a terminal on one device and pick it up on the other."),
+                Triple("Share", "Files and copies, both ways", "Send a file in a tap, and copy on the phone to paste on the computer, or the other way round."),
+                Triple("Terminals", "Terminals that follow you", "Start a terminal on the computer and pick it up on the phone."),
             ),
             TourPages.map { Triple(s(it.kicker), s(it.title), s(it.body)) },
         )

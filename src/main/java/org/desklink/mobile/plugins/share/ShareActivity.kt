@@ -120,7 +120,7 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
                     main.post {
                         sendingNow = false
                         // Never a silent return to Home: a share that could not be read says so.
-                        if (!shared) Toast.makeText(applicationContext, R.string.share_unreadable_toast, Toast.LENGTH_LONG).show()
+                        if (!shared) Toast.makeText(applicationContext, failureMessage(intent), Toast.LENGTH_LONG).show()
                         live?.get()?.finish()
                     }
                 }
@@ -128,7 +128,7 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
             return
         } else {
             // No sharing plugin for this computer: nothing was sent.
-            Toast.makeText(this, R.string.share_unreadable_toast, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.share_unavailable_toast, Toast.LENGTH_LONG).show()
         }
         finish()
     }
@@ -258,6 +258,11 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
 
     companion object {
         /** Runs [share] on [intent]: whether it handed something on; a read that throws (a revoked grant) is a failure, not a crash. */
+        /** What to tell the person when nothing was sent: a file that could not be read, or nothing found to share. */
+        internal fun failureMessage(intent: Intent): Int =
+            if (intent.hasExtra(Intent.EXTRA_STREAM) || Intent.ACTION_SEND_MULTIPLE == intent.action) R.string.share_unreadable_toast
+            else R.string.share_nothing_toast
+
         internal fun runShare(share: (Intent) -> Boolean, intent: Intent): Boolean =
             runCatching { share(intent) }.getOrDefault(false)
 

@@ -23,10 +23,10 @@
     <string name="ob_tour_screens_body">Watch one screen on the other, and use your phone as a touchpad and keyboard.</string>
     <string name="ob_tour_share_kicker">Share</string>
     <string name="ob_tour_share_title">Files and copies, both ways</string>
-    <string name="ob_tour_share_body">Send a file in a tap, and copy on one device to paste on the other.</string>
+    <string name="ob_tour_share_body">Send a file in a tap, and copy on the phone to paste on the computer, or the other way round.</string>
     <string name="ob_tour_terminals_kicker">Terminals</string>
     <string name="ob_tour_terminals_title">Terminals that follow you</string>
-    <string name="ob_tour_terminals_body">Start a terminal on one device and pick it up on the other.</string>
+    <string name="ob_tour_terminals_body">Start a terminal on the computer and pick it up on the phone.</string>
 
     <!-- Get started guide -->
     <string name="guide_title">Get started</string>

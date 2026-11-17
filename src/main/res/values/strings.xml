@@ -100,7 +100,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
     <string name="mouse_receiver_plugin_description">Receive remote mouse movement</string>
     <string name="mouse_receiver_plugin_name">Mouse receiver</string>
-    <string name="mouse_receiver_no_permissions">To receive touch inputs remotely you need to grant Accessibility permissions to fully control your device</string>
+    <string name="mouse_receiver_no_permissions">To receive touch inputs remotely you need to grant Accessibility permissions to fully control this phone</string>
 
 
     <string name="device_menu_unpair">Unpair</string>
@@ -350,7 +350,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
   <string name="remote_control_requesting">Requesting remote-control permission</string>
   <string name="remote_control_enabled">Remote control enabled</string>
   <string name="remote_control_denied">The computer did not allow control</string>
-  <string name="remote_control_denied_reason">Control stopped on the computer. Ask again.</string>
+  <string name="remote_control_denied_reason">The computer stopped or refused control. Ask again.</string>
   <string name="session_password_title">Computer password</string>
   <string name="session_password_message">This computer asks for a password before it can be viewed, controlled or used from a terminal.</string>
   <string name="session_password_label">Password</string>

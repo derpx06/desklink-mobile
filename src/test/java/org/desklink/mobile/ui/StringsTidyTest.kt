@@ -7,13 +7,19 @@ import java.io.File
 
 /** The English resources are tidy: no stray quote or text inside a plural, no space before a colon, one spelling of Wi-Fi and cancelled. */
 class StringsTidyTest {
-    private val files = File("src/main/res/values").listFiles { file -> file.name.startsWith("strings") && file.extension == "xml" }!!.toList()
+    // The English resources: the default and British ones.
+    private val files = listOf("src/main/res/values", "src/main/res/values-en-rGB").map(::File).filter(File::isDirectory)
+        .flatMap { dir -> dir.listFiles { file -> file.name.startsWith("strings") && file.extension == "xml" }!!.toList() }
 
     private fun problems(check: (String, String) -> Boolean): List<String> = files.flatMap { file ->
         file.readLines().mapIndexedNotNull { index, line -> if (check(file.name, line)) "${file.name}:${index + 1}: ${line.trim()}" else null }
     }
 
-    @Test fun noStrayQuoteEndsAString() = assertEquals(emptyList<String>(), problems { _, line -> Regex("""[^\\=>]"</(?:string|item)>""").containsMatchIn(line) && !line.contains("=\"") })
+    /** An unescaped quote in a string's text is dropped by aapt, or ends it early: only \" belongs there. */
+    @Test fun noStrayQuoteInAStringsText() = assertEquals(
+        emptyList<String>(),
+        problems { _, line -> Regex(""">([^<]*)</(?:string|item)>""").find(line)?.groupValues?.get(1)?.let { Regex("""(?<!\\)"""").containsMatchIn(it) } == true },
+    )
 
     @Test fun noTextSitsDirectlyInsideAPlurals() = assertEquals(emptyList<String>(), problems { _, line -> Regex("""<plurals[^>]*>[^<\s]""").containsMatchIn(line) })
 
