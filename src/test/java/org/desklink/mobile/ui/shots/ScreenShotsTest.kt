@@ -300,6 +300,21 @@ abstract class ScreenShots : ShotTest() {
         check(apart == (columns == 2)) { "$form ($width dp): expected $columns column(s), the cards' left edges are ${left("Claude Code")} and ${left("Build")}" }
     }
 
+    /** From 720 dp Settings shows the list of pages beside the first page; below it the list alone (every row stays on its page). */
+    @Test fun settingsSplitsOnWideScreens() {
+        compose.setContent {
+            org.desklink.mobile.ui.compose.DeskLinkFixedTheme(compose.activity, false) {
+                SettingsTab(deskSettings(), noopSettings, null, {}, {}, 0, {})
+            }
+        }
+        compose.waitForIdle()
+        val width = compose.activity.resources.configuration.screenWidthDp
+        val page = compose.onAllNodesWithText(compose.activity.getString(org.desklink.mobile.R.string.settings_connect_on_startup), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        val list = compose.onAllNodesWithText(compose.activity.getString(org.desklink.mobile.R.string.settings_all), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        check(list) { "$form: the list of pages is missing" }
+        check(page == (width >= 720)) { "$form ($width dp): the first page beside the list should be ${width >= 720}, was $page" }
+    }
+
     @Test fun terminalsEmpty() = shoot("terminals-empty", terminals(TerminalsPanel.LIST, connected))
     @Test fun terminalsReconnecting() = shoot("terminals-reconnecting", terminals(TerminalsPanel.LIST, connected.copy(link = TerminalLinkState.DISCONNECTED, sessions = sessions.take(2))))
     @Test fun terminalsLoading() = shoot("terminals-loading", terminals(TerminalsPanel.LOADING, TerminalClientState()))

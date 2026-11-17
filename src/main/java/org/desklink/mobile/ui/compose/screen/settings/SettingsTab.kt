@@ -19,7 +19,11 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -137,10 +141,38 @@ fun SettingsTab(
     /** The "Get started" guide. */
     onGuide: () -> Unit = {},
 ) {
+    // From 720 dp (a tablet, an unfolded phone) the list of pages sits beside the open page, as on the computer;
+    // below it, the list and each page are screens of their own. Every row is on its page either way.
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        if (maxWidth >= SPLIT_AT) {
+            val pages = if (desk == null) SettingsPage.WITHOUT_COMPUTER else SettingsPage.entries
+            val shown = route ?: pages.first().route
+            androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
+                Box(Modifier.width(340.dp).fillMaxHeight()) { SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer, onGuide) }
+                Box(Modifier.width(1.dp).fillMaxHeight().background(tokens.hairline))
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    // A group's page has no back arrow here (the list is beside it); a page below it keeps its own.
+                    SettingsRoute(desk, actions, shown, onOpen, if (shown.contains('/') || shown !in pages.map { it.route }) onBack else null, waitingPermissions, about, onSwitchComputer, onGuide)
+                }
+            }
+        } else {
+            SettingsRoute(desk, actions, route, onOpen, onBack, waitingPermissions, about, onSwitchComputer, onGuide)
+        }
+    }
+}
+
+/** Where the tab is narrower than this, the list and a page are separate screens. */
+private val SPLIT_AT = 720.dp
+
+@Composable
+private fun SettingsRoute(
+    desk: DeskSettings?, actions: SettingsActions, route: String?, onOpen: (String) -> Unit, onBack: (() -> Unit)?,
+    waitingPermissions: Int, about: @Composable () -> Unit, onSwitchComputer: (() -> Unit)?, onGuide: () -> Unit,
+) {
     val group = route?.let(SettingsPage::groupOf)
     when {
         route == null -> SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer, onGuide)
-        route == SettingsPage.NETWORK -> NetworkScreen(onBack)
+        route == SettingsPage.NETWORK -> NetworkScreen(onBack ?: {})
         route == SettingsPage.PERMISSIONS -> SettingsColumn(stringResource(R.string.settings_permissions), onBack) { PermissionsSection(desk) }
         route == SettingsPage.ABOUT -> about()
         group != null -> SettingsGroupPage(group, desk, actions, onOpen, onBack)
@@ -282,7 +314,7 @@ private fun PageRow(page: SettingsPage, summary: String, badge: Int, onClick: ()
 }
 
 @Composable
-private fun SettingsGroupPage(page: SettingsPage, desk: DeskSettings?, actions: SettingsActions, onOpen: (String) -> Unit, onBack: () -> Unit) {
+private fun SettingsGroupPage(page: SettingsPage, desk: DeskSettings?, actions: SettingsActions, onOpen: (String) -> Unit, onBack: (() -> Unit)?) {
     val context = LocalContext.current
     val prefs = remember { PreferenceManager.getDefaultSharedPreferences(context) }
     @Suppress("UNUSED_VARIABLE") val resumed = rememberResumeTick()
