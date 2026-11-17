@@ -23,6 +23,8 @@ class UpdateMiscTest {
         assertEquals(UpdateSkew.None, UpdateSkew.of("0.3.0", "0.3.9")) // a patch is nothing
         for (bad in listOf(null, "", "banana", "1")) assertEquals(UpdateSkew.None, UpdateSkew.of("0.3.0", bad))
         assertEquals(UpdateSkew.None, UpdateSkew.of(null, "0.3.0"))
+        
+        assertEquals(16, (UpdateSkew.of("0.3.0", "2147483647.2147483647.2147483647") as UpdateSkew.PeerNewer).peer.length)
     }
 
     @Test fun aReleaseConfigurationNeverTrustsTheTestKeys() {

@@ -43,9 +43,9 @@ internal class UpdateEngine(
     }
 
     /** The state for the person right now, from the cache only (no network). */
-    fun state(manual: Boolean = false): UpdateState {
+    fun state(manual: Boolean = false, ignoreEnabled: Boolean = false): UpdateState {
         if (!configured()) return UpdateState.NotConfigured
-        if (!manual && !store.enabled) return UpdateState.Disabled
+        if (!manual && !ignoreEnabled && !store.enabled) return UpdateState.Disabled
         val installed = build.version ?: return UpdateState.UpToDate
         val p = cachePayload() ?: return UpdateState.UpToDate
         return UpdateDecider.decide(installed, build.versionCode, store.channel(installed), p, store.prefsForDecision(), store.installId(), clock(), manual)

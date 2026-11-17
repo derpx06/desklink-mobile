@@ -14,10 +14,11 @@ internal sealed interface UpdateSkew {
         fun of(own: String?, peer: String?): UpdateSkew {
             val a = Version.parseLenient(own) ?: return None
             val b = Version.parseLenient(peer) ?: return None
+            val shown = peer!!.takeWhile { it in '0'..'9' || it == '.' }.take(16)
             val c = compareValuesBy(b, a, { it.major }, { it.minor })
             return when {
-                c < 0 -> PeerOlder(peer!!.takeWhile { it in '0'..'9' || it == '.' })
-                c > 0 -> PeerNewer(peer!!.takeWhile { it in '0'..'9' || it == '.' })
+                c < 0 -> PeerOlder(shown)
+                c > 0 -> PeerNewer(shown)
                 else -> None
             }
         }

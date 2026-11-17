@@ -78,6 +78,16 @@ class UpdateOpenCoordinatorTest {
         assertNull(open(c2))
     }
 
+    @Test fun aRequiredUpdateInTheCacheIsShownEvenWithAutomaticChecksOffAndNothingElseIs() = LocalServer { LocalServer.Reply(500) }.use { s ->
+        val (_, c) = coordinator(s.url, required); store.enabled = false
+        assertTrue(open(c) is UpdateState.Required)
+        assertTrue(s.requests.isEmpty()) // no network
+        val (_, c2) = coordinator(s.url, available); store.enabled = false
+        assertNull(open(c2)) // an ordinary update stays quiet when the person turned checking off
+        val (_, c3) = coordinator(s.url, required); store.enabled = false; blocked = true
+        assertNull(open(c3)) // and it still waits for a free screen
+    }
+
     @Test fun upToDateOrEmptyCacheShowsNothing() {
         val (_, c) = coordinator("http://127.0.0.1:1/x", null)
         assertNull(open(c))

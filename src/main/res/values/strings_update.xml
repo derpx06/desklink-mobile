@@ -40,7 +40,7 @@
     <string name="update_check_button">Check</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_up_to_date">You\'re up to date</string>
-    <string name="update_up_to_date_line">DeskLink %1$s · Checked %2$s</string>
+    <string name="update_up_to_date_line">%1$s · Checked %2$s</string>
     <string name="update_failed">Couldn\'t check for updates. Try again later.</string>
     <string name="update_auto">Check automatically</string>
     <string name="update_auto_line">Once a day. Sends no personal information.</string>

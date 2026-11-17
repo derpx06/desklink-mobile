@@ -73,6 +73,7 @@ private fun SheetFrame(content: @Composable () -> Unit) {
 /** The update sheet and the Settings controls, drawn in every state. Each shot also runs the accessibility and mid-word walkers. */
 abstract class UpdateShots : ShotTest() {
     @Test fun sheetGitHub() = shoot("update-sheet-github") { SheetFrame { UpdateSheetContent(model(InstallSource.GITHUB), actions()) } }
+    @Test fun sheetGitHubVerifyOpen() = shoot("update-sheet-verify-open") { SheetFrame { UpdateSheetContent(model(InstallSource.GITHUB), actions(), verifyOpen = true) } }
     @Test fun sheetPlay() = shoot("update-sheet-play") { SheetFrame { UpdateSheetContent(model(InstallSource.GOOGLE_PLAY), actions()) } }
     @Test fun sheetFdroid() = shoot("update-sheet-fdroid") { SheetFrame { UpdateSheetContent(model(InstallSource.FDROID), actions()) } }
     @Test fun sheetRequired() = shoot("update-sheet-required") { SheetFrame { UpdateSheetContent(model(InstallSource.GOOGLE_PLAY, required = true), actions()) } }
@@ -96,9 +97,15 @@ abstract class UpdateShots : ShotTest() {
 class PhoneUpdateShots : UpdateShots() {
     override val form = "phone"
 
-    @Test fun theVerifyDisclosureOpensAndCopies() {
+    /** The real host: back (and so a swipe or a tap outside) is "Not now". */
+    @Test fun theHostMapsDismissToNotNow() {
         val log = mutableListOf<String>()
-        shoot("update-sheet-verify") { SheetFrame { UpdateSheetContent(model(InstallSource.GITHUB), actions(log)) } }
+        compose.setContent { org.desklink.mobile.ui.compose.DeskLinkFixedTheme(compose.activity, false) { org.desklink.mobile.ui.compose.update.UpdatePromptHost(model(InstallSource.GOOGLE_PLAY), actions(log)) } }
+        compose.waitForIdle()
+        compose.onNodeWithText("Update on Google Play").assertIsDisplayed()
+        (org.robolectric.shadows.ShadowDialog.getLatestDialog() as androidx.activity.ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        compose.waitForIdle()
+        assertEquals(listOf("notnow"), log)
     }
 
     @Test fun everyButtonCallsItsAction() {
@@ -154,3 +161,8 @@ class RtlUpdateShots : UpdateShots() {
     override val form = "rtl"
     override val rtl = true
 }
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w780dp-h360dp-land-xhdpi")
+class LandscapeUpdateShots : UpdateShots() { override val form = "landscape" }

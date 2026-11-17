@@ -255,7 +255,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
      * Anything else is up: the tour or setup, a screen other than Home, a dialog or a permission step, a pairing waiting, a computer's
      * ask. The update sheet skips that open and is not retried until the next one.
      */
-    private fun updateBlocked(): Boolean = !onboardingSeen || stack.lastOrNull() != HOME || qrConflict != null ||
+    private fun updateBlocked(): Boolean = !onboardingSeen || stack.lastOrNull() != HOME || nav.selected != AppTab.HOME || qrConflict != null ||
         org.desklink.mobile.plugins.desksettings.Asks.waiting().isNotEmpty() ||
         supportFragmentManager.fragments.any { it is androidx.fragment.app.DialogFragment } ||
         DeskLinkApplication.getInstance().devices.values.any { it.pairStatus == PairState.RequestedByPeer || it.pairStatus == PairState.Requested }

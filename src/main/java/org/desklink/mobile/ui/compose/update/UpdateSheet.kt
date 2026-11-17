@@ -59,7 +59,7 @@ import org.desklink.mobile.update.InstallSource
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun UpdateSheetContent(model: UpdateSheetModel, actions: UpdateSheetActions, modifier: Modifier = Modifier) {
+internal fun UpdateSheetContent(model: UpdateSheetModel, actions: UpdateSheetActions, modifier: Modifier = Modifier, verifyOpen: Boolean = false) {
     val t = tokens
     val title = stringResource(if (model.required) R.string.update_required_title else R.string.update_title, model.version)
     val focus = remember { FocusRequester() }
@@ -67,7 +67,8 @@ internal fun UpdateSheetContent(model: UpdateSheetModel, actions: UpdateSheetAct
         modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 22.dp).semantics { paneTitle = title },
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        UpdateIllustrationCard(warning = model.required)
+        // A landscape phone has no height to spare: the picture goes, the words and buttons keep the room.
+        if (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp >= 480) UpdateIllustrationCard(warning = model.required)
         Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Text(
                 title, fontSize = 25.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold, color = t.text,
@@ -94,10 +95,6 @@ internal fun UpdateSheetContent(model: UpdateSheetModel, actions: UpdateSheetAct
             modifier = Modifier.fillMaxWidth().focusRequester(focus),
         )
         androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-        if (model.source == InstallSource.GITHUB && model.sha256 != null) VerifyDownload(model.sha256, actions.onCopyChecksum)
-        if (model.source == InstallSource.GITHUB) {
-            Text(stringResource(R.string.update_signature_note), fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
-        }
         if (!model.required) {
             // Side by side; under 320 dp, or when a label would wrap mid-word at a large font, one under the other.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -105,6 +102,8 @@ internal fun UpdateSheetContent(model: UpdateSheetModel, actions: UpdateSheetAct
                 DeskTextButton(stringResource(R.string.update_skip), actions.onSkip, modifier = Modifier.weight(1f))
             }
         }
+        // Last, so the primary action and Not now / Skip stay in view: the checksum and the signature sentence open on demand.
+        if (model.source == InstallSource.GITHUB) VerifyDownload(model.sha256, actions.onCopyChecksum, verifyOpen)
     }
 }
 
@@ -122,11 +121,14 @@ private fun VersionChips(model: UpdateSheetModel) {
             stringResource(R.string.update_have, model.installed), fontSize = 13.sp, color = t.text,
             modifier = Modifier.border(1.dp, t.hairlineStrong, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 6.dp),
         )
-        Icon(painterResource(R.drawable.sym_arrow_forward), contentDescription = null, tint = t.textDim, modifier = Modifier.size(18.dp).graphicsLayer { if (rtl) scaleX = -1f })
-        Text(
-            stringResource(if (model.beta) R.string.update_new_beta else R.string.update_new, model.version), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = t.onAccent,
-            modifier = Modifier.background(t.accent, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 6.dp),
-        )
+        // The arrow belongs to the new version: when the row wraps they go together, never an arrow left at a line's end.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(painterResource(R.drawable.sym_arrow_forward), contentDescription = null, tint = t.textDim, modifier = Modifier.size(18.dp).graphicsLayer { if (rtl) scaleX = -1f })
+            Text(
+                stringResource(if (model.beta) R.string.update_new_beta else R.string.update_new, model.version), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = t.onAccent,
+                modifier = Modifier.background(t.accent, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
     }
 }
 
@@ -162,9 +164,9 @@ internal fun primaryLabel(source: InstallSource): String = stringResource(
 
 /** "Verify the download": a disclosure holding the full SHA-256 and a Copy button. */
 @Composable
-private fun VerifyDownload(sha: String, onCopy: (String) -> Unit) {
+private fun VerifyDownload(sha: String?, onCopy: (String) -> Unit, startOpen: Boolean) {
     val t = tokens
-    var open by rememberSaveable { mutableStateOf(false) }
+    var open by rememberSaveable { mutableStateOf(startOpen) }
     val toggle = { open = !open }
     Column(Modifier.fillMaxWidth().background(t.surface, RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp))) {
         Row(
@@ -177,10 +179,12 @@ private fun VerifyDownload(sha: String, onCopy: (String) -> Unit) {
             Icon(painterResource(if (open) R.drawable.sym_expand_less else R.drawable.sym_expand_more), contentDescription = null, tint = t.textDim, modifier = Modifier.size(22.dp))
         }
         if (open) {
-            Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.update_checksum, sha), fontFamily = MonoFamily, fontSize = 12.sp, lineHeight = 16.sp, color = t.text, textAlign = TextAlign.Start, modifier = Modifier.weight(1f))
+            // The hash is shown eight characters at a time: it wraps between groups, never inside one. Copy gives it whole.
+            if (sha != null) Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.update_checksum, sha.chunked(8).joinToString(" ")), fontFamily = MonoFamily, fontSize = 12.sp, lineHeight = 16.sp, color = t.text, textAlign = TextAlign.Start, modifier = Modifier.weight(1f))
                 DeskTextButton(stringResource(R.string.update_copy), { onCopy(sha) })
             }
+            Text(stringResource(R.string.update_signature_note), fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim, modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 12.dp))
         }
     }
 }

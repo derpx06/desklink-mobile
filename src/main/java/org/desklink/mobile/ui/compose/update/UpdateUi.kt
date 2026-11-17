@@ -71,7 +71,8 @@ internal class UpdateUi(
     private val holder by lazy { UpdateRuntime.get(context) }
     private val engine: UpdateEngine get() = holder.engine
     private val store get() = holder.store
-    private val coordinator by lazy { UpdateOpenCoordinator(engine, store, scope, blocked) }
+    // blocked() reads the activity's screen state and fragment manager: it is evaluated on the main thread, never on the IO thread the coordinator runs on.
+    private val coordinator by lazy { UpdateOpenCoordinator(engine, store, scope) { withContext(Dispatchers.Main) { blocked() } } }
 
     /** The sheet showing now, or null. */
     private class Showing(val state: UpdateState, val model: UpdateSheetModel)
@@ -88,7 +89,8 @@ internal class UpdateUi(
         onCopyChecksum = { sha ->
             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("SHA-256", sha))
-            Toast.makeText(context, R.string.update_checksum_copied, Toast.LENGTH_SHORT).show()
+            // Android 13 and later show their own "copied" confirmation.
+            if (android.os.Build.VERSION.SDK_INT < 33) Toast.makeText(context, R.string.update_checksum_copied, Toast.LENGTH_SHORT).show()
         },
     )
 
@@ -180,6 +182,7 @@ internal class UpdateUi(
     /** "Check for updates": ignores rollout, skip and Later; an update found opens the sheet at once. */
     private fun manualCheck() {
         if (status == CheckStatus.Checking) return
+        val before = status
         status = CheckStatus.Checking
         scope.launch {
             val result = withContext(Dispatchers.IO) {
@@ -192,13 +195,18 @@ internal class UpdateUi(
             status = when {
                 outcome is UpdateEngine.Outcome.Failed -> CheckStatus.Failed
                 state is UpdateState.Available || state is UpdateState.Required -> { show(state); CheckStatus.Idle }
+                // Nothing was asked (too soon after the last check): never claim "up to date" from a stale cache; the old status stays.
+                outcome is UpdateEngine.Outcome.Skipped -> before.takeUnless { it == CheckStatus.Checking } ?: CheckStatus.Idle
                 else -> CheckStatus.UpToDate(BuildConfig.VERSION_NAME.substringBefore('-'), checkedText())
             }
             version++
         }
     }
 
-    private fun checkedText(): String = DateUtils.formatDateTime(context, System.currentTimeMillis(), DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_ALL)
+    /** Short, so the row keeps to one line beside its button: the time today, the date otherwise. */
+    private fun checkedText(): String = System.currentTimeMillis().let {
+        DateUtils.formatDateTime(context, it, if (DateUtils.isToday(it)) DateUtils.FORMAT_SHOW_TIME else DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_ALL)
+    }
 
     private companion object {
         const val PACKAGE = "org.desklink.mobile"

@@ -41,12 +41,12 @@ internal fun UpdatesSettings(model: UpdatesSettingsModel, actions: UpdatesSettin
                 checked = model.enabled, onClick = { actions.onEnabled(!model.enabled) },
             )
             GroupRow(
-                stringResource(R.string.update_wifi), icon = R.drawable.sym_download,
+                stringResource(R.string.update_wifi), icon = R.drawable.sym_public,
                 checked = model.wifiOnly, onClick = { actions.onWifiOnly(!model.wifiOnly) },
             )
             ChannelRow(model, actions)
             model.skippedVersion?.let { v ->
-                GroupRow(stringResource(R.string.update_skipped, v), icon = R.drawable.sym_arrow_forward) { DeskTextButton(stringResource(R.string.update_undo), actions.onUndoSkip) }
+                GroupRow(stringResource(R.string.update_skipped, v), icon = R.drawable.sym_skip_next) { DeskTextButton(stringResource(R.string.update_undo), actions.onUndoSkip) }
             }
         }
         Text(stringResource(R.string.update_share), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp))
@@ -80,7 +80,7 @@ private fun ChannelRow(model: UpdatesSettingsModel, actions: UpdatesSettingsActi
     val name = stringResource(if (model.channel == Channel.BETA) R.string.update_channel_beta else R.string.update_channel_stable)
     val other = if (model.channel == Channel.BETA) Channel.STABLE else Channel.BETA
     GroupRow(
-        stringResource(R.string.update_channel), icon = R.drawable.sym_description,
+        stringResource(R.string.update_channel), icon = R.drawable.sym_tune,
         // Stable is not offered until the update information lists one: a plain note says why.
         subtitle = if (!model.stableSelectable && model.channel == Channel.BETA) stringResource(R.string.update_channel_note) else null,
         onClick = if (model.stableSelectable || model.channel == Channel.STABLE) ({ actions.onChannel(other) }) else null,

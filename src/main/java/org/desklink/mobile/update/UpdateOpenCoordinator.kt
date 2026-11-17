@@ -17,13 +17,20 @@ internal class UpdateOpenCoordinator(
     private val engine: UpdateEngine,
     private val store: UpdateStore,
     private val scope: CoroutineScope,
-    private val blocked: () -> Boolean,
+    /** Evaluated by the caller on the thread that owns the screen's state (the main thread); the coordinator itself runs elsewhere. */
+    private val blocked: suspend () -> Boolean,
 ) {
     /** Null = show nothing. Otherwise the [UpdateState.Available] or [UpdateState.Required] to present. */
     suspend fun onOpen(openId: String): UpdateState? {
         if (store.lastPopupOpen == openId) return null // at most once per open
         store.lastPopupOpen = openId
-        if (!engine.configured() || !store.enabled) return null
+        if (!engine.configured()) return null
+        if (!store.enabled) {
+            // Automatic checks are off: no network at all. A REQUIRED update already in the verified cache is still shown (it must not
+            // be silently suppressed); nothing else is.
+            val cached = engine.state(ignoreEnabled = true)
+            return if (cached is UpdateState.Required && !blocked()) cached else null
+        }
         var state = engine.state()
         if (!offers(state)) return null
         val age = engine.cacheAgeMs()
@@ -34,7 +41,7 @@ internal class UpdateOpenCoordinator(
             state = engine.state()
             if (!offers(state)) return null
         }
-        return state.takeUnless { blocked() } // the screen is not free: this open shows nothing and is not retried
+        return if (blocked()) null else state // the screen is not free: this open shows nothing and is not retried
     }
 
     /** The popup was dismissed with Not now, swipe, back, tap outside or the primary button. A required update is only dismissed for this open. */
