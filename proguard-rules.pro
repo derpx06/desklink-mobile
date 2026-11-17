@@ -26,6 +26,10 @@
 # The webrtc-sdk AAR ships no consumer rules, and its native code finds Java
 # classes, fields and methods by name over JNI.
 -keep class org.webrtc.** { *; }
+# jni_zero is libwebrtc's JNI helper: the native library looks `org/jni_zero/JniInit` up by name at start-up
+# (jni_zero.cc "Failed to find class", then SIGILL) and nothing in Java references the class, so R8 removed it
+# and every release build aborted at the first WebRTC use. The whole package is 15 small classes.
+-keep class org.jni_zero.** { *; }
 -keepclasseswithmembernames class * {
     native <methods>;
 }

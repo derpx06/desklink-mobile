@@ -1,0 +1,13 @@
+# Classes the release (R8) classes.dex must define: native code looks them up by name (JNI FindClass), nothing in Java
+# references them, so shrinking removes them and the app aborts at first use. scripts/check-release-dex.sh fails the
+# build when one is missing. Found by reading the class-path literals of every bundled .so
+# (libjingle_peerconnection_so.so, libandroidx.graphics.path.so) against the release dex; add a line when a native
+# library starts looking up another one.
+org/jni_zero/JniInit
+org/jni_zero/JniUtil
+androidx/graphics/path/ConicConverter
+androidx/graphics/path/PathIteratorPreApi34Impl
+org/webrtc/PeerConnectionFactory
+org/webrtc/PeerConnection
+org/webrtc/DataChannel
+org/webrtc/RtpSender

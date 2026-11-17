@@ -251,3 +251,10 @@ tasks.named("generateLicenseReport") {
 tasks.named("preBuild") {
     dependsOn("generateLicenseReport")
 }
+
+// A release APK that lacks a class native code looks up by name aborts at the first WebRTC use (F-QA-2: R8 removed
+// org.jni_zero.JniInit). Every assembleRelease checks the dex for the list in release-required-classes.txt.
+val checkReleaseDex = tasks.register<Exec>("checkReleaseDex") {
+    commandLine("sh", "scripts/check-release-dex.sh")
+}
+tasks.matching { it.name == "assembleRelease" }.configureEach { finalizedBy(checkReleaseDex) }
