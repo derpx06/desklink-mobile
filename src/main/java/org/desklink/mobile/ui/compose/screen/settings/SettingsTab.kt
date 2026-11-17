@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -87,6 +88,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import org.desklink.mobile.ui.compose.components.RowGroup
@@ -140,19 +142,30 @@ fun SettingsTab(
     onSwitchComputer: (() -> Unit)? = null,
     /** The "Get started" guide. */
     onGuide: () -> Unit = {},
+    /** Beside the list a page is chosen, not pushed: replaces the page open. */
+    onSelect: (String) -> Unit = onOpen,
+    /** Whether the tab shows the list beside the page (so Back leaves Settings from a first-level page). */
+    onSplit: (Boolean) -> Unit = {},
 ) {
-    // From 720 dp (a tablet, an unfolded phone) the list of pages sits beside the open page, as on the computer;
-    // below it, the list and each page are screens of their own. Every row is on its page either way.
+    // From 720 dp wide and 560 dp high (a tablet, an unfolded phone; not a phone on its side) the list of pages sits
+    // beside the open page, as on the computer; otherwise the list and each page are screens of their own. Every row
+    // is on its page either way. Crossing the width (a rotation) drops the scroll offsets and the search text.
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
-        if (maxWidth >= SPLIT_AT) {
+        val split = maxWidth >= SPLIT_AT && maxHeight >= SPLIT_MIN_HEIGHT
+        androidx.compose.runtime.SideEffect { onSplit(split) }
+        if (split) {
             val pages = if (desk == null) SettingsPage.WITHOUT_COMPUTER else SettingsPage.entries
-            val shown = route ?: pages.first().route
+            // A route that is not a page of this list (stale, or one with no computer paired) shows the first page.
+            val shown = route?.takeIf { SettingsPage.groupOf(it) in pages } ?: pages.first().route
+            val selected = SettingsPage.groupOf(shown)
             androidx.compose.foundation.layout.Row(Modifier.fillMaxSize()) {
-                Box(Modifier.width(340.dp).fillMaxHeight()) { SettingsList(desk, actions, onOpen, waitingPermissions, onSwitchComputer, onGuide) }
+                Box(Modifier.width(340.dp).fillMaxHeight()) { SettingsList(desk, actions, onSelect, waitingPermissions, onSwitchComputer, onGuide, selected = selected, split = true) }
                 Box(Modifier.width(1.dp).fillMaxHeight().background(tokens.hairline))
-                Box(Modifier.weight(1f).fillMaxHeight()) {
-                    // A group's page has no back arrow here (the list is beside it); a page below it keeps its own.
-                    SettingsRoute(desk, actions, shown, onOpen, if (shown.contains('/') || shown !in pages.map { it.route }) onBack else null, waitingPermissions, about, onSwitchComputer, onGuide)
+                Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+                    Box(Modifier.widthIn(max = 640.dp).fillMaxHeight()) {
+                        // A group's page has no back arrow here (the list is beside it); a page below it goes up to its page.
+                        SettingsRoute(desk, actions, shown, onOpen, if (shown.contains('/')) onBack else null, waitingPermissions, about, onSwitchComputer, onGuide)
+                    }
                 }
             }
         } else {
@@ -163,6 +176,7 @@ fun SettingsTab(
 
 /** Where the tab is narrower than this, the list and a page are separate screens. */
 private val SPLIT_AT = 720.dp
+private val SPLIT_MIN_HEIGHT = 560.dp
 
 @Composable
 private fun SettingsRoute(
@@ -186,7 +200,13 @@ private fun SettingsRoute(
  * that page. Nothing here is a new setting: every row is still on its page.
  */
 @Composable
-private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: (String) -> Unit, waitingPermissions: Int, onSwitchComputer: (() -> Unit)?, onGuide: () -> Unit) {
+private fun SettingsList(
+    desk: DeskSettings?, actions: SettingsActions, onOpen: (String) -> Unit, waitingPermissions: Int, onSwitchComputer: (() -> Unit)?, onGuide: () -> Unit,
+    /** The page open beside the list: marked in it. */
+    selected: SettingsPage? = null,
+    /** Beside a page: the quick switches are on the pages, so the list leaves them out and shows the pages. */
+    split: Boolean = false,
+) {
     val context = LocalContext.current
     val t = tokens
     val pages = if (desk == null) SettingsPage.WITHOUT_COMPUTER else SettingsPage.entries
@@ -211,7 +231,7 @@ private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: 
             }
             return@SettingsColumn
         }
-        if (desk != null) {
+        if (desk != null && !split) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SectionLabel(stringResource(R.string.settings_quick_switches))
                 RowGroup {
@@ -248,6 +268,7 @@ private fun SettingsList(desk: DeskSettings?, actions: SettingsActions, onOpen: 
                         page,
                         if (waiting) androidx.compose.ui.res.pluralStringResource(R.plurals.settings_permissions_waiting, waitingPermissions, waitingPermissions) else stringResource(page.summary, name),
                         badge = if (waiting) waitingPermissions else 0,
+                        selected = page == selected,
                         onClick = { onOpen(page.route) },
                     )
                 }
@@ -291,10 +312,11 @@ private fun ComputerCard(desk: DeskSettings, onOpen: () -> Unit, onSwitch: (() -
 
 /** A group row: a 40 dp tile, title, and a line (the value in words); [badge] > 0 shows how many things wait. */
 @Composable
-private fun PageRow(page: SettingsPage, summary: String, badge: Int, onClick: () -> Unit) {
+private fun PageRow(page: SettingsPage, summary: String, badge: Int, selected: Boolean = false, onClick: () -> Unit) {
     val t = tokens
     Row(
-        Modifier.fillMaxWidth().background(t.surface).clickable(role = Role.Button, onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+        // The open page beside the list is tinted and announced as selected.
+        Modifier.fillMaxWidth().background(if (selected) t.accentContainer else t.surface).semantics { if (selected) this.selected = true }.clickable(role = Role.Button, onClick = onClick).heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         // At the largest font the tile would leave the title a sliver ("Notification|s", "Advance|d"): it goes, as on the computer card.

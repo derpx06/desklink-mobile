@@ -42,6 +42,27 @@ class TabNav(selected: AppTab = AppTab.HOME, stacks: Map<AppTab, List<String>> =
         if (top(tab) != route) stacks[tab] = stack(tab) + route
     }
 
+    /** Settings shows its list beside the page (a wide screen): the page is chosen, not pushed, and Back leaves Settings. */
+    var split = false
+
+    /** Replaces [tab]'s stack with [routes] (choosing a page in the side list). */
+    fun setStack(tab: AppTab, routes: List<String>) {
+        if (routes.isEmpty()) stacks.remove(tab) else stacks[tab] = routes
+    }
+
+    /**
+     * One step up inside [tab]: a pop, except while Settings is split, where a subpage reached alone (a deep link)
+     * goes up to its page instead of to nothing.
+     */
+    fun up(tab: AppTab): Boolean {
+        val current = stack(tab)
+        if (split && tab == AppTab.SETTINGS && current.size == 1 && current[0].contains('/')) {
+            stacks[tab] = listOf(current[0].substringBefore('/'))
+            return true
+        }
+        return pop(tab)
+    }
+
     /** Pops the top route of [tab]; false when it was already at its root. */
     fun pop(tab: AppTab): Boolean {
         val current = stack(tab)
@@ -63,6 +84,20 @@ class TabNav(selected: AppTab = AppTab.HOME, stacks: Map<AppTab, List<String>> =
 
     /** The back button: pops the selected tab, else returns to Home. False when already at Home's root. */
     fun back(): Boolean {
+        // Split Settings has a page open whatever the stack says: a subpage goes up to its page, a first-level page
+        // (or none) leaves Settings, and a stack of several is walked back one at a time.
+        if (split && selected == AppTab.SETTINGS) {
+            val current = stack(selected)
+            when {
+                current.size == 1 && current[0].contains('/') -> up(selected)
+                current.size <= 1 -> {
+                    reset(selected)
+                    selected = AppTab.HOME
+                }
+                else -> pop(selected)
+            }
+            return true
+        }
         if (pop(selected)) return true
         if (selected != AppTab.HOME) {
             selected = AppTab.HOME

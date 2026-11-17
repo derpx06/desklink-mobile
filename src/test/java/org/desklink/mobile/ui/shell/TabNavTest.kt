@@ -96,4 +96,44 @@ class TabNavTest {
         assertEquals("both moving: their mean", true to 0.5f, filesBadge(true, 0.25f, true, 0.75f))
         assertEquals("an idle Bucket's old fraction is ignored", false to null, filesBadge(false, 0.9f, false, 0.2f))
     }
+
+    @Test
+    fun splitSettingsChoosesAPageAndBackLeavesSettings() {
+        val nav = TabNav(AppTab.SETTINGS)
+        nav.split = true
+        // Tapping pages in the side list replaces the page, it does not pile up a history.
+        nav.setStack(AppTab.SETTINGS, listOf("sound"))
+        nav.setStack(AppTab.SETTINGS, listOf("files"))
+        nav.setStack(AppTab.SETTINGS, listOf("privacy"))
+        assertEquals(listOf("privacy"), nav.stack(AppTab.SETTINGS))
+        // Back from a first-level page leaves Settings (for Home), at once.
+        assertTrue(nav.back())
+        assertEquals(AppTab.HOME, nav.selected)
+        assertTrue(nav.stack(AppTab.SETTINGS).isEmpty())
+        // Nothing chosen (the first page shows): Back leaves too.
+        nav.select(AppTab.SETTINGS)
+        assertTrue(nav.back())
+        assertEquals(AppTab.HOME, nav.selected)
+    }
+
+    @Test
+    fun splitSettingsGoesUpFromASubpageToItsPage() {
+        val nav = TabNav(AppTab.SETTINGS)
+        nav.split = true
+        // A deep link pushes the subpage alone: up (the arrow) and Back go to its page, then leave.
+        nav.push(AppTab.SETTINGS, "advanced/permissions")
+        assertTrue(nav.up(AppTab.SETTINGS))
+        assertEquals(listOf("advanced"), nav.stack(AppTab.SETTINGS))
+        nav.push(AppTab.SETTINGS, "advanced/network")
+        assertTrue(nav.back())
+        assertEquals(listOf("advanced"), nav.stack(AppTab.SETTINGS))
+        assertEquals(AppTab.SETTINGS, nav.selected)
+        assertTrue(nav.back())
+        assertEquals(AppTab.HOME, nav.selected)
+        // One pane: the old behaviour, a plain pop.
+        val single = TabNav(AppTab.SETTINGS)
+        single.push(AppTab.SETTINGS, "advanced/permissions")
+        assertTrue(single.up(AppTab.SETTINGS))
+        assertTrue(single.stack(AppTab.SETTINGS).isEmpty())
+    }
 }

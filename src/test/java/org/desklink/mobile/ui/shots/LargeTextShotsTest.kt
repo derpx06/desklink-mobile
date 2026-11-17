@@ -44,6 +44,15 @@ class SlightlyLargerTextScreenShots : ScreenShots() {
     @Before fun fontScale() = RuntimeEnvironment.setFontScale(1.15f)
 }
 
+/** A tablet at font 2.0: Settings beside its list, the rows at the largest text. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w840dp-h1100dp-xhdpi")
+class TabletHugeScreenShots : ScreenShots() {
+    override val form = "tablet-huge"
+    @Before fun fontScale() = RuntimeEnvironment.setFontScale(2.0f)
+}
+
 /** Right to left: where a chevron, a progress bar or a padding is mirrored wrongly or a row's parts trade places. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)

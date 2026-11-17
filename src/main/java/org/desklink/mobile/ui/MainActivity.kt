@@ -1462,9 +1462,12 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             onGuide = { push(GUIDE) },
             route = nav.top(AppTab.SETTINGS),
             onOpen = { nav.push(AppTab.SETTINGS, it) },
-            onBack = { nav.pop(AppTab.SETTINGS) },
+            // Beside the list a page is chosen, not pushed: the stack is that page (a subpage under its group).
+            onSelect = { route -> nav.setStack(AppTab.SETTINGS, listOf(route)) },
+            onSplit = { nav.split = it },
+            onBack = { nav.up(AppTab.SETTINGS) },
             waitingPermissions = waitingPermissions(this, device?.name ?: getString(R.string.settings_your_computer)),
-            about = { AboutRoute { nav.pop(AppTab.SETTINGS) } },
+            about = { AboutRoute { nav.up(AppTab.SETTINGS) } },
             onSwitchComputer = { nav.select(AppTab.HOME); computersRequest++ },
             actions = SettingsActions(
                 // One writer per setting: these are this phone's plugins, the desk's own

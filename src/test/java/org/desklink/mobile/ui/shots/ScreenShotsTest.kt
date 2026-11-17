@@ -300,19 +300,49 @@ abstract class ScreenShots : ShotTest() {
         check(apart == (columns == 2)) { "$form ($width dp): expected $columns column(s), the cards' left edges are ${left("Claude Code")} and ${left("Build")}" }
     }
 
-    /** From 720 dp Settings shows the list of pages beside the first page; below it the list alone (every row stays on its page). */
-    @Test fun settingsSplitsOnWideScreens() {
-        compose.setContent {
-            org.desklink.mobile.ui.compose.DeskLinkFixedTheme(compose.activity, false) {
-                SettingsTab(deskSettings(), noopSettings, null, {}, {}, 0, {})
+    private val settingsRoute = androidx.compose.runtime.mutableStateOf<String?>(null)
+    private val settingsNoComputer = androidx.compose.runtime.mutableStateOf(false)
+    private var settingsShown = false
+
+    /** Sets what Settings shows (the content can be set once per test: the route is state). */
+    private fun splitSettings(route: String?, noComputer: Boolean = false) {
+        settingsRoute.value = route
+        settingsNoComputer.value = noComputer
+        if (!settingsShown) {
+            settingsShown = true
+            compose.setContent {
+                org.desklink.mobile.ui.compose.DeskLinkFixedTheme(compose.activity, false) {
+                    SettingsTab(if (settingsNoComputer.value) null else deskSettings(), noopSettings, settingsRoute.value, {}, {}, 0, {})
+                }
             }
         }
         compose.waitForIdle()
-        val width = compose.activity.resources.configuration.screenWidthDp
-        val page = compose.onAllNodesWithText(compose.activity.getString(org.desklink.mobile.R.string.settings_connect_on_startup), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        val list = compose.onAllNodesWithText(compose.activity.getString(org.desklink.mobile.R.string.settings_all), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-        check(list) { "$form: the list of pages is missing" }
-        check(page == (width >= 720)) { "$form ($width dp): the first page beside the list should be ${width >= 720}, was $page" }
+    }
+
+    private fun texts(res: Int) = compose.onAllNodesWithText(compose.activity.getString(res), useUnmergedTree = true).fetchSemanticsNodes().size
+
+    private val splits: Boolean
+        get() = compose.activity.resources.configuration.let { it.screenWidthDp >= 720 && it.screenHeightDp >= 560 }
+
+    /** From 720 x 560 dp Settings shows the list of pages beside the first page; below it the list alone (every row stays on its page). */
+    @Test fun settingsSplitsOnWideScreens() {
+        splitSettings(null)
+        check(texts(org.desklink.mobile.R.string.settings_all) > 0) { "$form: the list of pages is missing" }
+        check((texts(org.desklink.mobile.R.string.settings_connect_on_startup) > 0) == splits) { "$form: the first page beside the list should be $splits" }
+        // Beside the list the quick switches are left out (they are on the pages); alone they are in the list.
+        check((texts(org.desklink.mobile.R.string.settings_quick_switches) == 0) == splits) { "$form: quick switches in the list: ${!splits}" }
+    }
+
+    /** The open page is marked in the list; a stale route or one with no computer shows the first page, not a second list. */
+    @Test fun settingsMarksTheOpenPageAndNeverDoublesTheList() {
+        splitSettings("privacy")
+        val selected = compose.onAllNodes(androidx.compose.ui.test.isSelected(), useUnmergedTree = true).fetchSemanticsNodes().size
+        check((selected > 0) == splits) { "$form: the open page is marked: $splits, was $selected" }
+        splitSettings("no-such-page")
+        check(texts(org.desklink.mobile.R.string.settings_search) <= 1) { "$form: the search field is in the list twice" }
+        splitSettings("sound", noComputer = true)
+        check(texts(org.desklink.mobile.R.string.settings_search) <= 1) { "$form: a route with no computer doubled the list" }
+        if (splits) check(texts(org.desklink.mobile.R.string.settings_connect_on_startup) > 0 || texts(org.desklink.mobile.R.string.settings_all) > 0)
     }
 
     @Test fun terminalsEmpty() = shoot("terminals-empty", terminals(TerminalsPanel.LIST, connected))
