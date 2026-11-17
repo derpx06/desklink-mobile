@@ -191,7 +191,7 @@ class DeskLinkApplication : Application() {
         // Gallery: the folder watchers of the computers that accept images, registered once per process.
         org.desklink.mobile.plugins.gallery.GalleryWatcher.kick(this)
         org.desklink.mobile.helpers.ThreadHelper.execute { runCatching { org.desklink.mobile.plugins.share.TransferNotification.sweep(this) } }
-        // 1.3 removed several features: what they stored is deleted once, off the main thread.
+        // 0.3 removed several features: what they stored is deleted once, off the main thread.
         org.desklink.mobile.helpers.ThreadHelper.execute {
             org.desklink.mobile.helpers.RemovedFeatures.runOnce(this)
             runCatching { org.desklink.mobile.plugins.findmyphone.RingVolume.restoreIfLeft(this) }

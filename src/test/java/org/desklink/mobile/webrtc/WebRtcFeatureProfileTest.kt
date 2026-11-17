@@ -129,7 +129,7 @@ class WebRtcFeatureProfileTest {
     }
 
     /**
-     * 1.3 removed these features. An older peer may still advertise or send them: they are outside
+     * 0.3 removed these features. An older peer may still advertise or send them: they are outside
      * the profile, so they are filtered at the boundary and never reach a handler.
      */
     @Test

@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
 
-/** No string a person can read may still name a feature 1.3 removed. */
+/** No string a person can read may still name a feature 0.3 removed. */
 class RemovedFeatureWordsTest {
     private val forbidden = Regex(
         "drawing pad|webcam|presenter|tv remote|automation|keystroke|quick command|device controls|run command[,.]|run command and",

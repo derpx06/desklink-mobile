@@ -11,7 +11,7 @@ import androidx.preference.PreferenceManager
 import java.io.File
 
 /**
- * DeskLink 1.3 removed automations, run commands, the drawing pad, presenter, TV remote, the remote
+ * DeskLink 0.3 removed automations, run commands, the drawing pad, presenter, TV remote, the remote
  * keyboard and send-keystrokes. What they stored is deleted, once, quietly: nothing reads it any
  * more and some of it names commands the person typed. Pairing records, certificates and every
  * other preference are never touched; only the names listed here.

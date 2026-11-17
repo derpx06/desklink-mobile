@@ -108,7 +108,7 @@ abstract class Wave5Shots : ShotTest() {
     }
 
     private val about = AboutData(
-        "DeskLink", R.drawable.desklink_mark, "1.3.0", build = "20300 · debug", developer = "derpx06",
+        "DeskLink", R.drawable.desklink_mark, "0.3.0", build = "20300 · debug", developer = "derpx06",
         developerURL = "https://github.com/derpx06", bugURL = "https://example.org/bug", sourceCodeURL = "https://example.org/src",
         privacyURL = "https://example.org/privacy",
         upstreamAuthors = listOf(AboutPerson("Albert Vaca Cintora", R.string.maintainer_and_developer), AboutPerson("Aleix Pol", R.string.developer)),

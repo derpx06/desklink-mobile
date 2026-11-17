@@ -1,9 +1,9 @@
 # Play Console answers
 
-Answers for the Play Console forms for DeskLink 1.3.0 (`org.desklink.mobile`).
+Answers for the Play Console forms for DeskLink 0.3.0 (`org.desklink.mobile`).
 They follow `PRIVACY.md`; if the app or the relay changes, update both.
 
-**1.3.0 ships with the relay off** (`RELAY_ENABLED` false in `build.gradle.kts`): no relay
+**0.3.0 ships with the relay off** (`RELAY_ENABLED` false in `build.gradle.kts`): no relay
 connection and no TURN, so the relay and Cloudflare TURN parts below do not happen in this
 release. The owner should decide whether to answer the forms for the LAN-only build before
 submitting.
@@ -19,7 +19,7 @@ logs them, change "Processed ephemerally" to No.
 
 | Question | Answer |
 |---|---|
-| Does your app collect or share any of the required user data types? | Yes (device IDs and IP address through the relay; ML Kit metrics and an install id; see below) |
+| Does your app collect or share any of the required user data types? | Yes (see below). With the relay off in 0.3 nothing goes through it, so declaring device IDs and the IP address "through the relay" is over-declared today: kept on purpose so the form stays right if the relay is enabled later (ML Kit metrics and an install id apply either way) |
 | Is all of the user data collected by your app encrypted in transit? | Yes |
 | Do you provide a way for users to request that their data is deleted? | Yes: nothing is stored server-side; uninstalling or unpairing removes everything. Point to PRIVACY.md |
 | Independent security review | No |
@@ -103,7 +103,7 @@ app is in the background; for `mediaProjection`, start and stop a screen share.
 
 ### All files access
 
-Not declared. DeskLink 1.3 has no file browser for the phone's storage; received files go to the Downloads
+Not declared. DeskLink 0.3 has no file browser for the phone's storage; received files go to the Downloads
 folder or a folder the user picks, and the Bucket uses a folder the user picks with the Storage
 Access Framework. `MANAGE_EXTERNAL_STORAGE` is not in the manifest.
 
@@ -124,8 +124,13 @@ Access Framework. `MANAGE_EXTERNAL_STORAGE` is not in the manifest.
 - `READ_EXTERNAL_STORAGE` / `WRITE_EXTERNAL_STORAGE`: up to Android 10 only (`maxSdkVersion` 29).
 - Not in release builds: `READ_LOGS` and `SYSTEM_ALERT_WINDOW` (the "automatic clipboard sync" workaround is
   declared only by hand-installed debug builds), Bluetooth permissions (the Bluetooth link was removed).
+- `USE_FULL_SCREEN_INTENT`: a computer's ask to start screen sharing opens on a locked or sleeping phone (on
+  Android 14+ only after the person allows it). **Declare it in Play Console** (Full-screen intent declaration):
+  "ask to start screen sharing", a call-like use. `ACCESS_LOCAL_NETWORK` (the local-network permission on newer
+  Android) and the `FOREGROUND_SERVICE_*` types (`connectedDevice`, `mediaProjection`, `microphone`) are declared
+  with their own explanations above/below.
 - Removed: SMS, MMS, call log, `QUERY_ALL_PACKAGES`, `REQUEST_INSTALL_PACKAGES`,
-  `USE_FULL_SCREEN_INTENT`, background location, all files access. None of the SMS / Call Log
+  background location, all files access. None of the SMS / Call Log
   policy declarations apply.
 
 ## App content

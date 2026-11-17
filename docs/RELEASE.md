@@ -81,19 +81,24 @@ Code is not obfuscated (`-dontobfuscate`), but R8 still removes and inlines code
 
 ## 4. Versioning
 
-`versionCode` must increase on every upload. Scheme from 2.0.0:
-`major * 10000 + minor * 100 + patch` (2.0.0 = 20000, 2.0.1 = 20001, 2.1.0 = 20100).
-Add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (500 characters
-max) for each release; Play, F-Droid and the GitHub release all read it.
+`versionName` is the product version: **0.3.0**, the first public beta (the "beta" lives in the release notes,
+the GitHub and Play release type and the update channel, not in the version string). `versionCode` is
+**independent of `versionName`** and must increase on every upload and never go down: the first build was numbered
+2.0.0 / 20000, so 0.3.0 is **20300** and the next beta or stable upload continues upward (20301, 20400, ...).
+Add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (500 characters max, named for the
+versionCode, not the version) for each release; Play, F-Droid and the GitHub release all read it.
+`ReleaseHygieneTest` pins versionName, the changelog file's length and the `CHANGELOG.md` top heading together.
 
 ## 5. CI
 
 - `ci.yml` runs unit tests, `lintDebug` and an unsigned `assembleRelease` on every
   push and pull request.
-- `release.yml` runs on a `v*` tag (`git tag v2.0.0 && git push origin v2.0.0`).
-  It builds the APK and AAB, signs them if the secrets below exist, writes
-  `SHA256SUMS`, and publishes everything to a GitHub Release whose notes are the
-  version's changelog file.
+- `release.yml` runs on a `v*` tag (`git tag v0.3.0 && git push origin v0.3.0`; the tag must equal `versionName`).
+  It checks the tag against `versionName`, runs the unit tests and the dex guard,
+  builds the APK and AAB, signs them if the secrets below exist, writes `SHA256SUMS`, and
+  publishes everything to a GitHub **prerelease** (0.x is a beta) whose notes are the version's
+  changelog file. Without the upload-key secrets the APK is `-unsigned` (Android will not install
+  it): the release is then a **draft**, with a warning in the job summary, and is never public.
 
 Repository secrets (Settings > Secrets and variables > Actions):
 
@@ -135,22 +140,15 @@ https://github.com/derpx06/desklink-mobile/blob/master/PRIVACY.md
 ## 7. Checklist
 
 1. Bump `versionCode`/`versionName` in `build.gradle.kts`, add the changelog file.
-   Check `DESKLINK_RELAY_URL` is set (section 2).
+   Keep versionCode above every earlier upload. (`DESKLINK_RELAY_URL` is inert while `RELAY_ENABLED` is false.)
 2. `./gradlew testDebugUnitTest lintDebug assembleRelease`. Every `assembleRelease` and `bundleRelease` then runs the dex guard (`scripts/check-release-dex.sh`): it fails the build when the shrunk dex lacks a class native code looks up by name (`org.jni_zero.JniInit`: R8 removed it once and every release build aborted at the first WebRTC use), a plugin canary, or has fewer than 23 plugins. When a native library starts looking up another class, add it to `release-required-classes.txt` (read the class-path literals of the `.so` files) and keep it in `proguard-rules.pro`.
-3. Install the release APK on a real phone; pair, run a feature over LAN and over the
-   relay (`docs/testing/RELIABILITY.md` in the workspace).
+3. Install the release APK on a real phone; pair and run a feature over LAN
+   (`docs/testing/RELIABILITY.md` in the workspace).
 4. Tag and push; check the GitHub release and its `SHA256SUMS`.
-5. Upload the AAB and `mapping.txt` to Play (internal track first).
+5. Upload the AAB and `mapping.txt` to Play: the beta goes to a closed or open **testing track** first, not to production.
 
 
-## 4. Version scheme
-
-`versionName` is the product version (1.3.0 on both apps). `versionCode` is
-`20000 + minor * 100 + patch` (1.3.0 = 20300): the first build was numbered 2.0.0 / 20000, so the code
-only ever goes up. Each release needs `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`
-(`ReleaseHygieneTest` checks that it exists) and a `CHANGELOG.md` entry.
-
-## 5. Third-party facts (the owner's decisions; nothing here was changed)
+## 8. Third-party facts (the owner's decisions; nothing here was changed)
 
 What the release APK (`assembleRelease`, arm64-v8a + armeabi-v7a, 43.7 MB) bundles that is not free software
 or needs a decision. Written down so the choice is made knowingly:
@@ -176,8 +174,8 @@ Decisions that are the owner's, with the facts:
 - **Removing the ML Kit telemetry** (the datatransport services and `MlKitInitProvider` via
   `tools:node="remove"`) was not done: it cannot be checked off-device that recognition still works without
   them. Real-phone check V14 in the workspace list covers it if you want to try.
-- **Unused dependencies** (done in 1.3): rxjava, reactive-streams, swiperefreshlayout, gridlayout and lifecycle-extensions had no users
+- **Unused dependencies** (done in 0.3): rxjava, reactive-streams, swiperefreshlayout, gridlayout and lifecycle-extensions had no users
   and were removed; `lifecycle-process` (for `ProcessLifecycleOwner`) is declared directly.
-- **minSdk 24 (decided for 1.3).** Android 7.0 is the minimum: it drops Android 6.0 (well under 1% of devices), removes the API-24
+- **minSdk 24 (decided for 0.3).** Android 7.0 is the minimum: it drops Android 6.0 (well under 1% of devices), removes the API-24
   `NewApi` lint errors and the guards they asked for, and Termux's terminal libraries already declared 24. The 20 moot entries
   were deleted from `lint-baseline.xml`; the build still fails on any new lint error.

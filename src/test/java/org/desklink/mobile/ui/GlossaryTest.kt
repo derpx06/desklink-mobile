@@ -36,7 +36,7 @@ class GlossaryTest {
 
     /**
      * The words of the machinery, which the desk's `assert_plain` bans from its first run and guide too. Credits keep
-     * upstream's words; the relay's own lines show only on a relay link, which 1.3 never makes (RELAY_ENABLED is off).
+     * upstream's words; the relay's own lines show only on a relay link, which 0.3 never makes (RELAY_ENABLED is off).
      */
     private val jargon = listOf("WebRTC", "peer", "handover", "mDNS", "TLS", "daemon", "packet", "plugin", "codec", "protocol", "GStreamer", "LAN", "certificate", "successfully", "Please", "relay", "Relay")
     private val relayOnly = setOf("remote_path_turn", "home_connected_relay", "home_connected_turn", "home_short_relay", "home_trying_paths", "home_check_away_relay_on")

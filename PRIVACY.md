@@ -1,7 +1,7 @@
 # DeskLink privacy policy
 
 Last updated: 2026-10-25. Applies to the DeskLink Android app (`org.desklink.mobile`)
-from version 1.3.0.
+from version 0.3.0.
 
 DeskLink connects your phone to your own computer running DeskLink. It has no
 account, no ads and no advertising or tracking SDKs. We do not collect, sell or share
@@ -43,7 +43,7 @@ your call log or messages, or see your location.
 
 ## The DeskLink relay
 
-**Not used in version 1.3.** This release works on your local network only: the
+**Not used in version 0.3.** This release works on your local network only: the
 relay and TURN are switched off in the app, and nothing below happens. This
 section describes them for a later version that turns them on.
 

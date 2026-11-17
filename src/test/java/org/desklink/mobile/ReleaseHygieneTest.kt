@@ -28,13 +28,18 @@ class ReleaseHygieneTest {
     }
 
     @Test
-    fun theVersionIs130AndHasItsStoreChangelog() {
+    fun theVersionIsOneThingEverywhereItIsWritten() {
         val gradle = project("build.gradle.kts").readText()
-        assertTrue("versionName = \"1.3.0\"" in gradle)
+        val name = Regex("versionName = \"([^\"]+)\"").find(gradle)!!.groupValues[1]
+        assertEquals("the first public beta", "0.3.0", name)
         val code = Regex("versionCode = (\\d+)").find(gradle)!!.groupValues[1]
-        assertTrue("monotonic after the first 20000", code.toInt() > 20000)
-        assertTrue("changelog $code.txt", project("fastlane/metadata/android/en-US/changelogs/$code.txt").readText().startsWith("DeskLink 1.3"))
-        assertTrue("CHANGELOG.md has 1.3.0", "## 1.3.0" in project("CHANGELOG.md").readText())
+        assertTrue("never lower than the first build (20000) or the first beta (20300)", code.toInt() >= 20300)
+        val changelog = project("fastlane/metadata/android/en-US/changelogs/$code.txt").readText()
+        assertTrue("changelog $code.txt names the version", changelog.startsWith("DeskLink " + name.substringBeforeLast('.')))
+        assertTrue("Play 'What's new' is 500 characters at most (${changelog.length})", changelog.length <= 500)
+        assertTrue("Play short description is 80 characters at most", project("fastlane/metadata/android/en-US/short_description.txt").readText().trim().length <= 80)
+        val top = project("CHANGELOG.md").readLines().first { it.startsWith("## ") }
+        assertTrue("CHANGELOG.md top heading is $name: $top", top.startsWith("## $name"))
     }
 
     @Test

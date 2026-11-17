@@ -35,7 +35,7 @@ webrtc/  (WebRtcSessionCoordinator, WebRtcTransport, envelopes, file engine)   b
 
 ## Known exceptions (today)
 
-Measured on 1.3 (phase 3); each is listed so it is fixed on purpose, not copied:
+Measured on 0.3 (phase 3); each is listed so it is fixed on purpose, not copied:
 
 * `webrtc/` imports `plugins/` in 5 files (`WebRtcSessionCoordinator`,
   `WebRtcTransport`, `WebRtcFileProtocol`, `WebRtcFileTransferManager`,
@@ -86,7 +86,7 @@ Measured on 1.3 (phase 3); each is listed so it is fixed on purpose, not copied:
 
 ## Module structure: done and next
 
-Done in 1.3 (phase 3): seams that moved whole top-level declarations without
+Done in 0.3 (phase 3): seams that moved whole top-level declarations without
 changing a class: the file engine's `FileRunner` and error helpers, the Bucket's
 data model, Home's state types.
 

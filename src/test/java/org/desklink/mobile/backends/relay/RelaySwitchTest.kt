@@ -17,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import java.io.File
 
 /**
- * 1.3 ships LAN-only: `BuildConfig.RELAY_ENABLED` is false, and with it off nothing relay-related runs or shows, whatever
+ * 0.3 ships LAN-only: `BuildConfig.RELAY_ENABLED` is false, and with it off nothing relay-related runs or shows, whatever
  * the stored prefs say (they are kept untouched).
  */
 @RunWith(RobolectricTestRunner::class)

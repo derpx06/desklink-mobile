@@ -255,7 +255,7 @@ object FolderSync {
     const val MAX_BUCKET_ITEMS = 10_000
     /** F8c: one file ("Files over 1 GB can't go in the Bucket"). */
     const val MAX_BUCKET_FILE_BYTES = 1L shl 30
-    /** 1.3 decision 3: a warning from 8 GB, new additions refused at 10 GB. */
+    /** 0.3 decision 3: a warning from 8 GB, new additions refused at 10 GB. */
     const val WARN_BUCKET_BYTES = 8L shl 30
     const val MAX_BUCKET_BYTES = 10L shl 30
     /** F8c: one add (a share, a pick, a folder): at most this many items and bytes; the rest are left out. */

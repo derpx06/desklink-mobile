@@ -39,7 +39,7 @@ import java.util.concurrent.TimeUnit
 /**
  * The relay's switches (docs/RELAY.md §7). [BuildConfig.RELAY_ENABLED] is the only control: there is no setting or row that
  * turns the relay or TURN on or off. On, the build's relay ([BuildConfig.DEFAULT_RELAY_URL]) and its TURN credentials are
- * simply used; off (1.3: LAN only), neither runs.
+ * simply used; off ( 0.3: LAN only), neither runs.
  */
 object RelaySettings {
     /** Written by earlier builds' rows; kept in storage untouched (no migration) and never read. */

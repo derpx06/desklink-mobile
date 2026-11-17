@@ -37,9 +37,11 @@ android {
         applicationId = "org.desklink.mobile"
         minSdk = 24
         targetSdk = 36
-        // 1.3.0: versionCode is 20000 + minor * 100 + patch (the first build was numbered 2.0.0 / 20000, so the number only goes up).
+        // versionCode is independent of versionName and only ever goes up: the first build was numbered
+        // 2.0.0 / 20000, so the product version 0.3.0 (the first public beta) is 20300 and the next
+        // beta or stable upload takes 20301, 20400, ... (never lower). Each upload needs a higher code.
         versionCode = 20300
-        versionName = "1.3.0"
+        versionName = "0.3.0"
         // English only on purpose: the new strings (strings_ui, everything, guide: ~1260 keys) have no translations, so the
         // generated per-app language list (generateLocaleConfig) offers English alone rather than a mostly-English "German".
         // The old values-xx folders stay in the source for a later translation pass (docs/IMPROVEMENTS.md).

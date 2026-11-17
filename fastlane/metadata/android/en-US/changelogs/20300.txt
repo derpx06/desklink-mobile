@@ -1,9 +1,7 @@
-DeskLink 1.3:
-- Faster, steadier connection: it comes back by itself after sleep, a network change or a restart, and says clearly when it cannot
-- The Bucket: one folder kept in step between your phone and your computer, two folders deep, with progress and resume
-- Faster file transfers that resume after a lost link and never arrive twice
+DeskLink 0.3 beta:
+- Steadier connection: comes back by itself after sleep or a network change, says so when it cannot
+- The Bucket: one folder kept in step between phone and computer
+- Faster file transfers that resume and never arrive twice
 - Notes, snippets, contacts and calls on your computer (off until you turn them on)
-- Your phone's microphone or sound on your computer, and the computer's sound on your phone, when you allow it
-- The computer's pointer and keyboard can carry on onto your phone; the phone can send a photo, a scan or a QR text to the computer
-- A call the computer asks for is placed only after you tap Allow; secret notifications are never sent
-- New look with five tabs; removed: browsing the phone's files, the presentation remote and Bluetooth
+- Phone mic or sound on the computer and back, when you allow it
+- New look; removed: browsing the phone's files, the presentation remote, Bluetooth

@@ -155,7 +155,7 @@ private fun AppCard(aboutData: AboutData, onOpenUrl: (String) -> Unit, onEasterE
     }
 }
 
-/** "What's new in 1.3": one row that opens a short list in plain words. */
+/** "What's new in <version>": one row that opens a short list in plain words. */
 @Composable
 private fun WhatsNew(version: String, startOpen: Boolean) {
     val t = tokens
@@ -215,7 +215,7 @@ private fun AboutScreenPreview() {
     val sample = AboutData(
         name = "DeskLink",
         icon = R.drawable.desklink_mark,
-        versionName = "1.3.0",
+        versionName = "0.3.0",
         build = "20300 · debug",
         developer = "derpx06",
         developerURL = "https://github.com/derpx06",

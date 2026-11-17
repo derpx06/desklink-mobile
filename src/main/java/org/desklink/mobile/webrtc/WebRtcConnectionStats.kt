@@ -13,7 +13,7 @@ enum class WebRtcConnectionPath(val label: String) {
 }
 
 /**
- * The path as a surface may name it. With the relay compiled out (BuildConfig.RELAY_ENABLED, 1.3) every link began on
+ * The path as a surface may name it. With the relay compiled out (BuildConfig.RELAY_ENABLED,  0.3) every link began on
  * the LAN, so nothing is named the internet or a relay: anything but LAN reads as not known yet (null). The real path
  * stays on the device for what decides on it (the fast lane).
  */

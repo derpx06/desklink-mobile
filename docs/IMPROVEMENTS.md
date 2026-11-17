@@ -1,4 +1,4 @@
-# Improvements (1.3, phase 3.5): phone audit
+# Improvements ( 0.3, phase 3.5): phone audit
 
 A per-module reliability and performance pass over the phone app after the
 phase-3 seams (593ff94). Each module group was audited read-only by an
@@ -94,7 +94,7 @@ Tests: `aViewOnlyDesktopSaysViewOnlyAndOffersToAskAgain`,
   `strings_everything.xml` and `strings_guide.xml`; a language is added to the list when its folder is complete.
   The desk has no translation catalogue either (window strings are literals): a gettext pass is its follow-up.
 
-## Robustness (batch 5, from the 1.3 robustness audit)
+## Robustness (batch 5, from the 0.3 robustness audit)
 
 - **LAN listener unavailable (ROB-1).** When no TCP port of 1716..1764 can be opened (a leaked file descriptor, another app holding
   the range) the LAN provider no longer throws out of the foreground service's start (a crash that fed `CrashLoop` and kept
@@ -108,7 +108,7 @@ Tests: `aViewOnlyDesktopSaysViewOnlyAndOffersToAskAgain`,
 - **Battery (ROB-4)** with no sticky battery broadcast, and **transfer history (ROB-6)** on a full disk or after a torn last line: no
   exception to the caller; the record stays in memory.
 
-## Security audit (1.3, SEC-4 and SEC-5)
+## Security audit ( 0.3, SEC-4 and SEC-5)
 
 - **SEC-4 (documentation only)**: this phone's private key is kept in plain app-private SharedPreferences (`RsaHelper`), not in
   the Android Keystore. Backup is disabled and the app's data is excluded from device transfers, but root, a debuggable build or a
