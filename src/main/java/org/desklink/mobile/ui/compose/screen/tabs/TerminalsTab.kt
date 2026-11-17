@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -389,17 +393,17 @@ fun TerminalsContent(
                     s.id to (labels[s.id] ?: previews[s.id]?.name ?: SessionPreviews.agentName(context, s.title) ?: s.cwd?.takeIf { it.isNotBlank() } ?: s.title.ifBlank { s.id.take(8) })
                 }
                 val shown = matchingSessions(state.sessions, query) { names[it.id].orEmpty() }
-                // One column on a phone; side by side on a tablet or an unfolded phone (two from 2 x 340 dp).
-                val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> androidx.compose.foundation.lazy.grid.GridItemSpan) =
-                    { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }
-                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(minSize = 340.dp),
+                // One column on a phone; side by side from two cards of 270 dp (a tablet, an unfolded phone from about 590 dp).
+                val full: (LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 270.dp),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item(key = "launchers", span = full) { NewTerminalTile(connected && !busy, actions.onNew) { if (!connected) actions.onUnavailable() } }
+                    // One cell, not a bar across a wide screen.
+                    item(key = "launchers") { NewTerminalTile(connected && !busy, actions.onNew) { if (!connected) actions.onUnavailable() } }
                     if (state.sessions.isEmpty()) {
                         item(key = "none", span = full) {
                             Text(stringResource(R.string.terminal_empty_hint), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp))
@@ -411,7 +415,8 @@ fun TerminalsContent(
                                 Text(stringResource(R.string.terminals_no_match, query.trim()), fontSize = 14.sp, lineHeight = 20.sp, color = t.textDim, modifier = Modifier.padding(horizontal = 6.dp))
                             }
                         }
-                        items(shown, key = { it.id }) { session ->
+                        // A lone session takes the whole width rather than the left cell of two.
+                        items(shown, key = { it.id }, span = { if (shown.size == 1) GridItemSpan(maxLineSpan) else GridItemSpan(1) }) { session ->
                             val base = previews[session.id] ?: SessionPreview(
                                 id = session.id,
                                 name = names[session.id].orEmpty(),

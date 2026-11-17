@@ -36,6 +36,8 @@ import org.desklink.mobile.webrtc.terminal.TerminalLinkState
 import org.desklink.mobile.webrtc.terminal.TerminalSessionState
 import org.desklink.mobile.ui.compose.screen.transfers.TransferActions
 import org.junit.Before
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -275,6 +277,28 @@ abstract class ScreenShots : ShotTest() {
             labels = mapOf("s2" to "Build"),
         ),
     )
+
+    /** The session cards sit side by side once two fit (a tablet), one column on a phone: the x of the first two cards says which. */
+    @Test fun terminalSessionsFillTheWidthInColumns() {
+        compose.setContent {
+            org.desklink.mobile.ui.compose.DeskLinkFixedTheme(compose.activity, false) {
+                terminals(
+                    TerminalsPanel.LIST, connected.copy(sessions = sessions),
+                    previews = mapOf("s1" to SessionPreview("s1", "Claude Code", "CC", true, listOf("Do you want to proceed?"), "80×24", waiting = true)),
+                    labels = mapOf("s2" to "Build"),
+                )()
+            }
+        }
+        compose.waitForIdle()
+        val shown = { text: String -> compose.onAllNodesWithText(text, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        // A lazy grid composes only what is in view: at a very large font the second card can be below the fold.
+        if (!shown("Claude Code") || !shown("Build")) return
+        val left = { text: String -> compose.onAllNodesWithText(text, useUnmergedTree = true).onFirst().fetchSemanticsNode().positionInRoot.x }
+        val width = compose.activity.resources.configuration.screenWidthDp
+        val columns = if (width - 32 >= 2 * 270 + 12) 2 else 1
+        val apart = left("Claude Code") != left("Build")
+        check(apart == (columns == 2)) { "$form ($width dp): expected $columns column(s), the cards' left edges are ${left("Claude Code")} and ${left("Build")}" }
+    }
 
     @Test fun terminalsEmpty() = shoot("terminals-empty", terminals(TerminalsPanel.LIST, connected))
     @Test fun terminalsReconnecting() = shoot("terminals-reconnecting", terminals(TerminalsPanel.LIST, connected.copy(link = TerminalLinkState.DISCONNECTED, sessions = sessions.take(2))))
