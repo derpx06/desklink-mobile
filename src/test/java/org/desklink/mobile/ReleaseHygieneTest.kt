@@ -94,6 +94,6 @@ class ReleaseHygieneTest {
         val gradle = project("build.gradle.kts").readText()
         val code = Regex("""versionCode = (\d+)""").find(gradle)!!.groupValues[1].toInt()
         assertTrue("versionCode $code is below the first beta's 20300", code >= 20300)
-        assertTrue("the documented rule", "independent of versionName" in project("docs/RELEASE.md").readText())
+        assertTrue("the documented rule", "independent of `versionName`" in project("docs/RELEASE.md").readText())
     }
 }
