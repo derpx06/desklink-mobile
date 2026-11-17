@@ -11,3 +11,6 @@ org/webrtc/PeerConnectionFactory
 org/webrtc/PeerConnection
 org/webrtc/DataChannel
 org/webrtc/RtpSender
+# A plugin: the list is built by reflection from a generated index, so a shrunk-away plugin silently disappears.
+org/desklink/mobile/plugins/clipboard/ClipboardPlugin
+#min-plugins 23

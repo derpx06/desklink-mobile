@@ -253,8 +253,13 @@ tasks.named("preBuild") {
 }
 
 // A release APK that lacks a class native code looks up by name aborts at the first WebRTC use (F-QA-2: R8 removed
-// org.jni_zero.JniInit). Every assembleRelease checks the dex for the list in release-required-classes.txt.
+// org.jni_zero.JniInit). assembleRelease and bundleRelease (the AAB uploaded to Play) check their dex for the list in
+// release-required-classes.txt (scripts/check-release-dex.sh); a missing class fails the build.
 val checkReleaseDex = tasks.register<Exec>("checkReleaseDex") {
-    commandLine("sh", "scripts/check-release-dex.sh")
+    commandLine("sh", "scripts/check-release-dex.sh", "--apk")
+}
+val checkReleaseBundleDex = tasks.register<Exec>("checkReleaseBundleDex") {
+    commandLine("sh", "scripts/check-release-dex.sh", "--aab")
 }
 tasks.matching { it.name == "assembleRelease" }.configureEach { finalizedBy(checkReleaseDex) }
+tasks.matching { it.name == "bundleRelease" }.configureEach { finalizedBy(checkReleaseBundleDex) }

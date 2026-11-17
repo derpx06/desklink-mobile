@@ -136,7 +136,7 @@ https://github.com/derpx06/desklink-mobile/blob/master/PRIVACY.md
 
 1. Bump `versionCode`/`versionName` in `build.gradle.kts`, add the changelog file.
    Check `DESKLINK_RELAY_URL` is set (section 2).
-2. `./gradlew testDebugUnitTest lintDebug assembleRelease`.
+2. `./gradlew testDebugUnitTest lintDebug assembleRelease`. Every `assembleRelease` and `bundleRelease` then runs the dex guard (`scripts/check-release-dex.sh`): it fails the build when the shrunk dex lacks a class native code looks up by name (`org.jni_zero.JniInit`: R8 removed it once and every release build aborted at the first WebRTC use), a plugin canary, or has fewer than 23 plugins. When a native library starts looking up another class, add it to `release-required-classes.txt` (read the class-path literals of the `.so` files) and keep it in `proguard-rules.pro`.
 3. Install the release APK on a real phone; pair, run a feature over LAN and over the
    relay (`docs/testing/RELIABILITY.md` in the workspace).
 4. Tag and push; check the GitHub release and its `SHA256SUMS`.
