@@ -62,16 +62,18 @@ internal object UpdateVerifier {
 
     private fun parsePayload(bytes: ByteArray, nowSec: Long, lastSeen: Long): Verdict {
         val p = StrictJson.parse(bytes) as? Map<*, *> ?: return reject(FailReason.PARSE)
+        // Failure order: parse, schema, types, expired (future, window, expiry), replay.
         val schema = num(p["schemaVersion"])
+        if (schema == null || schema < 1) return reject(FailReason.PARSE)
+        if (schema > 1) return reject(FailReason.SCHEMA)
         val issuedAt = num(p["issuedAt"])
         val expires = num(p["expires"])
-        if (schema == null || issuedAt == null || expires == null || issuedAt < 0 || expires < 0) return reject(FailReason.PARSE)
+        if (issuedAt == null || expires == null) return reject(FailReason.PARSE) // JSON has no negative integer token
         return when {
-            schema > 1 -> reject(FailReason.SCHEMA)
-            schema != 1L -> reject(FailReason.PARSE)
             // A clock-skewed `issuedAt` is reported as `expired`: the documented code set has no clock code.
             issuedAt > nowSec + FUTURE_TOLERANCE -> reject(FailReason.EXPIRED)
-            nowSec > expires || expires - issuedAt !in 1..MAX_LIFETIME -> reject(FailReason.EXPIRED)
+            expires - issuedAt !in 1..MAX_LIFETIME -> reject(FailReason.EXPIRED)
+            nowSec > expires -> reject(FailReason.EXPIRED)
             issuedAt < lastSeen -> reject(FailReason.REPLAY)
             else -> {
                 val channels = p["channels"] as? Map<*, *>
@@ -99,14 +101,15 @@ internal object UpdateVerifier {
             rollout = rollout,
             notes = notes(o["notes"] as? List<*>),
             notesUrl = UrlAllowlist.release(o["notesUrl"] as? String, v),
-            size = num(o["size"])?.takeIf { it >= 0 },
+            size = num(o["size"]),
             apkUrl = UrlAllowlist.apk(apk?.get("url") as? String, v),
             apkSha256 = (apk?.get("sha256") as? String)?.takeIf { Regex("[0-9a-f]{64}").matches(it) },
             releaseUrl = UrlAllowlist.release(downloads?.get("releaseUrl") as? String, v),
         )
     }
 
-    private fun realDate(s: String): Boolean = Regex("""\d{4}-\d{2}-\d{2}""").matches(s) && runCatching { java.time.LocalDate.parse(s) }.isSuccess
+    private fun realDate(s: String): Boolean =
+        Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(s) && runCatching { java.time.LocalDate.parse(s) }.getOrNull()?.let { it.year >= 1 } == true
 
     /** Objects `{title, detail?, glyph?}`: a note that breaks a rule is skipped, then the first 8 are kept. */
     private fun notes(a: List<*>?): List<Note> = a.orEmpty().mapNotNull { n ->

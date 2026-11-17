@@ -51,6 +51,9 @@ internal class UpdateOpenCoordinator(
     companion object {
         const val OPEN_BUDGET_MS = 3_500L
 
+        /** One per activity INSTANCE (a launcher launch creates one); [onOpen] ignores a repeated id, so a reused id would silence a real open. */
+        fun newOpenId(): String = java.util.UUID.randomUUID().toString()
+
         /**
          * A launcher launch of the main activity in a new instance: a cold start or a re-launch from the launcher or recents.
          * Not rotation (a saved state), not a share, QR, deep link or notification tap (no LAUNCHER category), not the service.

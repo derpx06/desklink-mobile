@@ -6,7 +6,8 @@ import kotlin.concurrent.withLock
 import kotlin.random.Random
 
 /** What this build is: its display version, its monotonic code (compared, not the name), and where to ask. */
-internal data class UpdateBuild(val version: Version, val versionCode: Int, val versionName: String, val url: String, val debug: Boolean)
+/** [version] is null when the build's own version name is malformed (a build bug): nothing is then ever offered. */
+internal data class UpdateBuild(val version: Version?, val versionCode: Int, val versionName: String, val url: String, val debug: Boolean)
 
 /** The check, the cache and the decision for one install. All I/O goes through the injected pieces so the rules test on a JVM. */
 internal class UpdateEngine(
@@ -45,8 +46,9 @@ internal class UpdateEngine(
     fun state(manual: Boolean = false): UpdateState {
         if (!configured()) return UpdateState.NotConfigured
         if (!manual && !store.enabled) return UpdateState.Disabled
+        val installed = build.version ?: return UpdateState.UpToDate
         val p = cachePayload() ?: return UpdateState.UpToDate
-        return UpdateDecider.decide(build.version, build.versionCode, store.channel(build.version), p, store.prefsForDecision(), store.installId(), clock(), manual)
+        return UpdateDecider.decide(installed, build.versionCode, store.channel(installed), p, store.prefsForDecision(), store.installId(), clock(), manual)
     }
 
     /**
@@ -69,21 +71,24 @@ internal class UpdateEngine(
         }
         when (result) {
             UpdateChecker.Result.NotModified -> {
-                store.lastChecked = now
-                clearFailure()
-                Outcome.Fresh
+                store.lastAttempt = now
+                if (cachePayload() != null) {
+                    store.lastChecked = now
+                    clearFailure()
+                    Outcome.Fresh
+                } else {
+                    // "Not modified" about a cache that no longer verifies (expired): it is not fresh, and the next check refetches.
+                    store.etag = null
+                    fail(FailReason.EXPIRED, now)
+                }
             }
             is UpdateChecker.Result.Failed -> fail(result.reason, now)
             is UpdateChecker.Result.Body -> {
                 when (val v = UpdateVerifier.verify(result.bytes, keys(), now / 1000, store.lastIssuedAt)) {
                     // The ETag is stored only after the body fully verified; a bad body is cached nowhere.
                     is UpdateVerifier.Verdict.Ok -> {
-                        store.cachedEnvelope = String(result.bytes, Charsets.UTF_8)
-                        store.etag = result.etag
                         // Never beyond now: a manifest dated in the future must not lock out every real one after it.
-                        store.lastIssuedAt = maxOf(store.lastIssuedAt, minOf(v.payload.issuedAt, now / 1000))
-                        store.lastChecked = now
-                        clearFailure()
+                        store.recordAccepted(String(result.bytes, Charsets.UTF_8), result.etag, minOf(v.payload.issuedAt, now / 1000), now)
                         Outcome.Fresh
                     }
                     is UpdateVerifier.Verdict.Rejected -> fail(v.reason, now)
@@ -93,6 +98,7 @@ internal class UpdateEngine(
     }
 
     private fun fail(reason: FailReason, now: Long): Outcome {
+        store.lastAttempt = now
         if (store.failedSince == 0L) store.failedSince = now
         store.failReason = reason.code
         store.failStreak = store.failStreak + 1
@@ -107,6 +113,10 @@ internal class UpdateEngine(
 
     /** Delay before the next automatic check: a day +-10 % after success, 1/3/6/12/24 h while failing (section 4.2). */
     fun nextDelayMs(random: Random = Random.Default): Long = scheduleDelayMs(store.failStreak, random)
+
+    /** How long the background loop waits before its first check: from the last attempt, so restarting the service never refetches early. */
+    fun initialDelayMs(random: Random = Random.Default): Long =
+        store.lastAttempt.takeIf { it > 0 }?.let { maxOf(0L, it + nextDelayMs(random) - clock()) } ?: 0L
 
     // The person's three choices about the offered version.
     fun later(c: Component) {

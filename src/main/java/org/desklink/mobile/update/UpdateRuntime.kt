@@ -30,7 +30,7 @@ internal object UpdateRuntime {
             val app = context.applicationContext
             val store = UpdateStore(app)
             val name = BuildConfig.VERSION_NAME
-            val build = UpdateBuild(Version.parseLenient(name) ?: Version(0, 0, 0), BuildConfig.VERSION_CODE, name, BuildConfig.DEFAULT_UPDATE_URL, BuildConfig.DEBUG)
+            val build = UpdateBuild(Version.parseLenient(name), BuildConfig.VERSION_CODE, name, BuildConfig.DEFAULT_UPDATE_URL, BuildConfig.DEBUG)
             val cm = app.getSystemService<ConnectivityManager>()
             val engine = UpdateEngine(build, store, UpdateChecker(name, BuildConfig.DEBUG), UpdateKeys::all, System::currentTimeMillis) {
                 cm?.isActiveNetworkMetered == false
@@ -41,9 +41,12 @@ internal object UpdateRuntime {
 
     fun startBackground(context: Context) {
         runCatching {
+            // An empty build URL (and no debug override to look at) is strictly inert: nothing is built, nothing runs.
+            if (BuildConfig.DEFAULT_UPDATE_URL.isBlank() && !BuildConfig.DEBUG) return
             val h = get(context)
             if (!h.engine.configured() || job?.isActive == true) return
             job = scope.launch {
+                delay(h.engine.initialDelayMs())
                 while (isActive) {
                     runCatching { h.engine.refresh() }
                     delay(h.engine.nextDelayMs())

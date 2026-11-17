@@ -4,6 +4,7 @@ package org.desklink.mobile.update
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,7 +28,7 @@ class UpdateMiscTest {
     @Test fun aReleaseConfigurationNeverTrustsTheTestKeys() {
         val release = UpdateKeys.forBuild(debug = false)
         assertTrue(release.keys.none { it.startsWith("test") })
-        val testKeys = listOf(UpdateKeys.TEST_K1, UpdateKeys.TEST_K2).map { UpdateVerifier.base64Url(it)!!.toList() }
+        val testKeys = DebugKeys.KEYS.values.map { UpdateVerifier.base64Url(it)!!.toList() }
         assertTrue(release.values.none { it.toList() in testKeys })
         assertEquals(setOf("test1", "test2"), UpdateKeys.forBuild(debug = true).keys.filter { it.startsWith("test") }.toSet())
         // The compiled real slots, when filled, are 32-byte keys.
@@ -42,12 +43,26 @@ class UpdateMiscTest {
         }
     }
 
-    @Test fun nothingOutsideTheModuleCallsIntoItExceptTheAllowedHooks() {
-        val allowed = setOf("update", "BackgroundService.kt", "MainActivity.kt", "UpdatesSettings.kt", "SettingsScreens.kt", "SettingsSearch.kt", "UpdatePromptHost.kt")
+    @Test fun nothingOutsideTheModuleCallsIntoItExceptTheNamedHooks() {
+        // Full relative paths, so a same-named file elsewhere does not pass. Add an entry when a phase-2 hook lands.
+        val allowed = setOf("BackgroundService.kt")
+        val root = File("src/main/java/org/desklink/mobile")
         val users = File("src/main/java").walkTopDown().filter { it.extension == "kt" || it.extension == "java" }
-            .filter { it.readText().contains("org.desklink.mobile.update") && it.parentFile.name != "update" }
-            .map { it.name }.toSet()
+            .filter { it.readText().contains("org.desklink.mobile.update") && it.relativeTo(root).path.startsWith("update/").not() }
+            .map { it.relativeTo(root).path }.toSet()
         assertTrue("unexpected callers of the update module: ${users - allowed}", allowed.containsAll(users))
+    }
+
+    @Test fun releaseSourcesCarryNoTestKeys() {
+        assertFalse(File("src/main").walkTopDown().filter { it.isFile }.any { f -> DebugKeys.KEYS.values.any { f.readText().contains(it) } })
+    }
+
+    @Test fun theUtf8DecoderReportsOverlongAndCesu() {
+        // The strict decoder is what StrictJson relies on: overlong forms and CESU-8 surrogates are errors, not replacement characters.
+        for (bad in listOf(byteArrayOf(0xC0.toByte(), 0x80.toByte()), byteArrayOf(0xED.toByte(), 0xA0.toByte(), 0x80.toByte()), byteArrayOf(0xF8.toByte(), 0x88.toByte(), 0x80.toByte(), 0x80.toByte(), 0x80.toByte()))) {
+            assertNull(StrictJson.parse(byteArrayOf('"'.code.toByte()) + bad + byteArrayOf('"'.code.toByte())))
+        }
+        assertEquals("é", StrictJson.parse("\"é\"".toByteArray()))
     }
 
     @Test fun noNotificationNoNewPermission() {

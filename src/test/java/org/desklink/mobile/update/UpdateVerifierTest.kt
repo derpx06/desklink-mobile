@@ -22,7 +22,7 @@ import org.robolectric.RobolectricTestRunner
 class UpdateVerifierTest {
     private fun verify(body: ByteArray, now: Long = NOW, lastSeen: Long = 0, keys: Map<String, ByteArray> = Signer.keys) = UpdateVerifier.verify(body, keys, now, lastSeen)
     private fun rejected(v: Verdict) = (v as Verdict.Rejected).reason
-    private fun beta(v: Verdict) = (v as Verdict.Ok).payload.channels[Channel.BETA]
+    private fun beta(v: Verdict) = (v as? Verdict.Ok)?.payload?.channels?.get(Channel.BETA)
     private val b64 = Base64.getUrlEncoder().withoutPadding()
 
     /** An envelope whose payload text is exactly [raw] and whose signature is real: for payloads JSONObject would normalise. */
@@ -82,7 +82,6 @@ class UpdateVerifierTest {
         assertEquals(FailReason.PARSE, rejected(verify(signedRaw(raw.replaceFirst("{", "{\"issuedAt\":1,")))))
         assertEquals(FailReason.PARSE, rejected(verify(signedRaw(raw.replaceFirst("{", "{\"a\":NaN,")))))
         assertEquals(FailReason.PARSE, rejected(verify(signedRaw(raw.replaceFirst("{", "{\"a\":\"\\ud800\",")))))
-        assertEquals(FailReason.PARSE, rejected(verify(signedRaw(raw.replaceFirst("{", "{\"a\":99999999999999999999,")))))
     }
 
     @Test fun deepNestingIsRefusedWithoutOverflowingTheStack() {
@@ -125,6 +124,7 @@ class UpdateVerifierTest {
         assertEquals(FailReason.PARSE, rejected(verify(Signer.envelope(Signer.payload(schema = 0)))))
         assertEquals(FailReason.PARSE, rejected(verify(signedRaw("""{"schemaVersion":1,"issuedAt":"1","expires":2,"channels":{}}"""))))
         assertEquals(FailReason.PARSE, rejected(verify(signedRaw("""{"schemaVersion":1.0,"issuedAt":$NOW,"expires":${NOW + 100},"channels":{}}"""))))
+        assertEquals(FailReason.SCHEMA, rejected(verify(signedRaw("""{"schemaVersion":2,"issuedAt":"x","expires":null}"""))))
         assertEquals(FailReason.EXPIRED, rejected(verify(Signer.envelope(Signer.payload(expires = NOW - 1)))))
         assertTrue(verify(Signer.envelope(Signer.payload(issuedAt = NOW - 100, expires = NOW))) is Verdict.Ok) // exactly at expiry is still good
         assertEquals(FailReason.REPLAY, rejected(verify(Signer.envelope(Signer.payload(issuedAt = NOW - 10)), lastSeen = NOW)))
@@ -159,6 +159,49 @@ class UpdateVerifierTest {
         assertEquals("star", c.notes[0].glyph) // unknown glyph falls back
         assertEquals("shield", c.notes[1].glyph)
         assertTrue(beta(verify(Signer.envelope(Signer.payload(beta = Signer.component("0.4.0", 20400, notes = JSONArray())))))!!.notes.isEmpty())
+    }
+
+    @Test fun numbersAreIntegerTokensOnlyAndTheWholePayloadFailsOtherwise() {
+        for (n in listOf("-0", "100.0", "5e1", "1e999", "01", "-1", "1E2")) {
+            val raw = """{"schemaVersion":1,"issuedAt":$NOW,"expires":${NOW + 100},"x":$n,"channels":{}}"""
+            assertEquals(n, FailReason.PARSE, rejected(verify(signedRaw(raw))))
+        }
+        // An integer above i64 is valid JSON but out of range for the field that reads it.
+        assertEquals(FailReason.PARSE, rejected(verify(signedRaw("""{"schemaVersion":1,"issuedAt":99999999999999999999,"expires":1,"channels":{}}"""))))
+        // null is not absent.
+        for (extra in listOf("\"rollout\":null", "\"minSupported\":null")) {
+            val raw = """{"schemaVersion":1,"issuedAt":$NOW,"expires":${NOW + 100},"channels":{"beta":{"android":{"version":"0.4.0","versionCode":20400,$extra}}}}"""
+            assertNull(extra, beta(verify(signedRaw(raw))))
+        }
+    }
+
+    @Test fun unknownPayloadFieldsAreIgnoredAtEveryLevel() {
+        val raw = """{"schemaVersion":1,"issuedAt":$NOW,"expires":${NOW + 100},"extra":{"a":1},"channels":{"x":1,"beta":{"y":2,"android":{"version":"0.4.0","versionCode":20400,"z":[1]}}}}"""
+        assertEquals(20400, beta(verify(signedRaw(raw)))!!.versionCode)
+    }
+
+    @Test fun duplicateKeysAreFoundAfterUnescapingAndWhenNested() {
+        assertEquals(FailReason.PARSE, rejected(verify(signedRaw("""{"schemaVersion":1,"issuedAt":$NOW,"expires":${NOW + 100},"channels":{"b\u0065ta":{},"beta":{}}}"""))))
+        assertEquals(FailReason.PARSE, rejected(verify(String(Signer.envelope(Signer.payload())).replace("\"kid\":", "\"k\\u0069d\":\"x\",\"kid\":").toByteArray())))
+    }
+
+    @Test fun theFrozenTextListIsExact() {
+        fun ok(cp: Int) = PlainText.valid(String(Character.toChars(cp)), 5) != null
+        for (cp in listOf(0x00, 0x1F, 0x7F, 0x85, 0x9F, 0x00AD, 0x061C, 0x180E, 0x200B, 0x200F, 0x202A, 0x2028, 0x2029, 0x2060, 0x2064, 0x2066, 0x206F, 0xFEFF, 0xFFF9, 0x110BD, 0x13430, 0x13440, 0x1BCA0, 0x1D173, 0xE0001, 0xE0020, 0xE007F, '<'.code, '>'.code, '&'.code)) assertFalse(Integer.toHexString(cp), ok(cp))
+        for (cp in listOf(0x20, 0x7E, 0xA0, 0xAE, 0x0378, 0x3000, 0x2065, 0x200A, 0x2010, 0xE000, 0xFFFE, 0x1F600, 0x0301, 0xE0000, 0xE0080)) assertTrue(Integer.toHexString(cp), ok(cp))
+        assertNull(PlainText.valid("a\u200Db", 10)) // a ZWJ sequence is skipped
+        assertEquals(2, "e\u0301".codePointCount(0, 2)); assertNull(PlainText.valid("e\u0301e", 2))
+    }
+
+    @Test fun releasedIsARealDate() {
+        fun rel(d: String) = beta(verify(signedRaw("""{"schemaVersion":1,"issuedAt":$NOW,"expires":${NOW + 100},"channels":{"beta":{"android":{"version":"0.4.0","versionCode":20400,"released":"$d"}}}}""")))!!.released
+        assertEquals("2024-02-29", rel("2024-02-29")); assertEquals("2000-02-29", rel("2000-02-29")); assertEquals("9999-12-31", rel("9999-12-31"))
+        for (bad in listOf("2026-02-29", "2100-02-29", "0000-01-01", "2026-13-01", "2026-1-01", "\u0662026-01-01", "2026-01-01 ")) assertNull(bad, rel(bad))
+    }
+
+    @Test fun versionPartsAreAsciiAndBounded() {
+        assertEquals(Version(2147483647, 0, 0), Version.parse("2147483647.0.0")); assertNull(Version.parse("2147483648.0.0"))
+        assertNull(Version.parse("\u0660.1.0")); assertNull(Version.parseLenient("\u0660.1.0")); assertTrue(Version(0, 10, 0) > Version(0, 9, 0))
     }
 
     @Test fun lengthsCountUnicodeScalarsNotUtf16Units() {

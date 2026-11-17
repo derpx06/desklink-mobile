@@ -21,12 +21,13 @@ internal class UpdateChecker(private val appVersion: String, private val debugLo
         data class Failed(val reason: FailReason) : Result
     }
 
-    private val http = client.newBuilder()
+    // Built on the first fetch: with an empty build URL nothing here is ever constructed.
+    private val http by lazy { (client ?: OkHttpClient()).newBuilder()
         .followRedirects(false).followSslRedirects(false)
         .retryOnConnectionFailure(false)
         .connectTimeout(timeoutS, TimeUnit.SECONDS).readTimeout(timeoutS, TimeUnit.SECONDS)
         .callTimeout(timeoutS, TimeUnit.SECONDS)
-        .cache(null).build()
+        .cache(null).build() }
 
     fun fetch(url: String, etag: String?): Result {
         var current = url
@@ -46,7 +47,7 @@ internal class UpdateChecker(private val appVersion: String, private val debugLo
                             val loc = resp.header("Location") ?: return Result.Failed(FailReason.URL)
                             val next = runCatching { URI(current).resolve(loc).toString() }.getOrNull() ?: return Result.Failed(FailReason.URL)
                             // Same host only, and https stays https.
-                            if (URI(next).host?.lowercase() != URI(current).host?.lowercase() || (URI(current).scheme == "https" && URI(next).scheme != "https")) {
+                            if (URI(next).host?.lowercase() != URI(current).host?.lowercase() || URI(next).port != URI(current).port || (URI(current).scheme == "https" && URI(next).scheme != "https")) {
                                 return Result.Failed(FailReason.URL)
                             }
                             current = next
@@ -69,7 +70,7 @@ internal class UpdateChecker(private val appVersion: String, private val debugLo
     private fun readCapped(source: okio.BufferedSource, etag: String?): Result {
         // Stops at the cap: one byte past it is enough to know the body is too big, and nothing more is read.
         if (source.request(UpdateVerifier.MAX_BYTES.toLong() + 1)) return Result.Failed(FailReason.OVERSIZED)
-        return Result.Body(source.readByteArray(), etag?.takeIf { it.length <= 256 })
+        return Result.Body(source.readByteArray(), etag?.takeIf { it.length <= 256 && it.all { c -> c.code in 0x20..0x7e } })
     }
 
     private fun allowed(url: String): Boolean {

@@ -58,7 +58,7 @@ android {
         // environment), like the relay's. Empty = the update system is inert: no check, no popup, no network. Release builds have
         // no runtime override; a debug build can be pointed at a local test server (UpdateStore.debugUrl).
         val updateUrl = releaseSigningValue("DESKLINK_UPDATE_URL") ?: ""
-        buildConfigField("String", "DEFAULT_UPDATE_URL", "\"$updateUrl\"")
+        buildConfigField("String", "DEFAULT_UPDATE_URL", "\"${updateUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     buildFeatures {

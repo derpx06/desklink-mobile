@@ -6,9 +6,9 @@
     "beta": {
       "desktop": {
         "version": "0.4.0",
-        "released": "2026-12-08",
+        "released": "0001-01-01",
         "minSupported": "0.3.0",
-        "rollout": -1,
+        "rollout": 100,
         "notes": [
           {
             "title": "Files has a list view",
@@ -42,7 +42,7 @@
       "android": {
         "version": "0.4.0",
         "versionCode": 20400,
-        "released": "2026-12-08",
+        "released": "0001-01-01",
         "minSupported": "0.3.0",
         "rollout": 100,
         "notes": [

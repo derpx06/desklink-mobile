@@ -16,7 +16,9 @@ internal class UpdateStore(private val prefs: SharedPreferences) {
     private inline fun <T> guarded(default: T, block: () -> T): T = try {
         block()
     } catch (_: ClassCastException) {
-        prefs.edit().clear().commit()
+        // A corrupt file is cleared, but the replay ratchet survives: wiping it would let an old signed manifest back in.
+        val keep = prefs.all[K_ISSUED] as? Long
+        prefs.edit().clear().apply { if (keep != null) putLong(K_ISSUED, keep) }.commit()
         default
     }
 
@@ -50,6 +52,18 @@ internal class UpdateStore(private val prefs: SharedPreferences) {
     var lastChecked: Long
         get() = guarded(0L) { prefs.getLong(K_CHECKED, 0) }
         set(v) = prefs.edit().putLong(K_CHECKED, v).apply()
+
+    /** One atomic write for an accepted manifest: the cache, its ETag, the replay ratchet and the check time go together or not at all. */
+    fun recordAccepted(envelope: String, etag: String?, issuedAt: Long, checkedAt: Long) {
+        prefs.edit().putString(K_BODY, envelope).apply { if (etag != null) putString(K_ETAG, etag) else remove(K_ETAG) }
+            .putLong(K_ISSUED, maxOf(lastIssuedAt, issuedAt)).putLong(K_CHECKED, checkedAt).putLong(K_ATTEMPT, checkedAt)
+            .remove(K_FAIL_SINCE).remove(K_FAIL_REASON).remove(K_FAIL_N).commit()
+    }
+
+    /** The last time a check was tried (success or failure): the background loop waits from here, so a service restart does not refetch. */
+    var lastAttempt: Long
+        get() = guarded(0L) { prefs.getLong(K_ATTEMPT, 0) }
+        set(v) = prefs.edit().putLong(K_ATTEMPT, v).apply()
 
     var lastIssuedAt: Long
         get() = guarded(0L) { prefs.getLong(K_ISSUED, 0) }
@@ -102,6 +116,7 @@ internal class UpdateStore(private val prefs: SharedPreferences) {
         private const val K_BODY = "cachedEnvelope"
         private const val K_CHECKED = "lastChecked"
         private const val K_ISSUED = "lastIssuedAt"
+        private const val K_ATTEMPT = "lastAttempt"
         private const val K_SKIP = "skippedVersion"
         private const val K_SNOOZE_V = "snoozedVersion"
         private const val K_SNOOZE_T = "snoozedUntil"

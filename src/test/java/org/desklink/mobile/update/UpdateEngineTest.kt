@@ -104,6 +104,34 @@ class UpdateEngineTest {
         assertEquals(UpdateState.UpToDate, e.state())
     }
 
+    @Test fun aNotModifiedAnswerAboutAnExpiredCacheIsNotFresh() = LocalServer { r -> if (r.headers["if-none-match"] != null) LocalServer.Reply(304) else LocalServer.Reply(200, mapOf("ETag" to "\"e1\""), manifest()) }.use { s ->
+        val e = engine(s.url); e.refresh(); nowMs += 22L * 86_400_000
+        val checked = store.lastChecked
+        assertEquals(UpdateEngine.Outcome.Failed(FailReason.EXPIRED), e.refresh())
+        assertEquals(checked, store.lastChecked); assertNull(store.etag) // the next check refetches in full
+    }
+
+    @Test fun aBackgroundLoopWaitsFromTheLastAttemptNotFromTheServiceStart() = LocalServer { LocalServer.Reply(500) }.use { s ->
+        val e = engine(s.url)
+        assertEquals(0L, e.initialDelayMs()) // never tried
+        e.refresh() // fails: 1 h backoff
+        assertTrue(e.initialDelayMs() in 1..3_600_000L)
+        nowMs += 3_600_001; assertEquals(0L, e.initialDelayMs())
+    }
+
+    @Test fun anEtagThatCouldNotBeSentBackIsNotStored() = LocalServer { LocalServer.Reply(200, mapOf("ETag" to "\"caf\u00e9\""), manifest()) }.use { s ->
+        engine(s.url).refresh(); assertNull(store.etag)
+    }
+
+    @Test fun aCorruptFileIsClearedButTheReplayRatchetSurvives() {
+        val prefs = org.desklink.mobile.MockSharedPreference()
+        prefs.edit().putLong("lastIssuedAt", 1234L).putString("enabled_wrong", "x").putString("update_check", "not a boolean").commit()
+        val st = UpdateStore(prefs)
+        assertTrue(st.enabled) // the corrupt value is read as the default
+        assertEquals(1234L, st.lastIssuedAt)
+        assertNull(prefs.getString("update_check", null))
+    }
+
     @Test fun theChannelDefaultsToBetaOnZeroDotXAndTheStoredChoiceWins() {
         assertEquals(Channel.BETA, store.channel(Version(0, 3, 0))); assertEquals(Channel.STABLE, store.channel(Version(1, 0, 0)))
         store.setChannel(Channel.STABLE); assertEquals(Channel.STABLE, store.channel(Version(0, 3, 0)))

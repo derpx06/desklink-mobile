@@ -63,6 +63,10 @@ class UpdateCheckerTest {
         LocalServer { LocalServer.Reply(302) }.use { assertEquals(FailReason.URL, failed(checker().fetch(it.url, null))) }
     }
 
+    @Test fun aRedirectToAnotherPortOfTheSameHostIsRefused() = LocalServer { LocalServer.Reply(302, mapOf("Location" to "http://127.0.0.1:1/x")) }.use {
+        assertEquals(FailReason.URL, failed(checker().fetch(it.url, null)))
+    }
+
     @Test fun aSlowServerTimesOut() = LocalServer { LocalServer.Reply(200, body = ByteArray(20), trickle = true) }.use {
         val t = System.nanoTime()
         assertEquals(FailReason.TIMEOUT, failed(checker(timeoutS = 1).fetch(it.url, null)))

@@ -9,8 +9,8 @@ import java.nio.charset.CodingErrorAction
  * verifier use). org.json is not used because it coerces types, accepts duplicate keys and recurses without a limit.
  *
  * Accepted: UTF-8 without a BOM, RFC 8259 grammar only (no NaN, Infinity, comments, trailing commas or raw control
- * characters), no duplicate object keys, no lone surrogate (raw or `\u` escaped), integers within the i64 range, nesting
- * depth at most [MAX_DEPTH], nothing after the value. Values: Map, List, String, Long, Double, Boolean, null. A document that
+ * characters), no duplicate object keys, no lone surrogate (raw or `\u` escaped), integer tokens only, nesting
+ * depth at most [MAX_DEPTH], nothing after the value. Numbers are integer tokens only (`0|[1-9][0-9]*`; anything else fails the whole document). Values: Map, List, String, Long, [Big], Boolean, null. A document that
  * breaks any rule is `null` (never an exception).
  */
 internal object StrictJson {
@@ -54,7 +54,7 @@ internal object StrictJson {
                 't' -> lit("true", true)
                 'f' -> lit("false", false)
                 'n' -> lit("null", null)
-                else -> if (c == '-' || c in '0'..'9') num() else throw Bad()
+                else -> if (c in '0'..'9') num() else throw Bad()
             }
         }
 
@@ -132,20 +132,15 @@ internal object StrictJson {
             return out
         }
 
+        /** The integer token grammar only, `0|[1-9][0-9]*`: a sign, fraction, exponent or leading zero fails the whole document. Above i64: [Big]. */
         fun num(): Any {
             val start = i
-            if (s[i] == '-') i++
-            if (i >= s.length) throw Bad()
             if (s[i] == '0') i++ else if (s[i] in '1'..'9') { while (i < s.length && s[i] in '0'..'9') i++ } else throw Bad()
-            var integer = true
-            if (i < s.length && s[i] == '.') { integer = false; i++; val d = i; while (i < s.length && s[i] in '0'..'9') i++; if (i == d) throw Bad() }
-            if (i < s.length && (s[i] == 'e' || s[i] == 'E')) {
-                integer = false; i++
-                if (i < s.length && (s[i] == '+' || s[i] == '-')) i++
-                val d = i; while (i < s.length && s[i] in '0'..'9') i++; if (i == d) throw Bad()
-            }
-            val t = s.substring(start, i)
-            return if (integer) (t.toLongOrNull() ?: throw Bad()) else t.toDouble().also { if (it.isNaN() || it.isInfinite()) throw Bad() }
+            if (i < s.length && s[i] in "0123456789.eE+-") throw Bad()
+            return s.substring(start, i).toLongOrNull() ?: Big
         }
     }
+
+    /** An integer token above the i64 range: valid JSON, but out of range for any field that reads it. */
+    object Big
 }

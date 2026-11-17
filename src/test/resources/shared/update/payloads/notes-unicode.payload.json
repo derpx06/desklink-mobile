@@ -27,6 +27,10 @@
             "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "detail": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
             "glyph": "speed"
+          },
+          {
+            "title": "Glyph five",
+            "glyph": 5
           }
         ],
         "notesUrl": "https://github.com/derpx06/DeskLink/releases/tag/v0.4.0",
@@ -62,6 +66,10 @@
             "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "detail": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
             "glyph": "speed"
+          },
+          {
+            "title": "Glyph five",
+            "glyph": 5
           }
         ],
         "size": 41234567,
