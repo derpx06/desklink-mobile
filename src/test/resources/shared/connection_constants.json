@@ -18,6 +18,7 @@
   "desktopHeartbeatDeadMillis": 30000,
   "desktopHeartbeatDeadDozingMillis": 90000,
   "desktopHeartbeatIdleAwakeMillis": 2000,
+  "lanEscalateAfterMillis": 3000,
   "deskProbeAfterMillis": 2000,
   "quietAfterMillis": 4000,
   "fastDeadAfterMillis": 8000,

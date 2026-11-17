@@ -281,6 +281,7 @@ class BackgroundService : Service() {
             override fun onAvailable(network: Network) {
                 Log.i("BackgroundService", "Valid network available")
                 availableNetworks.add(network)
+                leaseRecheck.removeCallbacks(networkLostReport)
                 connectedToNonCellularNetwork.postValue(availableNetworks.isNotEmpty())
                 // A new network next to the current one (make-before-break
                 // Wi-Fi, ethernet) moves nothing that exists: announce on it,
@@ -296,7 +297,11 @@ class BackgroundService : Service() {
                 availableNetworks.remove(network)
                 connectedToNonCellularNetwork.postValue(availableNetworks.isNotEmpty())
                 // The last network: the desk is told (a network next to it that stays means nothing is leaving).
-                if (availableNetworks.isEmpty()) LeavingReport.shared.report("network-lost")
+                // Debounced: a roam is onLost then onAvailable about a second apart and nothing leaves.
+                if (availableNetworks.isEmpty()) {
+                    leaseRecheck.removeCallbacks(networkLostReport)
+                    leaseRecheck.postDelayed(networkLostReport, NETWORK_LOST_REPORT_DELAY_MS)
+                }
                 // Any lost LAN network may have carried the links. Capabilities
                 // can't be read for a lost network, so the address map decides:
                 // VPNs never get an entry (see onLinkPropertiesChanged).
@@ -411,6 +416,11 @@ class BackgroundService : Service() {
     }
 
     private val leaseRecheck = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** The last network stayed gone for [NETWORK_LOST_REPORT_DELAY_MS]: the desk is told (never while a network is back). */
+    private val networkLostReport = Runnable {
+        if (availableNetworks.isEmpty()) LeavingReport.shared.report("network-lost")
+    }
     private val leaseRecheckTask = Runnable { updateConnectionPowerLease() }
 
     /** The screen went off: the locks held only for someone looking go now, not at the next check. */
@@ -568,8 +578,10 @@ class BackgroundService : Service() {
         Log.d("DeskLink/BgService", "onDestroy")
         if (safeStart) return super.onDestroy()
         initialized = false
-        // First, before anything is torn down: the desk checks the link now (off the main thread).
-        LeavingReport.shared.report("service-stopped")
+        // First, before the providers are stopped below: the desk checks the link now. Written on a
+        // thread of its own, waited for at most DESTROY_WAIT_MS (best effort, bounded on main).
+        leaseRecheck.removeCallbacks(networkLostReport)
+        LeavingReport.shared.report("service-stopped", LeavingReport.DESTROY_WAIT_MS)
         screenReceiver?.let { runCatching { unregisterReceiver(it) } }
         screenReceiver = null
         leavingReceiver?.let { runCatching { unregisterReceiver(it) } }
@@ -682,6 +694,8 @@ class BackgroundService : Service() {
         ).joinToString("\u0000")
 
         /** One hold lasts at most this long; renewed every [WORK_LEASE_CHECK_MS] while working. */
+        /** How long the last network must stay gone before the desk is told (a roam is onLost then onAvailable ~1 s apart). */
+        const val NETWORK_LOST_REPORT_DELAY_MS = 1_500L
         const val WORK_LEASE_MS = 60_000L
         const val WORK_LEASE_CHECK_MS = 20_000L
 
