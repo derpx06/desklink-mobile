@@ -217,9 +217,8 @@ class ScreenControlPlugin : Plugin() {
         if (remoteControlRefused && controlDenial == text) return
         remoteControlRefused = true
         controlDenial = text
-        latestStatus = reason?.takeIf(String::isNotBlank)?.let {
-            context.getString(R.string.remote_control_denied_reason, it)
-        } ?: text
+        // Never the computer's own words (they are its notes, not ours): a plain sentence.
+        latestStatus = if (reason.isNullOrBlank()) text else context.getString(R.string.remote_control_denied_reason)
     }
 
     /** The phone could not ask (no live view yet, link not ready): not a refusal, so nothing sticks and asking goes on. */

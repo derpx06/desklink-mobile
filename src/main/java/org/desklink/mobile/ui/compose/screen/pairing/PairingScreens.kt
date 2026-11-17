@@ -482,7 +482,7 @@ fun PairCodeScreen(state: PairCodeState, onCancel: () -> Unit, onMatch: () -> Un
                 }
                 PairStage.IDLE -> Text(stringResource(R.string.pair_request_hint), fontSize = 13.sp, color = t.textDim, textAlign = TextAlign.Center)
             }
-            state.message?.let { Text(it, fontSize = 14.sp, color = t.red, textAlign = TextAlign.Center) }
+            state.message?.let { Text(it, fontSize = 14.sp, color = t.red, textAlign = TextAlign.Center, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive }) }
             Spacer(Modifier.height(24.dp))
         }
         // Side by side; stacked full width (the primary on top) past a font scale of 1.3, where two

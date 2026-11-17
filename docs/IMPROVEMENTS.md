@@ -86,3 +86,10 @@ Tests: `aViewOnlyDesktopSaysViewOnlyAndOffersToAskAgain`,
   closed check; O2 `pathExecutor.shutdownNow()` does not wait for a running
   `onPath` before `peer.dispose()`. Both native use-after-free risks, same
   root as P4.
+
+## Translations (follow-up)
+
+- The phone ships English only (`resConfigs("en")`, so the generated per-app language list offers English alone). The
+  `values-xx` folders hold about 170 of 352 keys in `strings.xml` and none of the ~1260 in `strings_ui.xml`,
+  `strings_everything.xml` and `strings_guide.xml`; a language is added to the list when its folder is complete.
+  The desk has no translation catalogue either (window strings are literals): a gettext pass is its follow-up.

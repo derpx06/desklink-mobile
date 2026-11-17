@@ -93,6 +93,7 @@ class TokenContrastTest {
             Triple("coral dot on surface", t.coral, t.surface),
             // An offline glyph and a disabled icon: faint, but never under 3.
             Triple("textFaint on surface", t.textFaint, t.surface),
+            Triple("textFaint on the page", t.textFaint, t.bg),
             // A ring around an undone CheckItem is drawn at 70 %.
             Triple("check ring", t.onAccentContainer.copy(alpha = 0.7f), t.accentContainer),
             // The progress fill on its track.

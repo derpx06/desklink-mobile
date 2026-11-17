@@ -40,6 +40,9 @@ android {
         // 1.3.0: versionCode is 20000 + minor * 100 + patch (the first build was numbered 2.0.0 / 20000, so the number only goes up).
         versionCode = 20300
         versionName = "1.3.0"
+        // English only on purpose: the new strings (strings_ui, everything, guide: ~1260 keys) have no translations, so the
+        // generated per-app language list (generateLocaleConfig) offers English alone rather than a mostly-English "German".
+        // The old values-xx folders stay in the source for a later translation pass (docs/IMPROVEMENTS.md).
         resConfigs("en")
         // The DeskLink relay (docs/RELAY.md): the deployed relay's wss://<host>/v1
         // from the DESKLINK_RELAY_URL Gradle property or environment variable.

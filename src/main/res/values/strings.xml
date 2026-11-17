@@ -49,22 +49,22 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="pref_plugin_ping">Nudge</string>
     <string name="pref_plugin_ping_desc">Send and receive nudges</string>
     <string name="pref_plugin_notifications">Notification sync</string>
-    <string name="pref_plugin_notifications_desc">Access your notifications from other devices</string>
+    <string name="pref_plugin_notifications_desc">Access your notifications from your computer</string>
     <string name="pref_plugin_receive_notifications">Receive notifications</string>
-    <string name="pref_plugin_receive_notifications_desc">Receive notifications from the other device and display them on Android</string>
+    <string name="pref_plugin_receive_notifications_desc">Receive notifications from your computer and show them on this phone</string>
     <string name="pref_plugin_sharereceiver">Share and receive</string>
     <string name="pref_plugin_sharereceiver_desc">Share files and URLs between devices</string>
     <string name="pref_plugin_inputdevicesreceiver">Share input devices</string>
-    <string name="pref_plugin_inputdevicesreceiver_desc">Share mouse and keyboard with the remote device</string>
+    <string name="pref_plugin_inputdevicesreceiver_desc">Share mouse and keyboard with your computer</string>
     <string name="pref_plugin_lockdevice">Lock device</string>
-    <string name="pref_plugin_lockdevice_desc">Lock this device from a paired device</string>
-    <string name="lockdevice_no_permissions">To lock this device remotely you need to grant Accessibility permissions</string>
-    <string name="lock_remote_device">Lock remote device</string>
+    <string name="pref_plugin_lockdevice_desc">Lock this phone from a paired computer</string>
+    <string name="lockdevice_no_permissions">To lock this phone from your computer you need to grant Accessibility permissions</string>
+    <string name="lock_remote_device">Lock the computer</string>
     <string name="device_list_empty">No devices</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
     <string name="open_settings">Open settings</string>
-    <string name="settings_activity_unavailable">Settings screen unavailable on this device</string>
+    <string name="settings_activity_unavailable">Settings screen unavailable on this phone</string>
     <string name="no_permissions">You need to grant permission to access notifications</string>
     <string name="no_permission_mprisreceiver">To be able to control your media players you need to grant access to the notifications</string>
     <!-- A nudge from the computer arrived; %1$s is its name. -->
@@ -109,8 +109,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="error_already_paired">Already paired.</string>
     <string name="error_timed_out">The computer didn\'t answer in time. Try again.</string>
     <string name="error_clocks_not_match">The clocks on this phone and the computer are too far apart. Set both to automatic time and try again.</string>
-    <string name="error_canceled_by_user">Pairing was canceled.</string>
-    <string name="error_canceled_by_other_peer">The computer canceled the pairing.</string>
+    <string name="error_canceled_by_user">Pairing was cancelled.</string>
+    <string name="error_canceled_by_other_peer">The computer cancelled the pairing.</string>
     <string name="qr_not_a_pairing_code">That isn\'t a DeskLink pairing code. Scan the code shown in DeskLink on your computer.</string>
     <string name="qr_replace_pairing_title">Replace the pairing with %1$s?</string>
     <string name="qr_replace_pairing_message">This code shows a different identity for a computer you already paired with. Only continue if you reinstalled DeskLink on that computer.</string>
@@ -120,13 +120,13 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="pair_requested">Pair requested</string>
     <string name="pairing_verification_code" translatable="false">🔑 %1s</string>
     <string name="pairing_request_from">Pairing request from \'%1s\'</string>
-    <plurals name="incoming_file_title">Receiving file from %1s>
+    <plurals name="incoming_file_title">
         <item quantity="one">Receiving %1$d file from %2$s</item>
         <item quantity="other">Receiving %1$d files from %2$s</item>
     </plurals>
     <plurals name="incoming_files_text">
         <item quantity="one">File: %1s</item>
-        <item quantity="other">(File %2$d of %3$d) : %1$s</item>
+        <item quantity="other">(File %2$d of %3$d): %1$s</item>
     </plurals>
     <plurals name="outgoing_file_title">
         <item quantity="one">Sending %1$d file to %2$s</item>
@@ -134,7 +134,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     </plurals>
     <plurals name="outgoing_files_text">
         <item quantity="one">File: %1$s</item>
-        <item quantity="other">(File %2$d of %3$d) : %1$s</item>
+        <item quantity="other">(File %2$d of %3$d): %1$s</item>
     </plurals>
     <plurals name="received_files_title">
         <item quantity="one">Received file from %1$s</item>
@@ -146,7 +146,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     </plurals>
     <plurals name="sent_files_title">
         <item quantity="one">Sent file to %1$s</item>
-        <item quantity="other">Sent %2$d files to %1$s"</item>
+        <item quantity="other">Sent %2$d files to %1$s</item>
     </plurals>
     <plurals name="send_files_fail_title">
         <item quantity="one">Couldn\'t send the file to %1$s</item>
@@ -200,7 +200,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="findmyphone_title">Find my phone</string>
     <string name="findmyphone_title_tablet">Find my tablet</string>
     <string name="findmyphone_title_tv">Find my TV</string>
-    <string name="findmyphone_description">Rings this device so you can find it</string>
+    <string name="findmyphone_description">Rings this phone so you can find it</string>
     <string name="findmyphone_found">Found it</string>
 
 
@@ -214,15 +214,15 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
 
 
     <string name="pref_plugin_mprisreceiver">Media Player Control</string>
-    <string name="pref_plugin_mprisreceiver_desc">Control your phone\'s media players from another device</string>
+    <string name="pref_plugin_mprisreceiver_desc">Control your phone\'s media players from your computer</string>
 
     <string name="notification_channel_media_control">Media control</string>
 
 
     <string name="device_not_reachable">The computer isn\'t reachable right now.</string>
 
-    <string name="pref_plugin_findremotedevice">Find remote device</string>
-    <string name="pref_plugin_findremotedevice_desc">Ring your remote device</string>
+    <string name="pref_plugin_findremotedevice">Find the computer</string>
+    <string name="pref_plugin_findremotedevice_desc">Ring your computer</string>
     <string name="ring">Ring</string>
 
     <string name="all">All</string>
@@ -251,7 +251,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="allow_all_networks_text">Allow all</string>
 
     <string name="location_permission_needed_title">Permission required</string>
-    <string name="location_permission_needed_desc">DeskLink needs the background location permission to know the WiFi network you are connected to even when the app is in the background. This is because the name of the WiFi networks around you could be used to find your location, even when this is not what DeskLink does.</string>
+    <string name="location_permission_needed_desc">DeskLink needs the background location permission to know the Wi-Fi network you are connected to even when the app is in the background. This is because the name of the Wi-Fi networks around you could be used to find your location, even when this is not what DeskLink does.</string>
 
 
 
@@ -337,7 +337,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
   <string name="remote_screen_connected">Live screen connected</string>
   <string name="remote_screen_error">Could not show live screen</string>
   <string name="notification_channel_screen_sharing">Live sessions</string>
-  <string name="remote_screen_plugin_missing">Screen sharing unavailable on this device</string>
+  <string name="remote_screen_plugin_missing">Screen sharing unavailable on this phone</string>
   <string name="remote_screen_retry">Ask for the screen again</string>
   <string name="remote_screen_waiting_frame">Screen approved, waiting for the first picture…</string>
   <string name="remote_screen_stopped">Screen sharing stopped</string>
@@ -349,8 +349,8 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
   <string name="remote_mode_trackpad">Touchpad</string>
   <string name="remote_control_requesting">Requesting remote-control permission</string>
   <string name="remote_control_enabled">Remote control enabled</string>
-  <string name="remote_control_denied">Desktop did not grant remote-control permission</string>
-  <string name="remote_control_denied_reason">Control not granted: %1$s</string>
+  <string name="remote_control_denied">The computer did not allow control</string>
+  <string name="remote_control_denied_reason">Control stopped on the computer. Ask again.</string>
   <string name="session_password_title">Computer password</string>
   <string name="session_password_message">This computer asks for a password before it can be viewed, controlled or used from a terminal.</string>
   <string name="session_password_label">Password</string>
@@ -383,7 +383,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="setting_webrtc_stun_servers">Helper servers</string>
     <string name="setting_webrtc_stun_servers_description">For experts. Addresses of servers that help your devices find each other across networks, separated by commas. Leave empty to use your own network only.</string>
 
-    <string name="receive_notifications_permission_explanation">Notifications need to be allowed to receive them from other devices</string>
+    <string name="receive_notifications_permission_explanation">Notifications need to be allowed to receive them from your computer</string>
     <string name="findmyphone_notifications_explanation">The notifications permission is needed so the phone can ring when the app is in the background</string>
 
 
@@ -391,17 +391,17 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="notification_channel_keepwatching">Continue playing</string>
 
     <string name="ping_result">Pinged in %1$d milliseconds</string>
-    <string name="ping_failed">Could not ping device</string>
+    <string name="ping_failed">Could not ping the computer</string>
     <string name="ping_in_progress">Pinging…</string>
 
     <string name="device_host_invalid">That address doesn’t look right. Use something like 192.168.1.20 or my-pc.local.</string>
-    <string name="device_host_duplicate">Host already exists in the list</string>
+    <string name="device_host_duplicate">That computer is already in the list</string>
 
 
 
     <!-- Terminal -->
     <string name="terminal_title">Terminal</string>
-    <string name="terminal_device_unavailable">This device is not available for terminal sessions</string>
+    <string name="terminal_device_unavailable">Terminal sessions are not available for this computer</string>
     <string name="terminal_status_reconnecting">Reconnecting…</string>
     <string name="terminal_reconnecting">Reconnecting…</string>
     <string name="terminal_loading">Loading terminal sessions</string>
@@ -410,7 +410,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_launcher_claude">Claude Code</string>
     <string name="terminal_launcher_codex">Codex</string>
     <string name="terminal_not_allowed_title">Terminal access is turned off</string>
-    <string name="terminal_not_allowed_message">Terminal access from this phone is off on your computer.</string>
+    <string name="terminal_not_allowed_message">Terminal access from this phone is off on your computer. Turn on Terminal access for this phone in DeskLink Settings on your computer.</string>
     <string name="terminal_locked_title">Locked</string>
     <string name="terminal_enter_password">Enter password</string>
     <string name="terminal_ended_by_computer">The computer ended this session</string>
@@ -418,7 +418,7 @@ SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted
     <string name="terminal_rename_hint">Name</string>
     <string name="terminal_close_session">End session</string>
     <string name="terminal_close_title">End this session?</string>
-    <string name="terminal_close_message">The shell and any program running in it will be ended on your desktop.</string>
+    <string name="terminal_close_message">The shell and any program running in it will be ended on your computer.</string>
     <string name="terminal_close_confirm">End session</string>
     <string name="terminal_back_to_sessions">Back to Terminals</string>
     <string name="terminal_reattach">Reconnect to this session</string>

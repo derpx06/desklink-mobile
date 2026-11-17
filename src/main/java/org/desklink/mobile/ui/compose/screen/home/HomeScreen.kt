@@ -274,11 +274,12 @@ private fun connectionLabel(connection: DeviceConnection, path: WebRtcConnection
 )
 
 @Composable
-fun connectionShort(connection: DeviceConnection): String = stringResource(connectionShortRes(connection))
+fun connectionShort(connection: DeviceConnection, path: WebRtcConnectionPath? = null): String = stringResource(connectionShortRes(connection, path))
 
-fun connectionShortRes(connection: DeviceConnection): Int = when (connection) {
+/** "Relay" only when the link really goes through a relay (TURN); any other way over the internet is "Internet". */
+fun connectionShortRes(connection: DeviceConnection, path: WebRtcConnectionPath? = null): Int = when (connection) {
     DeviceConnection.LOCAL -> R.string.home_short_wifi
-    DeviceConnection.AWAY -> R.string.home_short_relay
+    DeviceConnection.AWAY -> if (path == WebRtcConnectionPath.TURN) R.string.home_short_relay else R.string.home_short_internet
     DeviceConnection.CONNECTED -> R.string.connection_connected
     DeviceConnection.CONNECTING -> R.string.connection_connecting
     DeviceConnection.OFFLINE -> R.string.connection_offline
@@ -338,7 +339,7 @@ private fun StatusChip(text: String, dot: androidx.compose.ui.graphics.Color, in
 private fun NameBlock(state: HomeState, onSwitch: () -> Unit, spoken: List<String?>, modifier: Modifier = Modifier, header: @Composable () -> Unit, footer: @Composable () -> Unit) {
     val t = tokens
     // What the card shows is what TalkBack says: the switch sentence, then the status words, the round trip and the update note.
-    val switchDescription = (listOf(stringResource(R.string.home_switch_computer, state.name, connectionShort(state.connection))) + spoken.filterNotNull()).joinToString(". ")
+    val switchDescription = (listOf(stringResource(R.string.home_switch_computer, state.name, connectionShort(state.connection, state.path))) + spoken.filterNotNull()).joinToString(". ")
     val big = LocalDensity.current.fontScale > 1.4f
     Column(
         modifier

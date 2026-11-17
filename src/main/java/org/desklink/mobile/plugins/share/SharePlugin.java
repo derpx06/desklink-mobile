@@ -348,12 +348,13 @@ public class SharePlugin extends Plugin {
         }
     }
 
-    public void share(Intent intent) {
+    /** Whether there was something to send (and it was handed on); false when the share could not be read. */
+    public boolean share(Intent intent) {
         Bundle extras = intent.getExtras();
         ArrayList<Uri> streams = streamsFromIntent(intent, extras);
         if (streams != null && !streams.isEmpty()) {
             sendUriList(streams);
-            return;
+            return true;
         }
         if (extras != null) {
             String text = extras.getString(Intent.EXTRA_TEXT);
@@ -379,10 +380,11 @@ public class SharePlugin extends Plugin {
                 NetworkPacket np = new NetworkPacket(SharePlugin.PACKET_TYPE_SHARE_REQUEST);
                 np.set(isUrl ? "url" : "text", text);
                 device.sendPacket(np);
-                return;
+                return true;
             }
         }
         Log.e("SharePlugin", "There's nothing we know how to share");
+        return false;
     }
 
     private ArrayList<Uri> streamsFromIntent(Intent intent, Bundle extras) {

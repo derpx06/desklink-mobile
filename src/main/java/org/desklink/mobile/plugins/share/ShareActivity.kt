@@ -112,17 +112,23 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
             live = java.lang.ref.WeakReference(this)
             val main = android.os.Handler(android.os.Looper.getMainLooper())
             org.desklink.mobile.helpers.ThreadHelper.execute {
+                var shared = false
                 try {
-                    plugin.share(intent)
+                    shared = runShare({ plugin.share(it) }, intent)
                 } finally {
                     // The live instance: a rotation meanwhile replaced the one that was tapped.
                     main.post {
                         sendingNow = false
+                        // Never a silent return to Home: a share that could not be read says so.
+                        if (!shared) Toast.makeText(applicationContext, R.string.share_unreadable_toast, Toast.LENGTH_LONG).show()
                         live?.get()?.finish()
                     }
                 }
             }
             return
+        } else {
+            // No sharing plugin for this computer: nothing was sent.
+            Toast.makeText(this, R.string.share_unreadable_toast, Toast.LENGTH_LONG).show()
         }
         finish()
     }
@@ -154,7 +160,10 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!intent.isReadable()) return finish()
+        if (!intent.isReadable()) {
+            Toast.makeText(this, R.string.share_unreadable_toast, Toast.LENGTH_LONG).show()
+            return finish()
+        }
         // Recreated (a rotation) while the share is read: not again; and if it was done meanwhile, nothing is left to do.
         if (savedInstanceState?.getBoolean(KEY_SHARING) == true) {
             if (!sendingNow) return finish()
@@ -248,6 +257,10 @@ class ShareActivity : BaseActivity<ActivityShareBinding>() {
     }
 
     companion object {
+        /** Runs [share] on [intent]: whether it handed something on; a read that throws (a revoked grant) is a failure, not a crash. */
+        internal fun runShare(share: (Intent) -> Boolean, intent: Intent): Boolean =
+            runCatching { share(intent) }.getOrDefault(false)
+
         /** The shared Uris, whatever else another app put in the list (an Intent in it crashed the confirm sheet). */
         internal fun streamUris(intent: Intent): List<android.net.Uri> =
             if (Intent.ACTION_SEND_MULTIPLE == intent.action) ShareIntake.streams(intent)
