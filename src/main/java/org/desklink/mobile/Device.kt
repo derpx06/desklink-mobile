@@ -561,9 +561,24 @@ class Device : PacketReceiver {
      */
     fun sendDozeState() {
         if (!isPaired) return
-        val interactive = isInteractive()
+        sendStateReport(heartbeatPacket(reply = true, interactive = isInteractive()))
+    }
+
+    /**
+     * This phone is about to lose its network or stop (Wi-Fi switching off, airplane mode, the
+     * service ending, the task swiped away): say so at once on every live path, so the desk checks
+     * the link now instead of after its silence budget. A state report like `dozing`, best effort,
+     * never a command; a phone that is in fact still here answers the desk's probe and the desk
+     * carries on. Call off the main thread (the LAN write may block).
+     */
+    fun sendLeaving(reason: String) {
+        if (!isPaired) return
+        sendStateReport(heartbeatPacket(reply = true, interactive = isInteractive(), leaving = reason))
+    }
+
+    private fun sendStateReport(packet: NetworkPacket) {
         webRtcTransport?.takeIf { it.isReadyForPackets() }?.sendPacket(
-            heartbeatPacket(reply = true, interactive = interactive),
+            packet,
             object : TransportCallback {
                 override fun onSuccess() = Unit
                 override fun onFailure(error: TransportError) = Unit
@@ -571,7 +586,7 @@ class Device : PacketReceiver {
         )
         if (hasBootstrapLink) {
             sendBootstrapPacket(
-                heartbeatPacket(reply = true, interactive = interactive),
+                packet,
                 object : SendPacketStatusCallback() {
                     override fun onSuccess() = Unit
                     override fun onFailure(e: Throwable) = Unit
@@ -1661,13 +1676,23 @@ class Device : PacketReceiver {
 /**
  * `desklink.heartbeat`, carrying `dozing` (contract §11): with the phone's screen off the desk
  * stretches its dead time and stops probing the data channel, since a frozen phone cannot answer.
- * [reply] marks a report that must not be answered (answers and state pushes alike).
+ * [reply] marks a report that must not be answered (answers and state pushes alike). [leaving] (a
+ * reason for logs) says the phone is about to go away: the desk probes at once.
  */
-internal fun heartbeatPacket(reply: Boolean, interactive: Boolean): NetworkPacket =
+internal fun heartbeatPacket(reply: Boolean, interactive: Boolean, leaving: String? = null): NetworkPacket =
     NetworkPacket(DeskLinkProtocol.PACKET_TYPE_HEARTBEAT).apply {
         if (reply) this["reply"] = true
         this["dozing"] = !interactive
+        // `leaving` (+ `reason`, for logs only): a state report like `dozing`, absent = not leaving.
+        if (leaving != null) {
+            this[HEARTBEAT_LEAVING] = true
+            this[HEARTBEAT_LEAVING_REASON] = leaving
+        }
     }
+
+/** `desklink.heartbeat` fields of the leaving report, pinned to `connection_constants.json`. */
+internal const val HEARTBEAT_LEAVING = "leaving"
+internal const val HEARTBEAT_LEAVING_REASON = "reason"
 
 /**
  * The empty snapshots for phone-owned features that are turned off or lack their permission:

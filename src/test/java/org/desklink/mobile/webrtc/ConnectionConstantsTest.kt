@@ -8,6 +8,7 @@ import org.desklink.mobile.backends.lan.LinkRace
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -40,6 +41,19 @@ class ConnectionConstantsTest {
         assertEquals(f.getJSONObject("pendingFeatureLimit").getInt("android"), PENDING_FEATURE_LIMIT)
         assertEquals(f.getLong("laneRetryFirstMillis"), FileLaneProtocol.RETRY_MS)
         assertEquals(f.getLong("laneRetryMaxMillis"), FileLaneProtocol.COOL_MAX_MS)
+    }
+
+    /** `desklink.heartbeat {leaving, reason}`: the desk's `connection_constants_match_the_shared_fixture` reads the same keys. */
+    @Test
+    fun `the leaving report's fields are the desk's`() {
+        assertEquals(f.getString("heartbeatLeavingField"), org.desklink.mobile.HEARTBEAT_LEAVING)
+        assertEquals(f.getString("heartbeatLeavingReasonField"), org.desklink.mobile.HEARTBEAT_LEAVING_REASON)
+        val packet = org.desklink.mobile.heartbeatPacket(reply = true, interactive = true, leaving = "wifi-off")
+        assertTrue(packet.getBoolean(f.getString("heartbeatLeavingField"), false))
+        assertEquals("wifi-off", packet.getString(f.getString("heartbeatLeavingReasonField")))
+        // Absent means not leaving (the desk and old builds read it that way); the constants of the
+        // desk-only liveness numbers are not mirrored here (the phone answers every probe already).
+        assertFalse(org.desklink.mobile.heartbeatPacket(reply = true, interactive = true).has(f.getString("heartbeatLeavingField")))
     }
 
     @Test
