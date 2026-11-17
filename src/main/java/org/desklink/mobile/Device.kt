@@ -1592,6 +1592,28 @@ class Device : PacketReceiver {
         }
     }
 
+    /**
+     * Access granted since the plugins were loaded (see [org.desklink.mobile.helpers.PluginAccess]): reloads only what waited for it.
+     * True if anything was reloaded.
+     */
+    @WorkerThread
+    fun reloadIfAccessGranted(): Boolean {
+        if (!isPaired || !isReachable) return false
+        val change = org.desklink.mobile.helpers.PluginAccess.waiting(
+            enabled = ::isPluginEnabled,
+            loaded = loadedPlugins.keys,
+            noRequired = pluginsWithoutPermissions,
+            noOptional = pluginsWithoutOptionalPermissions,
+        )
+        if (change.isNone()) return false
+        Log.i("Device", "${deviceInfo.name}: access granted for ${change.reload}, loading it")
+        synchronized(this) {
+            change.recreate.forEach(::removePlugin)
+            reloadPluginsFromSettings()
+        }
+        return true
+    }
+
     fun launchBackgroundReloadPluginsFromSettings() {
         CoroutineScope(Dispatchers.IO + org.desklink.mobile.helpers.Guarded.handler("background")).launch {
             reloadPluginsFromSettings()

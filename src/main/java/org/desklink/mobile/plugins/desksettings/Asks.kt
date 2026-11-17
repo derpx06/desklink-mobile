@@ -287,6 +287,8 @@ object Asks {
     fun report(deskId: String) {
         val device = device(deskId) ?: return
         org.desklink.mobile.helpers.ThreadHelper.execute {
+            // What was just granted loads its plugin first: the report must not say on for a plugin that is not loaded.
+            runCatching { device.reloadIfAccessGranted() }
             runCatching {
                 device.getPlugin(DeskSettingsPlugin::class.java)?.sendReport(force = true)
                 device.getPlugin(org.desklink.mobile.plugins.inputdevicesreceiver.InputDevicesReceiverPlugin::class.java)?.reportAllowed()
@@ -299,6 +301,8 @@ object Asks {
         val devices = runCatching { DeskLinkApplication.getInstance().devices.values.filter { it.isPaired } }.getOrDefault(emptyList())
         if (devices.isEmpty()) return
         org.desklink.mobile.helpers.ThreadHelper.execute {
+            // Back from Android's settings: access granted there loads its plugin before the report is made.
+            devices.forEach { runCatching { it.reloadIfAccessGranted() } }
             devices.forEach { runCatching { it.getPlugin(DeskSettingsPlugin::class.java)?.sendReport() } }
         }
     }

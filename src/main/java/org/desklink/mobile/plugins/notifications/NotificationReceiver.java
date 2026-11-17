@@ -104,6 +104,8 @@ public class NotificationReceiver extends NotificationListenerService {
         for (NotificationListener listener : listeners) {
             listener.onListenerConnected(this);
         }
+        // Notification access was just granted (this service only connects with it): the plugins that waited for it load now.
+        org.desklink.mobile.helpers.PluginAccess.reloadGranted();
     }
 
     @Override
