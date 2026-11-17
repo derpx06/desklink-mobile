@@ -124,13 +124,10 @@ Access Framework. `MANAGE_EXTERNAL_STORAGE` is not in the manifest.
 - `READ_EXTERNAL_STORAGE` / `WRITE_EXTERNAL_STORAGE`: up to Android 10 only (`maxSdkVersion` 29).
 - Not in release builds: `READ_LOGS` and `SYSTEM_ALERT_WINDOW` (the "automatic clipboard sync" workaround is
   declared only by hand-installed debug builds), Bluetooth permissions (the Bluetooth link was removed).
-- `USE_FULL_SCREEN_INTENT`: a computer's ask to start screen sharing opens on a locked or sleeping phone (on
-  Android 14+ only after the person allows it). **Declare it in Play Console** (Full-screen intent declaration):
-  "ask to start screen sharing", a call-like use. `ACCESS_LOCAL_NETWORK` (the local-network permission on newer
-  Android) and the `FOREGROUND_SERVICE_*` types (`connectedDevice`, `mediaProjection`, `microphone`) are declared
-  with their own explanations above/below.
+- `ACCESS_LOCAL_NETWORK` (the local-network permission on newer Android) and the `FOREGROUND_SERVICE_*` types
+  (`connectedDevice`, `mediaProjection`, `microphone`) are declared with their own explanations above and below.
 - Removed: SMS, MMS, call log, `QUERY_ALL_PACKAGES`, `REQUEST_INSTALL_PACKAGES`,
-  background location, all files access. None of the SMS / Call Log
+  `USE_FULL_SCREEN_INTENT`, background location, all files access. None of the SMS / Call Log
   policy declarations apply.
 
 ## App content

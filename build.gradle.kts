@@ -52,7 +52,7 @@ android {
         val relayUrl = releaseSigningValue("DESKLINK_RELAY_URL") ?: ""
         buildConfigField("String", "DEFAULT_RELAY_URL", "\"$relayUrl\"")
         // The only control for everything off the LAN (docs/RELAY.md): the relay connection, its TURN and
-        // relay-bootstrapped WebRTC. No setting or row turns them on or off; on, they are simply used. 1.3 ships LAN-only:
+        // relay-bootstrapped WebRTC. No setting or row turns them on or off; on, they are simply used. 0.3 ships LAN-only:
         // false in every build type (defaultConfig covers debug and release). Set true to bring the relay back (desktop:
         // RELAY_ENABLED in relay_link/mod.rs). Relay prefs stored by earlier builds are kept and never read.
         buildConfigField("boolean", "RELAY_ENABLED", "false")

@@ -110,7 +110,7 @@ Proposed next, each its own reviewed change with tests first:
   Java-facing façade so plugins and Java callers do not change.
 * **`MainActivity.kt` (≈1.7k)**: move the polling tick's state building into a
   `HomeStateBuilder` and make device state observable (phase 3.5 item 1).
-* **Gradle modules.** A follow-up, not part of 1.3: `:protocol` (packet
+* **Gradle modules.** A follow-up, not part of 0.3: `:protocol` (packet
   constants, envelope, fixtures; pure Kotlin/JVM), `:transport` (the
   Java-compatible `SessionTransport` and `DeviceManager`), `:webrtc` (libwebrtc
   wrapper and file engine), `:feature-*` per plugin family, `:app` (UI,
