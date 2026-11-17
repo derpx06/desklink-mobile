@@ -61,6 +61,7 @@ class BackgroundService : Service() {
     private lateinit var applicationInstance: DeskLinkApplication
     private var networkCallback: NetworkCallback? = null
     private var screenReceiver: DeskLinkBroadcastReceiver? = null
+    private var leavingReceiver: LeavingReceiver? = null
     private var defaultNetworkCallback: NetworkCallback? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private var connectionWakeLock: PowerManager.WakeLock? = null
@@ -257,6 +258,12 @@ class BackgroundService : Service() {
         }
         screenReceiver = DeskLinkBroadcastReceiver()
         registerReceiver(screenReceiver, filter)
+        // Wi-Fi switching off, airplane mode: the desk is told before the radio goes (best effort).
+        leavingReceiver = LeavingReceiver()
+        registerReceiver(
+            leavingReceiver,
+            IntentFilter(WifiManager.WIFI_STATE_CHANGED_ACTION).apply { addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED) },
+        )
 
         // Watch for changes on all network connections except cellular networks
         val networkRequestBuilder = createNonCellularNetworkRequestBuilder()
@@ -288,6 +295,8 @@ class BackgroundService : Service() {
                 Log.i("BackgroundService", "Valid network lost")
                 availableNetworks.remove(network)
                 connectedToNonCellularNetwork.postValue(availableNetworks.isNotEmpty())
+                // The last network: the desk is told (a network next to it that stays means nothing is leaving).
+                if (availableNetworks.isEmpty()) LeavingReport.shared.report("network-lost")
                 // Any lost LAN network may have carried the links. Capabilities
                 // can't be read for a lost network, so the address map decides:
                 // VPNs never get an entry (see onLinkPropertiesChanged).
@@ -559,8 +568,12 @@ class BackgroundService : Service() {
         Log.d("DeskLink/BgService", "onDestroy")
         if (safeStart) return super.onDestroy()
         initialized = false
+        // First, before anything is torn down: the desk checks the link now (off the main thread).
+        LeavingReport.shared.report("service-stopped")
         screenReceiver?.let { runCatching { unregisterReceiver(it) } }
         screenReceiver = null
+        leavingReceiver?.let { runCatching { unregisterReceiver(it) } }
+        leavingReceiver = null
         leaseRecheck.removeCallbacks(leaseRecheckTask)
         destroyed = true
         leaseRecheck.removeCallbacks(stateChangedTask)
@@ -606,6 +619,16 @@ class BackgroundService : Service() {
     }
 
     override fun onBind(intent: Intent): IBinder? = null
+
+    /**
+     * The task was swiped away. The foreground service usually lives on; when the process is about
+     * to be killed (ColorOS) it does not, and the desk should hear so. A phone that stays answers
+     * the desk's probe and nothing changes.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        LeavingReport.shared.report("task-removed")
+        super.onTaskRemoved(rootIntent)
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(LOG_TAG, "onStartCommand")
