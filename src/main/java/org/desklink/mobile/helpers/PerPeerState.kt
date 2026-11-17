@@ -40,6 +40,7 @@ object PerPeerState {
         "desklink.transfer.checkpoints" to "keyed by transfer id, with the device inside: FileTransferStore.forgetDevice, pinned in PeerStateTest",
         "crash_loop" to "the app's own start-up crash counter",
         "permissions_asked" to "which Android permissions were asked once; the phone's, not a computer's",
+        "desklink_update" to "the update check's own state (install id, cache, skip): the phone's, not a computer's",
         "desklink_privacy_defaults" to "one-time marker of the privacy defaults run",
         "desklink_removed_features" to "one-time marker of the removed-feature cleanup",
         "findmyphone_ring" to "the ring volume to put back: the phone's",

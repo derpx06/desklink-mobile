@@ -46,6 +46,7 @@ class IdleTimersTest {
         "ui/compose/screen/home/HomeMediaUi.kt" to "the seek bar; StartedEffect and only while the media is playing",
         "ui/compose/screen/tabs/TerminalsTab.kt" to "terminal list refresh and previews; StartedEffect, only while the tab is on screen",
         "BackgroundService.kt" to "the work-lease recheck: re-arms only while work holds the lease, and the lease lapses on its own",
+        "update/UpdateRuntime.kt" to "the daily update-check refresh: runs only while BackgroundService does, cancelled in onDestroy",
         "Device.kt" to "the doze/peer expiry handler: armed only for a live link",
         "plugins/findmyphone/FlashlightManager.kt" to "the flash blink, only while the phone is ringing (60 s limit)",
         "plugins/mprisreceiver/MprisReceiverPlugin.java" to "position ticks, only while media plays",
