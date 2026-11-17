@@ -45,12 +45,24 @@ class UpdateMiscTest {
 
     @Test fun nothingOutsideTheModuleCallsIntoItExceptTheNamedHooks() {
         // Full relative paths, so a same-named file elsewhere does not pass. Add an entry when a phase-2 hook lands.
-        val allowed = setOf("BackgroundService.kt")
+        val allowed = setOf("BackgroundService.kt", "ui/MainActivity.kt", "ui/compose/screen/settings/SettingsTab.kt")
         val root = File("src/main/java/org/desklink/mobile")
         val users = File("src/main/java").walkTopDown().filter { it.extension == "kt" || it.extension == "java" }
-            .filter { it.readText().contains("org.desklink.mobile.update") && it.relativeTo(root).path.startsWith("update/").not() }
+            .filter { it.readText().contains("org.desklink.mobile.update") && it.relativeTo(root).path.startsWith("update/").not() && !it.relativeTo(root).path.startsWith("ui/compose/update/") }
             .map { it.relativeTo(root).path }.toSet()
         assertTrue("unexpected callers of the update module: ${users - allowed}", allowed.containsAll(users))
+    }
+
+    @Test fun updateUiExistsOnlyInThePopupAndSettings() {
+        // The sheet is hosted once by MainActivity; the controls are one section of About. No Home card, tab, list, badge or notification.
+        val root = File("src/main/java/org/desklink/mobile")
+        val names = Regex("UpdatePromptHost|UpdatesSettings\\b|UpdateSheet|UpdateIllustrationCard|UpdateNoteRow|UpdateUi\\b")
+        val users = File("src/main/java").walkTopDown().filter { it.extension == "kt" || it.extension == "java" }
+            .filter { names.containsMatchIn(it.readText()) }.map { it.relativeTo(root).path }.filter { !it.startsWith("ui/compose/update/") }.toSet()
+        assertEquals(setOf("ui/MainActivity.kt"), users) // About only takes a slot lambda
+        for (dir in listOf("ui/compose/screen/home", "ui/compose/screen/tabs", "ui/compose/components")) {
+            File(root, dir).walkTopDown().filter { it.extension == "kt" }.forEach { assertFalse("${it.name} draws update UI", it.readText().contains("R.string.update_")) }
+        }
     }
 
     @Test fun releaseSourcesCarryNoTestKeys() {

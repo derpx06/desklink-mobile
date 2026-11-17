@@ -59,6 +59,7 @@ Measured on 0.3 (phase 3); each is listed so it is fixed on purpose, not copied:
 | `plugins/<feature>/` | one package per feature (23 `@PluginFactory.LoadablePlugin` classes, found by KSP `classindexksp`; no manual registry). `folders/` holds the Bucket: `BucketModel` (what the screens show), `BucketEngine` (the worker), `FolderSync` (the F8 rules), `BucketUi` |
 | `ui/compose/screen/home/` | `HomeState` (state and actions, data only), `HomeScreen` and the section files beside it |
 | `update/` | the update check (docs/UPDATES.md): strict-JSON signed-manifest verification (BouncyCastle Ed25519), the decision table, the fetch (own OkHttp client, https only, 64 KiB cap), its own `desklink_update` preferences, install-source detection and the show-on-open coordinator. A leaf: nothing in pairing, transport, WebRTC or the plugins calls it, and it calls none of them (a test scans for both) |
+| `ui/compose/update/` | the update UI, only here: `UpdatePromptHost` (the Material 3 bottom sheet, hosted once by MainActivity), `UpdateSheet`, `UpdateIllustrationCard` (Canvas, tokens), `UpdateNoteRow`, `UpdatesSettings` (the controls, one section of About) and `UpdateUi` (the glue to `update/`). No Home card, tab, badge or notification; a test scans for that |
 | `helpers/` | shared utilities with one job each (`RateLimiter`, `Sizes`, `InboundLimits`, `PerPeerState`, `security/`, …) |
 | `org/webrtc/DeskLinkVideoEncoderFactories.java` | low-latency hardware encoder setup (screen latency contract) |
 

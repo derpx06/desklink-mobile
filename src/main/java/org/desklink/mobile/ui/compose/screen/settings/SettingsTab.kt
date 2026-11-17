@@ -300,6 +300,12 @@ private fun ComputerCard(desk: DeskSettings, onOpen: () -> Unit, onSwitch: (() -
             Column(Modifier.weight(1f)) {
                 Text(desk.name, fontFamily = MonoFamily, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
                 Text(stringResource(R.string.settings_paired_key, desk.key), fontSize = 13.sp, lineHeight = 18.sp, color = t.textDim)
+                // One muted line, not a card: only when the computer's DeskLink differs by major.minor (docs/UPDATES.md 6.8).
+                when (val skew = org.desklink.mobile.update.UpdateSkew.of(org.desklink.mobile.BuildConfig.VERSION_NAME, desk.peerVersion)) {
+                    is org.desklink.mobile.update.UpdateSkew.PeerOlder -> Text(stringResource(R.string.update_skew_older, skew.peer), fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
+                    is org.desklink.mobile.update.UpdateSkew.PeerNewer -> Text(stringResource(R.string.update_skew_newer, skew.peer), fontSize = 12.sp, lineHeight = 16.sp, color = t.textDim)
+                    org.desklink.mobile.update.UpdateSkew.None -> Unit
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     StatusDot(if (desk.ready) t.mintText else t.textFaint, size = 7.dp)
                     Text(status, fontSize = 12.sp, lineHeight = 16.sp, color = if (desk.ready) t.mintText else t.textDim)

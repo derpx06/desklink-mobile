@@ -72,6 +72,8 @@ fun AboutScreen(
     /** Plays the first-run tour again; null hides the row. */
     onReplayTour: (() -> Unit)? = null,
     whatsNewOpen: Boolean = false,
+    /** The Updates controls (a section here and nowhere else); null hides them. */
+    updates: (@Composable () -> Unit)? = null,
 ) {
     val bottomPadding = safeDrawingBottomPadding()
     LazyColumn(
@@ -81,6 +83,10 @@ fun AboutScreen(
     ) {
         item { AppCard(aboutData, onOpenUrl, onEasterEggTriggered) }
         item { WhatsNew(aboutData.versionName.substringBeforeLast('.'), whatsNewOpen) }
+        updates?.let { content ->
+            item { SectionLabel(stringResource(R.string.update_section)) }
+            item { content() }
+        }
         item {
             RowGroup {
                 aboutData.bugURL?.let { url ->

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- The update system's words (docs/UPDATES.md 6.1): phone and computer, sentence case, no jargon. -->
+<resources>
+    <!-- The sheet -->
+    <string name="update_title">DeskLink %1$s is ready</string>
+    <string name="update_have">You have %1$s</string>
+    <string name="update_new">%1$s</string>
+    <string name="update_new_beta">%1$s · beta</string>
+    <string name="update_versions_spoken">You have %1$s. Update to %2$s.</string>
+    <string name="update_versions_spoken_beta">You have %1$s. Update to %2$s, beta.</string>
+    <string name="update_whats_new">What\'s new</string>
+    <string name="update_source_play">Google Play</string>
+    <string name="update_source_play_line">Free · opens the Play listing</string>
+    <string name="update_source_github">GitHub download</string>
+    <string name="update_source_github_line">APK · %1$s · opens in your browser</string>
+    <string name="update_source_github_line_nosize">APK · opens in your browser</string>
+    <string name="update_source_fdroid">F-Droid</string>
+    <string name="update_source_fdroid_line">Opens F-Droid</string>
+    <string name="update_source_release">Release page</string>
+    <string name="update_source_release_line">Opens in your browser</string>
+    <string name="update_btn_play">Update on Google Play</string>
+    <string name="update_btn_download">Download update</string>
+    <string name="update_btn_fdroid">Open F-Droid</string>
+    <string name="update_btn_release">Open release page</string>
+    <string name="update_verify">Verify the download</string>
+    <string name="update_checksum">SHA-256 %1$s</string>
+    <string name="update_copy">Copy</string>
+    <string name="update_checksum_copied">Checksum copied</string>
+    <string name="update_not_now">Not now</string>
+    <string name="update_skip">Skip this version</string>
+    <string name="update_signature_note">Install the update the same way you installed DeskLink. An app signed with a different key can\'t update this one; you would have to uninstall it first, which removes its pairings.</string>
+    <string name="update_required_title">Update needed</string>
+    <string name="update_required_body">This version can\'t connect to computers running DeskLink %1$s or newer. Update to keep using it.</string>
+    <string name="update_no_browser">Couldn\'t open the link</string>
+
+    <!-- Settings > About > Updates -->
+    <string name="update_section">Updates</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_check_button">Check</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_up_to_date">You\'re up to date</string>
+    <string name="update_up_to_date_line">DeskLink %1$s · Checked %2$s</string>
+    <string name="update_failed">Couldn\'t check for updates. Try again later.</string>
+    <string name="update_auto">Check automatically</string>
+    <string name="update_auto_line">Once a day. Sends no personal information.</string>
+    <string name="update_auto_off">Automatic checks are off</string>
+    <string name="update_auto_off_line">You can still check by hand.</string>
+    <string name="update_wifi">Only on Wi-Fi</string>
+    <string name="update_channel">Update channel</string>
+    <string name="update_channel_beta">Beta</string>
+    <string name="update_channel_stable">Stable</string>
+    <string name="update_channel_note">Stable starts at 1.0. Until then DeskLink is in beta.</string>
+    <string name="update_skipped">Skipped %1$s</string>
+    <string name="update_undo">Undo</string>
+    <string name="update_not_set_up">Updates aren\'t set up in this build</string>
+    <string name="update_share">DeskLink asks its update server for the newest version once a day. The request does not include your name, your device ID or anything about your computers. The server can see your network address, as any website can. The answer is signed, and DeskLink ignores anything that is not.</string>
+
+    <!-- The one muted line under the computer\'s name -->
+    <string name="update_skew_older">Runs DeskLink %1$s. Update it for the newest features.</string>
+    <string name="update_skew_newer">Runs a newer DeskLink (%1$s). Update this phone.</string>
+</resources>

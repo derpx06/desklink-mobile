@@ -134,6 +134,8 @@ data class DeskSettings(
     val pluginPermissions: List<Pair<String, () -> Unit>> = emptyList(),
     /** What the desk itself reports (`desklink.settings`); null from an older desk or before it arrives. */
     val remote: org.desklink.mobile.plugins.desksettings.DeskSettingsState? = null,
+    /** The computer's DeskLink version from its identity (informational: a muted line when it differs by major.minor); null when unknown. */
+    val peerVersion: String? = null,
     /** This phone's media is shown and controlled on the desk. */
     val phoneMediaOn: Boolean = false,
     /** Desk-side switches the desk has not confirmed yet. */

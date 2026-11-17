@@ -247,6 +247,18 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
         )
     }
     private val snackbar = SnackbarHostState()
+
+    /** The update sheet and the Settings controls (docs/UPDATES.md): shown only on a launcher open, and never over anything else. */
+    private val updateUi by lazy { org.desklink.mobile.ui.compose.update.UpdateUi(applicationContext, lifecycleScope, ::updateBlocked) }
+
+    /**
+     * Anything else is up: the tour or setup, a screen other than Home, a dialog or a permission step, a pairing waiting, a computer's
+     * ask. The update sheet skips that open and is not retried until the next one.
+     */
+    private fun updateBlocked(): Boolean = !onboardingSeen || stack.lastOrNull() != HOME || qrConflict != null ||
+        org.desklink.mobile.plugins.desksettings.Asks.waiting().isNotEmpty() ||
+        supportFragmentManager.fragments.any { it is androidx.fragment.app.DialogFragment } ||
+        DeskLinkApplication.getInstance().devices.values.any { it.pairStatus == PairState.RequestedByPeer || it.pairStatus == PairState.Requested }
     private var knownPaired: Set<String>? = null
     private val defaultPrefs: SharedPreferences by lazy { PreferenceManager.getDefaultSharedPreferences(applicationContext) }
 
@@ -293,6 +305,10 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             view.view.animate().alpha(0f).setDuration(160).withEndAction(view::remove).start()
         }
         setContent { DeskLinkTheme(this) { Root() } }
+        // A launcher launch in a new instance is an "open": not a rotation, a share, a QR or deep link, a notification or the service.
+        if (org.desklink.mobile.update.UpdateOpenCoordinator.isLauncherOpen(intent.action, intent.categories, savedInstanceState != null)) {
+            updateUi.onOpen(org.desklink.mobile.update.UpdateOpenCoordinator.newOpenId())
+        }
         if (BuildConfig.DEBUG && savedInstanceState == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) logFirstFrame()
 
         lifecycleScope.launch {
@@ -547,6 +563,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
             ) { route ->
                 holder.SaveableStateProvider(route) { Screen(route, paired) }
             }
+            org.desklink.mobile.ui.compose.update.UpdatePromptHost(updateUi.sheetModel, updateUi.sheetActions)
             // A computer's ask waiting for the person: on top of every screen, with the notification's own Allow / Not now.
             org.desklink.mobile.ui.compose.components.IncomingAsksBanner(
                 org.desklink.mobile.plugins.desksettings.Asks.waiting(),
@@ -1438,6 +1455,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                 pluginPermissions = it.pluginsWithoutPermissions.values.filter { p -> it.isPluginEnabled(p.pluginKey) }.map { p -> p.displayName to { showPluginPermission(p, optional = false) } } +
                     it.pluginsWithoutOptionalPermissions.values.filter { p -> it.isPluginEnabled(p.pluginKey) }.map { p -> p.displayName to { showPluginPermission(p, optional = true) } },
                 remote = it.getPlugin(DeskSettingsPlugin::class.java)?.settings,
+                peerVersion = it.deviceInfo.appVersion,
                 phoneMediaOn = it.isPluginEnabled(Plugin.getPluginKey(MprisReceiverPlugin::class.java)),
                 pending = it.getPlugin(DeskSettingsPlugin::class.java)?.pending.orEmpty(),
                 callsOn = it.isPluginEnabled(Plugin.getPluginKey(org.desklink.mobile.plugins.telephony.TelephonyPlugin::class.java)),
@@ -1643,6 +1661,7 @@ class MainActivity : AppCompatActivity(), OnSharedPreferenceChangeListener {
                     onEasterEggTriggered = { startActivity(Intent(this@MainActivity, EasterEggActivity::class.java)) },
                     onLicensesClicked = { startActivity(Intent(this@MainActivity, LicensesActivity::class.java)) },
                     onReplayTour = { push(ONBOARDING) },
+                    updates = { org.desklink.mobile.ui.compose.update.UpdatesSettings(updateUi.settingsModel(), updateUi.settingsActions) },
                 )
             }
         }

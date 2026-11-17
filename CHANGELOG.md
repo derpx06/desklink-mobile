@@ -10,7 +10,9 @@ which only ever goes up.
 - Update prompts. When you open DeskLink, a sheet tells you if a newer version is available, with what changed and the
   right way to update for how you installed it (Google Play, F-Droid, a GitHub download). Not now, skip a version, or turn
   it off in Settings > About. DeskLink checks once a day (on Wi-Fi by default) for one signed file and sends nothing about
-  you; it never downloads or installs anything by itself. Beta builds follow the Beta channel.
+  you; it never downloads or installs anything by itself. Beta builds follow the Beta channel. Settings > About >
+  Updates has Check for updates, Check automatically, Only on Wi-Fi, the channel and Undo for a skipped version. The
+  computer's row says when its DeskLink is a different version.
 - Connection: comes back by itself after sleep, a network change or a restart; says clearly when it cannot.
 - The Bucket: one folder kept in step with the computer, two folders deep, with progress and resume; a failed
   listing is never read as "everything was deleted"; names that differ only in capitals are not synced.
