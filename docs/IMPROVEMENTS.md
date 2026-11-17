@@ -93,3 +93,17 @@ Tests: `aViewOnlyDesktopSaysViewOnlyAndOffersToAskAgain`,
   `values-xx` folders hold about 170 of 352 keys in `strings.xml` and none of the ~1260 in `strings_ui.xml`,
   `strings_everything.xml` and `strings_guide.xml`; a language is added to the list when its folder is complete.
   The desk has no translation catalogue either (window strings are literals): a gettext pass is its follow-up.
+
+## Robustness (batch 5, from the 1.3 robustness audit)
+
+- **LAN listener unavailable (ROB-1).** When no TCP port of 1716..1764 can be opened (a leaked file descriptor, another app holding
+  the range) the LAN provider no longer throws out of the foreground service's start (a crash that fed `CrashLoop` and kept
+  Bluetooth and loopback from starting). It logs `LAN listener unavailable` (and an `AppLog` event `lan`), does not announce a port of 0
+  over mDNS, keeps UDP discovery, and tries again, announcing, on the next network change. **Not surfaced in the UI**: the state is
+  only the log line and `LanLinkProvider.isTcpListenerUp()` (used by its tests); a desk's inbound LAN link to this phone fails until
+  a port is free (the phone can still dial out). A visible notice is a follow-up (it needs a string and a row on the phone's status
+  surfaces). The last port, 1764, is now tried too (the old loop never reached it).
+- **Refused foreground start (ROB-2).** `startForeground` refused (Android 12+ background start): the service stops (`stopSelf`,
+  not sticky) instead of lingering un-foregrounded. It cannot call `startForeground` first the way the safe-mode branch does.
+- **Battery (ROB-4)** with no sticky battery broadcast, and **transfer history (ROB-6)** on a full disk or after a torn last line: no
+  exception to the caller; the record stays in memory.

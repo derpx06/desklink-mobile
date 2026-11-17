@@ -666,7 +666,13 @@ class BackgroundService : Service() {
                 startForeground(FOREGROUND_NOTIFICATION_ID, createForegroundNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
             } catch (e: IllegalStateException) { // To catch ForegroundServiceStartNotAllowedException
                 Log.w("BackgroundService", "Couldn't startForeground", e)
-                return START_STICKY
+                // A start made with startForegroundService that never reaches startForeground is likely to end in the
+                // framework's ForegroundServiceDidNotStartInTimeException (a crash that feeds CrashLoop; whether a refused
+                // call clears the pending requirement depends on the Android version): stop, as the safe-mode branch above
+                // does. Unlike that branch this cannot call startForeground first (it was just refused), so the service
+                // stops without ever having been foreground. The next start from a foreground state brings it back.
+                stopSelf()
+                return START_NOT_STICKY
             }
         }
         else {

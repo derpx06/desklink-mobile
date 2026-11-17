@@ -46,6 +46,18 @@ class BatteryPluginTest {
         packet = null // remove old capture packet
     }
 
+    @Test
+    fun aMissingStickyBatteryBroadcastDoesNotBreakTheLoad() {
+        // registerReceiver returns null for the sticky ACTION_BATTERY_CHANGED where it is not available yet.
+        val noSticky = object : android.content.ContextWrapper(context) {
+            override fun registerReceiver(receiver: android.content.BroadcastReceiver?, filter: android.content.IntentFilter?): Intent? = null
+        }
+        val relaxedDevice = mockk<Device>(relaxed = true)
+        every { relaxedDevice.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java) } returns null
+        val plugin = BatteryPlugin().apply { setContext(noSticky, relaxedDevice) }
+        Assert.assertTrue(plugin.onCreate())
+    }
+
     // LOCAL -> REMOTE
 
     @Test

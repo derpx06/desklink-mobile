@@ -115,4 +115,27 @@ class TransferHistoryTest {
         assertEquals(Thumbnails.Access.GONE, Thumbnails.access { throw java.io.FileNotFoundException("deleted") })
         assertEquals(Thumbnails.Access.GONE, Thumbnails.access { false })
     }
+
+    @Test
+    fun aRecordAppendedAfterATornLastLineIsNotGluedToIt() {
+        val file = folder.root.resolve("torn.tsv")
+        TransferHistoryStore(file) { now }.append(record("a"))
+        // Killed mid-append: the last line is cut and has no newline; and the rewrite on load cannot run (a full disk).
+        file.appendText(TransferHistoryStore.encode(record("b")).take(12))
+        folder.root.resolve("torn.tsv.tmp").mkdir() // writeText on a directory throws
+        val reopened = TransferHistoryStore(file) { now }
+        reopened.append(record("c"))
+        assertEquals(listOf("c", "a"), TransferHistoryStore(file) { now }.all().map { it.id })
+    }
+
+    @Test
+    fun removeOnAFullDiskNeverThrowsAndKeepsTheListInMemory() {
+        val file = folder.root.resolve("full.tsv")
+        val store = TransferHistoryStore(file) { now }
+        store.append(record("a"))
+        store.append(record("b"))
+        folder.root.resolve("full.tsv.tmp").mkdir() // the temporary file cannot be written
+        store.remove("a")
+        assertEquals(listOf("b"), store.all().map { it.id })
+    }
 }

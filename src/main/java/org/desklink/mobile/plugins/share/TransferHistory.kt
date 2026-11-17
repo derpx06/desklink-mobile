@@ -99,9 +99,21 @@ class TransferHistoryStore(private val file: File, private val now: () -> Long =
         if (list.size > MAX_RECORDS) {
             prune()
         } else {
-            file.parentFile?.mkdirs()
-            file.appendText(encode(record) + "\n")
+            try {
+                file.parentFile?.mkdirs()
+                // A file cut short (killed mid-append, and the rewrite on load could not run: a full disk) ends without a
+                // newline: the next record would be glued to the torn one and both lost on the next read.
+                if (file.length() > 0 && !endsWithNewline()) file.appendText("\n")
+                file.appendText(encode(record) + "\n")
+            } catch (_: java.io.IOException) {
+                // A full disk: the record stays in memory (listed this run), and is written by the next rewrite.
+            }
         }
+    }
+
+    private fun endsWithNewline(): Boolean = java.io.RandomAccessFile(file, "r").use {
+        it.seek(it.length() - 1)
+        it.read() == '\n'.code
     }
 
     @Synchronized
@@ -127,11 +139,16 @@ class TransferHistoryStore(private val file: File, private val now: () -> Long =
         records!!
     }
 
+    /** Writes the whole list to a temporary file and renames it over the history. A full disk or a failed rename leaves the old file and the list in memory: never an exception to a click. */
     private fun rewrite() {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.path + ".tmp")
-        tmp.writeText(records.orEmpty().joinToString("") { encode(it) + "\n" })
-        tmp.renameTo(file)
+        try {
+            file.parentFile?.mkdirs()
+            val tmp = File(file.path + ".tmp")
+            tmp.writeText(records.orEmpty().joinToString("") { encode(it) + "\n" })
+            if (!tmp.renameTo(file)) tmp.delete()
+        } catch (_: java.io.IOException) {
+            // Kept in memory; the next change tries again.
+        }
     }
 
     companion object {
@@ -240,7 +257,7 @@ object TransferHistory {
     }
 
     fun remove(context: Context, id: String) {
-        store(context).remove(id)
+        runCatching { store(context).remove(id) }
         revision++
     }
 }

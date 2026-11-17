@@ -139,8 +139,8 @@ class BatteryPlugin : Plugin() {
             addAction(Intent.ACTION_BATTERY_LOW)
             addAction(Intent.ACTION_BATTERY_OKAY)
         }
-        val currentState = context.registerReceiver(receiver, intentFilter)
-        receiver.onReceive(context, currentState)
+        // The sticky battery broadcast is not there yet on some builds (early boot, managed profiles): null, not an NPE.
+        context.registerReceiver(receiver, intentFilter)?.let { receiver.onReceive(context, it) }
         DndSync.Restore.cancel(device.deviceId) // the link is back within the minute: nothing is put back
         dndSyncOn = device.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)?.settings?.dndSync == true
         context.registerReceiver(dndReceiver, IntentFilter().apply {

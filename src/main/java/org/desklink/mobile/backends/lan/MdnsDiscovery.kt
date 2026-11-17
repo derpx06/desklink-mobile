@@ -84,8 +84,21 @@ class MdnsDiscovery {
         discoveryListener = null
     }
 
+    /** Whether this phone is registered (or registering) over mDNS; for tests. */
+    val isAnnouncing: Boolean get() = registrationListener != null
+
+    /** How many times registering was actually attempted (a port existed); for tests. */
+    @Volatile var announceAttempts = 0
+        private set
+
     fun startAnnouncing() {
+        // No TCP listener (every port was taken): NsdManager rejects a port of 0 with an IllegalArgumentException.
+        if (lanLinkProvider.tcpPort <= 0) {
+            Log.w(LOG_TAG, "Not announcing via MDNS: no TCP port")
+            return
+        }
         if (registrationListener == null) {
+            announceAttempts++
             val serviceInfo: NsdServiceInfo?
             try {
                 serviceInfo = createNsdServiceInfo()
@@ -94,7 +107,12 @@ class MdnsDiscovery {
                 return
             }
             registrationListener = createRegistrationListener()
-            mNsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, registrationListener)
+            try {
+                mNsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, registrationListener)
+            } catch (e: RuntimeException) { // an invalid service info or a refused registration must not end the service's start
+                Log.w(LOG_TAG, "Couldn't register via MDNS: " + e.message)
+                registrationListener = null
+            }
         }
     }
 

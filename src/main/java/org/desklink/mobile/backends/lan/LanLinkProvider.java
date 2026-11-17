@@ -93,7 +93,7 @@ public class LanLinkProvider extends BaseLinkProvider {
     // own beacon — exactly the connection discovery is trying to make.
     final ConcurrentHashMap<InetAddress, Long> lastTcpConnectionTimeByIp = new ConcurrentHashMap<>();
 
-    private ServerSocket tcpServer;
+    private volatile ServerSocket tcpServer;
     private DatagramSocket udpServer;
 
     private final MdnsDiscovery mdnsDiscovery;
@@ -748,14 +748,47 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     private final java.util.concurrent.Semaphore incomingHandshakes = new java.util.concurrent.Semaphore(MAX_INCOMING_HANDSHAKES);
 
+    /** False while no port of the range could be bound (see [#setupTcpListener]); LAN links cannot be accepted then. */
+    private volatile boolean tcpListenerUp = false;
+
+    public boolean isTcpListenerUp() {
+        return tcpListenerUp;
+    }
+
+    /** The mDNS part, for tests. */
+    @androidx.annotation.VisibleForTesting
+    MdnsDiscovery mdnsDiscoveryForTest() {
+        return mdnsDiscovery;
+    }
+
+    /** Announces this phone over mDNS on a trusted network, once there is a TCP port to announce (a port of 0 is refused by NsdManager). */
+    private void startAnnouncingIfListening() {
+        if (!tcpListenerUp) return;
+        synchronized (mdnsDiscovery) {
+            if (TrustedNetworkHelper.isTrustedNetwork(context)) {
+                mdnsDiscovery.startAnnouncing();
+            }
+        }
+    }
+
+    /**
+     * Opens the TCP listener. When every port of the range fails (fd exhaustion, another app holding the range) this
+     * reports "LAN listener unavailable" and returns, instead of throwing out of the foreground service's start on the
+     * main thread (a crash that fed CrashLoop's safe mode and kept Bluetooth and loopback from starting); the next network
+     * change tries again ([#onNetworkChange]).
+     */
     private void setupTcpListener() {
         try {
-            tcpServer = openServerSocketOnFreePort(MIN_PORT);
+            tcpServer = openServerSocketOnFreePort(MIN_PORT, MAX_PORT);
             org.desklink.mobile.webrtc.RealFileLanes.Companion.setListenPort(tcpServer.getLocalPort());
         } catch (IOException e) {
-            Log.e("LanLinkProvider", "Error creating tcp server", e);
-            throw new RuntimeException(e);
+            tcpServer = null;
+            tcpListenerUp = false;
+            Log.e("LanLinkProvider", "LAN listener unavailable: no port in " + MIN_PORT + ".." + MAX_PORT + " could be opened", e);
+            org.desklink.mobile.helpers.AppLog.INSTANCE.event("lan", "listener unavailable: " + e.getMessage());
+            return;
         }
+        tcpListenerUp = true;
         ThreadHelper.execute(() -> {
             while (listening) {
                 try {
@@ -799,22 +832,20 @@ public class LanLinkProvider extends BaseLinkProvider {
 
     }
 
-    static ServerSocket openServerSocketOnFreePort(int minPort) throws IOException {
-        int tcpPort = minPort;
-        while (tcpPort <= MAX_PORT) {
+    static ServerSocket openServerSocketOnFreePort(int minPort, int maxPort) throws IOException {
+        IOException last = null;
+        // Every port of the range, the last one included (it was never tried: the old loop gave up on reaching it).
+        for (int tcpPort = minPort; tcpPort <= maxPort; tcpPort++) {
             try {
                 ServerSocket candidateServer = new ServerSocket(tcpPort);
                 Log.i("DeskLink/LanLink", "Using port " + tcpPort);
                 return candidateServer;
             } catch (IOException e) {
-                tcpPort++;
-                if (tcpPort == MAX_PORT) {
-                    Log.e("DeskLink/LanLink", "No ports available");
-                    throw e; //Propagate exception
-                }
+                last = e;
             }
         }
-        throw new RuntimeException("This should not be reachable");
+        Log.e("DeskLink/LanLink", "No ports available");
+        throw last != null ? last : new IOException("No ports in " + minPort + ".." + maxPort);
     }
 
     private void broadcastUdpIdentityPacket(@Nullable Network network) {
@@ -914,10 +945,8 @@ public class LanLinkProvider extends BaseLinkProvider {
 
             synchronized (mdnsDiscovery) {
                 mdnsDiscovery.startDiscovering();
-                if (TrustedNetworkHelper.isTrustedNetwork(context)) {
-                    mdnsDiscovery.startAnnouncing();
-                }
             }
+            startAnnouncingIfListening();
 
             broadcastUdpIdentityPacket(null);
         }
@@ -927,6 +956,12 @@ public class LanLinkProvider extends BaseLinkProvider {
     public void onNetworkChange(@Nullable Network network) {
         if (udpServer == null) {
             setupUdpListener();
+        }
+        // The range was all taken at start: a network change is the moment to try again.
+        if (listening && !tcpListenerUp) {
+            setupTcpListener();
+            // Announcing was skipped at start for want of a port: now there is one.
+            startAnnouncingIfListening();
         }
 
         // A socket bound to the previous interface will not recover merely
@@ -1022,8 +1057,9 @@ public class LanLinkProvider extends BaseLinkProvider {
             mdnsDiscovery.stopDiscovering();
         }
         try {
+            tcpListenerUp = false;
             org.desklink.mobile.webrtc.RealFileLanes.Companion.setListenPort(0);
-            tcpServer.close();
+            if (tcpServer != null) tcpServer.close();
         } catch (Exception e) {
             Log.e("LanLink", "Exception", e);
         }
@@ -1042,6 +1078,6 @@ public class LanLinkProvider extends BaseLinkProvider {
     @Override
     public int getPriority() { return 20; }
 
-    public int getTcpPort() { return tcpServer.getLocalPort(); }
+    public int getTcpPort() { ServerSocket server = tcpServer; return server == null ? 0 : server.getLocalPort(); }
 
 }
