@@ -20,18 +20,60 @@ import org.desklink.mobile.helpers.ThreadHelper;
 import org.desklink.mobile.DeskLinkApplication;
 import org.desklink.mobile.R;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.concurrent.Executor;
 
 
 public class SendFileActivity extends AppCompatActivity {
 
     private String mDeviceId;
 
+    /** The activity that is on screen: a rotation while the files are read replaces the one that picked them. */
+    private static WeakReference<SendFileActivity> live = new WeakReference<>(null);
+
+    /** The picked files, each once: a picker that returns the first as `data` and again in the clip would send it twice. */
+    static ArrayList<Uri> uniqueUris(Uri data, ClipData clip) {
+        LinkedHashSet<String> seen = new LinkedHashSet<>();
+        ArrayList<Uri> uris = new ArrayList<>();
+        if (data != null && seen.add(data.toString())) uris.add(data);
+        if (clip != null) {
+            for (int i = 0; i < clip.getItemCount(); i++) {
+                Uri uri = clip.getItemAt(i).getUri();
+                if (uri != null && seen.add(uri.toString())) uris.add(uri);
+            }
+        }
+        return uris;
+    }
+
+    /**
+     * Runs [work] (the reads) on [executor] and finishes the live activity after it, on the main thread: the picker's read
+     * grant on the files ends with the activity that received them, and the reads open one file after another.
+     */
+    static void sendThenFinish(SendFileActivity from, Executor executor, Runnable work) {
+        live = new WeakReference<>(from);
+        android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+        executor.execute(() -> {
+            try {
+                work.run();
+            } finally {
+                main.post(() -> {
+                    SendFileActivity activity = live.get();
+                    if (activity != null) activity.finish();
+                });
+            }
+        });
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         mDeviceId = getIntent().getStringExtra("deviceId");
+        live = new WeakReference<>(this);
+        // Recreated (a rotation) while the picker is up or the files are being read: the picker is already there.
+        if (savedInstanceState != null) return;
 
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("*/*");
@@ -52,31 +94,16 @@ public class SendFileActivity extends AppCompatActivity {
             case Activity.RESULT_FIRST_USER:
                 if (resultCode == RESULT_OK) {
 
-                    final ArrayList<Uri> uris = new ArrayList<>();
-
-                    Uri uri = data.getData();
-                    if (uri != null) {
-                        uris.add(uri);
-                    }
-
-                    ClipData clipdata = data.getClipData();
-                    if (clipdata != null) {
-                        for (int i = 0; i < clipdata.getItemCount(); i++) {
-                            uris.add(clipdata.getItemAt(i).getUri());
-                        }
-                    }
-
+                    final ArrayList<Uri> uris = uniqueUris(data.getData(), data.getClipData());
                     if (uris.isEmpty()) {
                         Log.w("SendFileActivity", "No files to send?");
                     } else {
-                        ThreadHelper.execute(() -> {
+                        // Stays until the reads are done (finished by sendThenFinish).
+                        sendThenFinish(this, ThreadHelper::execute, () -> {
                             SharePlugin plugin = DeskLinkApplication.getInstance().getDevicePlugin(mDeviceId, SharePlugin.class);
-                            if (plugin == null) {
-                                finish();
-                                return;
-                            }
-                            plugin.sendUriList(uris);
+                            if (plugin != null) plugin.sendUriList(uris);
                         });
+                        break;
                     }
                 }
                 finish();
