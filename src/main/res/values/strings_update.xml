@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- The update system's words (docs/UPDATES.md 6.1): phone and computer, sentence case, no jargon. -->
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
     <!-- The sheet -->
     <string name="update_title">DeskLink %1$s is ready</string>
     <string name="update_have">You have %1$s</string>
