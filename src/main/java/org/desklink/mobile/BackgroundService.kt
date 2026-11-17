@@ -239,6 +239,8 @@ class BackgroundService : Service() {
         if (org.desklink.mobile.helpers.CrashLoop.safeMode(this)) { safeStart = true; return }
         this.applicationInstance = DeskLinkApplication.getInstance()
         instance = this
+        // The update check refreshes its cache about daily, UI-free, and fails silently (docs/UPDATES.md 4.1).
+        org.desklink.mobile.update.UpdateRuntime.startBackground(this)
         // Android binds the accessibility service within a second or two of the process starting; still unbound after
         // that, when it ran before, means the system stopped it (ColorOS: every force stop and update). Said once.
         android.os.Handler(mainLooper).postDelayed({
@@ -577,6 +579,7 @@ class BackgroundService : Service() {
     override fun onDestroy() {
         Log.d("DeskLink/BgService", "onDestroy")
         if (safeStart) return super.onDestroy()
+        org.desklink.mobile.update.UpdateRuntime.stopBackground()
         val wasInitialized = initialized
         initialized = false
         // First, before the providers are stopped below: the desk checks the link now. Written on a

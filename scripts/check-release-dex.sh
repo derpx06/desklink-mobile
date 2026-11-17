@@ -30,6 +30,10 @@ missing=0
 for cls in $(grep -v '^#' "$here/release-required-classes.txt" | grep -v '^$'); do
   if ! grep -qx "L$cls;" "$tmp/defined"; then echo "check-release-dex: MISSING $cls"; missing=1; fi
 done
+# Strings a release must not contain (the update system's test key): `#forbidden-string <text>` lines.
+for str in $(sed -n 's/^#forbidden-string *//p' "$here/release-required-classes.txt"); do
+  if grep -aqF -- "$str" "$tmp"/*.dex "$tmp"/*/*.dex 2>/dev/null; then echo "check-release-dex: FORBIDDEN string in the dex: $str"; missing=1; fi
+done
 # The plugin list is built by reflection from a generated index: a shrunk-away plugin silently disappears.
 minimum=$(sed -n 's/^#min-plugins *//p' "$here/release-required-classes.txt")
 plugins=$(awk "/Class descriptor/{c=\$4} /Superclass/{ if (\$3 ~ /desklink\\/mobile\\/plugins\\/Plugin;/) print c}" "$tmp/dump" | sort -u | wc -l)

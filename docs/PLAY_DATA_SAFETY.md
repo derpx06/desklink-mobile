@@ -34,6 +34,11 @@ provider holds the keys. Play's guidance exempts "data transferred off the devic
 using end-to-end encryption that is unreadable by anyone other than the sender
 and recipient", so these are **not** declared as collected or shared.
 
+The update check requests one static signed file over HTTPS. It sends no user data (no identifier, no account; the app
+version only in the `User-Agent`), so it is not declared as collected or shared. The network address is visible to the
+host as in any request, the same as for the model-list download. Answers stay as they are; no new permission is added
+(INTERNET is already declared). The 128-bit rollout id is generated and kept on the phone and is never transmitted.
+
 Crash reports are written to app storage and leave the device only when the user
 shares them through the Android share sheet (user-initiated), so they are not
 declared.

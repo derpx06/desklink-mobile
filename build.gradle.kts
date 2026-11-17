@@ -54,6 +54,11 @@ android {
         // false in every build type (defaultConfig covers debug and release). Set true to bring the relay back (desktop:
         // RELAY_ENABLED in relay_link/mod.rs). Relay prefs stored by earlier builds are kept and never read.
         buildConfigField("boolean", "RELAY_ENABLED", "false")
+        // The update check (docs/UPDATES.md 3.6): the signed manifest's address from DESKLINK_UPDATE_URL (Gradle property or
+        // environment), like the relay's. Empty = the update system is inert: no check, no popup, no network. Release builds have
+        // no runtime override; a debug build can be pointed at a local test server (UpdateStore.debugUrl).
+        val updateUrl = releaseSigningValue("DESKLINK_UPDATE_URL") ?: ""
+        buildConfigField("String", "DEFAULT_UPDATE_URL", "\"$updateUrl\"")
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
     buildFeatures {

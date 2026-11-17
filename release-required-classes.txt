@@ -13,4 +13,10 @@ org/webrtc/DataChannel
 org/webrtc/RtpSender
 # A plugin: the list is built by reflection from a generated index, so a shrunk-away plugin silently disappears.
 org/desklink/mobile/plugins/clipboard/ClipboardPlugin
+# The signed update manifest is verified with BouncyCastle's Ed25519 (docs/UPDATES.md 2.6).
+org/bouncycastle/math/ec/rfc8032/Ed25519
+org/desklink/mobile/update/UpdateVerifier
+# The update system's openly published TEST public keys must not be in a release build (debug-only, see UpdateKeys).
+#forbidden-string 1ESE_TECkkgupykava9EhlyV7zD9PZRlo22v2jNoKS0
+#forbidden-string gdqQHUmHGByYeiKgAEQ7735GcnSB-3C0oQopuPHKZ-g
 #min-plugins 23

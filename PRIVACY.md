@@ -67,6 +67,13 @@ DeskLink relay.
 - The app downloads Google Play's public list of device models
   (`storage.googleapis.com`) to show a friendly name for your phone. No personal
   data is sent with this request.
+- **Update check.** Once a day while the app runs, and when you open it if the last answer is old, DeskLink fetches a small
+  signed file (`latest.json`) from the project's update server over HTTPS to learn whether a newer version exists. The
+  request carries no name, device ID, pairing data, account or cookies; only DeskLink's version in the `User-Agent`. The
+  server operator (Firebase Hosting, Google) can see your network address and the time, as any website can. DeskLink
+  ignores anything not signed by the project key. It shows a prompt only when you open the app, and never installs
+  anything by itself. Turn it off in Settings > About; by default it only checks on Wi-Fi. Builds without an update
+  address make no request.
 - **ML Kit text recognition** (Google) is switched off in the default build and present only in a build made with `-Pdesklink.ocr=true`. There it reads text out of photos you take to insert on
   the computer. The recognition runs on the phone, but Google's ML Kit library may send
   usage and performance metrics and an installation identifier to Google. Nothing you

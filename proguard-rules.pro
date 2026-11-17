@@ -44,3 +44,9 @@
     public static int e(...);
 }
 
+
+# The update check verifies a signed manifest with BouncyCastle's Ed25519 (docs/UPDATES.md 2.6). With an empty
+# DESKLINK_UPDATE_URL R8 can prove the check unreachable and drop it; keeping these makes the release dex always carry the
+# verifier (release-required-classes.txt asserts it), so a build with a URL cannot ship without it.
+-keep class org.bouncycastle.math.ec.rfc8032.Ed25519 { *; }
+-keep class org.desklink.mobile.update.UpdateVerifier { *; }

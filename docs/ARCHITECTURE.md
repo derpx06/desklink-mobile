@@ -58,6 +58,7 @@ Measured on 1.3 (phase 3); each is listed so it is fixed on purpose, not copied:
 | `webrtc/` | `WebRtcSessionCoordinator` (signalling, recovery, watchdogs, remote session), `WebRtcTransport` (PeerConnection, media policy), `WebRtcEnvelope`/`WebRtcChannel`/`WebRtcHandover`, the file engine (`WebRtcFileTransferManager`, `FileSender`, `FileReceiver`, `FileRunner`, `TransferErrors`, `FileLane`), `terminal/` |
 | `plugins/<feature>/` | one package per feature (23 `@PluginFactory.LoadablePlugin` classes, found by KSP `classindexksp`; no manual registry). `folders/` holds the Bucket: `BucketModel` (what the screens show), `BucketEngine` (the worker), `FolderSync` (the F8 rules), `BucketUi` |
 | `ui/compose/screen/home/` | `HomeState` (state and actions, data only), `HomeScreen` and the section files beside it |
+| `update/` | the update check (docs/UPDATES.md): strict-JSON signed-manifest verification (BouncyCastle Ed25519), the decision table, the fetch (own OkHttp client, https only, 64 KiB cap), its own `desklink_update` preferences, install-source detection and the show-on-open coordinator. A leaf: nothing in pairing, transport, WebRTC or the plugins calls it, and it calls none of them (a test scans for both) |
 | `helpers/` | shared utilities with one job each (`RateLimiter`, `Sizes`, `InboundLimits`, `PerPeerState`, `security/`, …) |
 | `org/webrtc/DeskLinkVideoEncoderFactories.java` | low-latency hardware encoder setup (screen latency contract) |
 

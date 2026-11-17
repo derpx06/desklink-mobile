@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Update prompts. When you open DeskLink, a sheet tells you if a newer version is available, with what changed and the
+  right way to update for how you installed it (Google Play, F-Droid, a GitHub download). Not now, skip a version, or turn
+  it off in Settings > About. DeskLink checks once a day (on Wi-Fi by default) for one signed file and sends nothing about
+  you; it never downloads or installs anything by itself. Beta builds follow the Beta channel. (Phase 1: the check and
+  its rules; the sheet and the Settings controls follow.)
+
 ## 1.3.0
 
 - Needs Android 7.0 (API 24) or newer; Android 6.0 is no longer supported.
