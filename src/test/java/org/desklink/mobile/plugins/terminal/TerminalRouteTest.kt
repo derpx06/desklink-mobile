@@ -11,6 +11,7 @@ import org.desklink.mobile.ui.compose.screen.tabs.TerminalsPanel
 import org.desklink.mobile.ui.compose.screen.tabs.matchingSessions
 import org.desklink.mobile.ui.compose.screen.tabs.sessionStatus
 import org.desklink.mobile.ui.compose.screen.tabs.terminalsControlsOwnRow
+import org.desklink.mobile.ui.compose.screen.tabs.listAgainWhenDeskReportsAccess
 import org.desklink.mobile.ui.compose.screen.tabs.terminalsPanel
 import org.desklink.mobile.webrtc.SessionPasswordDenial
 import org.desklink.mobile.webrtc.terminal.TerminalClientState
@@ -153,6 +154,14 @@ class TerminalRouteTest {
         assertEquals("not connected beats a timeout", TerminalsPanel.DISCONNECTED, terminalsPanel(true, TerminalsGate.OPEN, down, loadTimedOut = true))
         assertEquals("a list from before the link went stays, dimmed, with its chip", TerminalsPanel.LIST, terminalsPanel(true, TerminalsGate.OPEN, down.copy(listLoaded = true)))
         assertEquals("the phone's own check comes before anything the desk says", TerminalsPanel.GATE, terminalsPanel(true, TerminalsGate.DENIED, up.copy(notAllowed = true)))
+    }
+
+    /** QA4-23: terminal access turned on at the desk (its settings report says so): a refused tab asks for the list again by itself. */
+    @Test
+    fun aRefusedTabReloadsWhenTheDeskReportsTerminalAccessOn() {
+        assertTrue(listAgainWhenDeskReportsAccess(deskSaysOn = true, refused = true))
+        assertFalse("still off at the desk", listAgainWhenDeskReportsAccess(deskSaysOn = false, refused = true))
+        assertFalse("not refused: nothing to redo", listAgainWhenDeskReportsAccess(deskSaysOn = true, refused = false))
     }
 
     @Test

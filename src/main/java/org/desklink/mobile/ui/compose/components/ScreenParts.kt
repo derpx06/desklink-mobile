@@ -151,7 +151,7 @@ fun LargeTitle(title: String, modifier: Modifier = Modifier, subtitle: String? =
         }
         if (subtitle != null) {
             Text(
-                subtitle, fontSize = 13.sp, lineHeight = 18.sp, color = tokens.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                subtitle, fontSize = 13.sp, lineHeight = 18.sp, color = tokens.textDim, maxLines = 4, overflow = TextOverflow.Ellipsis,
                 // Folds by height and fades, so the list below moves up with the finger instead of jumping.
                 modifier = Modifier
                     .padding(top = 2.dp)

@@ -178,8 +178,8 @@ class NotesUi(
                         R.drawable.sym_edit_note,
                         stringResource(if (query.isBlank()) R.string.notes_empty_title else R.string.notes_no_match),
                         stringResource(R.string.notes_empty_body),
-                        // Scrolls clear of the New note button, which floats over the bottom.
-                        Modifier.verticalScroll(rememberScrollState()).padding(bottom = 88.dp),
+                        // Its own area ends above the New note button, which floats over the bottom: the words scroll, never under it.
+                        Modifier.padding(bottom = 88.dp).verticalScroll(rememberScrollState()),
                     )
                 } else {
                     LazyColumn(contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

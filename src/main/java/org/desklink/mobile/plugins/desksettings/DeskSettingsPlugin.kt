@@ -85,6 +85,9 @@ class DeskSettingsPlugin : Plugin() {
     /** Whether this desk can be asked for [key] (a desk that reports its asks.json features) and it is off there. */
     fun askable(key: String): Boolean = settings?.features?.get(key) == false
 
+    /** The desk's settings report says [key] is on (it reports it on every change). */
+    fun reportedOn(key: String): Boolean = settings?.features?.get(key) == true
+
     /**
      * "Ask on computer" (or Ask again): `desklink.settings.request {set: {<key>: true}}`, a request the desk shows its person; it
      * never turns anything on by itself. One pending per key; [manual] false (nobody pressed) at most every [Asks.REASK_MS].

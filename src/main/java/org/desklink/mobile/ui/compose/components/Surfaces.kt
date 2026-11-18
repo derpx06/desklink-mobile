@@ -182,7 +182,8 @@ fun DeskSearchField(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isEmpty()) Text(placeholder, fontSize = 16.sp, color = t.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Two lines at large text: the hint is the field's purpose, not something to cut to "Search notes and sni...".
+            if (value.isEmpty()) Text(placeholder, fontSize = 16.sp, color = t.textDim, maxLines = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.4f) 2 else 1, overflow = TextOverflow.Ellipsis)
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,

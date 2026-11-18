@@ -590,7 +590,7 @@ class NotesSyncScenariosTest {
         assertNotNull(modified)
         val note = shelf.notes.getValue(id)
         assertTrue(!note.deleted && note.body == "typed after")
-        assertEquals("no junk 'New Note (conflicted copy)'", 1, shelf.notes.size)
+        assertEquals("no junk 'New note (conflicted copy)'", 1, shelf.notes.size)
         // Deleting an already deleted note stays a deletion and changes nothing.
         shelf.applyEdit(id, null, nextTick()) { it.copy(deleted = true) }
         assertNull(shelf.applyEdit(id, null, nextTick()) { it.copy(deleted = true) }.second)

@@ -36,12 +36,12 @@ data class Note(
      */
     val ancestors: List<Long> = emptyList(),
 ) {
-    /** Its title, or its first line without heading/list marks, or "New Note"; the desk derives conflicted-copy titles alike. */
+    /** Its title, or its first line without heading/list marks, or "New note"; the desk derives conflicted-copy titles alike. */
     val label: String
         get() = if (trimNote(title).isNotEmpty()) {
             trimNote(title).takeCodePoints(80)
         } else {
-            (firstLabelLine(body) ?: "New Note").takeCodePoints(80)
+            (firstLabelLine(body) ?: "New note").takeCodePoints(80)
         }
 
     fun sameContent(other: Note) = title == other.title && body == other.body && pinned == other.pinned && deleted == other.deleted

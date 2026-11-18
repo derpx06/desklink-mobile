@@ -127,6 +127,12 @@ enum class TerminalsPanel {
  */
 internal fun terminalsControlsOwnRow(screenWidthDp: Int, fontScale: Float): Boolean = screenWidthDp - 260 < 150 * fontScale
 
+/**
+ * Terminal access was off at the computer and the tab shows it; the computer's settings report (sent on every change) now says
+ * it is on: the list is asked for again, with no tap on Try again.
+ */
+fun listAgainWhenDeskReportsAccess(deskSaysOn: Boolean, refused: Boolean) = deskSaysOn && refused
+
 /** How long a list request is awaited, link up, before the tab says it could not load. */
 const val LIST_TIMEOUT_MS = 8_000L
 
@@ -225,6 +231,12 @@ fun TerminalsTab(
         }
     }
     val panel = terminalsPanel(client != null, gate, state, loadTimedOut)
+    // Terminal access turned on at the computer while this tab shows it off: the desk's settings report says so; load the list.
+    val deskPlugin = remember(deviceId) { DeskLinkApplication.getInstance().getDevice(deviceId)?.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java) }
+    val deskSaysOn = deskPlugin?.let { @Suppress("UNUSED_VARIABLE") val c = it.asksChanged; it.reportedOn("terminalAccess") } == true
+    LaunchedEffect(deskSaysOn, state.notAllowed) {
+        if (listAgainWhenDeskReportsAccess(deskSaysOn, state.notAllowed)) { listTries++; client?.refresh() }
+    }
     // Sessions can also start at the desk, which is not announced: look again while this tab is on screen.
     StartedEffect(client, connected, panel) {
         while (client != null && connected && (panel == TerminalsPanel.LIST || panel == TerminalsPanel.LOADING) && gate == TerminalsGate.OPEN) {

@@ -635,7 +635,8 @@ private fun QuickActions(state: HomeState, gate: (() -> Unit) -> Unit, actions: 
         !state.clipboardOn -> stringResource(R.string.home_tile_clipboard_off)
         else -> state.clipboardPreview?.let { stringResource(R.string.home_tile_clipboard_preview, it) }
     }
-    val columns = if (LocalDensity.current.fontScale > 1.4f) 2 else 4
+    // Two across from 1.2x text: at 1.3x four across put "Ring computer" and "Lock computer" edge to edge.
+    val columns = if (LocalDensity.current.fontScale > 1.15f) 2 else 4
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         SectionHeader(stringResource(R.string.home_quick_actions)) { DeskTextButton(stringResource(R.string.home_all_actions), onAll) }
         val shape = DeskLinkShape.group

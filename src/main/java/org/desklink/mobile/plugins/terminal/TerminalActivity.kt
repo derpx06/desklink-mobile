@@ -1212,13 +1212,13 @@ internal fun TerminalHeader(name: String, detail: String, status: String?, size:
             // Name and detail read as one item and are not live: the detail carries the round trip, refreshed every 2 s.
             Column(Modifier.semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(detail, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                Text(detail.split(" · ").joinToString(" · ") { org.desklink.mobile.ui.compose.ltrRun(it) }, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
             }
             // Reconnecting, ended, exited: a line of its own, so a long folder never pushes it out of sight, and the only live part.
             status?.let { Text(it, fontSize = 12.sp, color = TermCoralText, maxLines = 2, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         }
         // At the largest text sizes the grid size is dropped: it squeezed the name and the status into a word per line.
-        size?.takeIf { androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.5f }?.let { Text(it, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1) }
+        size?.takeIf { androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.5f }?.let { Text(org.desklink.mobile.ui.compose.ltrRun(it), fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1) }
         menu()
     }
 }

@@ -167,7 +167,7 @@ class ShelfTest {
     @Test
     fun labelsMatchTheDesk() {
         assertEquals("Shopping", Note("a", body = "\n## - Shopping\nmilk", created = 1, modified = 1).label)
-        assertEquals("New Note", Note("a", body = " \n#\n", created = 1, modified = 1).label)
+        assertEquals("New note", Note("a", body = " \n#\n", created = 1, modified = 1).label)
         assertEquals("Title", Note("a", title = "  Title ", body = "x", created = 1, modified = 1).label)
         assertEquals(80, Note("a", title = "😀".repeat(100), created = 1, modified = 1).label.codePointCount(0, 160))
     }
