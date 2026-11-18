@@ -126,6 +126,14 @@ Access Framework. `MANAGE_EXTERNAL_STORAGE` is not in the manifest.
   declared only by hand-installed debug builds), Bluetooth permissions (the Bluetooth link was removed).
 - `ACCESS_LOCAL_NETWORK` (the local-network permission on newer Android) and the `FOREGROUND_SERVICE_*` types
   (`connectedDevice`, `mediaProjection`, `microphone`) are declared with their own explanations above and below.
+- `ACCESS_COARSE_LOCATION`: declared with `ACCESS_FINE_LOCATION` for the same reason (reading the current Wi-Fi network on
+  Android versions that tie it to location); foreground use only, nothing is stored or sent.
+- Ordinary permissions (install-time, no Play declaration, no data-safety entry): `INTERNET`, `ACCESS_NETWORK_STATE`,
+  `ACCESS_WIFI_STATE`, `CHANGE_NETWORK_STATE`, `CHANGE_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE` (device discovery),
+  `WAKE_LOCK`, `RECEIVE_BOOT_COMPLETED` (start after boot, switchable), `VIBRATE`, `MODIFY_AUDIO_SETTINGS`,
+  `POST_NOTIFICATIONS` (a runtime prompt on Android 13+, for DeskLink's own notices). Libraries can merge a few more
+  ordinary permissions of their own (for example `USE_BIOMETRIC` from the AndroidX biometric library); the Play Console
+  lists the merged set, and none of them needs a declaration.
 - Removed: SMS, MMS, call log, `QUERY_ALL_PACKAGES`, `REQUEST_INSTALL_PACKAGES`,
   `USE_FULL_SCREEN_INTENT`, background location, all files access. None of the SMS / Call Log
   policy declarations apply.

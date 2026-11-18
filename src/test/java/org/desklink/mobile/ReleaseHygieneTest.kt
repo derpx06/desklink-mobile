@@ -42,6 +42,15 @@ class ReleaseHygieneTest {
         assertTrue("CHANGELOG.md top heading is $name: $top", top.startsWith("## $name"))
     }
 
+    /** Without the address a tagged build has an inert update check even with real keys: the workflow must pass it. */
+    @Test
+    fun theReleaseWorkflowPassesTheUpdateAddressToTheBuild() {
+        val workflow = project(".github/workflows/release.yml").readText()
+        assertTrue("DESKLINK_UPDATE_URL: \${{ vars.DESKLINK_UPDATE_URL }}" in workflow)
+        assertTrue("update check inert: DESKLINK_UPDATE_URL not set" in workflow)
+        assertTrue("the build reads it", "DESKLINK_UPDATE_URL" in project("build.gradle.kts").readText())
+    }
+
     @Test
     fun theStoreAndPrivacyTextsDoNotPromiseRemovedFeatures() {
         for (path in listOf("PRIVACY.md", "docs/PLAY_DATA_SAFETY.md", "fastlane/metadata/android/en-US/full_description.txt", "README.md")) {
