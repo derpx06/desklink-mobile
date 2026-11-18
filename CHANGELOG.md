@@ -38,5 +38,11 @@ which only ever goes up.
 - Typing into the phone through the editor's input connection, with a notice when no field is selected.
 - Release builds are checked for the classes WebRTC looks up by name (the R8 guard).
 - One phone / computer vocabulary in the app's words.
+- Reconnecting: a phone that waits for the computer's offer asks it to offer after 20 s of silence on a live link (at
+  most every 30 s, doubling to 5 min while it fails); a recovery that could not start no longer blocks the next one.
+- Sentence case ("New note"); large-text layouts (Home quick actions two across from 1.2x text, the Notes empty state);
+  right-to-left terminal readouts read correctly.
+- The Terminals tab refreshes itself when Terminal access is turned on at the computer; the update sheet refreshes on
+  first open.
 - Removed: browsing the phone's files, the presentation remote, Bluetooth, run commands, automations, the drawing
   pad, the TV remote.
