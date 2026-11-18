@@ -80,9 +80,8 @@ class WebRtcSessionCoordinator(
     private var activeAttemptId: String? = null
     /** The desktop's last offered attempt, named in a restart request so it is not taken for stale. */
     private var lastPeerAttemptId: String? = null
-    /** Last signed message heard from the desktop's WebRTC side, and when this phone last asked it to offer. */
-    @Volatile private var lastHeardFromDeskAt = SystemClock.elapsedRealtime()
-    @Volatile private var lastDeskAskAt = Long.MIN_VALUE / 2
+    /** When a responder phone may ask a silent desktop to offer (see [DeskAskGate]); guarded by [lock]. */
+    private val deskAsk = DeskAskGate(SystemClock.elapsedRealtime())
     private var activeBinding: SessionBinding? = null
     /** Written under [lock]; volatile so [wireForCallback] can read it without the lock. */
     @Volatile
@@ -241,7 +240,12 @@ class WebRtcSessionCoordinator(
         val localDeviceId = DeviceHelper.getDeviceId(context)
         // The usual case: a LAN heartbeat while the peer is fine. Publishing it fired a device-list
         // change (notification, lease, UI) on every heartbeat and every thaw of a frozen process.
-        if (hasActiveFeatureTransport()) return
+        if (hasActiveFeatureTransport()) {
+            synchronized(lock) { deskAsk.reset(SystemClock.elapsedRealtime()) }
+            return
+        }
+        // A fresh link: the desk is about to offer on its own schedule; the silence counts from now.
+        if (newLink) synchronized(lock) { deskAsk.reset(SystemClock.elapsedRealtime()) }
         if (!device.isPaired) return
         // A heartbeat arrives every ~10 s. Restarting on each one tore down a
         // negotiation still in progress and reset the backoff, so on any
@@ -284,29 +288,6 @@ class WebRtcSessionCoordinator(
      * initiator offers on its own, so the answering side asks it to with a
      * signed `restart_request` instead of waiting (docs/RELAY.md §4).
      */
-    /**
-     * The responder side of a desk whose own retries have run out: a live LAN link, no feature transport,
-     * nothing negotiating and nothing heard from the desktop's WebRTC side for [DESK_SILENCE_BEFORE_ASK_MS]
-     * -> the same signed `restart_request` as over the relay, at most once per [DESK_ASK_MIN_GAP_MS]. A state
-     * ask the desktop may ignore (it answers it as the deterministic initiator); never an unbounded loop.
-     * Called from the LAN heartbeat path ([onBootstrapReconnected]) after its in-flight check.
-     */
-    private fun askDeskToOfferIfSilent() {
-        val now = SystemClock.elapsedRealtime()
-        val ask = synchronized(lock) {
-            val yes = shouldAskDeskToOffer(
-                responder = !shouldRestartAfterBootstrapReconnect(DeviceHelper.getDeviceId(context), device.deviceId, false),
-                hasActiveFeatureTransport = hasActiveFeatureTransport(),
-                negotiationInFlight = negotiationInFlight(recoveryInProgress, activeAttemptId != null, now - attemptStartedAt),
-                sinceHeardMs = now - lastHeardFromDeskAt,
-                sinceAskMs = now - lastDeskAskAt,
-            )
-            if (yes) lastDeskAskAt = now
-            yes
-        }
-        if (ask) requestPeerRestart()
-    }
-
     fun requestPeerRestart() {
         val binding = sessions.currentBinding(device.deviceId) ?: return
         if (!device.isPaired || !remoteAcceptsSignal()) return
@@ -315,6 +296,29 @@ class WebRtcSessionCoordinator(
         val attemptId = synchronized(lock) { activeAttemptId ?: lastPeerAttemptId } ?: UUID.randomUUID().toString()
         publish("RestartRequested", "Asking the desktop to offer over the new bootstrap link")
         sendSignal(binding, attemptId, SignalingMessageType.RESTART_REQUEST, JSONObject())
+    }
+
+    /**
+     * The responder side of a desk whose own retries have run out: a live LAN link, no feature transport,
+     * nothing negotiating and nothing heard from the desktop's WebRTC side for [DeskAskGate.SILENCE_MS]
+     * -> the same signed `restart_request` as over the relay, at most once per [DeskAskGate.BASE_GAP_MS],
+     * doubling to [DeskAskGate.MAX_GAP_MS] while asks do not end in a feature transport. A state ask the
+     * desktop may ignore (it answers it as the deterministic initiator); never an unbounded loop. Called
+     * from the LAN heartbeat path ([onBootstrapReconnected]) after its in-flight check; not for a relay
+     * link, whose registration already asks.
+     */
+    private fun askDeskToOfferIfSilent() {
+        if (device.relayLink != null) return
+        val now = SystemClock.elapsedRealtime()
+        val ask = synchronized(lock) {
+            deskAsk.tryAsk(
+                responder = !shouldRestartAfterBootstrapReconnect(DeviceHelper.getDeviceId(context), device.deviceId, false),
+                hasActiveFeatureTransport = hasActiveFeatureTransport(),
+                negotiationInFlight = negotiationInFlight(recoveryInProgress, activeAttemptId != null, now - attemptStartedAt),
+                now = now,
+            )
+        }
+        if (ask) requestPeerRestart()
     }
 
     /**
@@ -334,6 +338,7 @@ class WebRtcSessionCoordinator(
 
     fun onLocalNetworkMoved() {
         resetLadder("network changed")
+        synchronized(lock) { deskAsk.reset(SystemClock.elapsedRealtime()) }
         val current = synchronized(lock) {
             val binding = activeBinding
             val attemptId = activeAttemptId
@@ -963,7 +968,7 @@ class WebRtcSessionCoordinator(
         require(message.fromDeviceId == device.deviceId) { "WebRTC signaling sender does not match paired device" }
         require(message.verify(device.certificate.publicKey)) { "Invalid paired identity signature on WebRTC signaling" }
         acceptRequestId(message.requestId)
-        lastHeardFromDeskAt = SystemClock.elapsedRealtime()
+        synchronized(lock) { deskAsk.heard(SystemClock.elapsedRealtime()) }
 
         when (message.messageType) {
             SignalingMessageType.OFFER -> {
@@ -2982,22 +2987,6 @@ class WebRtcSessionCoordinator(
          * until feature-ready, so an attempt it started that stalled (ICE checking for ever, no
          * FAILED) blocked the heartbeat's replacement for good.
          */
-        /** Silence from the desktop's WebRTC side before a responder phone asks it to offer (over the LAN link). */
-        const val DESK_SILENCE_BEFORE_ASK_MS = 20_000L
-
-        /** The least time between two such asks: bounded, never a reconnect loop. */
-        const val DESK_ASK_MIN_GAP_MS = 30_000L
-
-        @JvmStatic
-        fun shouldAskDeskToOffer(
-            responder: Boolean,
-            hasActiveFeatureTransport: Boolean,
-            negotiationInFlight: Boolean,
-            sinceHeardMs: Long,
-            sinceAskMs: Long,
-        ): Boolean = responder && !hasActiveFeatureTransport && !negotiationInFlight &&
-            sinceHeardMs >= DESK_SILENCE_BEFORE_ASK_MS && sinceAskMs >= DESK_ASK_MIN_GAP_MS
-
         @JvmStatic
         fun shouldResetLadderOnBootstrap(newLink: Boolean): Boolean = newLink
 
