@@ -10,7 +10,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Show on open (docs/UPDATES.md 4.1): the only thing that may ever raise update UI on the phone. Decided at most once per
- * open, from the cache; a cache older than 24 h is refreshed with a 3.5 s budget off the main thread, and an answer that
+ * open, from the cache; an empty cache or one older than 24 h is refreshed (also when it says "up to date") with a 3.5 s budget off the main thread, and an answer that
  * arrives later is stored for the next open and never shown. Skipped while anything else is up ([blocked]).
  */
 internal class UpdateOpenCoordinator(
@@ -32,15 +32,15 @@ internal class UpdateOpenCoordinator(
             return if (cached is UpdateState.Required && !blocked()) cached else null
         }
         var state = engine.state()
-        if (!offers(state)) return null
-        val age = engine.cacheAgeMs()
-        if (age == null || age > UpdateEngine.DAY_MS) {
-            // The refresh keeps running past the budget (its answer lands in the cache for the next open).
+        // The refresh is decided BEFORE looking at what the cache says: an empty or old "up to date" cache must not hide a new release
+        // until the daily background refresh. [UpdateEngine.openRefreshDue] holds the gap and the failure backoff.
+        if (engine.openRefreshDue()) {
+            // The refresh keeps running past the budget (its answer lands in the cache for the next open, never shown late).
             val job = scope.async(Dispatchers.IO) { engine.refresh(atOpen = true) }
             withTimeoutOrNull(OPEN_BUDGET_MS) { job.await() }
             state = engine.state()
-            if (!offers(state)) return null
         }
+        if (!offers(state)) return null
         return if (blocked()) null else state // the screen is not free: this open shows nothing and is not retried
     }
 

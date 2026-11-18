@@ -88,6 +88,47 @@ class UpdateOpenCoordinatorTest {
         assertNull(open(c3)) // and it still waits for a free screen
     }
 
+    private val upToDate = Signer.envelope(Signer.payload(beta = Signer.component("0.3.0", 20300)))
+    private val offerBody = Signer.envelope(Signer.payload())
+
+    @Test fun anEmptyCacheIsRefreshedAtTheFirstOpenAndTheOfferShowsWithinTheBudget() = LocalServer { LocalServer.Reply(200, body = offerBody, delayMs = 200) }.use { s ->
+        val (_, c) = coordinator(s.url, null)
+        assertTrue(open(c) is UpdateState.Available)
+        assertEquals(1, s.requests.size)
+    }
+
+    @Test fun aStaleUpToDateCacheIsRefreshedToo() = LocalServer { LocalServer.Reply(200, body = offerBody) }.use { s ->
+        val (_, c) = coordinator(s.url, upToDate); nowMs += 2 * 86_400_000L
+        store.lastChecked = NOW * 1000
+        assertTrue(open(c) is UpdateState.Available)
+        assertEquals(1, s.requests.size)
+    }
+
+    @Test fun aFreshUpToDateCacheMakesNoRequest() = LocalServer { LocalServer.Reply(200, body = offerBody) }.use { s ->
+        val (_, c) = coordinator(s.url, upToDate)
+        assertNull(open(c)); assertTrue(s.requests.isEmpty())
+    }
+
+    @Test fun automaticChecksOffMakeNoRequestEvenWithAnEmptyCache() = LocalServer { LocalServer.Reply(200, body = offerBody) }.use { s ->
+        val (_, c) = coordinator(s.url, null); store.enabled = false
+        assertNull(open(c)); assertTrue(s.requests.isEmpty())
+    }
+
+    @Test fun anOpenDoesNotHammerAfterAFailureOrWithinAMinute() = LocalServer { LocalServer.Reply(500) }.use { s ->
+        val (_, c) = coordinator(s.url, null)
+        assertNull(open(c)); assertEquals(1, s.requests.size)
+        nowMs += 30_000; assertNull(open(c)); assertEquals(1, s.requests.size) // inside the failure backoff
+        nowMs += 3_600_000; assertNull(open(c)); assertEquals(2, s.requests.size) // backoff over
+    }
+
+    @Test fun aLateAnswerForAnEmptyCacheIsKeptForTheNextOpen() = LocalServer { LocalServer.Reply(200, body = offerBody, delayMs = 4_500) }.use { s ->
+        val (_, c) = coordinator(s.url, null)
+        assertNull(open(c)) // nothing within the budget, nothing shown late
+        Thread.sleep(2_500)
+        nowMs += 61_000
+        assertTrue(open(c) is UpdateState.Available) // the next open finds it in the cache
+    }
+
     @Test fun upToDateOrEmptyCacheShowsNothing() {
         val (_, c) = coordinator("http://127.0.0.1:1/x", null)
         assertNull(open(c))

@@ -35,6 +35,18 @@ internal class UpdateEngine(
     /** The cache is old (or empty): older than 24 h. */
     fun cacheAgeMs(): Long? = store.lastChecked.takeIf { it > 0 }?.let { clock() - it }
 
+    /**
+     * Should an app open refresh the cache now? Only when it is empty or older than 24 h, not within a minute of the last try, and, after
+     * a failure, not before the failure backoff has passed (an open is never a way round it).
+     */
+    fun openRefreshDue(): Boolean {
+        val age = cacheAgeMs()
+        if (age != null && age <= DAY_MS) return false
+        val last = store.lastAttempt.takeIf { it > 0 } ?: return true
+        val gap = if (store.failStreak > 0) scheduleDelayMs(store.failStreak, Random.Default) else OPEN_GAP_MS
+        return clock() - last >= gap
+    }
+
     fun cachePayload(): Payload? {
         val env = store.cachedEnvelope ?: return null
         // Verified again on load; lastSeen 0 because the cache is the newest thing seen by definition.
@@ -134,6 +146,7 @@ internal class UpdateEngine(
 
     companion object {
         const val MANUAL_GAP_MS = 5_000L
+        const val OPEN_GAP_MS = 60_000L
         const val LATER_MS = 24 * 3_600_000L
         const val DAY_MS = LATER_MS
         private val BACKOFF_H = longArrayOf(1, 3, 6, 12, 24)
