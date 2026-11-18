@@ -43,7 +43,7 @@
     <string name="update_up_to_date_line">%1$s · Checked %2$s</string>
     <string name="update_failed">Couldn\'t check for updates. Try again later.</string>
     <string name="update_auto">Check automatically</string>
-    <string name="update_auto_line">Once a day. Sends no personal information.</string>
+    <string name="update_auto_line">Once a day. The request carries no identifier; nothing about you is sent.</string>
     <string name="update_auto_off">Automatic checks are off</string>
     <string name="update_auto_off_line">You can still check by hand.</string>
     <string name="update_wifi">Only on Wi-Fi</string>

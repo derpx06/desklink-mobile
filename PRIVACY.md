@@ -69,7 +69,7 @@ DeskLink relay.
   data is sent with this request.
 - **Update check.** Once a day while the app runs, and when you open it if the last answer is old, DeskLink fetches a small
   signed file (`latest.json`) from the project's update server over HTTPS to learn whether a newer version exists. The
-  request carries no name, device ID, pairing data, account or cookies; only DeskLink's version in the `User-Agent`. The
+  request carries no name, device ID, identifier, pairing data, account or cookies; only DeskLink's version in the `User-Agent`. A random install number stays on this phone only, to decide your staged-rollout bucket on the device; it is never sent. The
   server operator (Firebase Hosting, Google) can see your network address and the time, as any website can. DeskLink
   ignores anything not signed by the project key. It shows a prompt only when you open the app, and never installs
   anything by itself. Turn it off in Settings > About; by default it only checks on Wi-Fi. Builds without an update
