@@ -80,6 +80,9 @@ class WebRtcSessionCoordinator(
     private var activeAttemptId: String? = null
     /** The desktop's last offered attempt, named in a restart request so it is not taken for stale. */
     private var lastPeerAttemptId: String? = null
+    /** Last signed message heard from the desktop's WebRTC side, and when this phone last asked it to offer. */
+    @Volatile private var lastHeardFromDeskAt = SystemClock.elapsedRealtime()
+    @Volatile private var lastDeskAskAt = Long.MIN_VALUE / 2
     private var activeBinding: SessionBinding? = null
     /** Written under [lock]; volatile so [wireForCallback] can read it without the lock. */
     @Volatile
@@ -256,6 +259,7 @@ class WebRtcSessionCoordinator(
             )
         ) {
             beginIfSupported()
+            askDeskToOfferIfSilent()
             return
         }
         withIceServers { iceServers ->
@@ -280,6 +284,29 @@ class WebRtcSessionCoordinator(
      * initiator offers on its own, so the answering side asks it to with a
      * signed `restart_request` instead of waiting (docs/RELAY.md §4).
      */
+    /**
+     * The responder side of a desk whose own retries have run out: a live LAN link, no feature transport,
+     * nothing negotiating and nothing heard from the desktop's WebRTC side for [DESK_SILENCE_BEFORE_ASK_MS]
+     * -> the same signed `restart_request` as over the relay, at most once per [DESK_ASK_MIN_GAP_MS]. A state
+     * ask the desktop may ignore (it answers it as the deterministic initiator); never an unbounded loop.
+     * Called from the LAN heartbeat path ([onBootstrapReconnected]) after its in-flight check.
+     */
+    private fun askDeskToOfferIfSilent() {
+        val now = SystemClock.elapsedRealtime()
+        val ask = synchronized(lock) {
+            val yes = shouldAskDeskToOffer(
+                responder = !shouldRestartAfterBootstrapReconnect(DeviceHelper.getDeviceId(context), device.deviceId, false),
+                hasActiveFeatureTransport = hasActiveFeatureTransport(),
+                negotiationInFlight = negotiationInFlight(recoveryInProgress, activeAttemptId != null, now - attemptStartedAt),
+                sinceHeardMs = now - lastHeardFromDeskAt,
+                sinceAskMs = now - lastDeskAskAt,
+            )
+            if (yes) lastDeskAskAt = now
+            yes
+        }
+        if (ask) requestPeerRestart()
+    }
+
     fun requestPeerRestart() {
         val binding = sessions.currentBinding(device.deviceId) ?: return
         if (!device.isPaired || !remoteAcceptsSignal()) return
@@ -936,6 +963,7 @@ class WebRtcSessionCoordinator(
         require(message.fromDeviceId == device.deviceId) { "WebRTC signaling sender does not match paired device" }
         require(message.verify(device.certificate.publicKey)) { "Invalid paired identity signature on WebRTC signaling" }
         acceptRequestId(message.requestId)
+        lastHeardFromDeskAt = SystemClock.elapsedRealtime()
 
         when (message.messageType) {
             SignalingMessageType.OFFER -> {
@@ -2492,6 +2520,16 @@ class WebRtcSessionCoordinator(
         }
     }
 
+    /** A scheduled recovery that will not start an attempt: the heartbeat may start one again. */
+    internal fun abandonPendingRecovery() {
+        synchronized(lock) {
+            if (activeAttemptId == null) {
+                recoveryInProgress = false
+                device.setWebRtcRecoveryPending(false)
+            }
+        }
+    }
+
     private fun scheduleRecovery(
         binding: SessionBinding,
         attemptId: String,
@@ -2541,7 +2579,12 @@ class WebRtcSessionCoordinator(
             pendingInitiation.schedule(Runnable {
                 val current = sessions.currentBinding(device.deviceId)
                 recovery.release()
-                if (current == null || !sessions.isCurrent(current)) return@Runnable
+                if (current == null || !sessions.isCurrent(current)) {
+                    // Nothing will start: the flags set when this recovery was scheduled must not outlive it,
+                    // or `negotiationInFlight` blocks every heartbeat start for good.
+                    abandonPendingRecovery()
+                    return@Runnable
+                }
                 if (synchronized(lock) { closed || activeAttemptId != null }) return@Runnable
                 // Fetched before the lock: the relay's TURN grant may take 2 s.
                 val iceServers = runCatching { iceServersForPath() }
@@ -2939,6 +2982,22 @@ class WebRtcSessionCoordinator(
          * until feature-ready, so an attempt it started that stalled (ICE checking for ever, no
          * FAILED) blocked the heartbeat's replacement for good.
          */
+        /** Silence from the desktop's WebRTC side before a responder phone asks it to offer (over the LAN link). */
+        const val DESK_SILENCE_BEFORE_ASK_MS = 20_000L
+
+        /** The least time between two such asks: bounded, never a reconnect loop. */
+        const val DESK_ASK_MIN_GAP_MS = 30_000L
+
+        @JvmStatic
+        fun shouldAskDeskToOffer(
+            responder: Boolean,
+            hasActiveFeatureTransport: Boolean,
+            negotiationInFlight: Boolean,
+            sinceHeardMs: Long,
+            sinceAskMs: Long,
+        ): Boolean = responder && !hasActiveFeatureTransport && !negotiationInFlight &&
+            sinceHeardMs >= DESK_SILENCE_BEFORE_ASK_MS && sinceAskMs >= DESK_ASK_MIN_GAP_MS
+
         @JvmStatic
         fun shouldResetLadderOnBootstrap(newLink: Boolean): Boolean = newLink
 
