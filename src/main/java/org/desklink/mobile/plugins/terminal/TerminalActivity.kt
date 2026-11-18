@@ -518,7 +518,7 @@ class TerminalActivity : AppCompatActivity() {
             Column(Modifier.fillMaxSize()) {
                 TerminalHeader(
                     name = stringResource(R.string.terminal_new_terminal),
-                    detail = deskName(),
+                    detail = listOf(deskName()),
                     status = if (connected) null else stringResource(R.string.terminal_status_reconnecting),
                     size = null,
                     backLabel = stringResource(R.string.terminal_back_to_sessions),
@@ -628,7 +628,7 @@ class TerminalActivity : AppCompatActivity() {
             Column(Modifier.fillMaxSize()) {
                 TerminalHeader(
                     name = name,
-                    detail = listOfNotNull(session?.cwd?.takeIf { it.isNotBlank() }, deskName(), rttMs?.takeIf { subtitle == null }?.let { stringResource(R.string.home_meta_rtt, it.toInt()) }).joinToString(" · "),
+                    detail = listOfNotNull(session?.cwd?.takeIf { it.isNotBlank() }, deskName(), rttMs?.takeIf { subtitle == null }?.let { stringResource(R.string.home_meta_rtt, it.toInt()) }),
                     status = subtitle,
                     size = session?.takeIf { it.cols > 0 && it.rows > 0 }?.let { stringResource(R.string.terminal_session_size, it.cols, it.rows) },
                     backLabel = stringResource(R.string.terminal_back_to_sessions),
@@ -1202,7 +1202,7 @@ private const val ARROW_REPEAT_MS = 50L
  * ([menu] draws the button and its dropdown). The status line is a live region, so a reconnect or an exit is announced; the round trip in the detail is not.
  */
 @Composable
-internal fun TerminalHeader(name: String, detail: String, status: String?, size: String?, backLabel: String, onBack: () -> Unit, menu: @Composable () -> Unit) {
+internal fun TerminalHeader(name: String, detail: List<String>, status: String?, size: String?, backLabel: String, onBack: () -> Unit, menu: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 4.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
             Icon(painterResource(R.drawable.sym_arrow_back), contentDescription = backLabel, tint = TermText)
@@ -1211,14 +1211,14 @@ internal fun TerminalHeader(name: String, detail: String, status: String?, size:
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             // Name and detail read as one item and are not live: the detail carries the round trip, refreshed every 2 s.
             Column(Modifier.semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(name, fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(detail.split(" · ").joinToString(" · ") { org.desklink.mobile.ui.compose.ltrRun(it) }, fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+                Text(org.desklink.mobile.ui.compose.isolatedRun(name), fontFamily = MonoFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TermText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(org.desklink.mobile.ui.compose.detailLine(detail), fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
             }
             // Reconnecting, ended, exited: a line of its own, so a long folder never pushes it out of sight, and the only live part.
             status?.let { Text(it, fontSize = 12.sp, color = TermCoralText, maxLines = 2, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         }
         // At the largest text sizes the grid size is dropped: it squeezed the name and the status into a word per line.
-        size?.takeIf { androidx.compose.ui.platform.LocalDensity.current.fontScale < 1.5f }?.let { Text(org.desklink.mobile.ui.compose.ltrRun(it), fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1) }
+        size?.takeIf { androidx.compose.ui.platform.LocalDensity.current.fontScale < org.desklink.mobile.ui.compose.TextScale.HUGE }?.let { Text(org.desklink.mobile.ui.compose.ltrRun(it), fontFamily = MonoFamily, fontSize = 11.sp, color = TermDim, maxLines = 1) }
         menu()
     }
 }

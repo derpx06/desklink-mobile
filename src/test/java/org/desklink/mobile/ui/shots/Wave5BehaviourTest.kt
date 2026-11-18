@@ -112,7 +112,7 @@ class Wave5BehaviourTest {
     @Test fun terminalHeaderAnnouncesOnlyItsStatus() {
         compose.setContent {
             DeskLinkFixedTheme(compose.activity, true) {
-                org.desklink.mobile.plugins.terminal.TerminalHeader("build", "src · arch-desk · 12 ms", "Reconnecting", "80x24", "Back", {}, {})
+                org.desklink.mobile.plugins.terminal.TerminalHeader("build", listOf("src", "arch-desk", "12 ms"), "Reconnecting", "80x24", "Back", {}, {})
             }
         }
         val live = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)

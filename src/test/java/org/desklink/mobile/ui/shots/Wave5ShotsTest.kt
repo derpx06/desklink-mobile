@@ -150,8 +150,8 @@ abstract class Wave5Shots : ShotTest() {
 
     @Test fun terminalHeader() = shoot("w5-terminal-header") {
         Column(Modifier.fillMaxSize().background(Color(0xFF0E0F11)), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            TerminalHeader("zsh", "~/desklink-mobile · $desk · 12 ms", null, "80×38", "Back to sessions", {}) {}
-            TerminalHeader("Claude Code with a long name that must not push the size off", "~/a/very/deep/folder/that/needs/a/middle/ellipsis/to/fit · $desk", "Reconnecting…", "120×40", "Back to sessions", {}) {}
+            TerminalHeader("zsh", listOf("~/desklink-mobile", desk, "12 ms"), null, "80×38", "Back to sessions", {}) {}
+            TerminalHeader("Claude Code with a long name that must not push the size off", listOf("~/a/very/deep/folder/that/needs/a/middle/ellipsis/to/fit", desk), "Reconnecting…", "120×40", "Back to sessions", {}) {}
         }
     }
 

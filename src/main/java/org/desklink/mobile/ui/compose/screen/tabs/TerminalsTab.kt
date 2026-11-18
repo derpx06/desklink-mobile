@@ -232,7 +232,7 @@ fun TerminalsTab(
     }
     val panel = terminalsPanel(client != null, gate, state, loadTimedOut)
     // Terminal access turned on at the computer while this tab shows it off: the desk's settings report says so; load the list.
-    val deskPlugin = remember(deviceId) { DeskLinkApplication.getInstance().getDevice(deviceId)?.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java) }
+    val deskPlugin = DeskLinkApplication.getInstance().getDevice(deviceId)?.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)
     val deskSaysOn = deskPlugin?.let { @Suppress("UNUSED_VARIABLE") val c = it.asksChanged; it.reportedOn("terminalAccess") } == true
     LaunchedEffect(deskSaysOn, state.notAllowed) {
         if (listAgainWhenDeskReportsAccess(deskSaysOn, state.notAllowed)) { listTries++; client?.refresh() }
@@ -285,7 +285,7 @@ fun TerminalsTab(
         )
     }
 
-    val asker = remember(deviceId) { DeskLinkApplication.getInstance().getDevice(deviceId)?.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java) }
+    val asker = DeskLinkApplication.getInstance().getDevice(deviceId)?.getPlugin(org.desklink.mobile.plugins.desksettings.DeskSettingsPlugin::class.java)
     val ended = stringResource(R.string.terminal_snack_ended)
     val needsLink = stringResource(R.string.terminal_needs_link, deskName)
     TerminalsContent(

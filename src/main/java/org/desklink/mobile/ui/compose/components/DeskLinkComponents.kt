@@ -253,7 +253,7 @@ fun EmptyState(
         modifier
             .fillMaxWidth()
             // Less air at large text, so the words are not pushed under a floating button.
-            .padding(horizontal = 32.dp, vertical = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.4f) 12.dp else 40.dp),
+            .padding(horizontal = 32.dp, vertical = if (androidx.compose.ui.platform.LocalDensity.current.fontScale > org.desklink.mobile.ui.compose.TextScale.LARGE) 12.dp else 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
